@@ -1,6 +1,7 @@
 package fr.vriege.anilib.configuration.standard;
 
 import fr.vriege.anilib.feature.library.bundle.LibraryPlugin;
+import fr.vriege.anilib.feature.localsource.bundle.LocalSourcePlugin;
 import fr.vriege.anilib.kernel.StartedAnilib;
 import fr.vriege.anilib.kernel.runtime.DefaultPluginEngine;
 
@@ -14,6 +15,9 @@ public final class StandardAnilib {
 
     public static StartedAnilib start(Path dataDirectory) {
         Path libraryFile = dataDirectory.toAbsolutePath().normalize().resolve("library.anilib");
-        return new DefaultPluginEngine().start(List.of(new LibraryPlugin(libraryFile)));
+        Path localContent = dataDirectory.toAbsolutePath().normalize().resolve("local-content");
+        return new DefaultPluginEngine().start(List.of(
+                new LibraryPlugin(libraryFile),
+                new LocalSourcePlugin(localContent)));
     }
 }
