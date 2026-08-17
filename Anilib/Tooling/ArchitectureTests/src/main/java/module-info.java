@@ -1,4 +1,5 @@
 module fr.vriege.anilib.tooling.archtests {
+    requires fr.vriege.anilib.tooling.javaquality;
     requires java.desktop;
     requires jdk.httpserver;
     requires fr.vriege.anilib.framework.http.api;

@@ -47,6 +47,7 @@ public final class ArchitectureTestMain {
         assertions += CoverCacheTest.run();
         assertions += LibraryPresentationTest.run();
         assertions += SourceExtensionSdkTest.run();
+        assertions += SourceExtensionIsolationRuleTest.run();
         assertions += DiscoveryTest.run();
         assertions += HttpFrameworkTest.run();
         System.out.println("Architecture tests: " + assertions + " assertions passed.");

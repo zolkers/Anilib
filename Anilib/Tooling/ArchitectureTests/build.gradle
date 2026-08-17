@@ -3,6 +3,7 @@ plugins {
 }
 
 dependencies {
+    implementation project(':Anilib:Tooling:JavaQuality')
     implementation project(':Anilib:Foundation')
     implementation project(':Anilib:Kernel:Api')
     implementation project(':Anilib:Kernel:Runtime')
