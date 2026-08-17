@@ -2,7 +2,6 @@ package fr.vriege.anilib.feature.reader.runtime;
 
 import fr.vriege.anilib.feature.reader.ReaderException;
 import fr.vriege.anilib.feature.reader.ReaderPolicy;
-import fr.vriege.anilib.feature.source.PagedSource;
 import fr.vriege.anilib.feature.source.SourcePageResource;
 
 import java.util.LinkedHashMap;
@@ -12,10 +11,11 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
+import java.util.function.Function;
 
 /** Per-session bounded LRU cache and asynchronous neighboring-page loader. */
 final class ReaderPagePipeline implements AutoCloseable {
-    private final PagedSource source;
+    private final Function<SourcePageResource, byte[]> pageReader;
     private final List<SourcePageResource> pages;
     private final ReaderPolicy policy;
     private final Executor executor;
@@ -25,11 +25,11 @@ final class ReaderPagePipeline implements AutoCloseable {
     private boolean closed;
 
     ReaderPagePipeline(
-            PagedSource source,
+            Function<SourcePageResource, byte[]> pageReader,
             List<SourcePageResource> pages,
             ReaderPolicy policy,
             Executor executor) {
-        this.source = Objects.requireNonNull(source, "source must not be null");
+        this.pageReader = Objects.requireNonNull(pageReader, "pageReader must not be null");
         this.pages = List.copyOf(pages);
         this.policy = Objects.requireNonNull(policy, "policy must not be null");
         this.executor = Objects.requireNonNull(executor, "executor must not be null");
@@ -87,8 +87,8 @@ final class ReaderPagePipeline implements AutoCloseable {
                 throw new ReaderException("Reader page " + index + " exceeds the configured size limit");
             }
             byte[] bytes = Objects.requireNonNull(
-                    source.readPage(resource),
-                    "paged source returned null page bytes").clone();
+                    pageReader.apply(resource),
+                    "page reader returned null page bytes").clone();
             if (bytes.length > policy.maximumPageBytes()) {
                 throw new ReaderException("Reader page " + index + " exceeds the configured size limit");
             }

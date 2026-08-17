@@ -6,6 +6,9 @@ import fr.vriege.anilib.feature.library.LibraryItem;
 import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.library.LibraryOrigin;
 import fr.vriege.anilib.feature.reader.ReaderException;
+import fr.vriege.anilib.feature.reader.ReaderContent;
+import fr.vriege.anilib.feature.reader.ReaderContentProvider;
+import fr.vriege.anilib.feature.reader.ReaderContentRegistrar;
 import fr.vriege.anilib.feature.reader.ReaderPolicy;
 import fr.vriege.anilib.feature.reader.ReaderService;
 import fr.vriege.anilib.feature.reader.ReaderSession;
@@ -22,18 +25,20 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /** Shared reader engine resolving library origins into validated paged sessions. */
-public final class DefaultReaderService implements ReaderService, AutoCloseable {
+public final class DefaultReaderService implements ReaderService, ReaderContentRegistrar, AutoCloseable {
     private final SourceRegistry sources;
     private final LibraryCatalog library;
     private final ReaderPolicy policy;
     private final Clock clock;
     private final ExecutorService pageExecutor;
     private final Set<DefaultReaderSession> sessions = new HashSet<>();
+    private ReaderContentProvider contentProvider;
     private boolean closed;
 
     public DefaultReaderService(SourceRegistry sources, LibraryCatalog library, ReaderPolicy policy) {
@@ -57,11 +62,17 @@ public final class DefaultReaderService implements ReaderService, AutoCloseable 
     public synchronized boolean canOpen(LibraryItemId libraryItemId) {
         Objects.requireNonNull(libraryItemId, "libraryItemId must not be null");
         ensureOpen();
-        return library.find(libraryItemId)
-                .flatMap(LibraryItem::origin)
-                .flatMap(origin -> sources.find(SourceId.of(origin.sourceId())))
-                .filter(PagedSource.class::isInstance)
-                .isPresent();
+        Optional<LibraryOrigin> origin = library.find(libraryItemId).flatMap(LibraryItem::origin);
+        if (origin.isEmpty()) {
+            return false;
+        }
+        SourceCatalogueItemId itemId = sourceItemId(origin.orElseThrow());
+        if (contentProvider != null
+                && contentProvider.find(itemId, preferredContentId(libraryItemId)).isPresent()) {
+            return true;
+        }
+        return fallbackAllowed()
+                && sources.find(itemId.sourceId()).filter(PagedSource.class::isInstance).isPresent();
     }
 
     @Override
@@ -72,18 +83,33 @@ public final class DefaultReaderService implements ReaderService, AutoCloseable 
                 .orElseThrow(() -> new ReaderException("Library item was not found"));
         LibraryOrigin origin = item.origin()
                 .orElseThrow(() -> new ReaderException("Library item has no source origin"));
-        Source source = sources.find(SourceId.of(origin.sourceId()))
-                .orElseThrow(() -> new ReaderException("Library source is not installed"));
-        if (!(source instanceof PagedSource pagedSource)) {
-            throw new ReaderException("Library source does not provide paged content");
+        SourceCatalogueItemId sourceItemId = sourceItemId(origin);
+        ReaderContentProvider provider = contentProvider;
+        Optional<ReaderContent> alternate = provider == null
+                ? Optional.empty()
+                : provider.find(sourceItemId, item.progress().map(progress -> progress.contentId()));
+        SourceContentUnit unit;
+        List<SourcePageResource> pages;
+        java.util.function.Function<SourcePageResource, byte[]> pageReader;
+        if (alternate.isPresent()) {
+            ReaderContent content = alternate.orElseThrow();
+            unit = content.contentUnit();
+            pages = content.pages();
+            pageReader = provider::readPage;
+        } else {
+            if (!fallbackAllowed()) {
+                throw new ReaderException("This title is not available while offline mode is enabled");
+            }
+            Source source = sources.find(sourceItemId.sourceId())
+                    .orElseThrow(() -> new ReaderException("Library source is not installed"));
+            if (!(source instanceof PagedSource pagedSource)) {
+                throw new ReaderException("Library source does not provide paged content");
+            }
+            List<SourceContentUnit> units = validatedUnits(pagedSource, sourceItemId);
+            unit = selectUnit(item, units);
+            pages = validatedPages(pagedSource, unit);
+            pageReader = pagedSource::readPage;
         }
-
-        SourceCatalogueItemId sourceItemId = new SourceCatalogueItemId(
-                source.descriptor().id(),
-                origin.sourceItemKey());
-        List<SourceContentUnit> units = validatedUnits(pagedSource, sourceItemId);
-        SourceContentUnit unit = selectUnit(item, units);
-        List<SourcePageResource> pages = validatedPages(pagedSource, unit);
         int initialPage = item.progress()
                 .filter(progress -> progress.contentId().equals(unit.id().value()))
                 .map(progress -> (int) Math.min(progress.position(), pages.size() - 1L))
@@ -93,7 +119,7 @@ public final class DefaultReaderService implements ReaderService, AutoCloseable 
                 unit.id().value(),
                 clock.instant(),
                 initialPage)));
-        ReaderPagePipeline pipeline = new ReaderPagePipeline(pagedSource, pages, policy, pageExecutor);
+        ReaderPagePipeline pipeline = new ReaderPagePipeline(pageReader, pages, policy, pageExecutor);
         DefaultReaderSession[] holder = new DefaultReaderSession[1];
         DefaultReaderSession session = new DefaultReaderSession(
                 library,
@@ -160,6 +186,37 @@ public final class DefaultReaderService implements ReaderService, AutoCloseable 
 
     private synchronized void removeSession(DefaultReaderSession session) {
         sessions.remove(session);
+    }
+
+    @Override
+    public synchronized AutoCloseable register(ReaderContentProvider provider) {
+        Objects.requireNonNull(provider, "provider must not be null");
+        ensureOpen();
+        if (contentProvider != null) {
+            throw new ReaderException("A Reader content provider is already registered");
+        }
+        contentProvider = provider;
+        return () -> unregister(provider);
+    }
+
+    private synchronized void unregister(ReaderContentProvider provider) {
+        if (contentProvider == provider) {
+            contentProvider = null;
+        }
+    }
+
+    private Optional<String> preferredContentId(LibraryItemId libraryItemId) {
+        return library.find(libraryItemId)
+                .flatMap(LibraryItem::progress)
+                .map(progress -> progress.contentId());
+    }
+
+    private boolean fallbackAllowed() {
+        return contentProvider == null || contentProvider.sourceFallbackAllowed();
+    }
+
+    private static SourceCatalogueItemId sourceItemId(LibraryOrigin origin) {
+        return new SourceCatalogueItemId(SourceId.of(origin.sourceId()), origin.sourceItemKey());
     }
 
     private void ensureOpen() {

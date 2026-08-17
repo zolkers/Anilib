@@ -23,6 +23,7 @@ public final class ReaderPlugin implements AnilibPlugin {
             .requires(SourceCapabilities.REGISTRY)
             .requires(LibraryCapabilities.CATALOG)
             .provides(ReaderCapabilities.SERVICE)
+            .provides(ReaderCapabilities.CONTENT_REGISTRAR)
             .provides(ReaderUiCapabilities.PRESENTATION)
             .build();
 
@@ -47,6 +48,7 @@ public final class ReaderPlugin implements AnilibPlugin {
         LibraryCatalog library = context.require(LibraryCapabilities.CATALOG);
         DefaultReaderService service = context.own(new DefaultReaderService(sources, library, policy));
         context.publish(ReaderCapabilities.SERVICE, service);
+        context.publish(ReaderCapabilities.CONTENT_REGISTRAR, service);
         context.publish(ReaderUiCapabilities.PRESENTATION, new DefaultReaderPresentation(service));
     }
 }
