@@ -1,0 +1,6 @@
+dependencies {
+    implementation project(':Anilib:Foundation')
+    implementation project(':Anilib:Kernel:Api')
+    implementation project(':Anilib:Features:CoverCache:Api')
+    implementation project(':Anilib:Features:CoverCache:Runtime')
+}
