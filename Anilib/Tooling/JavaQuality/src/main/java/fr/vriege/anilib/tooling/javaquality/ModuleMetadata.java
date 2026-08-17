@@ -10,6 +10,7 @@ public record ModuleMetadata(
         Layer layer,
         String role,
         String owner,
+        Language language,
         List<String> dependencies,
         Path directory,
         Path manifestPath) {
@@ -19,9 +20,16 @@ public record ModuleMetadata(
         Objects.requireNonNull(layer, "layer must not be null");
         Objects.requireNonNull(role, "role must not be null");
         Objects.requireNonNull(owner, "owner must not be null");
+        Objects.requireNonNull(language, "language must not be null");
         dependencies = List.copyOf(dependencies);
         Objects.requireNonNull(directory, "directory must not be null");
         Objects.requireNonNull(manifestPath, "manifestPath must not be null");
+    }
+
+    public enum Language {
+        JAVA,
+        JAVA_KOTLIN,
+        KOTLIN
     }
 
     public enum Layer {

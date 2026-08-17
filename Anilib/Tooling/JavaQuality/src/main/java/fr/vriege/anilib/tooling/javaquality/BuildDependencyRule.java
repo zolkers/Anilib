@@ -7,16 +7,29 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Rejects third-party libraries and build plugins. */
+/** Rejects dependencies outside exact platform-UI allowlists. */
 public final class BuildDependencyRule implements AnilibJavaRule {
     private static final Pattern DEPENDENCY = Pattern.compile(
             "^\\s*(?:api|implementation|compileOnly|runtimeOnly|testImplementation|testRuntimeOnly)\\s+(.+)$");
-    private static final Pattern PLUGIN = Pattern.compile("^\\s*id\\s+['\"]([^'\"]+)['\"].*$");
+    private static final Pattern PLUGIN = Pattern.compile(
+            "^\\s*id\\s+['\"]([^'\"]+)['\"](?:\\s+version\\s+['\"]([^'\"]+)['\"])?\\s*$");
+    private static final Pattern REPOSITORY = Pattern.compile("^\\s*(google|mavenCentral)\\(\\)\\s*$");
     private static final Set<String> ALLOWED_PLUGINS = Set.of("application", "base", "java", "java-library");
+    private static final String DESKTOP_BUILD = "Anilib/Platforms/Desktop/build.gradle";
+    private static final Map<String, Set<String>> ALLOWED_EXTERNAL_DEPENDENCIES = Map.of(
+            DESKTOP_BUILD,
+            Set.of("compose.desktop.currentOs", "compose.material3", "compose.materialIconsExtended"));
+    private static final Map<String, Set<String>> ALLOWED_EXTERNAL_PLUGINS = Map.of(
+            DESKTOP_BUILD,
+            Set.of(
+                    "org.jetbrains.kotlin.jvm@2.4.10",
+                    "org.jetbrains.kotlin.plugin.compose@2.4.10",
+                    "org.jetbrains.compose@1.11.0"));
 
     public BuildDependencyRule() {
     }
@@ -49,14 +62,31 @@ public final class BuildDependencyRule implements AnilibJavaRule {
             String line,
             List<Diagnostic> diagnostics) {
         Matcher dependency = DEPENDENCY.matcher(line);
-        if (dependency.matches() && !dependency.group(1).startsWith("project(")) {
+        String normalizedPath = path.toString().replace('\\', '/');
+        if (dependency.matches()
+                && !dependency.group(1).startsWith("project(")
+                && !allowed(ALLOWED_EXTERNAL_DEPENDENCIES, normalizedPath, dependency.group(1))) {
             diagnostics.add(new Diagnostic(name(), path, lineNumber,
-                    "Only Anilib project dependencies are allowed"));
+                    "Dependency is not in the platform UI allowlist"));
         }
         Matcher plugin = PLUGIN.matcher(line);
-        if (plugin.matches() && !ALLOWED_PLUGINS.contains(plugin.group(1))) {
-            diagnostics.add(new Diagnostic(name(), path, lineNumber,
-                    "External build plugin is forbidden: " + plugin.group(1)));
+        if (plugin.matches()) {
+            String pluginId = plugin.group(1);
+            String pluginKey = pluginId + "@" + plugin.group(2);
+            if (!ALLOWED_PLUGINS.contains(pluginId)
+                    && !allowed(ALLOWED_EXTERNAL_PLUGINS, normalizedPath, pluginKey)) {
+                diagnostics.add(new Diagnostic(name(), path, lineNumber,
+                        "External build plugin or version is forbidden: " + pluginKey));
+            }
         }
+        Matcher repository = REPOSITORY.matcher(line);
+        if (repository.matches() && !normalizedPath.equals(DESKTOP_BUILD)) {
+            diagnostics.add(new Diagnostic(name(), path, lineNumber,
+                    "Dependency repositories are restricted to allowlisted platform UI builds"));
+        }
+    }
+
+    private static boolean allowed(Map<String, Set<String>> allowlist, String path, String value) {
+        return allowlist.getOrDefault(path, Set.of()).contains(value);
     }
 }

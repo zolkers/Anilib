@@ -13,6 +13,7 @@ public final class AnilibJavaRuleRegistry {
                 new ImportPolicyRule(),
                 new ModuleArchitectureRule(),
                 new BuildDependencyRule(),
+                new KotlinSourceRule(),
                 new SourceFormatRule());
     }
 }

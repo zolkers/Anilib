@@ -9,7 +9,8 @@ The standard registry currently enforces:
 - JDK/Anilib-only imports and no wildcard imports;
 - complete module manifests, known direct dependencies, and inward layer flow;
 - explicit manifest dependencies for cross-module Java imports;
-- no third-party Gradle libraries or plugins;
+- exact per-platform UI dependency and compiler-plugin allowlists;
+- Kotlin platform source packages, imports, layout, and formatting;
 - a compact whitespace and line-length baseline.
 
 Run it directly or through the full gate:

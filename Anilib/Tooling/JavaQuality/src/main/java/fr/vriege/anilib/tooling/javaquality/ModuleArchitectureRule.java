@@ -44,8 +44,13 @@ public final class ModuleArchitectureRule implements AnilibJavaRule {
             if (modules.putIfAbsent(module.id(), module) != null) {
                 diagnostics.add(diagnostic(module, "Duplicate module id: " + module.id()));
             }
-            if (!Files.isRegularFile(module.directory().resolve("src/main/java/module-info.java"))) {
+            if (module.language() == ModuleMetadata.Language.JAVA
+                    && !Files.isRegularFile(module.directory().resolve("src/main/java/module-info.java"))) {
                 diagnostics.add(diagnostic(module, "Source-owning module must declare module-info.java"));
+            }
+            if (module.language() != ModuleMetadata.Language.JAVA
+                    && module.layer() != ModuleMetadata.Layer.PLATFORM) {
+                diagnostics.add(diagnostic(module, "Kotlin is restricted to platform UI adapters"));
             }
         }
         return modules;

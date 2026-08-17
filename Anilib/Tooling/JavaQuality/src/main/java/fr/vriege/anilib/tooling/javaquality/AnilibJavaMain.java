@@ -21,7 +21,8 @@ public final class AnilibJavaMain {
 
         if (diagnostics.isEmpty()) {
             System.out.println("AnilibJava: " + repository.javaSources().size()
-                    + " Java sources in " + repository.modules().size() + " modules passed.");
+                    + " Java and " + repository.kotlinSources().size()
+                    + " Kotlin sources in " + repository.modules().size() + " modules passed.");
             return;
         }
 
