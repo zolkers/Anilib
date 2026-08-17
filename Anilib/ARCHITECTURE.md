@@ -76,6 +76,16 @@ transactional installation, and owns the returned lifecycle handle. Duplicate
 IDs or incompatible Source API versions therefore fail before product startup;
 rollback and shutdown remove registrations automatically.
 
+An external source Bundle declares its stable source identity and sensitive
+permissions before graph validation. The Kernel supplies its factory with a
+`SourceExtensionContext` containing only granted capabilities. Network access
+is wrapped with exact scheme, host, and port checks; redirects are surfaced so
+each hop is authorized independently. AnilibJava additionally confines modules
+with `layer=EXTENSION` to the Source/HTTP contracts and rejects direct network,
+filesystem, reflection, Kernel, or raw Network imports. This is a capability
+boundary for product-selected modules; arbitrary untrusted bytecode is not
+loaded or claimed to be safely sandboxed.
+
 Discovery is a separate vertical feature over the Source registry and Library
 catalog. Its Java service owns paging, global and per-source search, validated
 filters, durable source preferences, duplicate-safe library admission, and

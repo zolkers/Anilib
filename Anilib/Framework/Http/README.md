@@ -20,5 +20,7 @@ applied cookies; file names are SHA-256 digests and writes use atomic moves.
 Desktop selects `JdkHttpTransport`, backed by the Java 21 HTTP client and HTTP/2.
 Android selects `UrlConnectionHttpTransport`, which is available in its native
 runtime. Both use the same policy engine and 16 MiB response safety limit. A
-future platform can supply another `HttpTransport` without changing a source or
+redirect response is returned to the caller instead of followed automatically,
+which lets a permission-scoped source client authorize every origin hop. A future
+platform can supply another `HttpTransport` without changing a source or
 duplicating cookies, cache, or rate-limit behavior.

@@ -34,7 +34,7 @@ modularity behind the UI; Aniyomi remains the product reference.
 - [x] stable source extension SDK
 - [x] JDK HTTP client, cookies, rate limits, and cache contracts
 - [x] browse, search, filters, migration, and source preferences
-- [ ] isolated source bundles with explicit permissions
+- [x] isolated source bundles with explicit permissions
 
 ## Phase 3 — reader and downloads
 

@@ -13,6 +13,8 @@ The service provides:
 - duplicate-safe admission into Library with a stable source origin;
 - migration between sources while preserving library identity, categories,
   favourite state, progress, and history.
+- installed anime/manga extension lists with declared permission and exact
+  network-origin details.
 
 Discovery does not install or scan extensions. Product configurations still
 select source Bundles explicitly, and the Source registry remains the only
