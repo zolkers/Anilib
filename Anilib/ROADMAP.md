@@ -3,6 +3,13 @@
 The target is broad product parity with Aniyomi, delivered as removable vertical
 features rather than a port of its internal Kotlin/Android layering.
 
+Product parity means matching Aniyomi's visible information architecture,
+navigation, screen hierarchy, labels, actions, states, settings, and behavior as
+closely as each platform permits. Anilib may adapt window layout for desktop,
+but it must not simplify or reinterpret an Aniyomi workflow merely because its
+internal implementation is different. The refactor applies to ownership and
+modularity behind the UI; Aniyomi remains the product reference.
+
 ## Phase 0 — architecture bootstrap
 
 - [x] Java 21 multi-module core with allowlisted platform UI libraries only
@@ -25,7 +32,7 @@ features rather than a port of its internal Kotlin/Android layering.
 ## Phase 2 — sources and discovery
 
 - [x] stable source extension SDK
-- [ ] JDK HTTP client, cookies, rate limits, and cache contracts
+- [x] JDK HTTP client, cookies, rate limits, and cache contracts
 - [ ] browse, search, filters, migration, and source preferences
 - [ ] isolated source bundles with explicit permissions
 

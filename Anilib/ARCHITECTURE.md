@@ -76,6 +76,14 @@ transactional installation, and owns the returned lifecycle handle. Duplicate
 IDs or incompatible Source API versions therefore fail before product startup;
 rollback and shutdown remove registrations automatically.
 
+HTTP is split at the platform boundary. Framework contracts own immutable
+requests and responses plus cookie, cache, rate-limit, and low-level transport
+ports. One shared policy engine applies those contracts. Desktop injects the
+Java 21 HTTP/2 transport; Android injects its native URL-connection transport.
+The Network Bundle publishes the resulting capabilities, so source code never
+imports either platform mechanism and configurations still select one explicit
+composition unit.
+
 ## Product lifecycle
 
 1. A configuration selects feature Bundles.
@@ -86,9 +94,9 @@ rollback and shutdown remove registrations automatically.
 
 Desktop and Android render the same shared Java presentation models through one
 adaptive Compose Multiplatform and Material 3 shell. Each product has a thin
-launcher for its own lifecycle, window, and storage directory. Kotlin, Android,
-and UI toolkit types stay in platform modules; all inward modules remain
-ordinary Java and are shared unchanged.
+launcher for its own lifecycle, window, storage directory, and final HTTP
+transport. Kotlin, Android, and UI toolkit types stay in platform modules; all
+inward modules remain ordinary Java and are shared unchanged.
 
 ## External dependency policy
 
