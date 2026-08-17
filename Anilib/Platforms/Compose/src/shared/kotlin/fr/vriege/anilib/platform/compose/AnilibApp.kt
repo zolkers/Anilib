@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.sp
 import fr.vriege.anilib.feature.library.LibraryProgress
 import fr.vriege.anilib.feature.library.LibraryItemId
 import fr.vriege.anilib.feature.discovery.ui.DiscoveryPresentation
+import fr.vriege.anilib.feature.downloads.ui.DownloadPresentation
 import fr.vriege.anilib.feature.library.ui.LibraryCard
 import fr.vriege.anilib.feature.library.ui.LibraryDetails
 import fr.vriege.anilib.feature.library.ui.LibraryHistoryRow
@@ -85,6 +86,7 @@ fun AnilibApp(
     presentation: LibraryPresentation,
     discovery: DiscoveryPresentation,
     reader: ReaderPresentation,
+    downloads: DownloadPresentation,
     pageDecoder: (ByteArray) -> ImageBitmap?,
     componentCount: Int,
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -94,9 +96,15 @@ fun AnilibApp(
     var section by remember { mutableStateOf(AppSection.LIBRARY) }
     var activeReader by remember { mutableStateOf<ReaderController?>(null) }
     var readerError by remember { mutableStateOf<String?>(null) }
+    var downloadError by remember { mutableStateOf<String?>(null) }
+    var downloadsOpen by remember { mutableStateOf(false) }
     val navigate: ((LibraryNavigator) -> Unit) -> Unit = { transition ->
         transition(navigator)
         destination = navigator.state()
+    }
+    val openSection: (AppSection) -> Unit = { next ->
+        section = next
+        if (next != AppSection.MORE) downloadsOpen = false
     }
 
     MaterialTheme(colorScheme = if (darkTheme) darkColorScheme() else lightColorScheme()) {
@@ -116,32 +124,49 @@ fun AnilibApp(
                         }
                         .onFailure { readerError = it.message ?: "The reader could not be opened." }
                 }
+                val enqueueDownload: (LibraryItemId) -> Unit = { id ->
+                    runCatching { downloads.enqueue(id) }
+                        .onSuccess { downloadError = null }
+                        .onFailure { downloadError = it.message ?: "The download could not be queued." }
+                }
                 BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                     if (maxWidth >= 720.dp) {
                         ExpandedShell(
                             presentation,
                             discovery,
                             reader,
+                            downloads,
                             destination,
                             section,
                             componentCount,
                             navigate,
-                            { section = it },
+                            openSection,
                             openReader,
                             readerError,
+                            enqueueDownload,
+                            downloadError,
+                            downloadsOpen,
+                            { downloadsOpen = true },
+                            { downloadsOpen = false },
                         )
                     } else {
                         CompactShell(
                             presentation,
                             discovery,
                             reader,
+                            downloads,
                             destination,
                             section,
                             componentCount,
                             navigate,
-                            { section = it },
+                            openSection,
                             openReader,
                             readerError,
+                            enqueueDownload,
+                            downloadError,
+                            downloadsOpen,
+                            { downloadsOpen = true },
+                            { downloadsOpen = false },
                         )
                     }
                 }
@@ -155,6 +180,7 @@ private fun ExpandedShell(
     presentation: LibraryPresentation,
     discovery: DiscoveryPresentation,
     reader: ReaderPresentation,
+    downloads: DownloadPresentation,
     destination: LibraryNavigationState,
     section: AppSection,
     componentCount: Int,
@@ -162,6 +188,11 @@ private fun ExpandedShell(
     openSection: (AppSection) -> Unit,
     openReader: (LibraryItemId) -> Unit,
     readerError: String?,
+    enqueueDownload: (LibraryItemId) -> Unit,
+    downloadError: String?,
+    downloadsOpen: Boolean,
+    openDownloads: () -> Unit,
+    closeDownloads: () -> Unit,
 ) {
     Row(modifier = Modifier.fillMaxSize()) {
         AnilibNavigationRail(section, openSection)
@@ -171,6 +202,7 @@ private fun ExpandedShell(
                 presentation,
                 discovery,
                 reader,
+                downloads,
                 destination,
                 section,
                 componentCount,
@@ -178,6 +210,11 @@ private fun ExpandedShell(
                 openSection,
                 openReader,
                 readerError,
+                enqueueDownload,
+                downloadError,
+                downloadsOpen,
+                openDownloads,
+                closeDownloads,
             )
         }
     }
@@ -188,6 +225,7 @@ private fun CompactShell(
     presentation: LibraryPresentation,
     discovery: DiscoveryPresentation,
     reader: ReaderPresentation,
+    downloads: DownloadPresentation,
     destination: LibraryNavigationState,
     section: AppSection,
     componentCount: Int,
@@ -195,6 +233,11 @@ private fun CompactShell(
     openSection: (AppSection) -> Unit,
     openReader: (LibraryItemId) -> Unit,
     readerError: String?,
+    enqueueDownload: (LibraryItemId) -> Unit,
+    downloadError: String?,
+    downloadsOpen: Boolean,
+    openDownloads: () -> Unit,
+    closeDownloads: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
@@ -202,6 +245,7 @@ private fun CompactShell(
                 presentation,
                 discovery,
                 reader,
+                downloads,
                 destination,
                 section,
                 componentCount,
@@ -209,6 +253,11 @@ private fun CompactShell(
                 openSection,
                 openReader,
                 readerError,
+                enqueueDownload,
+                downloadError,
+                downloadsOpen,
+                openDownloads,
+                closeDownloads,
             )
         }
         HorizontalDivider()
@@ -262,6 +311,7 @@ private fun AppDestination(
     presentation: LibraryPresentation,
     discovery: DiscoveryPresentation,
     reader: ReaderPresentation,
+    downloads: DownloadPresentation,
     destination: LibraryNavigationState,
     section: AppSection,
     componentCount: Int,
@@ -269,16 +319,24 @@ private fun AppDestination(
     openSection: (AppSection) -> Unit,
     openReader: (LibraryItemId) -> Unit,
     readerError: String?,
+    enqueueDownload: (LibraryItemId) -> Unit,
+    downloadError: String?,
+    downloadsOpen: Boolean,
+    openDownloads: () -> Unit,
+    closeDownloads: () -> Unit,
 ) {
     when (section) {
         AppSection.LIBRARY -> when (destination.page()) {
             LibraryPage.DETAILS -> DetailsDestination(
                 presentation,
                 reader,
+                downloads,
                 destination,
                 navigate,
                 openReader,
                 readerError,
+                enqueueDownload,
+                downloadError,
             )
             else -> LibraryPageContent(presentation.library(), componentCount, navigate)
         }
@@ -288,7 +346,11 @@ private fun AppDestination(
             openSection(AppSection.LIBRARY)
         }
         AppSection.BROWSE -> DiscoveryScreen(discovery, presentation)
-        AppSection.MORE -> MorePage(componentCount)
+        AppSection.MORE -> if (downloadsOpen) {
+            DownloadsScreen(downloads, closeDownloads)
+        } else {
+            MorePage(componentCount, openDownloads)
+        }
     }
 }
 
@@ -417,10 +479,13 @@ private fun HistoryCard(row: LibraryHistoryRow, openDetails: () -> Unit) {
 private fun DetailsDestination(
     presentation: LibraryPresentation,
     reader: ReaderPresentation,
+    downloads: DownloadPresentation,
     destination: LibraryNavigationState,
     navigate: ((LibraryNavigator) -> Unit) -> Unit,
     openReader: (LibraryItemId) -> Unit,
     readerError: String?,
+    enqueueDownload: (LibraryItemId) -> Unit,
+    downloadError: String?,
 ) {
     val id = destination.selectedTitle().orElse(null)
     val details = id?.let { presentation.details(it).orElse(null) }
@@ -430,8 +495,11 @@ private fun DetailsDestination(
         DetailsPage(
             details = details,
             canRead = runCatching { reader.canOpen(details.id()) }.getOrDefault(false),
+            canDownload = runCatching { downloads.canEnqueue(details.id()) }.getOrDefault(false),
             readerError = readerError,
+            downloadError = downloadError,
             read = { openReader(details.id()) },
+            download = { enqueueDownload(details.id()) },
             goBack = { navigate(LibraryNavigator::back) },
         )
     }
@@ -442,8 +510,11 @@ private fun DetailsDestination(
 private fun DetailsPage(
     details: LibraryDetails,
     canRead: Boolean,
+    canDownload: Boolean,
     readerError: String?,
+    downloadError: String?,
     read: () -> Unit,
+    download: () -> Unit,
     goBack: () -> Unit,
 ) {
     Scaffold(topBar = { TopAppBar(title = { Text(details.title()) }) }) { padding ->
@@ -464,13 +535,19 @@ private fun DetailsPage(
             if (!readerError.isNullOrBlank()) {
                 item { Text(readerError, color = MaterialTheme.colorScheme.error) }
             }
+            if (!downloadError.isNullOrBlank()) {
+                item { Text(downloadError, color = MaterialTheme.colorScheme.error) }
+            }
             item {
                 Row(
                     modifier = Modifier.padding(vertical = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Button(onClick = read, enabled = canRead) {
-                        Text(if (canRead) "Read" else "No readable pages")
+                        Text("Read")
+                    }
+                    Button(onClick = download, enabled = canDownload) {
+                        Text("Download")
                     }
                     Button(onClick = goBack) {
                         Text("Back")
@@ -512,7 +589,7 @@ private fun Fact(label: String, value: String) {
 }
 
 @Composable
-private fun EmptyPage(message: String) {
+internal fun EmptyPage(message: String) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
@@ -533,10 +610,10 @@ private fun PlaceholderPage(title: String, message: String) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MorePage(componentCount: Int) {
+private fun MorePage(componentCount: Int, openDownloads: () -> Unit) {
     Scaffold(topBar = { TopAppBar(title = { Text("More") }) }) { padding ->
         LazyColumn(modifier = Modifier.fillMaxSize().padding(padding)) {
-            item { MoreRow("Download queue", "Manage current and completed downloads") }
+            item { MoreRow("Download queue", "Manage current and completed downloads", openDownloads) }
             item { MoreRow("Categories", "Organize anime and manga in your library") }
             item { MoreRow("Statistics", "Library and reading activity") }
             item { MoreRow("Settings", "Appearance, library, reader, player, and tracking") }
@@ -546,8 +623,13 @@ private fun MorePage(componentCount: Int) {
 }
 
 @Composable
-private fun MoreRow(title: String, summary: String) {
-    Column(modifier = Modifier.fillMaxWidth().clickable { }.padding(horizontal = 24.dp, vertical = 18.dp)) {
+private fun MoreRow(title: String, summary: String, onClick: () -> Unit = {}) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 24.dp, vertical = 18.dp),
+    ) {
         Text(title, fontWeight = FontWeight.Medium)
         Spacer(Modifier.height(4.dp))
         Text(summary, color = MaterialTheme.colorScheme.onSurfaceVariant)
