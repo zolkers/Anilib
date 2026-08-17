@@ -15,7 +15,8 @@ The project starts with four hard constraints:
 The current bootstrap is intentionally a working architectural slice, not a
 claim of complete Aniyomi feature parity. It includes a transactional plugin
 kernel, a Library feature, a Compose Multiplatform desktop application, an
-Android-neutral host seam, architecture tests, and the dependency-free
+adaptive Compose UI shared with a real Android application, architecture tests,
+and the dependency-free
 `AnilibJava` quality checker. Kotlin and audited UI dependencies are confined
 to outer platform renderers; shared contracts and behavior remain Java 21.
 
@@ -26,12 +27,14 @@ Use Java 21 from the repository root:
 ```powershell
 .\gradlew.bat --no-daemon --console=plain check
 .\gradlew.bat --no-daemon --console=plain :Anilib:Platforms:Desktop:run
+.\gradlew.bat --no-daemon --console=plain :Anilib:Platforms:AndroidApp:assembleDebug
 .\gradlew.bat --no-daemon --console=plain javaQuality
 ```
 
 Only platform UI modules configure dependency repositories. The current
-allowlist contains Kotlin and Compose Multiplatform for Desktop; the Android SDK
-will remain an outer platform toolchain and may not leak into neutral modules.
+allowlist contains Kotlin, Compose Multiplatform, Android Gradle Plugin, and
+AndroidX Activity only in their owning platform builds. The Android SDK remains
+an outer platform toolchain and may not leak into neutral modules.
 See [THIRD_PARTY.md](THIRD_PARTY.md) for the exact audited coordinates.
 
 See [ARCHITECTURE.md](Anilib/ARCHITECTURE.md) and

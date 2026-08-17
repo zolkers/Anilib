@@ -20,7 +20,7 @@ features rather than a port of its internal Kotlin/Android layering.
 - [x] local archive/folder source
 - [x] cover cache and JDK image decoding
 - [x] desktop library, details, and history pages
-- [ ] Android application shell backed by the same capabilities
+- [x] Android application shell backed by the same capabilities
 
 ## Phase 2 — sources and discovery
 

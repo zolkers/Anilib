@@ -77,10 +77,11 @@ Bundle instances explicitly, which keeps addition and removal symmetrical.
 4. The platform resolves narrow capabilities and renders them.
 5. Closing the product releases all plugin sessions in reverse order.
 
-Desktop currently renders the shared Java presentation models with Compose
-Multiplatform and Material 3. Android will reuse Compose presentation patterns
-behind its platform adapter. Kotlin and UI toolkit types stay in platform
-modules; all inward modules remain ordinary Java and are shared unchanged.
+Desktop and Android render the same shared Java presentation models through one
+adaptive Compose Multiplatform and Material 3 shell. Each product has a thin
+launcher for its own lifecycle, window, and storage directory. Kotlin, Android,
+and UI toolkit types stay in platform modules; all inward modules remain
+ordinary Java and are shared unchanged.
 
 ## External dependency policy
 
