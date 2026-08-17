@@ -1,0 +1,12 @@
+plugins {
+    id 'application'
+}
+
+application {
+    mainModule = 'fr.vriege.anilib.tooling.javaquality'
+    mainClass = 'fr.vriege.anilib.tooling.javaquality.AnilibJavaMain'
+}
+
+tasks.named('run') {
+    args rootProject.projectDir.absolutePath
+}

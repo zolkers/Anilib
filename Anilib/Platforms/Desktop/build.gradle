@@ -1,0 +1,14 @@
+plugins {
+    id 'application'
+}
+
+dependencies {
+    implementation project(':Anilib:Configurations:Standard')
+    implementation project(':Anilib:Features:Library:Api')
+    implementation project(':Anilib:Kernel:Api')
+}
+
+application {
+    mainModule = 'fr.vriege.anilib.platform.desktop'
+    mainClass = 'fr.vriege.anilib.platform.desktop.DesktopMain'
+}

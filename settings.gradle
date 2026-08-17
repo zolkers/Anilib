@@ -1,0 +1,13 @@
+rootProject.name = 'anilib'
+
+include ':Anilib:Foundation'
+include ':Anilib:Kernel:Api'
+include ':Anilib:Kernel:Runtime'
+include ':Anilib:Features:Library:Api'
+include ':Anilib:Features:Library:Core'
+include ':Anilib:Features:Library:Bundle'
+include ':Anilib:Configurations:Standard'
+include ':Anilib:Platforms:Desktop'
+include ':Anilib:Platforms:Android'
+include ':Anilib:Tooling:JavaQuality'
+include ':Anilib:Tooling:ArchitectureTests'

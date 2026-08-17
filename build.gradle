@@ -1,0 +1,49 @@
+plugins {
+    id 'base'
+}
+
+group = 'fr.vriege.anilib'
+version = providers.gradleProperty('anilibVersion').get()
+
+subprojects {
+    apply plugin: 'java-library'
+
+    group = rootProject.group
+    version = rootProject.version
+
+    java {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(21)
+        }
+        modularity.inferModulePath = true
+        withSourcesJar()
+    }
+
+    tasks.withType(JavaCompile).configureEach {
+        options.encoding = 'UTF-8'
+        options.compilerArgs.addAll(['-Xlint:all', '-Werror'])
+    }
+
+    tasks.withType(Javadoc).configureEach {
+        options.encoding = 'UTF-8'
+        options.addBooleanOption('Xdoclint:all,-missing', true)
+    }
+}
+
+tasks.register('javaQuality') {
+    group = 'verification'
+    description = 'Runs the dependency-free AnilibJava repository quality checker.'
+    dependsOn ':Anilib:Tooling:JavaQuality:run'
+}
+
+tasks.register('architectureTest') {
+    group = 'verification'
+    description = 'Exercises plugin graph, rollback, and standard-product architecture contracts.'
+    dependsOn ':Anilib:Tooling:ArchitectureTests:run'
+}
+
+tasks.named('check') {
+    dependsOn subprojects.collect { it.tasks.named('check') }
+    dependsOn tasks.named('javaQuality')
+    dependsOn tasks.named('architectureTest')
+}
