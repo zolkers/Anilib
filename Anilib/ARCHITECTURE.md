@@ -76,6 +76,14 @@ transactional installation, and owns the returned lifecycle handle. Duplicate
 IDs or incompatible Source API versions therefore fail before product startup;
 rollback and shutdown remove registrations automatically.
 
+Discovery is a separate vertical feature over the Source registry and Library
+catalog. Its Java service owns paging, global and per-source search, validated
+filters, durable source preferences, duplicate-safe library admission, and
+migration while retaining user-owned progress, history, categories, and
+favourites. Its platform-neutral presentation is the only surface consumed by
+the shared Compose Browse screen, so Android and desktop cannot drift into two
+different discovery implementations.
+
 HTTP is split at the platform boundary. Framework contracts own immutable
 requests and responses plus cookie, cache, rate-limit, and low-level transport
 ports. One shared policy engine applies those contracts. Desktop injects the

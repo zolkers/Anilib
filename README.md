@@ -22,7 +22,10 @@ claim of complete Aniyomi feature parity. It includes a transactional plugin
 kernel, a Library feature, a Compose Multiplatform desktop application, an
 adaptive Compose UI shared with a real Android application, architecture tests,
 the versioned Source extension SDK, a cross-platform JDK-only HTTP framework,
-and the dependency-free
+and an Aniyomi-style Browse slice with source listings, global and per-source
+search, filters, persisted preferences, library admission, and migration. The
+same Discovery behavior and adaptive Compose screen run on Android and desktop.
+The repository also contains the dependency-free
 `AnilibJava` quality checker. Kotlin and audited UI dependencies are confined
 to outer platform renderers; shared contracts and behavior remain Java 21.
 

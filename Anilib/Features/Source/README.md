@@ -2,8 +2,9 @@
 
 The Source feature owns the stable entry point for local and remote content
 extensions. API version `1.0` deliberately covers registration and immutable
-identity only. Browse, search, filters, preferences, and network access are
-separate optional contracts so adding them does not break existing sources.
+identity only. API version `1.1` adds the optional `CatalogueSource` contract
+for browse, latest, search, filters, and preferences without breaking a source
+that implements only `Source`. Network access remains a separate capability.
 
 ## Extension shape
 
@@ -39,3 +40,16 @@ the source automatically during rollback or product shutdown.
 
 Extensions should depend only on `Features/Source/Api` plus the narrow optional
 contracts they implement. They must not depend on Source Runtime or Bundle.
+
+## Catalogue shape
+
+A catalogue source implements `CatalogueSource`. It receives immutable
+`SourceBrowseRequest` and `SourceSearchRequest` values containing the selected
+page, page size, validated filter values, and a preference snapshot. It returns
+one immutable `SourcePage`; the shared Discovery feature handles cross-source
+search, persistence, adding titles to Library, and migration.
+
+Filter schemas cover headers, separators, text, checkboxes, tri-state values,
+select lists, and sorts. Preference schemas cover switches, text, and select
+lists. Platforms render those schemas; extensions never import Compose,
+Android, or desktop UI types.
