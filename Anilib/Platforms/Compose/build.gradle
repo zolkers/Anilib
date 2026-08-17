@@ -35,6 +35,8 @@ kotlin {
                 implementation project(':Anilib:Features:Discovery:Api')
                 implementation project(':Anilib:Features:Discovery:Ui')
                 implementation project(':Anilib:Features:Source:Api')
+                implementation project(':Anilib:Features:Reader:Api')
+                implementation project(':Anilib:Features:Reader:Ui')
                 implementation compose.foundation
                 implementation compose.material3
                 implementation compose.materialIconsExtended
@@ -48,6 +50,8 @@ kotlin {
                 implementation project(':Anilib:Features:Discovery:Api')
                 implementation project(':Anilib:Features:Discovery:Ui')
                 implementation project(':Anilib:Features:Source:Api')
+                implementation project(':Anilib:Features:Reader:Api')
+                implementation project(':Anilib:Features:Reader:Ui')
                 implementation compose.foundation
                 implementation compose.material3
                 implementation compose.materialIconsExtended

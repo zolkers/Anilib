@@ -42,6 +42,7 @@ import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -49,11 +50,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.vriege.anilib.feature.library.LibraryProgress
+import fr.vriege.anilib.feature.library.LibraryItemId
 import fr.vriege.anilib.feature.discovery.ui.DiscoveryPresentation
 import fr.vriege.anilib.feature.library.ui.LibraryCard
 import fr.vriege.anilib.feature.library.ui.LibraryDetails
@@ -63,6 +66,8 @@ import fr.vriege.anilib.feature.library.ui.LibraryNavigator
 import fr.vriege.anilib.feature.library.ui.LibraryOverview
 import fr.vriege.anilib.feature.library.ui.LibraryPage
 import fr.vriege.anilib.feature.library.ui.LibraryPresentation
+import fr.vriege.anilib.feature.reader.ui.ReaderController
+import fr.vriege.anilib.feature.reader.ui.ReaderPresentation
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -79,12 +84,16 @@ private val dateTimeFormatter = DateTimeFormatter
 fun AnilibApp(
     presentation: LibraryPresentation,
     discovery: DiscoveryPresentation,
+    reader: ReaderPresentation,
+    pageDecoder: (ByteArray) -> ImageBitmap?,
     componentCount: Int,
     darkTheme: Boolean = isSystemInDarkTheme(),
 ) {
     val navigator = remember { LibraryNavigator() }
     var destination by remember { mutableStateOf(navigator.state()) }
     var section by remember { mutableStateOf(AppSection.LIBRARY) }
+    var activeReader by remember { mutableStateOf<ReaderController?>(null) }
+    var readerError by remember { mutableStateOf<String?>(null) }
     val navigate: ((LibraryNavigator) -> Unit) -> Unit = { transition ->
         transition(navigator)
         destination = navigator.state()
@@ -92,27 +101,49 @@ fun AnilibApp(
 
     MaterialTheme(colorScheme = if (darkTheme) darkColorScheme() else lightColorScheme()) {
         Surface(modifier = Modifier.fillMaxSize()) {
-            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                if (maxWidth >= 720.dp) {
-                    ExpandedShell(
-                        presentation,
-                        discovery,
-                        destination,
-                        section,
-                        componentCount,
-                        navigate,
-                        { section = it },
-                    )
-                } else {
-                    CompactShell(
-                        presentation,
-                        discovery,
-                        destination,
-                        section,
-                        componentCount,
-                        navigate,
-                        { section = it },
-                    )
+            val controller = activeReader
+            if (controller != null) {
+                DisposableEffect(controller) {
+                    onDispose { controller.close() }
+                }
+                ReaderScreen(controller, pageDecoder) { activeReader = null }
+            } else {
+                val openReader: (LibraryItemId) -> Unit = { id ->
+                    runCatching { reader.open(id) }
+                        .onSuccess {
+                            readerError = null
+                            activeReader = it
+                        }
+                        .onFailure { readerError = it.message ?: "The reader could not be opened." }
+                }
+                BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                    if (maxWidth >= 720.dp) {
+                        ExpandedShell(
+                            presentation,
+                            discovery,
+                            reader,
+                            destination,
+                            section,
+                            componentCount,
+                            navigate,
+                            { section = it },
+                            openReader,
+                            readerError,
+                        )
+                    } else {
+                        CompactShell(
+                            presentation,
+                            discovery,
+                            reader,
+                            destination,
+                            section,
+                            componentCount,
+                            navigate,
+                            { section = it },
+                            openReader,
+                            readerError,
+                        )
+                    }
                 }
             }
         }
@@ -123,11 +154,14 @@ fun AnilibApp(
 private fun ExpandedShell(
     presentation: LibraryPresentation,
     discovery: DiscoveryPresentation,
+    reader: ReaderPresentation,
     destination: LibraryNavigationState,
     section: AppSection,
     componentCount: Int,
     navigate: ((LibraryNavigator) -> Unit) -> Unit,
     openSection: (AppSection) -> Unit,
+    openReader: (LibraryItemId) -> Unit,
+    readerError: String?,
 ) {
     Row(modifier = Modifier.fillMaxSize()) {
         AnilibNavigationRail(section, openSection)
@@ -136,11 +170,14 @@ private fun ExpandedShell(
             AppDestination(
                 presentation,
                 discovery,
+                reader,
                 destination,
                 section,
                 componentCount,
                 navigate,
                 openSection,
+                openReader,
+                readerError,
             )
         }
     }
@@ -150,22 +187,28 @@ private fun ExpandedShell(
 private fun CompactShell(
     presentation: LibraryPresentation,
     discovery: DiscoveryPresentation,
+    reader: ReaderPresentation,
     destination: LibraryNavigationState,
     section: AppSection,
     componentCount: Int,
     navigate: ((LibraryNavigator) -> Unit) -> Unit,
     openSection: (AppSection) -> Unit,
+    openReader: (LibraryItemId) -> Unit,
+    readerError: String?,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
             AppDestination(
                 presentation,
                 discovery,
+                reader,
                 destination,
                 section,
                 componentCount,
                 navigate,
                 openSection,
+                openReader,
+                readerError,
             )
         }
         HorizontalDivider()
@@ -218,15 +261,25 @@ private fun AnilibNavigationBar(
 private fun AppDestination(
     presentation: LibraryPresentation,
     discovery: DiscoveryPresentation,
+    reader: ReaderPresentation,
     destination: LibraryNavigationState,
     section: AppSection,
     componentCount: Int,
     navigate: ((LibraryNavigator) -> Unit) -> Unit,
     openSection: (AppSection) -> Unit,
+    openReader: (LibraryItemId) -> Unit,
+    readerError: String?,
 ) {
     when (section) {
         AppSection.LIBRARY -> when (destination.page()) {
-            LibraryPage.DETAILS -> DetailsDestination(presentation, destination, navigate)
+            LibraryPage.DETAILS -> DetailsDestination(
+                presentation,
+                reader,
+                destination,
+                navigate,
+                openReader,
+                readerError,
+            )
             else -> LibraryPageContent(presentation.library(), componentCount, navigate)
         }
         AppSection.UPDATES -> PlaceholderPage("Updates", "New chapters and episodes will appear here.")
@@ -363,21 +416,36 @@ private fun HistoryCard(row: LibraryHistoryRow, openDetails: () -> Unit) {
 @Composable
 private fun DetailsDestination(
     presentation: LibraryPresentation,
+    reader: ReaderPresentation,
     destination: LibraryNavigationState,
     navigate: ((LibraryNavigator) -> Unit) -> Unit,
+    openReader: (LibraryItemId) -> Unit,
+    readerError: String?,
 ) {
     val id = destination.selectedTitle().orElse(null)
     val details = id?.let { presentation.details(it).orElse(null) }
     if (details == null) {
         MissingDetails { navigate(LibraryNavigator::openLibrary) }
     } else {
-        DetailsPage(details) { navigate(LibraryNavigator::back) }
+        DetailsPage(
+            details = details,
+            canRead = runCatching { reader.canOpen(details.id()) }.getOrDefault(false),
+            readerError = readerError,
+            read = { openReader(details.id()) },
+            goBack = { navigate(LibraryNavigator::back) },
+        )
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DetailsPage(details: LibraryDetails, goBack: () -> Unit) {
+private fun DetailsPage(
+    details: LibraryDetails,
+    canRead: Boolean,
+    readerError: String?,
+    read: () -> Unit,
+    goBack: () -> Unit,
+) {
     Scaffold(topBar = { TopAppBar(title = { Text(details.title()) }) }) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 24.dp),
@@ -393,9 +461,20 @@ private fun DetailsPage(details: LibraryDetails, goBack: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            if (!readerError.isNullOrBlank()) {
+                item { Text(readerError, color = MaterialTheme.colorScheme.error) }
+            }
             item {
-                Button(onClick = goBack, modifier = Modifier.padding(vertical = 12.dp)) {
-                    Text("Back")
+                Row(
+                    modifier = Modifier.padding(vertical = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Button(onClick = read, enabled = canRead) {
+                        Text(if (canRead) "Read" else "No readable pages")
+                    }
+                    Button(onClick = goBack) {
+                        Text("Back")
+                    }
                 }
             }
         }

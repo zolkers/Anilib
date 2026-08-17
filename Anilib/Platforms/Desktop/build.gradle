@@ -15,6 +15,7 @@ dependencies {
     implementation project(':Anilib:Features:CoverCache:Bundle')
     implementation project(':Anilib:Features:Discovery:Ui')
     implementation project(':Anilib:Features:Library:Ui')
+    implementation project(':Anilib:Features:Reader:Ui')
     implementation project(':Anilib:Kernel:Api')
     implementation project(':Anilib:Platforms:Compose')
     implementation compose.desktop.currentOs

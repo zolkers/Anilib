@@ -1,12 +1,16 @@
 package fr.vriege.anilib.platform.android
 
 import android.os.Bundle
+import android.graphics.BitmapFactory
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import fr.vriege.anilib.configuration.standard.StandardAnilib
 import fr.vriege.anilib.feature.discovery.ui.DiscoveryUiCapabilities
 import fr.vriege.anilib.feature.library.ui.LibraryUiCapabilities
+import fr.vriege.anilib.feature.reader.ui.ReaderUiCapabilities
 import fr.vriege.anilib.framework.http.runtime.UrlConnectionHttpTransport
 import fr.vriege.anilib.platform.compose.AnilibApp
 
@@ -26,11 +30,14 @@ class MainActivity : ComponentActivity() {
         product = started
         val presentation = started.capability(LibraryUiCapabilities.PRESENTATION)
         val discovery = started.capability(DiscoveryUiCapabilities.PRESENTATION)
+        val reader = started.capability(ReaderUiCapabilities.PRESENTATION)
         val componentCount = started.components().size
         setContent {
             AnilibApp(
                 presentation = presentation,
                 discovery = discovery,
+                reader = reader,
+                pageDecoder = ::decodePage,
                 componentCount = componentCount,
             )
         }
@@ -45,3 +52,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
+private fun decodePage(bytes: ByteArray): ImageBitmap? =
+    BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()

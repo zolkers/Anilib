@@ -2,16 +2,20 @@ package fr.vriege.anilib.platform.desktop
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import fr.vriege.anilib.configuration.standard.StandardAnilib
 import fr.vriege.anilib.feature.covercache.bundle.CoverCachePlugin
 import fr.vriege.anilib.feature.discovery.ui.DiscoveryUiCapabilities
 import fr.vriege.anilib.feature.library.ui.LibraryUiCapabilities
+import fr.vriege.anilib.feature.reader.ui.ReaderUiCapabilities
 import fr.vriege.anilib.framework.http.jdk.JdkHttpTransport
 import fr.vriege.anilib.kernel.StartedAnilib
 import fr.vriege.anilib.platform.compose.AnilibApp
 import java.awt.GraphicsEnvironment
+import org.jetbrains.skia.Image
 
 fun main() {
     val dataDirectory = DesktopDataDirectory.resolve()
@@ -27,6 +31,7 @@ fun main() {
     }
     val presentation = started.capability(LibraryUiCapabilities.PRESENTATION)
     val discovery = started.capability(DiscoveryUiCapabilities.PRESENTATION)
+    val reader = started.capability(ReaderUiCapabilities.PRESENTATION)
     application {
         Window(
             onCloseRequest = {
@@ -38,12 +43,17 @@ fun main() {
             AnilibApp(
                 presentation = presentation,
                 discovery = discovery,
+                reader = reader,
+                pageDecoder = ::decodePage,
                 componentCount = started.components().size,
                 darkTheme = desktopDarkTheme(),
             )
         }
     }
 }
+
+private fun decodePage(bytes: ByteArray): ImageBitmap? =
+    runCatching { Image.makeFromEncoded(bytes).toComposeImageBitmap() }.getOrNull()
 
 private fun printHeadlessSummary(started: StartedAnilib) {
     val count = started.capability(LibraryUiCapabilities.PRESENTATION).library().titles().size
