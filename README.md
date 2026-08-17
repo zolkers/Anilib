@@ -16,7 +16,7 @@ The current bootstrap is intentionally a working architectural slice, not a
 claim of complete Aniyomi feature parity. It includes a transactional plugin
 kernel, a Library feature, a Compose Multiplatform desktop application, an
 adaptive Compose UI shared with a real Android application, architecture tests,
-and the dependency-free
+the versioned Source extension SDK, and the dependency-free
 `AnilibJava` quality checker. Kotlin and audited UI dependencies are confined
 to outer platform renderers; shared contracts and behavior remain Java 21.
 

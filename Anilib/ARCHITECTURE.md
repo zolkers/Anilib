@@ -69,6 +69,13 @@ There is deliberately no classpath scanning, reflection-based injection, global
 service locator, or mutable “bag of services”. Configurations select concrete
 Bundle instances explicitly, which keeps addition and removal symmetrical.
 
+Source extensions follow the same rule. The Source Bundle publishes one typed
+registry and an installation-only registrar. A selected source Bundle declares
+the registrar capability, registers one immutable source descriptor during
+transactional installation, and owns the returned lifecycle handle. Duplicate
+IDs or incompatible Source API versions therefore fail before product startup;
+rollback and shutdown remove registrations automatically.
+
 ## Product lifecycle
 
 1. A configuration selects feature Bundles.

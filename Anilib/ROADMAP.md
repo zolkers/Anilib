@@ -24,7 +24,7 @@ features rather than a port of its internal Kotlin/Android layering.
 
 ## Phase 2 — sources and discovery
 
-- [ ] stable source extension SDK
+- [x] stable source extension SDK
 - [ ] JDK HTTP client, cookies, rate limits, and cache contracts
 - [ ] browse, search, filters, migration, and source preferences
 - [ ] isolated source bundles with explicit permissions
