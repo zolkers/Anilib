@@ -1,3 +1,11 @@
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        google()
+        mavenCentral()
+    }
+}
+
 rootProject.name = 'anilib'
 
 include ':Anilib:Foundation'
@@ -6,6 +14,7 @@ include ':Anilib:Kernel:Runtime'
 include ':Anilib:Features:Library:Api'
 include ':Anilib:Features:Library:Core'
 include ':Anilib:Features:Library:Runtime'
+include ':Anilib:Features:Library:Ui'
 include ':Anilib:Features:Library:Bundle'
 include ':Anilib:Features:LocalSource:Api'
 include ':Anilib:Features:LocalSource:Runtime'

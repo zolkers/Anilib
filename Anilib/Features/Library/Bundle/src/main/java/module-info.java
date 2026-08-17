@@ -2,6 +2,7 @@ module fr.vriege.anilib.feature.library.bundle {
     requires transitive fr.vriege.anilib.kernel.api;
     requires fr.vriege.anilib.feature.library.api;
     requires fr.vriege.anilib.feature.library.runtime;
+    requires fr.vriege.anilib.feature.library.ui;
 
     exports fr.vriege.anilib.feature.library.bundle;
 }
