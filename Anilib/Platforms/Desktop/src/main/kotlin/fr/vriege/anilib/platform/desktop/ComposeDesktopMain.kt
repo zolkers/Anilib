@@ -7,6 +7,7 @@ import androidx.compose.ui.window.application
 import fr.vriege.anilib.configuration.standard.StandardAnilib
 import fr.vriege.anilib.feature.covercache.bundle.CoverCachePlugin
 import fr.vriege.anilib.feature.library.ui.LibraryUiCapabilities
+import fr.vriege.anilib.framework.http.jdk.JdkHttpTransport
 import fr.vriege.anilib.kernel.StartedAnilib
 import fr.vriege.anilib.platform.compose.AnilibApp
 import java.awt.GraphicsEnvironment
@@ -15,6 +16,7 @@ fun main() {
     val dataDirectory = DesktopDataDirectory.resolve()
     val started = StandardAnilib.start(
         dataDirectory,
+        JdkHttpTransport(),
         listOf(CoverCachePlugin(dataDirectory.resolve("cache").resolve("covers"))),
     )
     if (GraphicsEnvironment.isHeadless()) {

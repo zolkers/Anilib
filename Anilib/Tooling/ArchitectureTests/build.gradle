@@ -18,6 +18,11 @@ dependencies {
     implementation project(':Anilib:Features:LocalSource:Runtime')
     implementation project(':Anilib:Features:Source:Api')
     implementation project(':Anilib:Features:Source:Bundle')
+    implementation project(':Anilib:Framework:Http:Api')
+    implementation project(':Anilib:Framework:Http:Runtime')
+    implementation project(':Anilib:Framework:Http:JdkRuntime')
+    implementation project(':Anilib:Features:Network:Api')
+    implementation project(':Anilib:Features:Network:Bundle')
 }
 
 application {

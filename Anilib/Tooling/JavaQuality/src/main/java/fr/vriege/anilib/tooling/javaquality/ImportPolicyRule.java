@@ -31,7 +31,7 @@ public final class ImportPolicyRule implements AnilibJavaRule {
                     diagnostics.add(new Diagnostic(name(), source.path(), index + 1,
                             "Wildcard imports are forbidden"));
                 }
-                if (!isAllowed(imported)) {
+                if (!isAllowed(imported, source)) {
                     diagnostics.add(new Diagnostic(name(), source.path(), index + 1,
                             "External import is forbidden: " + imported));
                 }
@@ -40,9 +40,15 @@ public final class ImportPolicyRule implements AnilibJavaRule {
         return diagnostics;
     }
 
-    private static boolean isAllowed(String imported) {
+    private static boolean isAllowed(String imported, JavaSource source) {
         return imported.startsWith("java.")
                 || imported.startsWith("javax.")
-                || imported.startsWith("fr.vriege.anilib.");
+                || imported.startsWith("fr.vriege.anilib.")
+                || isArchitectureTestHttpServer(imported, source);
+    }
+
+    private static boolean isArchitectureTestHttpServer(String imported, JavaSource source) {
+        return source.module().id().equals("tooling.architecture-tests")
+                && imported.startsWith("com.sun.net.httpserver.");
     }
 }

@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import fr.vriege.anilib.configuration.standard.StandardAnilib
 import fr.vriege.anilib.feature.library.ui.LibraryUiCapabilities
+import fr.vriege.anilib.framework.http.runtime.UrlConnectionHttpTransport
 import fr.vriege.anilib.platform.compose.AnilibApp
 
 /** Android launcher for the shared Anilib product and adaptive Compose shell. */
@@ -16,7 +17,11 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        val started = StandardAnilib.start(filesDir.toPath())
+        val started = StandardAnilib.start(
+            filesDir.toPath(),
+            UrlConnectionHttpTransport(),
+            emptyList(),
+        )
         product = started
         val presentation = started.capability(LibraryUiCapabilities.PRESENTATION)
         val componentCount = started.components().size

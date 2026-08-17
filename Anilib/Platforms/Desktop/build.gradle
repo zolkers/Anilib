@@ -10,6 +10,7 @@ repositories {
 }
 
 dependencies {
+    implementation project(':Anilib:Framework:Http:JdkRuntime')
     implementation project(':Anilib:Configurations:Standard')
     implementation project(':Anilib:Features:CoverCache:Bundle')
     implementation project(':Anilib:Features:Library:Ui')

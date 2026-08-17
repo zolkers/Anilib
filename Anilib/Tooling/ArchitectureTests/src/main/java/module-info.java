@@ -1,5 +1,9 @@
 module fr.vriege.anilib.tooling.archtests {
     requires java.desktop;
+    requires jdk.httpserver;
+    requires fr.vriege.anilib.framework.http.api;
+    requires fr.vriege.anilib.framework.http.runtime;
+    requires fr.vriege.anilib.framework.http.jdk.runtime;
     requires fr.vriege.anilib.foundation;
     requires fr.vriege.anilib.kernel.api;
     requires fr.vriege.anilib.kernel.runtime;
@@ -15,4 +19,6 @@ module fr.vriege.anilib.tooling.archtests {
     requires fr.vriege.anilib.feature.localsource.runtime;
     requires fr.vriege.anilib.feature.source.api;
     requires fr.vriege.anilib.feature.source.bundle;
+    requires fr.vriege.anilib.feature.network.api;
+    requires fr.vriege.anilib.feature.network.bundle;
 }
