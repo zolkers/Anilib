@@ -7,6 +7,8 @@ import fr.vriege.anilib.feature.library.LibraryItem;
 import fr.vriege.anilib.feature.library.MediaKind;
 import fr.vriege.anilib.feature.localsource.LocalSourceCapabilities;
 import fr.vriege.anilib.feature.network.NetworkCapabilities;
+import fr.vriege.anilib.feature.reader.ReaderCapabilities;
+import fr.vriege.anilib.feature.reader.ui.ReaderUiCapabilities;
 import fr.vriege.anilib.feature.library.ui.LibraryUiCapabilities;
 import fr.vriege.anilib.feature.source.SourceCapabilities;
 import fr.vriege.anilib.feature.source.SourceId;
@@ -50,6 +52,7 @@ public final class ArchitectureTestMain {
         assertions += SourceExtensionIsolationRuleTest.run();
         assertions += DiscoveryTest.run();
         assertions += HttpFrameworkTest.run();
+        assertions += ReaderTest.run();
         System.out.println("Architecture tests: " + assertions + " assertions passed.");
     }
 
@@ -65,7 +68,7 @@ public final class ArchitectureTestMain {
             LibraryItem item = LibraryItem.create("A test title", MediaKind.MANGA);
             catalog.save(item);
             check(catalog.find(item.id()).orElseThrow().equals(item), "library must return saved item");
-            check(application.components().size() == 5, "standard product must install five bootstrap bundles");
+            check(application.components().size() == 6, "standard product must install six bootstrap bundles");
             check(application.capability(LocalSourceCapabilities.CONTENT).publications().isEmpty(),
                     "standard product must expose the local source capability");
             SourceRegistry sourceRegistry = application.capability(SourceCapabilities.REGISTRY);
@@ -77,6 +80,10 @@ public final class ArchitectureTestMain {
                     "standard product must publish the HTTP client capability");
             check(application.capability(LibraryUiCapabilities.PRESENTATION).library().titles().size() == 1,
                     "Library Bundle must publish its presentation capability");
+            check(application.capability(ReaderCapabilities.SERVICE) != null,
+                    "Reader Bundle must publish its reader capability");
+            check(application.capability(ReaderUiCapabilities.PRESENTATION) != null,
+                    "Reader Bundle must publish its shared presentation capability");
             check(catalog.remove(item.id()), "library must remove existing item");
         } finally {
             deleteDirectory(dataDirectory);

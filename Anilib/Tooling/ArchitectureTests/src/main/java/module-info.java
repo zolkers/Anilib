@@ -24,4 +24,7 @@ module fr.vriege.anilib.tooling.archtests {
     requires fr.vriege.anilib.feature.source.bundle;
     requires fr.vriege.anilib.feature.network.api;
     requires fr.vriege.anilib.feature.network.bundle;
+    requires fr.vriege.anilib.feature.reader.api;
+    requires fr.vriege.anilib.feature.reader.runtime;
+    requires fr.vriege.anilib.feature.reader.ui;
 }

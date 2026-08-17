@@ -4,6 +4,7 @@ import fr.vriege.anilib.feature.library.bundle.LibraryPlugin;
 import fr.vriege.anilib.feature.discovery.bundle.DiscoveryPlugin;
 import fr.vriege.anilib.feature.localsource.bundle.LocalSourcePlugin;
 import fr.vriege.anilib.feature.network.bundle.NetworkPlugin;
+import fr.vriege.anilib.feature.reader.bundle.ReaderPlugin;
 import fr.vriege.anilib.feature.source.bundle.SourceSdkPlugin;
 import fr.vriege.anilib.framework.http.HttpTransport;
 import fr.vriege.anilib.framework.http.runtime.UrlConnectionHttpTransport;
@@ -49,6 +50,7 @@ public final class StandardAnilib {
         plugins.add(new LocalSourcePlugin(localContent));
         plugins.add(new NetworkPlugin(httpCache, httpTransport));
         plugins.add(new DiscoveryPlugin(sourcePreferences));
+        plugins.add(new ReaderPlugin());
         plugins.addAll(additionalPlugins);
         return new DefaultPluginEngine().start(List.copyOf(plugins));
     }
