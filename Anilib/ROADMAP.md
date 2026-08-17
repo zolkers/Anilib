@@ -15,7 +15,7 @@ features rather than a port of its internal Kotlin/Android layering.
 
 ## Phase 1 — local library
 
-- [ ] durable file-backed catalog with atomic writes and migrations
+- [x] durable file-backed catalog with atomic writes and migrations
 - [ ] categories, favourites, history, progress, and per-title metadata
 - [ ] local archive/folder source
 - [ ] cover cache and JDK image decoding
