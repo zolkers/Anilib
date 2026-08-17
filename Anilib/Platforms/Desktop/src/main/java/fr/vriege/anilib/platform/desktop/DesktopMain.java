@@ -1,6 +1,7 @@
 package fr.vriege.anilib.platform.desktop;
 
 import fr.vriege.anilib.configuration.standard.StandardAnilib;
+import fr.vriege.anilib.feature.covercache.bundle.CoverCachePlugin;
 import fr.vriege.anilib.feature.library.LibraryCapabilities;
 import fr.vriege.anilib.feature.library.LibraryCatalog;
 import fr.vriege.anilib.feature.library.LibraryItem;
@@ -23,6 +24,8 @@ import java.awt.GraphicsEnvironment;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.lang.reflect.InvocationTargetException;
+import java.nio.file.Path;
+import java.util.List;
 
 /** JDK-only desktop entry point for the Standard Anilib product. */
 public final class DesktopMain {
@@ -30,7 +33,10 @@ public final class DesktopMain {
     }
 
     public static void main(String[] arguments) throws InvocationTargetException, InterruptedException {
-        StartedAnilib application = StandardAnilib.start(DesktopDataDirectory.resolve());
+        Path dataDirectory = DesktopDataDirectory.resolve();
+        StartedAnilib application = StandardAnilib.start(
+                dataDirectory,
+                List.of(new CoverCachePlugin(dataDirectory.resolve("cache").resolve("covers"))));
         if (GraphicsEnvironment.isHeadless()) {
             System.out.println(summary(application));
             application.close();
