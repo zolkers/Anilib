@@ -8,6 +8,7 @@ dependencies {
     implementation project(':Anilib:Kernel:Runtime')
     implementation project(':Anilib:Configurations:Standard')
     implementation project(':Anilib:Features:Library:Api')
+    implementation project(':Anilib:Features:Library:Runtime')
 }
 
 application {
