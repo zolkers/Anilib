@@ -9,6 +9,8 @@ dependencies {
     implementation project(':Anilib:Configurations:Standard')
     implementation project(':Anilib:Features:Library:Api')
     implementation project(':Anilib:Features:Library:Runtime')
+    implementation project(':Anilib:Features:LocalSource:Api')
+    implementation project(':Anilib:Features:LocalSource:Runtime')
 }
 
 application {

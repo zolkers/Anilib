@@ -5,6 +5,7 @@ import fr.vriege.anilib.feature.library.LibraryCapabilities;
 import fr.vriege.anilib.feature.library.LibraryCatalog;
 import fr.vriege.anilib.feature.library.LibraryItem;
 import fr.vriege.anilib.feature.library.MediaKind;
+import fr.vriege.anilib.feature.localsource.LocalSourceCapabilities;
 import fr.vriege.anilib.foundation.component.ComponentDescriptor;
 import fr.vriege.anilib.kernel.AnilibPlugin;
 import fr.vriege.anilib.kernel.CapabilityKey;
@@ -37,6 +38,7 @@ public final class ArchitectureTestMain {
         installationRollsBackInReverseOrder();
         contributionsAreOrderedDeterministically();
         assertions += LibraryPersistenceTest.run();
+        assertions += LocalSourceTest.run();
         System.out.println("Architecture tests: " + assertions + " assertions passed.");
     }
 
@@ -52,7 +54,9 @@ public final class ArchitectureTestMain {
             LibraryItem item = LibraryItem.create("A test title", MediaKind.MANGA);
             catalog.save(item);
             check(catalog.find(item.id()).orElseThrow().equals(item), "library must return saved item");
-            check(application.components().size() == 1, "standard product must install one bootstrap bundle");
+            check(application.components().size() == 2, "standard product must install two bootstrap bundles");
+            check(application.capability(LocalSourceCapabilities.CONTENT).publications().isEmpty(),
+                    "standard product must expose the local source capability");
             check(catalog.remove(item.id()), "library must remove existing item");
         } finally {
             deleteDirectory(dataDirectory);
