@@ -94,6 +94,15 @@ favourites. Its platform-neutral presentation is the only surface consumed by
 the shared Compose Browse screen, so Android and desktop cannot drift into two
 different discovery implementations.
 
+Reader is another removable vertical over Library and Source. Its Bundle
+resolves a library origin only through the typed Source registry and accepts
+only sources implementing the versioned `PagedSource` contract. The shared
+runtime owns validated sessions, durable progress and history, asynchronous
+neighbor prefetch, defensive byte ownership, and a bounded LRU page cache.
+Reading directions and controller state stay platform-neutral; Compose renders
+one immersive screen on Android and desktop, while each outer adapter performs
+only its native encoded-image decoding.
+
 HTTP is split at the platform boundary. Framework contracts own immutable
 requests and responses plus cookie, cache, rate-limit, and low-level transport
 ports. One shared policy engine applies those contracts. Desktop injects the

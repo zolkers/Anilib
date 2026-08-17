@@ -25,6 +25,9 @@ the versioned Source extension SDK, a cross-platform JDK-only HTTP framework,
 and an Aniyomi-style Browse slice with source listings, global and per-source
 search, filters, persisted preferences, library admission, and migration. The
 same Discovery behavior and adaptive Compose screen run on Android and desktop.
+It also includes a removable Reader Bundle with local folder/CBZ pages,
+persistent resume and history, bounded asynchronous prefetch, LTR, RTL,
+vertical, and webtoon navigation, plus one immersive shared reader screen.
 The repository also contains the dependency-free
 `AnilibJava` quality checker. Kotlin and audited UI dependencies are confined
 to outer platform renderers; shared contracts and behavior remain Java 21.
