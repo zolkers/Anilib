@@ -30,7 +30,7 @@ public final class DesktopMain {
     }
 
     public static void main(String[] arguments) throws InvocationTargetException, InterruptedException {
-        StartedAnilib application = StandardAnilib.start();
+        StartedAnilib application = StandardAnilib.start(DesktopDataDirectory.resolve());
         if (GraphicsEnvironment.isHeadless()) {
             System.out.println(summary(application));
             application.close();

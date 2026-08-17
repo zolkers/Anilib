@@ -17,6 +17,9 @@ import fr.vriege.anilib.kernel.runtime.DefaultPluginEngine;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.nio.file.Path;
+import java.nio.file.Files;
+import java.io.IOException;
 
 /** Dependency-free executable architecture contract suite. */
 public final class ArchitectureTestMain {
@@ -37,13 +40,32 @@ public final class ArchitectureTestMain {
     }
 
     private static void standardProductPublishesLibrary() {
-        try (StartedAnilib application = StandardAnilib.start()) {
+        Path dataDirectory;
+        try {
+            dataDirectory = Files.createTempDirectory("anilib-standard-test");
+        } catch (IOException exception) {
+            throw new AssertionError("Unable to create standard product test directory", exception);
+        }
+        try (StartedAnilib application = StandardAnilib.start(dataDirectory)) {
             LibraryCatalog catalog = application.capability(LibraryCapabilities.CATALOG);
             LibraryItem item = LibraryItem.create("A test title", MediaKind.MANGA);
             catalog.save(item);
             check(catalog.find(item.id()).orElseThrow().equals(item), "library must return saved item");
             check(application.components().size() == 1, "standard product must install one bootstrap bundle");
             check(catalog.remove(item.id()), "library must remove existing item");
+        } finally {
+            deleteDirectory(dataDirectory);
+        }
+    }
+
+    private static void deleteDirectory(Path directory) {
+        try (java.util.stream.Stream<Path> entries = Files.list(directory)) {
+            for (Path entry : entries.toList()) {
+                Files.deleteIfExists(entry);
+            }
+            Files.deleteIfExists(directory);
+        } catch (IOException exception) {
+            throw new AssertionError("Unable to clean test directory " + directory, exception);
         }
     }
 

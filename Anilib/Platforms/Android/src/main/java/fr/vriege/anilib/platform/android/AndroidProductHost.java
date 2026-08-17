@@ -4,6 +4,8 @@ import fr.vriege.anilib.configuration.standard.StandardAnilib;
 import fr.vriege.anilib.kernel.CapabilityKey;
 import fr.vriege.anilib.kernel.StartedAnilib;
 
+import java.nio.file.Path;
+
 /**
  * Android-lifecycle seam that stays free of SDK types.
  *
@@ -12,16 +14,18 @@ import fr.vriege.anilib.kernel.StartedAnilib;
  * added to this shared host.</p>
  */
 public final class AndroidProductHost implements AutoCloseable {
+    private final Path dataDirectory;
     private StartedAnilib application;
 
-    public AndroidProductHost() {
+    public AndroidProductHost(Path dataDirectory) {
+        this.dataDirectory = dataDirectory.toAbsolutePath().normalize();
     }
 
     public synchronized void start() {
         if (application != null) {
             throw new IllegalStateException("Android Anilib product is already started");
         }
-        application = StandardAnilib.start();
+        application = StandardAnilib.start(dataDirectory);
     }
 
     public synchronized <T> T capability(CapabilityKey<T> key) {
