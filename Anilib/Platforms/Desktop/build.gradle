@@ -1,15 +1,39 @@
 plugins {
-    id 'application'
+    id 'org.jetbrains.kotlin.jvm' version '2.4.10'
+    id 'org.jetbrains.kotlin.plugin.compose' version '2.4.10'
+    id 'org.jetbrains.compose' version '1.11.0'
+}
+
+repositories {
+    google()
+    mavenCentral()
 }
 
 dependencies {
     implementation project(':Anilib:Configurations:Standard')
     implementation project(':Anilib:Features:CoverCache:Bundle')
     implementation project(':Anilib:Features:Library:Api')
+    implementation project(':Anilib:Features:Library:Ui')
     implementation project(':Anilib:Kernel:Api')
+    implementation compose.desktop.currentOs
+    implementation compose.materialIconsExtended
+    implementation compose.material3
 }
 
-application {
-    mainModule = 'fr.vriege.anilib.platform.desktop'
-    mainClass = 'fr.vriege.anilib.platform.desktop.DesktopMain'
+kotlin {
+    jvmToolchain(21)
+}
+
+compose.desktop {
+    application {
+        mainClass = 'fr.vriege.anilib.platform.desktop.ComposeDesktopMainKt'
+        nativeDistributions {
+            packageName = 'Anilib'
+            packageVersion = '0.1.0'
+            targetFormats(
+                    org.jetbrains.compose.desktop.application.dsl.TargetFormat.Dmg,
+                    org.jetbrains.compose.desktop.application.dsl.TargetFormat.Msi,
+                    org.jetbrains.compose.desktop.application.dsl.TargetFormat.Deb)
+        }
+    }
 }
