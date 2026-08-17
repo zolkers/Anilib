@@ -1,0 +1,4 @@
+dependencies {
+    api project(':Anilib:Framework:Http:Api')
+    api project(':Anilib:Kernel:Api')
+}
