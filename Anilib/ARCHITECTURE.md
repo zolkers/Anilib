@@ -1,0 +1,89 @@
+# Anilib Architecture
+
+Anilib uses the ownership discipline found in large modular Java applications
+such as Ghidra: a small kernel, explicit module metadata, feature-owned vertical
+slices, typed extension contracts, and product configurations that assemble a
+fixed graph. It does not copy Ghidra APIs or dynamically scan the classpath.
+
+## Dependency direction
+
+An arrow means “may depend on”. Dependencies must remain explicit and acyclic.
+
+```text
+Platforms -> Configurations -> Features -> Kernel -> Foundation
+     |              |             |          |
+     +--------------+-------------+----------+-> Framework -> Foundation
+
+Tooling may inspect every layer; production modules never depend on Tooling.
+```
+
+| Layer | Owns | Must not own |
+| --- | --- | --- |
+| `Foundation` | identities, immutable values, validation, minimal ownership primitives | feature behavior, platform types |
+| `Framework` | reusable storage, HTTP, media, settings, scheduling, UI-neutral contracts | product defaults, feature policy |
+| `Kernel` | plugin lifecycle, manifests, capabilities, contributions, graph resolution | library, reader, or player behavior |
+| `Features` | complete vertical user capabilities and their bundles | global product selection, platform SDK types |
+| `Configurations` | explicit feature selection and startup order | feature algorithms, platform adaptation |
+| `Platforms` | runnable applications and Android/desktop adapters | duplicated feature behavior |
+| `Tooling` | repository checks, graph validation, scaffolding, release checks | production behavior |
+
+Every source-owning module has both a JPMS `module-info.java` and a local
+`module.properties`. The former lets `javac` enforce actual access; the latter
+lets AnilibJava validate architectural intent without executing production code.
+
+## Feature shape
+
+```text
+Features/<Feature>/
+  Api/       immutable public models and narrow ports
+  Core/      optional domain behavior
+  Runtime/   optional long-lived mechanisms
+  Ui/        optional platform-neutral presentation model
+  Bundle/    the feature's single AnilibPlugin composition unit
+```
+
+Only useful modules are created. A small feature does not need empty `Runtime`
+or `Ui` folders. Features collaborate through an `Api`, a typed capability, or
+a typed contribution point, never by importing another feature's `Core`.
+
+## Plugins and extensions
+
+`AnilibPlugin` is the only runtime extension unit. Its side-effect-free
+`PluginManifest` declares:
+
+- a stable component descriptor;
+- required and provided typed `CapabilityKey<T>` values;
+- typed `ContributionPoint<T>` values it extends.
+
+The kernel validates the whole graph before installation. A capability has
+exactly one provider. Missing providers, duplicate providers, dependency cycles,
+undeclared publication, and undeclared access fail before a started product is
+published.
+
+Installation is transactional. Plugins install in dependency order. Each owns
+a LIFO cleanup stack; if installation fails, the kernel closes completed
+sessions in reverse order and attaches cleanup failures to the original error.
+The graph becomes immutable after startup.
+
+There is deliberately no classpath scanning, reflection-based injection, global
+service locator, or mutable “bag of services”. Configurations select concrete
+Bundle instances explicitly, which keeps addition and removal symmetrical.
+
+## Product lifecycle
+
+1. A configuration selects feature Bundles.
+2. A platform adds only platform-owned plugins or host adapters.
+3. The kernel validates and starts one immutable graph.
+4. The platform resolves narrow capabilities and renders them.
+5. Closing the product releases all plugin sessions in reverse order.
+
+Desktop currently uses the JDK's Swing toolkit. The future Android application
+may use Android SDK APIs only inside `Platforms/Android`; all other modules
+remain ordinary Java and are shared unchanged.
+
+## External dependency policy
+
+Production and verification code may use only JDK modules and other Anilib
+modules. No dependency repository is declared. Platform SDKs and the Gradle/JDK
+toolchain are build environments, not libraries, and must remain outside the
+neutral API surface.
