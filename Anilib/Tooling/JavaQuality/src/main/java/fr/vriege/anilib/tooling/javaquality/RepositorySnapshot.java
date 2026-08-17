@@ -1,0 +1,20 @@
+package fr.vriege.anilib.tooling.javaquality;
+
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Objects;
+
+/** Immutable repository index shared by all AnilibJava rules. */
+public record RepositorySnapshot(
+        Path root,
+        List<ModuleMetadata> modules,
+        List<JavaSource> javaSources,
+        List<Path> buildFiles) {
+
+    public RepositorySnapshot {
+        Objects.requireNonNull(root, "root must not be null");
+        modules = List.copyOf(modules);
+        javaSources = List.copyOf(javaSources);
+        buildFiles = List.copyOf(buildFiles);
+    }
+}
