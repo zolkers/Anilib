@@ -4,6 +4,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -13,9 +14,10 @@ public final class KotlinSourceRule implements AnilibJavaRule {
     private static final int MAX_LINE_LENGTH = 120;
     private static final String ROOT_PACKAGE = "fr.vriege.anilib";
     private static final Pattern IMPORT = Pattern.compile("^\\s*import\\s+([^ ]+)\\s*$");
-    private static final Set<String> EXTERNAL_UI_PREFIXES = Set.of(
-            "androidx.compose.",
-            "org.jetbrains.compose.");
+    private static final Map<String, Set<String>> EXTERNAL_IMPORT_PREFIXES = Map.of(
+            "platform.android.app", Set.of("android.", "androidx.activity."),
+            "platform.compose", Set.of("androidx.compose."),
+            "platform.desktop", Set.of("androidx.compose.", "org.jetbrains.compose."));
 
     public KotlinSourceRule() {
     }
@@ -141,7 +143,8 @@ public final class KotlinSourceRule implements AnilibJavaRule {
             return true;
         }
         return module.layer() == ModuleMetadata.Layer.PLATFORM
-                && EXTERNAL_UI_PREFIXES.stream().anyMatch(imported::startsWith);
+                && EXTERNAL_IMPORT_PREFIXES.getOrDefault(module.id(), Set.of()).stream()
+                        .anyMatch(imported::startsWith);
     }
 
     private static Diagnostic diagnostic(KotlinSource source, int line, String message) {

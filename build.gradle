@@ -1,12 +1,26 @@
 plugins {
     id 'base'
+    id 'com.android.application' version '9.1.1' apply false
+    id 'com.android.kotlin.multiplatform.library' version '9.1.1' apply false
+    id 'org.jetbrains.compose' version '1.11.0' apply false
+    id 'org.jetbrains.kotlin.jvm' version '2.4.10' apply false
+    id 'org.jetbrains.kotlin.multiplatform' version '2.4.10' apply false
+    id 'org.jetbrains.kotlin.plugin.compose' version '2.4.10' apply false
 }
 
 group = 'fr.vriege.anilib'
 version = providers.gradleProperty('anilibVersion').get()
 
 subprojects {
-    apply plugin: 'java-library'
+    apply plugin: 'base'
+
+    def platformManagedBuild = project.path in [
+            ':Anilib:Platforms:Compose',
+            ':Anilib:Platforms:AndroidApp'
+    ]
+    if (!platformManagedBuild) {
+        apply plugin: 'java-library'
+    }
 
     def moduleCoordinate = project.path.substring(1).replace(':', '-').toLowerCase(Locale.ROOT)
     group = "${rootProject.group}.${moduleCoordinate}"
@@ -16,12 +30,14 @@ subprojects {
         archivesName = moduleCoordinate
     }
 
-    java {
-        toolchain {
-            languageVersion = JavaLanguageVersion.of(21)
+    if (!platformManagedBuild) {
+        java {
+            toolchain {
+                languageVersion = JavaLanguageVersion.of(21)
+            }
+            modularity.inferModulePath = true
+            withSourcesJar()
         }
-        modularity.inferModulePath = true
-        withSourcesJar()
     }
 
     tasks.withType(JavaCompile).configureEach {

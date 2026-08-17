@@ -17,19 +17,55 @@ public final class BuildDependencyRule implements AnilibJavaRule {
     private static final Pattern DEPENDENCY = Pattern.compile(
             "^\\s*(?:api|implementation|compileOnly|runtimeOnly|testImplementation|testRuntimeOnly)\\s+(.+)$");
     private static final Pattern PLUGIN = Pattern.compile(
-            "^\\s*id\\s+['\"]([^'\"]+)['\"](?:\\s+version\\s+['\"]([^'\"]+)['\"])?\\s*$");
+            "^\\s*id\\s+['\"]([^'\"]+)['\"](?:\\s+version\\s+['\"]([^'\"]+)['\"])?(?:\\s+apply\\s+false)?\\s*$");
     private static final Pattern REPOSITORY = Pattern.compile("^\\s*(google|mavenCentral)\\(\\)\\s*$");
     private static final Set<String> ALLOWED_PLUGINS = Set.of("application", "base", "java", "java-library");
+    private static final String ANDROID_APP_BUILD = "Anilib/Platforms/AndroidApp/build.gradle";
+    private static final String COMPOSE_BUILD = "Anilib/Platforms/Compose/build.gradle";
     private static final String DESKTOP_BUILD = "Anilib/Platforms/Desktop/build.gradle";
-    private static final Map<String, Set<String>> ALLOWED_EXTERNAL_DEPENDENCIES = Map.of(
-            DESKTOP_BUILD,
-            Set.of("compose.desktop.currentOs", "compose.material3", "compose.materialIconsExtended"));
-    private static final Map<String, Set<String>> ALLOWED_EXTERNAL_PLUGINS = Map.of(
-            DESKTOP_BUILD,
-            Set.of(
-                    "org.jetbrains.kotlin.jvm@2.4.10",
-                    "org.jetbrains.kotlin.plugin.compose@2.4.10",
-                    "org.jetbrains.compose@1.11.0"));
+    private static final String ROOT_BUILD = "build.gradle";
+    private static final Map<String, Set<String>> ALLOWED_EXTERNAL_DEPENDENCIES = Map.ofEntries(
+            Map.entry(
+                    ANDROID_APP_BUILD,
+                    Set.of("'androidx.activity:activity-compose:1.13.0'")),
+            Map.entry(
+                    COMPOSE_BUILD,
+                    Set.of("compose.foundation", "compose.material3", "compose.materialIconsExtended")),
+            Map.entry(
+                    DESKTOP_BUILD,
+                    Set.of("compose.desktop.currentOs")));
+    private static final Map<String, Set<String>> ALLOWED_EXTERNAL_PLUGINS = Map.ofEntries(
+            Map.entry(
+                    ANDROID_APP_BUILD,
+                    Set.of(
+                            "com.android.application@null",
+                            "org.jetbrains.kotlin.plugin.compose@null")),
+            Map.entry(
+                    COMPOSE_BUILD,
+                    Set.of(
+                            "com.android.kotlin.multiplatform.library@null",
+                            "org.jetbrains.compose@null",
+                            "org.jetbrains.kotlin.multiplatform@null",
+                            "org.jetbrains.kotlin.plugin.compose@null")),
+            Map.entry(
+                    DESKTOP_BUILD,
+                    Set.of(
+                            "org.jetbrains.kotlin.jvm@null",
+                            "org.jetbrains.kotlin.plugin.compose@null",
+                            "org.jetbrains.compose@null")),
+            Map.entry(
+                    ROOT_BUILD,
+                    Set.of(
+                            "com.android.application@9.1.1",
+                            "com.android.kotlin.multiplatform.library@9.1.1",
+                            "org.jetbrains.compose@1.11.0",
+                            "org.jetbrains.kotlin.jvm@2.4.10",
+                            "org.jetbrains.kotlin.multiplatform@2.4.10",
+                            "org.jetbrains.kotlin.plugin.compose@2.4.10")));
+    private static final Set<String> ALLOWED_REPOSITORY_BUILDS = Set.of(
+            ANDROID_APP_BUILD,
+            COMPOSE_BUILD,
+            DESKTOP_BUILD);
 
     public BuildDependencyRule() {
     }
@@ -80,7 +116,7 @@ public final class BuildDependencyRule implements AnilibJavaRule {
             }
         }
         Matcher repository = REPOSITORY.matcher(line);
-        if (repository.matches() && !normalizedPath.equals(DESKTOP_BUILD)) {
+        if (repository.matches() && !ALLOWED_REPOSITORY_BUILDS.contains(normalizedPath)) {
             diagnostics.add(new Diagnostic(name(), path, lineNumber,
                     "Dependency repositories are restricted to allowlisted platform UI builds"));
         }

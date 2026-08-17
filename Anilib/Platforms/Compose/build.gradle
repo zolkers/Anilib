@@ -1,0 +1,51 @@
+plugins {
+    id 'org.jetbrains.kotlin.multiplatform'
+    id 'com.android.kotlin.multiplatform.library'
+    id 'org.jetbrains.kotlin.plugin.compose'
+    id 'org.jetbrains.compose'
+}
+
+repositories {
+    google()
+    mavenCentral()
+}
+
+kotlin {
+    jvm('desktop') {
+        compilerOptions {
+            jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21
+        }
+    }
+
+    android {
+        namespace = 'fr.vriege.anilib.platform.compose'
+        compileSdk = 37
+        minSdk = 26
+        compilerOptions {
+            jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21
+        }
+    }
+
+    sourceSets {
+        desktopMain {
+            kotlin.srcDir('src/shared/kotlin')
+            dependencies {
+                implementation project(':Anilib:Features:Library:Api')
+                implementation project(':Anilib:Features:Library:Ui')
+                implementation compose.foundation
+                implementation compose.material3
+                implementation compose.materialIconsExtended
+            }
+        }
+        androidMain {
+            kotlin.srcDir('src/shared/kotlin')
+            dependencies {
+                implementation project(':Anilib:Features:Library:Api')
+                implementation project(':Anilib:Features:Library:Ui')
+                implementation compose.foundation
+                implementation compose.material3
+                implementation compose.materialIconsExtended
+            }
+        }
+    }
+}

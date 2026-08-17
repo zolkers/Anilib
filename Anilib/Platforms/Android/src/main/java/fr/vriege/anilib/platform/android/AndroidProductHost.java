@@ -9,9 +9,9 @@ import java.nio.file.Path;
 /**
  * Android-lifecycle seam that stays free of SDK types.
  *
- * <p>A future APK module will call {@link #start()} and {@link #stop()} from its
- * Android lifecycle and render narrow capabilities. Android types must not be
- * added to this shared host.</p>
+ * <p>The APK module calls {@link #start()} and {@link #stop()} from its Android
+ * lifecycle and renders narrow capabilities. Android types must not be added
+ * to this shared host.</p>
  */
 public final class AndroidProductHost implements AutoCloseable {
     private final Path dataDirectory;
@@ -33,6 +33,13 @@ public final class AndroidProductHost implements AutoCloseable {
             throw new IllegalStateException("Android Anilib product is not started");
         }
         return application.capability(key);
+    }
+
+    public synchronized int componentCount() {
+        if (application == null) {
+            throw new IllegalStateException("Android Anilib product is not started");
+        }
+        return application.components().size();
     }
 
     public synchronized void stop() {
