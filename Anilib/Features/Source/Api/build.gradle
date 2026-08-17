@@ -1,5 +1,4 @@
 dependencies {
     api project(':Anilib:Foundation')
     api project(':Anilib:Kernel:Api')
-    api project(':Anilib:Features:Source:Api')
 }

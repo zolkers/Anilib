@@ -6,6 +6,10 @@ import fr.vriege.anilib.feature.localsource.LocalPublication;
 import fr.vriege.anilib.feature.localsource.LocalPublicationId;
 import fr.vriege.anilib.feature.localsource.LocalPublicationType;
 import fr.vriege.anilib.feature.localsource.LocalSourceException;
+import fr.vriege.anilib.feature.source.SourceContentKind;
+import fr.vriege.anilib.feature.source.SourceDescriptor;
+import fr.vriege.anilib.feature.source.SourceId;
+import fr.vriege.anilib.feature.source.SourceSdk;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -25,6 +29,13 @@ import java.util.zip.ZipFile;
 
 /** JDK-only local content source for folders and ZIP-compatible archives. */
 public final class FileSystemLocalContentSource implements LocalContentSource {
+    private static final SourceDescriptor DESCRIPTOR = new SourceDescriptor(
+            SourceId.of("anilib.local"),
+            "Local library",
+            "1.0.0",
+            "und",
+            Set.of(SourceContentKind.MANGA),
+            SourceSdk.API_VERSION);
     private static final long MAX_PAGE_BYTES = 64L * 1024L * 1024L;
     private static final Set<String> IMAGE_EXTENSIONS =
             Set.of("bmp", "gif", "jpeg", "jpg", "png", "webp");
@@ -41,6 +52,11 @@ public final class FileSystemLocalContentSource implements LocalContentSource {
         } catch (IOException exception) {
             throw failure("create local source root", exception);
         }
+    }
+
+    @Override
+    public SourceDescriptor descriptor() {
+        return DESCRIPTOR;
     }
 
     @Override

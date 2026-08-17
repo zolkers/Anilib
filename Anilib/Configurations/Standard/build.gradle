@@ -2,5 +2,6 @@ dependencies {
     api project(':Anilib:Kernel:Api')
     implementation project(':Anilib:Kernel:Runtime')
     implementation project(':Anilib:Features:Library:Bundle')
+    implementation project(':Anilib:Features:Source:Bundle')
     implementation project(':Anilib:Features:LocalSource:Bundle')
 }
