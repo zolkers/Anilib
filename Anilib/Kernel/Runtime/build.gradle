@@ -1,3 +1,4 @@
 dependencies {
     api project(':Anilib:Kernel:Api')
+    implementation project(':Anilib:Foundation')
 }
