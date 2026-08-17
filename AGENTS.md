@@ -15,7 +15,11 @@ This file applies to the whole repository.
   second registry or hidden classpath scanning mechanism.
 - Platform SDK types belong only in the matching `Platforms` adapter.
 - All Java packages start with `fr.vriege.anilib`.
-- Do not add third-party runtime, build-plugin, or test-library dependencies.
+- Keep Foundation, Framework, Kernel, Features, Configurations, Tooling, and
+  tests free of third-party runtime libraries. Platform UI adapters may use
+  only the exact dependencies and plugins allowlisted by `AnilibJava`.
+- Kotlin is restricted to platform UI adapters. Shared contracts and behavior
+  remain Java 21; external UI code must consume them through explicit APIs.
 
 ## Quality
 

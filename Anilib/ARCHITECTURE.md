@@ -77,13 +77,21 @@ Bundle instances explicitly, which keeps addition and removal symmetrical.
 4. The platform resolves narrow capabilities and renders them.
 5. Closing the product releases all plugin sessions in reverse order.
 
-Desktop currently uses the JDK's Swing toolkit. The future Android application
-may use Android SDK APIs only inside `Platforms/Android`; all other modules
-remain ordinary Java and are shared unchanged.
+Desktop currently renders the shared Java presentation models with Compose
+Multiplatform and Material 3. Android will reuse Compose presentation patterns
+behind its platform adapter. Kotlin and UI toolkit types stay in platform
+modules; all inward modules remain ordinary Java and are shared unchanged.
 
 ## External dependency policy
 
-Production and verification code may use only JDK modules and other Anilib
-modules. No dependency repository is declared. Platform SDKs and the Gradle/JDK
-toolchain are build environments, not libraries, and must remain outside the
-neutral API surface.
+Foundation, Framework, Kernel, Features, Configurations, Tooling, and tests may
+use only JDK modules and other Anilib modules. Platform UI adapters may use a
+small exact allowlist of audited UI libraries and compiler plugins. AnilibJava
+checks both the coordinates and the owning build file; a platform cannot add an
+arbitrary dependency merely because it renders UI.
+
+Java modules remain JPMS-enforced. Compose platform applications execute on an
+isolated classpath boundary because Compose and AndroidX publish overlapping
+automatic module names. Their Anilib dependencies remain explicit in
+`module.properties`, and Kotlin source packages, imports, layout, and formatting
+are checked by AnilibJava.

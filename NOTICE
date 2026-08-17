@@ -7,3 +7,6 @@ licensed under the Apache License, Version 2.0.
 
 Aniyomi and Mihon names and marks belong to their respective owners. This
 project is not endorsed by or affiliated with either project.
+
+The Desktop platform uses Kotlin and Compose Multiplatform, copyright JetBrains
+and their respective contributors, under the Apache License, Version 2.0.
