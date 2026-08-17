@@ -5,7 +5,7 @@ features rather than a port of its internal Kotlin/Android layering.
 
 ## Phase 0 — architecture bootstrap
 
-- [x] Java 21 multi-module build with zero third-party libraries
+- [x] Java 21 multi-module core with allowlisted platform UI libraries only
 - [x] typed plugin, capability, contribution, and lifecycle contracts
 - [x] validated transactional plugin runtime
 - [x] first Library vertical slice
@@ -19,7 +19,7 @@ features rather than a port of its internal Kotlin/Android layering.
 - [x] categories, favourites, history, progress, and per-title metadata
 - [x] local archive/folder source
 - [x] cover cache and JDK image decoding
-- [ ] desktop library, details, and history pages
+- [x] desktop library, details, and history pages
 - [ ] Android application shell backed by the same capabilities
 
 ## Phase 2 — sources and discovery
