@@ -71,8 +71,10 @@ import fr.vriege.anilib.feature.source.SourceDescriptor
 import fr.vriege.anilib.feature.source.SourceFilterDefinition
 import fr.vriege.anilib.feature.source.SourceFilterType
 import fr.vriege.anilib.feature.source.SourceFilterValue
+import fr.vriege.anilib.feature.source.InstalledSourceExtension
 import fr.vriege.anilib.feature.source.SourceListing
 import fr.vriege.anilib.feature.source.SourcePage
+import fr.vriege.anilib.feature.source.SourcePermission
 import fr.vriege.anilib.feature.source.SourcePreferenceType
 import fr.vriege.anilib.feature.source.SourceId
 import java.util.Locale
@@ -137,7 +139,7 @@ internal fun DiscoveryScreen(
                     }
                 },
                 actions = {
-                    if (section.kind != null && !globalSearch) {
+                    if (section.searchable() && !globalSearch) {
                         IconButton(onClick = { globalSearch = true }) {
                             Icon(Icons.Default.Search, contentDescription = "Global search")
                         }
@@ -160,8 +162,10 @@ internal fun DiscoveryScreen(
                     )
                 }
             }
-            if (globalSearch && globalQuery.isNotBlank() && section.kind != null) {
+            if (globalSearch && globalQuery.isNotBlank() && section.sourceTab()) {
                 GlobalSearchContent(presentation, section.kind!!, globalQuery)
+            } else if (globalSearch && section.extensionTab()) {
+                ExtensionList(presentation.extensions(section.kind!!), globalQuery)
             } else {
                 when (section) {
                     BrowseSection.ANIME_SOURCES,
@@ -182,8 +186,14 @@ internal fun DiscoveryScreen(
                             listing = nextListing
                         },
                     )
-                    BrowseSection.ANIME_EXTENSIONS -> ExtensionEmptyState("anime")
-                    BrowseSection.MANGA_EXTENSIONS -> ExtensionEmptyState("manga")
+                    BrowseSection.ANIME_EXTENSIONS -> ExtensionList(
+                        presentation.extensions(SourceContentKind.ANIME),
+                        "",
+                    )
+                    BrowseSection.MANGA_EXTENSIONS -> ExtensionList(
+                        presentation.extensions(SourceContentKind.MANGA),
+                        "",
+                    )
                     BrowseSection.MIGRATE_ANIME -> MigrationContent(
                         SourceContentKind.ANIME,
                         presentation,
@@ -643,8 +653,98 @@ private fun GlobalSearchContent(
 }
 
 @Composable
-private fun ExtensionEmptyState(kind: String) {
-    EmptyDiscovery("No $kind extensions installed. Add signed extension bundles to see them here.")
+private fun ExtensionList(extensions: List<InstalledSourceExtension>, query: String) {
+    val normalizedQuery = query.trim().lowercase(Locale.ROOT)
+    val visible = extensions.filter { extension ->
+        normalizedQuery.isEmpty()
+                || extension.manifest().component().displayName().lowercase(Locale.ROOT).contains(normalizedQuery)
+                || extension.source().displayName().lowercase(Locale.ROOT).contains(normalizedQuery)
+    }
+    var expanded by remember(extensions) { mutableStateOf<Set<SourceId>>(emptySet()) }
+    if (visible.isEmpty()) {
+        EmptyDiscovery(
+            if (query.isBlank()) {
+                "No extensions installed in this product configuration."
+            } else {
+                "No extensions match your search."
+            },
+        )
+        return
+    }
+    LazyColumn(modifier = Modifier.fillMaxSize()) {
+        item {
+            Text(
+                "Installed",
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 14.dp),
+            )
+        }
+        items(visible, key = { it.source().id().toString() }) { extension ->
+            val source = extension.source()
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        expanded = if (source.id() in expanded) {
+                            expanded - source.id()
+                        } else {
+                            expanded + source.id()
+                        }
+                    }
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                SourceBadge(source)
+                Spacer(Modifier.width(14.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(extension.manifest().component().displayName(), fontWeight = FontWeight.Medium)
+                    Text(
+                        "${languageName(source.languageTag())} - v${source.extensionVersion()}",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Text("Installed", color = MaterialTheme.colorScheme.primary, fontSize = 13.sp)
+            }
+            if (source.id() in expanded) {
+                ExtensionDetails(extension)
+            }
+            HorizontalDivider(modifier = Modifier.padding(start = 72.dp))
+        }
+    }
+}
+
+@Composable
+private fun ExtensionDetails(extension: InstalledSourceExtension) {
+    val manifest = extension.manifest()
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(start = 72.dp, end = 20.dp, bottom = 12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(14.dp)) {
+            Text(extension.source().displayName(), fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "Bundle ${manifest.component().id()} - ${manifest.component().version()}",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(8.dp))
+            Text("Permissions", fontWeight = FontWeight.Medium)
+            if (manifest.permissions().isEmpty()) {
+                Text("No sensitive permissions", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
+                if (SourcePermission.NETWORK in manifest.permissions()) {
+                    Text("Network", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    manifest.networkOrigins().sorted().forEach { origin ->
+                        Text("  $origin", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                if (SourcePermission.CLEARTEXT_NETWORK in manifest.permissions()) {
+                    Text("Cleartext network", color = MaterialTheme.colorScheme.error)
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -743,3 +843,11 @@ private fun languageName(tag: String): String = when (tag.lowercase(Locale.ROOT)
     "fr" -> "French"
     else -> tag
 }
+
+private fun BrowseSection.sourceTab(): Boolean =
+    this == BrowseSection.ANIME_SOURCES || this == BrowseSection.MANGA_SOURCES
+
+private fun BrowseSection.extensionTab(): Boolean =
+    this == BrowseSection.ANIME_EXTENSIONS || this == BrowseSection.MANGA_EXTENSIONS
+
+private fun BrowseSection.searchable(): Boolean = sourceTab() || extensionTab()
