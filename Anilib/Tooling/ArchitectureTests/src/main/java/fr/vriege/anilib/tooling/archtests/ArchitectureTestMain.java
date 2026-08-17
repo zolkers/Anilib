@@ -9,6 +9,8 @@ import fr.vriege.anilib.feature.localsource.LocalSourceCapabilities;
 import fr.vriege.anilib.feature.network.NetworkCapabilities;
 import fr.vriege.anilib.feature.reader.ReaderCapabilities;
 import fr.vriege.anilib.feature.reader.ui.ReaderUiCapabilities;
+import fr.vriege.anilib.feature.downloads.DownloadCapabilities;
+import fr.vriege.anilib.feature.downloads.ui.DownloadUiCapabilities;
 import fr.vriege.anilib.feature.library.ui.LibraryUiCapabilities;
 import fr.vriege.anilib.feature.source.SourceCapabilities;
 import fr.vriege.anilib.feature.source.SourceId;
@@ -53,6 +55,7 @@ public final class ArchitectureTestMain {
         assertions += DiscoveryTest.run();
         assertions += HttpFrameworkTest.run();
         assertions += ReaderTest.run();
+        assertions += DownloadTest.run();
         System.out.println("Architecture tests: " + assertions + " assertions passed.");
     }
 
@@ -68,7 +71,7 @@ public final class ArchitectureTestMain {
             LibraryItem item = LibraryItem.create("A test title", MediaKind.MANGA);
             catalog.save(item);
             check(catalog.find(item.id()).orElseThrow().equals(item), "library must return saved item");
-            check(application.components().size() == 6, "standard product must install six bootstrap bundles");
+            check(application.components().size() == 7, "standard product must install seven bootstrap bundles");
             check(application.capability(LocalSourceCapabilities.CONTENT).publications().isEmpty(),
                     "standard product must expose the local source capability");
             SourceRegistry sourceRegistry = application.capability(SourceCapabilities.REGISTRY);
@@ -84,6 +87,10 @@ public final class ArchitectureTestMain {
                     "Reader Bundle must publish its reader capability");
             check(application.capability(ReaderUiCapabilities.PRESENTATION) != null,
                     "Reader Bundle must publish its shared presentation capability");
+            check(application.capability(DownloadCapabilities.SERVICE) != null,
+                    "Downloads Bundle must publish its queue capability");
+            check(application.capability(DownloadUiCapabilities.PRESENTATION) != null,
+                    "Downloads Bundle must publish its shared presentation capability");
             check(catalog.remove(item.id()), "library must remove existing item");
         } finally {
             deleteDirectory(dataDirectory);
@@ -91,11 +98,10 @@ public final class ArchitectureTestMain {
     }
 
     private static void deleteDirectory(Path directory) {
-        try (java.util.stream.Stream<Path> entries = Files.list(directory)) {
-            for (Path entry : entries.toList()) {
+        try (java.util.stream.Stream<Path> entries = Files.walk(directory)) {
+            for (Path entry : entries.sorted(java.util.Comparator.reverseOrder()).toList()) {
                 Files.deleteIfExists(entry);
             }
-            Files.deleteIfExists(directory);
         } catch (IOException exception) {
             throw new AssertionError("Unable to clean test directory " + directory, exception);
         }
