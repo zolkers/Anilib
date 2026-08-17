@@ -28,6 +28,9 @@ same Discovery behavior and adaptive Compose screen run on Android and desktop.
 It also includes a removable Reader Bundle with local folder/CBZ pages,
 persistent resume and history, bounded asynchronous prefetch, LTR, RTL,
 vertical, and webtoon navigation, plus one immersive shared reader screen.
+The removable Downloads Bundle adds a durable queue, bounded concurrent jobs,
+pause/cancel/resume controls, restart-safe partial downloads, storage quotas,
+and offline reading through the same Reader on Android and desktop.
 The repository also contains the dependency-free
 `AnilibJava` quality checker. Kotlin and audited UI dependencies are confined
 to outer platform renderers; shared contracts and behavior remain Java 21.

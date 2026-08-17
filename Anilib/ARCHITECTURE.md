@@ -103,6 +103,17 @@ Reading directions and controller state stay platform-neutral; Compose renders
 one immersive screen on Android and desktop, while each outer adapter performs
 only its native encoded-image decoding.
 
+Downloads is a removable vertical over Library, Source, and Reader. Its Bundle
+owns the durable job queue, atomic metadata writes, page files, concurrent-job
+limit, per-page and total-storage policies, pause/cancel/resume transitions, and
+restart reconciliation of partial jobs. It registers one typed content provider
+through Reader's installation capability: completed local pages take priority,
+while the original `PagedSource` remains the online fallback. Offline mode
+disables that fallback without making Reader depend on Downloads, and removing
+the Downloads Bundle removes both the queue capability and the registration.
+The Java presentation model is rendered by one Aniyomi-style queue screen on
+Android and desktop.
+
 HTTP is split at the platform boundary. Framework contracts own immutable
 requests and responses plus cookie, cache, rate-limit, and low-level transport
 ports. One shared policy engine applies those contracts. Desktop injects the
