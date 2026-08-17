@@ -20,6 +20,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CollectionsBookmark
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.NewReleases
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -45,11 +48,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.vriege.anilib.feature.library.LibraryProgress
+import fr.vriege.anilib.feature.discovery.ui.DiscoveryPresentation
 import fr.vriege.anilib.feature.library.ui.LibraryCard
 import fr.vriege.anilib.feature.library.ui.LibraryDetails
 import fr.vriege.anilib.feature.library.ui.LibraryHistoryRow
@@ -73,11 +78,13 @@ private val dateTimeFormatter = DateTimeFormatter
 @Composable
 fun AnilibApp(
     presentation: LibraryPresentation,
+    discovery: DiscoveryPresentation,
     componentCount: Int,
     darkTheme: Boolean = isSystemInDarkTheme(),
 ) {
     val navigator = remember { LibraryNavigator() }
     var destination by remember { mutableStateOf(navigator.state()) }
+    var section by remember { mutableStateOf(AppSection.LIBRARY) }
     val navigate: ((LibraryNavigator) -> Unit) -> Unit = { transition ->
         transition(navigator)
         destination = navigator.state()
@@ -87,9 +94,25 @@ fun AnilibApp(
         Surface(modifier = Modifier.fillMaxSize()) {
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                 if (maxWidth >= 720.dp) {
-                    ExpandedShell(presentation, destination, componentCount, navigate)
+                    ExpandedShell(
+                        presentation,
+                        discovery,
+                        destination,
+                        section,
+                        componentCount,
+                        navigate,
+                        { section = it },
+                    )
                 } else {
-                    CompactShell(presentation, destination, componentCount, navigate)
+                    CompactShell(
+                        presentation,
+                        discovery,
+                        destination,
+                        section,
+                        componentCount,
+                        navigate,
+                        { section = it },
+                    )
                 }
             }
         }
@@ -99,15 +122,26 @@ fun AnilibApp(
 @Composable
 private fun ExpandedShell(
     presentation: LibraryPresentation,
+    discovery: DiscoveryPresentation,
     destination: LibraryNavigationState,
+    section: AppSection,
     componentCount: Int,
     navigate: ((LibraryNavigator) -> Unit) -> Unit,
+    openSection: (AppSection) -> Unit,
 ) {
     Row(modifier = Modifier.fillMaxSize()) {
-        AnilibNavigationRail(destination, navigate)
+        AnilibNavigationRail(section, openSection)
         VerticalDivider()
         Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
-            LibraryDestination(presentation, destination, componentCount, navigate)
+            AppDestination(
+                presentation,
+                discovery,
+                destination,
+                section,
+                componentCount,
+                navigate,
+                openSection,
+            )
         }
     }
 }
@@ -115,23 +149,34 @@ private fun ExpandedShell(
 @Composable
 private fun CompactShell(
     presentation: LibraryPresentation,
+    discovery: DiscoveryPresentation,
     destination: LibraryNavigationState,
+    section: AppSection,
     componentCount: Int,
     navigate: ((LibraryNavigator) -> Unit) -> Unit,
+    openSection: (AppSection) -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-            LibraryDestination(presentation, destination, componentCount, navigate)
+            AppDestination(
+                presentation,
+                discovery,
+                destination,
+                section,
+                componentCount,
+                navigate,
+                openSection,
+            )
         }
         HorizontalDivider()
-        AnilibNavigationBar(destination, navigate)
+        AnilibNavigationBar(section, openSection)
     }
 }
 
 @Composable
 private fun AnilibNavigationRail(
-    destination: LibraryNavigationState,
-    navigate: ((LibraryNavigator) -> Unit) -> Unit,
+    section: AppSection,
+    openSection: (AppSection) -> Unit,
 ) {
     NavigationRail(header = {
         Text(
@@ -141,53 +186,56 @@ private fun AnilibNavigationRail(
             modifier = Modifier.padding(vertical = 22.dp),
         )
     }) {
-        NavigationRailItem(
-            selected = destination.page() == LibraryPage.LIBRARY,
-            onClick = { navigate(LibraryNavigator::openLibrary) },
-            icon = { Icon(Icons.Default.CollectionsBookmark, contentDescription = null) },
-            label = { Text("Library") },
-        )
-        NavigationRailItem(
-            selected = destination.page() == LibraryPage.HISTORY,
-            onClick = { navigate(LibraryNavigator::openHistory) },
-            icon = { Icon(Icons.Default.History, contentDescription = null) },
-            label = { Text("History") },
-        )
+        AppSection.entries.forEach { item ->
+            NavigationRailItem(
+                selected = section == item,
+                onClick = { openSection(item) },
+                icon = { Icon(item.icon(), contentDescription = null) },
+                label = { Text(item.label) },
+            )
+        }
     }
 }
 
 @Composable
 private fun AnilibNavigationBar(
-    destination: LibraryNavigationState,
-    navigate: ((LibraryNavigator) -> Unit) -> Unit,
+    section: AppSection,
+    openSection: (AppSection) -> Unit,
 ) {
     NavigationBar {
-        NavigationBarItem(
-            selected = destination.page() == LibraryPage.LIBRARY,
-            onClick = { navigate(LibraryNavigator::openLibrary) },
-            icon = { Icon(Icons.Default.CollectionsBookmark, contentDescription = null) },
-            label = { Text("Library") },
-        )
-        NavigationBarItem(
-            selected = destination.page() == LibraryPage.HISTORY,
-            onClick = { navigate(LibraryNavigator::openHistory) },
-            icon = { Icon(Icons.Default.History, contentDescription = null) },
-            label = { Text("History") },
-        )
+        AppSection.entries.forEach { item ->
+            NavigationBarItem(
+                selected = section == item,
+                onClick = { openSection(item) },
+                icon = { Icon(item.icon(), contentDescription = null) },
+                label = { Text(item.label) },
+            )
+        }
     }
 }
 
 @Composable
-private fun LibraryDestination(
+private fun AppDestination(
     presentation: LibraryPresentation,
+    discovery: DiscoveryPresentation,
     destination: LibraryNavigationState,
+    section: AppSection,
     componentCount: Int,
     navigate: ((LibraryNavigator) -> Unit) -> Unit,
+    openSection: (AppSection) -> Unit,
 ) {
-    when (destination.page()) {
-        LibraryPage.LIBRARY -> LibraryPageContent(presentation.library(), componentCount, navigate)
-        LibraryPage.HISTORY -> HistoryPage(presentation, navigate)
-        LibraryPage.DETAILS -> DetailsDestination(presentation, destination, navigate)
+    when (section) {
+        AppSection.LIBRARY -> when (destination.page()) {
+            LibraryPage.DETAILS -> DetailsDestination(presentation, destination, navigate)
+            else -> LibraryPageContent(presentation.library(), componentCount, navigate)
+        }
+        AppSection.UPDATES -> PlaceholderPage("Updates", "New chapters and episodes will appear here.")
+        AppSection.HISTORY -> HistoryPage(presentation) { transition ->
+            navigate(transition)
+            openSection(AppSection.LIBRARY)
+        }
+        AppSection.BROWSE -> DiscoveryScreen(discovery, presentation)
+        AppSection.MORE -> MorePage(componentCount)
     }
 }
 
@@ -391,6 +439,42 @@ private fun EmptyPage(message: String) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PlaceholderPage(title: String, message: String) {
+    Scaffold(topBar = { TopAppBar(title = { Text(title) }) }) { padding ->
+        Box(
+            modifier = Modifier.fillMaxSize().padding(padding),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MorePage(componentCount: Int) {
+    Scaffold(topBar = { TopAppBar(title = { Text("More") }) }) { padding ->
+        LazyColumn(modifier = Modifier.fillMaxSize().padding(padding)) {
+            item { MoreRow("Download queue", "Manage current and completed downloads") }
+            item { MoreRow("Categories", "Organize anime and manga in your library") }
+            item { MoreRow("Statistics", "Library and reading activity") }
+            item { MoreRow("Settings", "Appearance, library, reader, player, and tracking") }
+            item { MoreRow("About", "$componentCount feature bundles active") }
+        }
+    }
+}
+
+@Composable
+private fun MoreRow(title: String, summary: String) {
+    Column(modifier = Modifier.fillMaxWidth().clickable { }.padding(horizontal = 24.dp, vertical = 18.dp)) {
+        Text(title, fontWeight = FontWeight.Medium)
+        Spacer(Modifier.height(4.dp))
+        Text(summary, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
 @Composable
 private fun MissingDetails(openLibrary: () -> Unit) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -427,3 +511,19 @@ private fun formatEnum(value: Enum<*>): String = value.name
     .replace('_', ' ')
     .lowercase(Locale.ROOT)
     .replaceFirstChar(Char::uppercase)
+
+private enum class AppSection(val label: String) {
+    LIBRARY("Library"),
+    UPDATES("Updates"),
+    HISTORY("History"),
+    BROWSE("Browse"),
+    MORE("More"),
+}
+
+private fun AppSection.icon(): ImageVector = when (this) {
+    AppSection.LIBRARY -> Icons.Default.CollectionsBookmark
+    AppSection.UPDATES -> Icons.Default.NewReleases
+    AppSection.HISTORY -> Icons.Default.History
+    AppSection.BROWSE -> Icons.Default.Explore
+    AppSection.MORE -> Icons.Default.MoreHoriz
+}

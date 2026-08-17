@@ -6,6 +6,7 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import fr.vriege.anilib.configuration.standard.StandardAnilib
 import fr.vriege.anilib.feature.covercache.bundle.CoverCachePlugin
+import fr.vriege.anilib.feature.discovery.ui.DiscoveryUiCapabilities
 import fr.vriege.anilib.feature.library.ui.LibraryUiCapabilities
 import fr.vriege.anilib.framework.http.jdk.JdkHttpTransport
 import fr.vriege.anilib.kernel.StartedAnilib
@@ -25,6 +26,7 @@ fun main() {
         return
     }
     val presentation = started.capability(LibraryUiCapabilities.PRESENTATION)
+    val discovery = started.capability(DiscoveryUiCapabilities.PRESENTATION)
     application {
         Window(
             onCloseRequest = {
@@ -35,6 +37,7 @@ fun main() {
         ) {
             AnilibApp(
                 presentation = presentation,
+                discovery = discovery,
                 componentCount = started.components().size,
                 darkTheme = desktopDarkTheme(),
             )

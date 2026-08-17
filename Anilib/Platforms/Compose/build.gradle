@@ -32,6 +32,9 @@ kotlin {
             dependencies {
                 implementation project(':Anilib:Features:Library:Api')
                 implementation project(':Anilib:Features:Library:Ui')
+                implementation project(':Anilib:Features:Discovery:Api')
+                implementation project(':Anilib:Features:Discovery:Ui')
+                implementation project(':Anilib:Features:Source:Api')
                 implementation compose.foundation
                 implementation compose.material3
                 implementation compose.materialIconsExtended
@@ -42,6 +45,9 @@ kotlin {
             dependencies {
                 implementation project(':Anilib:Features:Library:Api')
                 implementation project(':Anilib:Features:Library:Ui')
+                implementation project(':Anilib:Features:Discovery:Api')
+                implementation project(':Anilib:Features:Discovery:Ui')
+                implementation project(':Anilib:Features:Source:Api')
                 implementation compose.foundation
                 implementation compose.material3
                 implementation compose.materialIconsExtended

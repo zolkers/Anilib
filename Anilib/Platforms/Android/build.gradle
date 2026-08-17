@@ -33,6 +33,7 @@ android {
 dependencies {
     implementation project(':Anilib:Framework:Http:Runtime')
     implementation project(':Anilib:Configurations:Standard')
+    implementation project(':Anilib:Features:Discovery:Ui')
     implementation project(':Anilib:Features:Library:Ui')
     implementation project(':Anilib:Platforms:Compose')
     implementation 'androidx.activity:activity-compose:1.13.0'

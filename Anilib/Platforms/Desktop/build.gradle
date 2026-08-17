@@ -13,6 +13,7 @@ dependencies {
     implementation project(':Anilib:Framework:Http:JdkRuntime')
     implementation project(':Anilib:Configurations:Standard')
     implementation project(':Anilib:Features:CoverCache:Bundle')
+    implementation project(':Anilib:Features:Discovery:Ui')
     implementation project(':Anilib:Features:Library:Ui')
     implementation project(':Anilib:Kernel:Api')
     implementation project(':Anilib:Platforms:Compose')
