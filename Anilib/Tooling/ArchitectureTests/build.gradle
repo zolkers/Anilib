@@ -16,6 +16,8 @@ dependencies {
     implementation project(':Anilib:Features:Library:Ui')
     implementation project(':Anilib:Features:LocalSource:Api')
     implementation project(':Anilib:Features:LocalSource:Runtime')
+    implementation project(':Anilib:Features:Source:Api')
+    implementation project(':Anilib:Features:Source:Bundle')
 }
 
 application {

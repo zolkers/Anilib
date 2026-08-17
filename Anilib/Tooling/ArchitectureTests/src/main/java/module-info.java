@@ -13,4 +13,6 @@ module fr.vriege.anilib.tooling.archtests {
     requires fr.vriege.anilib.feature.library.ui;
     requires fr.vriege.anilib.feature.localsource.api;
     requires fr.vriege.anilib.feature.localsource.runtime;
+    requires fr.vriege.anilib.feature.source.api;
+    requires fr.vriege.anilib.feature.source.bundle;
 }

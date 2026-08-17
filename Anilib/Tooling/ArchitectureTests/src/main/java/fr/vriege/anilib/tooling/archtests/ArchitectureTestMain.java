@@ -7,6 +7,9 @@ import fr.vriege.anilib.feature.library.LibraryItem;
 import fr.vriege.anilib.feature.library.MediaKind;
 import fr.vriege.anilib.feature.localsource.LocalSourceCapabilities;
 import fr.vriege.anilib.feature.library.ui.LibraryUiCapabilities;
+import fr.vriege.anilib.feature.source.SourceCapabilities;
+import fr.vriege.anilib.feature.source.SourceId;
+import fr.vriege.anilib.feature.source.SourceRegistry;
 import fr.vriege.anilib.foundation.component.ComponentDescriptor;
 import fr.vriege.anilib.kernel.AnilibPlugin;
 import fr.vriege.anilib.kernel.CapabilityKey;
@@ -42,6 +45,7 @@ public final class ArchitectureTestMain {
         assertions += LocalSourceTest.run();
         assertions += CoverCacheTest.run();
         assertions += LibraryPresentationTest.run();
+        assertions += SourceExtensionSdkTest.run();
         System.out.println("Architecture tests: " + assertions + " assertions passed.");
     }
 
@@ -57,9 +61,14 @@ public final class ArchitectureTestMain {
             LibraryItem item = LibraryItem.create("A test title", MediaKind.MANGA);
             catalog.save(item);
             check(catalog.find(item.id()).orElseThrow().equals(item), "library must return saved item");
-            check(application.components().size() == 2, "standard product must install two bootstrap bundles");
+            check(application.components().size() == 3, "standard product must install three bootstrap bundles");
             check(application.capability(LocalSourceCapabilities.CONTENT).publications().isEmpty(),
                     "standard product must expose the local source capability");
+            SourceRegistry sourceRegistry = application.capability(SourceCapabilities.REGISTRY);
+            check(sourceRegistry.sources().size() == 1,
+                    "standard product must register its local source explicitly");
+            check(sourceRegistry.find(SourceId.of("anilib.local")).isPresent(),
+                    "standard product must expose the local source by stable id");
             check(application.capability(LibraryUiCapabilities.PRESENTATION).library().titles().size() == 1,
                     "Library Bundle must publish its presentation capability");
             check(catalog.remove(item.id()), "library must remove existing item");
