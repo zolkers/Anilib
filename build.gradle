@@ -8,8 +8,13 @@ version = providers.gradleProperty('anilibVersion').get()
 subprojects {
     apply plugin: 'java-library'
 
-    group = rootProject.group
+    def moduleCoordinate = project.path.substring(1).replace(':', '-').toLowerCase(Locale.ROOT)
+    group = "${rootProject.group}.${moduleCoordinate}"
     version = rootProject.version
+
+    base {
+        archivesName = moduleCoordinate
+    }
 
     java {
         toolchain {
