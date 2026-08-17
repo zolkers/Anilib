@@ -39,6 +39,7 @@ public final class ArchitectureTestMain {
         contributionsAreOrderedDeterministically();
         assertions += LibraryPersistenceTest.run();
         assertions += LocalSourceTest.run();
+        assertions += CoverCacheTest.run();
         System.out.println("Architecture tests: " + assertions + " assertions passed.");
     }
 
