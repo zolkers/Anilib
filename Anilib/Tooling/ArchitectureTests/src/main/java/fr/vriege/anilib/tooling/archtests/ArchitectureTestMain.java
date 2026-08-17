@@ -36,6 +36,7 @@ public final class ArchitectureTestMain {
         graphRejectsMissingPublication();
         installationRollsBackInReverseOrder();
         contributionsAreOrderedDeterministically();
+        assertions += LibraryPersistenceTest.run();
         System.out.println("Architecture tests: " + assertions + " assertions passed.");
     }
 
