@@ -17,7 +17,7 @@ features rather than a port of its internal Kotlin/Android layering.
 
 - [x] durable file-backed catalog with atomic writes and migrations
 - [x] categories, favourites, history, progress, and per-title metadata
-- [ ] local archive/folder source
+- [x] local archive/folder source
 - [ ] cover cache and JDK image decoding
 - [ ] desktop library, details, and history pages
 - [ ] Android application shell backed by the same capabilities
