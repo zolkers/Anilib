@@ -72,7 +72,9 @@ final class SourceExtensionSdkTest {
                 "a source requiring another major API must fail product startup");
         counter.check(SourceSdk.API_VERSION.supports(new SourceApiVersion(1, 0)),
                 "current Source API must support its own baseline");
-        counter.check(!SourceSdk.API_VERSION.supports(new SourceApiVersion(1, 1)),
+        counter.check(SourceSdk.API_VERSION.supports(new SourceApiVersion(1, 1)),
+                "current Source API must support its catalogue contract");
+        counter.check(!SourceSdk.API_VERSION.supports(new SourceApiVersion(1, 2)),
                 "current Source API must reject a newer minor contract");
     }
 

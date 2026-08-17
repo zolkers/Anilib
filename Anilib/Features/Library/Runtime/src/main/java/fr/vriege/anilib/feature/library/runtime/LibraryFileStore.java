@@ -2,6 +2,7 @@ package fr.vriege.anilib.feature.library.runtime;
 
 import fr.vriege.anilib.feature.library.LibraryItem;
 import fr.vriege.anilib.feature.library.LibraryItemId;
+import fr.vriege.anilib.feature.library.LibraryOrigin;
 import fr.vriege.anilib.feature.library.LibraryHistoryEntry;
 import fr.vriege.anilib.feature.library.LibraryProgress;
 import fr.vriege.anilib.feature.library.LibraryTitleMetadata;
@@ -34,7 +35,7 @@ import java.util.Set;
 /** Owns the versioned on-disk format and atomic replacement protocol. */
 final class LibraryFileStore {
     static final int MAGIC = 0x414E494C;
-    static final int CURRENT_VERSION = 2;
+    static final int CURRENT_VERSION = 3;
 
     private static final int MAX_ITEMS = 1_000_000;
     private static final int MAX_CATEGORIES_PER_ITEM = 1_000;
@@ -59,7 +60,8 @@ final class LibraryFileStore {
             List<LibraryItem> items = switch (version) {
                 case 0 -> readVersionZero(input);
                 case 1 -> readVersionOne(input);
-                case CURRENT_VERSION -> readVersionTwo(input);
+                case 2 -> readVersionTwo(input);
+                case CURRENT_VERSION -> readVersionThree(input);
                 default -> throw new IOException("Unsupported Anilib library version: " + version);
             };
             if (input.read() != -1) {
@@ -99,7 +101,7 @@ final class LibraryFileStore {
             output.writeInt(CURRENT_VERSION);
             output.writeInt(ordered.size());
             for (LibraryItem item : ordered) {
-                writeVersionTwoItem(output, item);
+                writeVersionThreeItem(output, item);
             }
             output.flush();
             channel.force(true);
@@ -186,6 +188,39 @@ final class LibraryFileStore {
         return List.copyOf(items);
     }
 
+    private static List<LibraryItem> readVersionThree(DataInputStream input) throws IOException {
+        int itemCount = readCount(input, MAX_ITEMS, "item");
+        List<LibraryItem> items = new ArrayList<>(itemCount);
+        Set<LibraryItemId> identifiers = new HashSet<>();
+        for (int index = 0; index < itemCount; index++) {
+            LibraryItemId id = new LibraryItemId(input.readUTF());
+            String title = input.readUTF();
+            MediaKind kind = MediaKind.valueOf(input.readUTF());
+            Instant addedAt = readInstant(input);
+            Set<String> categories = readUniqueStrings(
+                    input,
+                    MAX_CATEGORIES_PER_ITEM,
+                    "category");
+            boolean favorite = input.readBoolean();
+            Optional<LibraryProgress> progress = readProgress(input);
+            List<LibraryHistoryEntry> history = readHistory(input);
+            LibraryTitleMetadata metadata = readMetadata(input);
+            Optional<LibraryOrigin> origin = readOrigin(input);
+            addUnique(items, identifiers, new LibraryItem(
+                    id,
+                    title,
+                    kind,
+                    addedAt,
+                    categories,
+                    favorite,
+                    progress,
+                    history,
+                    metadata,
+                    origin));
+        }
+        return List.copyOf(items);
+    }
+
     private static void addUnique(
             List<LibraryItem> items,
             Set<LibraryItemId> identifiers,
@@ -218,6 +253,23 @@ final class LibraryFileStore {
         writeProgress(output, item.progress());
         writeHistory(output, item.history());
         writeMetadata(output, item.metadata());
+    }
+
+    private static void writeVersionThreeItem(DataOutputStream output, LibraryItem item) throws IOException {
+        writeVersionTwoItem(output, item);
+        output.writeBoolean(item.origin().isPresent());
+        if (item.origin().isPresent()) {
+            LibraryOrigin origin = item.origin().orElseThrow();
+            output.writeUTF(origin.sourceId());
+            output.writeUTF(origin.sourceItemKey());
+        }
+    }
+
+    private static Optional<LibraryOrigin> readOrigin(DataInputStream input) throws IOException {
+        if (!input.readBoolean()) {
+            return Optional.empty();
+        }
+        return Optional.of(new LibraryOrigin(input.readUTF(), input.readUTF()));
     }
 
     private static Optional<LibraryProgress> readProgress(DataInputStream input) throws IOException {
@@ -304,7 +356,7 @@ final class LibraryFileStore {
 
     private static void writeMetadata(
             DataOutputStream output,
-        LibraryTitleMetadata metadata) throws IOException {
+            LibraryTitleMetadata metadata) throws IOException {
         output.writeUTF(metadata.description());
         writeStrings(output, metadata.authors(), MAX_PEOPLE_PER_ITEM, "author");
         writeStrings(output, metadata.artists(), MAX_PEOPLE_PER_ITEM, "artist");

@@ -47,6 +47,7 @@ public final class ArchitectureTestMain {
         assertions += CoverCacheTest.run();
         assertions += LibraryPresentationTest.run();
         assertions += SourceExtensionSdkTest.run();
+        assertions += DiscoveryTest.run();
         assertions += HttpFrameworkTest.run();
         System.out.println("Architecture tests: " + assertions + " assertions passed.");
     }
@@ -63,7 +64,7 @@ public final class ArchitectureTestMain {
             LibraryItem item = LibraryItem.create("A test title", MediaKind.MANGA);
             catalog.save(item);
             check(catalog.find(item.id()).orElseThrow().equals(item), "library must return saved item");
-            check(application.components().size() == 4, "standard product must install four bootstrap bundles");
+            check(application.components().size() == 5, "standard product must install five bootstrap bundles");
             check(application.capability(LocalSourceCapabilities.CONTENT).publications().isEmpty(),
                     "standard product must expose the local source capability");
             SourceRegistry sourceRegistry = application.capability(SourceCapabilities.REGISTRY);

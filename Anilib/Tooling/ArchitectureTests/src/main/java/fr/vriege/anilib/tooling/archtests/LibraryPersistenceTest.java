@@ -2,6 +2,7 @@ package fr.vriege.anilib.tooling.archtests;
 
 import fr.vriege.anilib.feature.library.LibraryItem;
 import fr.vriege.anilib.feature.library.LibraryItemId;
+import fr.vriege.anilib.feature.library.LibraryOrigin;
 import fr.vriege.anilib.feature.library.LibraryHistoryEntry;
 import fr.vriege.anilib.feature.library.LibraryProgress;
 import fr.vriege.anilib.feature.library.LibraryTitleMetadata;
@@ -23,7 +24,7 @@ import java.util.stream.Stream;
 /** Black-box persistence, atomic replacement, and legacy migration checks. */
 final class LibraryPersistenceTest {
     private static final int MAGIC = 0x414E494C;
-    private static final int CURRENT_VERSION = 2;
+    private static final int CURRENT_VERSION = 3;
 
     private LibraryPersistenceTest() {
     }
@@ -34,6 +35,7 @@ final class LibraryPersistenceTest {
             roundTripsCurrentFormat(counter);
             migratesVersionZero(counter);
             migratesVersionOne(counter);
+            migratesVersionTwo(counter);
         } catch (IOException exception) {
             throw new AssertionError("Library persistence test failed", exception);
         }
@@ -68,13 +70,16 @@ final class LibraryPersistenceTest {
                             "A persistence test title.",
                             List.of("Test Author"),
                             List.of("Test Artist"),
-                            PublicationStatus.ONGOING));
+                            PublicationStatus.ONGOING))
+                    .withOrigin(new LibraryOrigin("test.source", "remote-title-7"));
             counter.check(item.favorite(), "favourite state must be expressible");
             counter.check(item.progress().orElseThrow().completion().orElseThrow() > 0.68,
                     "progress must expose a normalized completion");
             counter.check(item.history().size() == 2, "history must retain chronological visits");
             counter.check(item.metadata().publicationStatus() == PublicationStatus.ONGOING,
                     "per-title publication metadata must be typed");
+            counter.check(item.origin().orElseThrow().sourceId().equals("test.source"),
+                    "source origin must be expressible");
             FileLibraryCatalog catalog = new FileLibraryCatalog(file);
             catalog.save(item);
 
@@ -120,7 +125,23 @@ final class LibraryPersistenceTest {
                     "version one categories must survive migration");
             checkEnrichedDefaults(counter, item, "version one");
             counter.check(readVersion(file) == CURRENT_VERSION,
-                    "opening a version one catalog must rewrite version two");
+                    "opening a version one catalog must rewrite version three");
+        } finally {
+            deleteDirectory(directory);
+        }
+    }
+
+    private static void migratesVersionTwo(Counter counter) throws IOException {
+        Path directory = Files.createTempDirectory("anilib-library-v2-migration");
+        Path file = directory.resolve("library.anilib");
+        LibraryItemId id = new LibraryItemId("version-two-item");
+        try {
+            writeVersionTwo(file, id);
+            LibraryItem item = new FileLibraryCatalog(file).find(id).orElseThrow();
+            counter.check(item.favorite(), "version two favourite state must survive migration");
+            counter.check(item.origin().isEmpty(), "version two migration must initialize source origin");
+            counter.check(readVersion(file) == CURRENT_VERSION,
+                    "opening a version two catalog must rewrite version three");
         } finally {
             deleteDirectory(directory);
         }
@@ -157,12 +178,36 @@ final class LibraryPersistenceTest {
         }
     }
 
+    private static void writeVersionTwo(Path file, LibraryItemId id) throws IOException {
+        Instant addedAt = Instant.parse("2026-02-03T04:05:06.123456789Z");
+        try (DataOutputStream output = new DataOutputStream(
+                new BufferedOutputStream(Files.newOutputStream(file)))) {
+            output.writeInt(MAGIC);
+            output.writeInt(2);
+            output.writeInt(1);
+            output.writeUTF(id.value());
+            output.writeUTF("Version two title");
+            output.writeUTF(MediaKind.MANGA.name());
+            output.writeLong(addedAt.getEpochSecond());
+            output.writeInt(addedAt.getNano());
+            output.writeInt(0);
+            output.writeBoolean(true);
+            output.writeBoolean(false);
+            output.writeInt(0);
+            output.writeUTF("Version two metadata");
+            output.writeInt(0);
+            output.writeInt(0);
+            output.writeUTF(PublicationStatus.COMPLETED.name());
+        }
+    }
+
     private static void checkEnrichedDefaults(Counter counter, LibraryItem item, String version) {
         counter.check(!item.favorite(), version + " migration must default favourite to false");
         counter.check(item.progress().isEmpty(), version + " migration must initialize progress");
         counter.check(item.history().isEmpty(), version + " migration must initialize history");
         counter.check(item.metadata().equals(LibraryTitleMetadata.empty()),
                 version + " migration must initialize title metadata");
+        counter.check(item.origin().isEmpty(), version + " migration must initialize source origin");
     }
 
     private static int readVersion(Path file) throws IOException {

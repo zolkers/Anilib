@@ -7,6 +7,8 @@ dependencies {
     implementation project(':Anilib:Kernel:Api')
     implementation project(':Anilib:Kernel:Runtime')
     implementation project(':Anilib:Configurations:Standard')
+    implementation project(':Anilib:Features:Discovery:Api')
+    implementation project(':Anilib:Features:Discovery:Ui')
     implementation project(':Anilib:Features:CoverCache:Api')
     implementation project(':Anilib:Features:CoverCache:Runtime')
     implementation project(':Anilib:Features:CoverCache:Bundle')

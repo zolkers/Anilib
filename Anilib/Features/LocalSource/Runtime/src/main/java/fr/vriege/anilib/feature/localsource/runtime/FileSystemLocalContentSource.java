@@ -6,10 +6,20 @@ import fr.vriege.anilib.feature.localsource.LocalPublication;
 import fr.vriege.anilib.feature.localsource.LocalPublicationId;
 import fr.vriege.anilib.feature.localsource.LocalPublicationType;
 import fr.vriege.anilib.feature.localsource.LocalSourceException;
+import fr.vriege.anilib.feature.source.CatalogueSource;
+import fr.vriege.anilib.feature.source.SourceBrowseRequest;
+import fr.vriege.anilib.feature.source.SourceCatalogueItem;
+import fr.vriege.anilib.feature.source.SourceCatalogueItemId;
 import fr.vriege.anilib.feature.source.SourceContentKind;
 import fr.vriege.anilib.feature.source.SourceDescriptor;
+import fr.vriege.anilib.feature.source.SourceFilterDefinition;
+import fr.vriege.anilib.feature.source.SourceFilterType;
 import fr.vriege.anilib.feature.source.SourceId;
+import fr.vriege.anilib.feature.source.SourcePage;
+import fr.vriege.anilib.feature.source.SourcePreferenceDefinition;
+import fr.vriege.anilib.feature.source.SourcePreferenceType;
 import fr.vriege.anilib.feature.source.SourceSdk;
+import fr.vriege.anilib.feature.source.SourceSearchRequest;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -21,6 +31,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
@@ -28,7 +39,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 /** JDK-only local content source for folders and ZIP-compatible archives. */
-public final class FileSystemLocalContentSource implements LocalContentSource {
+public final class FileSystemLocalContentSource implements LocalContentSource, CatalogueSource {
     private static final SourceDescriptor DESCRIPTOR = new SourceDescriptor(
             SourceId.of("anilib.local"),
             "Local library",
@@ -42,6 +53,45 @@ public final class FileSystemLocalContentSource implements LocalContentSource {
     private static final Set<String> ARCHIVE_EXTENSIONS = Set.of("cbz", "zip");
     private static final Comparator<String> NAME_ORDER =
             String.CASE_INSENSITIVE_ORDER.thenComparing(Comparator.naturalOrder());
+    private static final List<SourceFilterDefinition> FILTERS = List.of(
+            new SourceFilterDefinition(
+                    "format",
+                    "Format",
+                    SourceFilterType.SELECT,
+                    List.of("All", "Folders", "Archives"),
+                    "All",
+                    ""),
+            new SourceFilterDefinition(
+                    "title",
+                    "Title contains",
+                    SourceFilterType.TEXT,
+                    List.of(),
+                    "",
+                    ""),
+            new SourceFilterDefinition(
+                    "sort",
+                    "Sort",
+                    SourceFilterType.SORT,
+                    List.of("Title ascending", "Title descending"),
+                    "Title ascending",
+                    ""));
+    private static final List<SourcePreferenceDefinition> PREFERENCES = List.of(
+            new SourcePreferenceDefinition(
+                    "include-folders",
+                    "Include folders",
+                    "Show image folders in the local catalogue",
+                    SourcePreferenceType.SWITCH,
+                    List.of(),
+                    "true",
+                    false),
+            new SourcePreferenceDefinition(
+                    "include-archives",
+                    "Include archives",
+                    "Show ZIP and CBZ archives in the local catalogue",
+                    SourcePreferenceType.SWITCH,
+                    List.of(),
+                    "true",
+                    false));
 
     private final Path root;
 
@@ -74,6 +124,37 @@ public final class FileSystemLocalContentSource implements LocalContentSource {
     }
 
     @Override
+    public SourcePage popular(SourceBrowseRequest request) {
+        return cataloguePage(request, "", false);
+    }
+
+    @Override
+    public boolean supportsLatest() {
+        return true;
+    }
+
+    @Override
+    public SourcePage latest(SourceBrowseRequest request) {
+        return cataloguePage(request, "", true);
+    }
+
+    @Override
+    public SourcePage search(SourceSearchRequest request) {
+        Objects.requireNonNull(request, "request must not be null");
+        return cataloguePage(request.browseRequest(), request.query(), false);
+    }
+
+    @Override
+    public List<SourceFilterDefinition> filters() {
+        return FILTERS;
+    }
+
+    @Override
+    public List<SourcePreferenceDefinition> preferences() {
+        return PREFERENCES;
+    }
+
+    @Override
     public List<LocalPage> pages(LocalPublicationId publicationId) {
         Objects.requireNonNull(publicationId, "publicationId must not be null");
         Path publication = resolvePublication(publicationId);
@@ -98,6 +179,79 @@ public final class FileSystemLocalContentSource implements LocalContentSource {
             case DIRECTORY -> readDirectoryPage(publication, page);
             case ZIP_ARCHIVE -> readArchivePage(publication, page);
         };
+    }
+
+    private SourcePage cataloguePage(SourceBrowseRequest request, String query, boolean latest) {
+        Objects.requireNonNull(request, "request must not be null");
+        java.util.Map<String, String> filters = new java.util.LinkedHashMap<>();
+        request.filters().forEach(value -> filters.put(value.filterId(), value.value()));
+        String normalizedQuery = query.strip().toLowerCase(Locale.ROOT);
+        String titleFilter = filters.getOrDefault("title", "").strip().toLowerCase(Locale.ROOT);
+        String format = filters.getOrDefault("format", "All");
+        boolean includeFolders = Boolean.parseBoolean(
+                request.preferences().getOrDefault("include-folders", "true"));
+        boolean includeArchives = Boolean.parseBoolean(
+                request.preferences().getOrDefault("include-archives", "true"));
+
+        Comparator<LocalPublication> order;
+        if (latest) {
+            order = Comparator.comparingLong(this::lastModified).reversed()
+                    .thenComparing(LocalPublication::title, NAME_ORDER);
+        } else if (filters.getOrDefault("sort", "Title ascending").equals("Title descending")) {
+            order = Comparator.comparing(LocalPublication::title, NAME_ORDER).reversed();
+        } else {
+            order = Comparator.comparing(LocalPublication::title, NAME_ORDER);
+        }
+
+        List<SourceCatalogueItem> matches = publications().stream()
+                .filter(publication -> included(publication, includeFolders, includeArchives, format))
+                .filter(publication -> contains(publication.title(), normalizedQuery))
+                .filter(publication -> contains(publication.title(), titleFilter))
+                .sorted(order)
+                .map(this::catalogueItem)
+                .toList();
+        int start = Math.min(matches.size(), Math.multiplyExact(request.page() - 1, request.pageSize()));
+        int end = Math.min(matches.size(), start + request.pageSize());
+        return new SourcePage(matches.subList(start, end), end < matches.size());
+    }
+
+    private SourceCatalogueItem catalogueItem(LocalPublication publication) {
+        String key = publication.id().type().name() + ":" + publication.id().relativePath();
+        String description = publication.id().type() == LocalPublicationType.DIRECTORY
+                ? "Local image folder"
+                : "Local ZIP/CBZ archive";
+        return new SourceCatalogueItem(
+                new SourceCatalogueItemId(DESCRIPTOR.id(), key),
+                publication.title(),
+                description,
+                Optional.empty(),
+                SourceContentKind.MANGA);
+    }
+
+    private long lastModified(LocalPublication publication) {
+        try {
+            return Files.getLastModifiedTime(root.resolve(publication.id().relativePath())).toMillis();
+        } catch (IOException exception) {
+            throw failure("read local publication modification time", exception);
+        }
+    }
+
+    private static boolean included(
+            LocalPublication publication,
+            boolean includeFolders,
+            boolean includeArchives,
+            String format) {
+        boolean directory = publication.id().type() == LocalPublicationType.DIRECTORY;
+        if ((directory && !includeFolders) || (!directory && !includeArchives)) {
+            return false;
+        }
+        return format.equals("All")
+                || (format.equals("Folders") && directory)
+                || (format.equals("Archives") && !directory);
+    }
+
+    private static boolean contains(String title, String query) {
+        return query.isEmpty() || title.toLowerCase(Locale.ROOT).contains(query);
     }
 
     private LocalPublication publication(Path path) {

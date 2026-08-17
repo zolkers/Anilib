@@ -18,7 +18,8 @@ public record LibraryItem(
         boolean favorite,
         Optional<LibraryProgress> progress,
         List<LibraryHistoryEntry> history,
-        LibraryTitleMetadata metadata) {
+        LibraryTitleMetadata metadata,
+        Optional<LibraryOrigin> origin) {
 
     public LibraryItem {
         Preconditions.requireNonNull(id, "id");
@@ -32,6 +33,20 @@ public record LibraryItem(
         Preconditions.requireNonNull(progress, "progress");
         history = List.copyOf(history);
         Preconditions.requireNonNull(metadata, "metadata");
+        Preconditions.requireNonNull(origin, "origin");
+    }
+
+    public LibraryItem(
+            LibraryItemId id,
+            String title,
+            MediaKind kind,
+            Instant addedAt,
+            Set<String> categories,
+            boolean favorite,
+            Optional<LibraryProgress> progress,
+            List<LibraryHistoryEntry> history,
+            LibraryTitleMetadata metadata) {
+        this(id, title, kind, addedAt, categories, favorite, progress, history, metadata, Optional.empty());
     }
 
     public LibraryItem(
@@ -49,7 +64,8 @@ public record LibraryItem(
                 false,
                 Optional.empty(),
                 List.of(),
-                LibraryTitleMetadata.empty());
+                LibraryTitleMetadata.empty(),
+                Optional.empty());
     }
 
     public static LibraryItem create(String title, MediaKind kind) {
@@ -82,6 +98,37 @@ public record LibraryItem(
         return copy(categories, favorite, progress, history, nextMetadata);
     }
 
+    public LibraryItem migratedTo(
+            String nextTitle,
+            LibraryOrigin nextOrigin,
+            LibraryTitleMetadata nextMetadata) {
+        return new LibraryItem(
+                id,
+                Preconditions.requireNonBlank(nextTitle, "nextTitle"),
+                kind,
+                addedAt,
+                categories,
+                favorite,
+                progress,
+                history,
+                Preconditions.requireNonNull(nextMetadata, "nextMetadata"),
+                Optional.of(Preconditions.requireNonNull(nextOrigin, "nextOrigin")));
+    }
+
+    public LibraryItem withOrigin(LibraryOrigin nextOrigin) {
+        return new LibraryItem(
+                id,
+                title,
+                kind,
+                addedAt,
+                categories,
+                favorite,
+                progress,
+                history,
+                metadata,
+                Optional.of(Preconditions.requireNonNull(nextOrigin, "nextOrigin")));
+    }
+
     private LibraryItem copy(
             Set<String> nextCategories,
             boolean nextFavorite,
@@ -97,6 +144,7 @@ public record LibraryItem(
                 nextFavorite,
                 nextProgress,
                 nextHistory,
-                nextMetadata);
+                nextMetadata,
+                origin);
     }
 }

@@ -2,7 +2,7 @@ package fr.vriege.anilib.feature.source;
 
 /** Stable version boundary implemented by the Source feature. */
 public final class SourceSdk {
-    public static final SourceApiVersion API_VERSION = new SourceApiVersion(1, 0);
+    public static final SourceApiVersion API_VERSION = new SourceApiVersion(1, 1);
 
     private SourceSdk() {
     }
