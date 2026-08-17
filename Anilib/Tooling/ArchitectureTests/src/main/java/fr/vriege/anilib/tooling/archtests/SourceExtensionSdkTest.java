@@ -5,18 +5,32 @@ import fr.vriege.anilib.feature.source.SourceApiVersion;
 import fr.vriege.anilib.feature.source.SourceCapabilities;
 import fr.vriege.anilib.feature.source.SourceContentKind;
 import fr.vriege.anilib.feature.source.SourceDescriptor;
+import fr.vriege.anilib.feature.source.SourceExtensionManifest;
 import fr.vriege.anilib.feature.source.SourceExtensionPlugin;
 import fr.vriege.anilib.feature.source.SourceId;
+import fr.vriege.anilib.feature.source.SourceNetworkOrigin;
+import fr.vriege.anilib.feature.source.SourcePermission;
+import fr.vriege.anilib.feature.source.SourcePermissionException;
 import fr.vriege.anilib.feature.source.SourceRegistry;
 import fr.vriege.anilib.feature.source.SourceSdk;
 import fr.vriege.anilib.feature.source.bundle.SourceSdkPlugin;
+import fr.vriege.anilib.feature.network.NetworkCapabilities;
+import fr.vriege.anilib.framework.http.AnilibHttpClient;
+import fr.vriege.anilib.framework.http.HttpRequest;
+import fr.vriege.anilib.framework.http.HttpResponse;
 import fr.vriege.anilib.foundation.component.ComponentDescriptor;
+import fr.vriege.anilib.kernel.AnilibPlugin;
+import fr.vriege.anilib.kernel.PluginManifest;
 import fr.vriege.anilib.kernel.PluginStartupException;
 import fr.vriege.anilib.kernel.StartedAnilib;
 import fr.vriege.anilib.kernel.runtime.DefaultPluginEngine;
 
+import java.net.URI;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 /** Contract checks for explicit, versioned, deterministic source extensions. */
 final class SourceExtensionSdkTest {
@@ -29,6 +43,8 @@ final class SourceExtensionSdkTest {
         rejectsDuplicateSourceIds(counter);
         rejectsIncompatibleApi(counter);
         validatesDescriptors(counter);
+        enforcesExplicitPermissions(counter);
+        rejectsInvalidExtensionDeclarations(counter);
         return counter.value;
     }
 
@@ -49,6 +65,8 @@ final class SourceExtensionSdkTest {
                     "source registry must resolve the installed source instance");
             counter.check(registry.find(SourceId.of("test.missing")).isEmpty(),
                     "source registry must report an unknown source explicitly");
+            counter.check(registry.extensions().size() == 2,
+                    "explicit source Bundles must publish observable extension metadata");
         }
         counter.expectIllegalState(registry::sources,
                 "source registry must close with its product");
@@ -74,7 +92,9 @@ final class SourceExtensionSdkTest {
                 "current Source API must support its own baseline");
         counter.check(SourceSdk.API_VERSION.supports(new SourceApiVersion(1, 1)),
                 "current Source API must support its catalogue contract");
-        counter.check(!SourceSdk.API_VERSION.supports(new SourceApiVersion(1, 2)),
+        counter.check(SourceSdk.API_VERSION.supports(new SourceApiVersion(1, 2)),
+                "current Source API must support its permission contract");
+        counter.check(!SourceSdk.API_VERSION.supports(new SourceApiVersion(1, 3)),
                 "current Source API must reject a newer minor contract");
     }
 
@@ -92,6 +112,111 @@ final class SourceExtensionSdkTest {
                 Set.of(),
                 SourceSdk.API_VERSION),
                 "source descriptors must declare at least one content kind");
+    }
+
+    private static void enforcesExplicitPermissions(Counter counter) {
+        SourceId sourceId = SourceId.of("test.networked");
+        SourceNetworkOrigin allowedOrigin = SourceNetworkOrigin.https("api.example.test");
+        SourceExtensionManifest extensionManifest = SourceExtensionManifest.networked(
+                ComponentDescriptor.of("extension.networked", "Networked", "1.0.0"),
+                sourceId,
+                Set.of(allowedOrigin));
+        AtomicInteger exchanges = new AtomicInteger();
+        AtomicReference<TestNetworkSource> created = new AtomicReference<>();
+        SourceExtensionPlugin extension = new SourceExtensionPlugin(extensionManifest, context -> {
+            counter.check(context.grantedPermissions().equals(Set.of(SourcePermission.NETWORK)),
+                    "source factory must observe only its declared permission grants");
+            TestNetworkSource source = new TestNetworkSource(
+                    descriptor(sourceId.toString(), "Networked", SourceSdk.API_VERSION, "en"),
+                    context.httpClient());
+            created.set(source);
+            return source;
+        });
+
+        try (StartedAnilib application = new DefaultPluginEngine().start(List.of(
+                new SourceSdkPlugin(),
+                networkProvider(exchanges),
+                extension))) {
+            TestNetworkSource source = created.get();
+            counter.check(source.fetch("https://api.example.test/catalog").statusCode() == 204,
+                    "an allowed exact origin must reach the product HTTP client");
+            counter.check(exchanges.get() == 1,
+                    "the restricted source client must delegate one allowed exchange");
+            counter.expectSourcePermission(
+                    () -> source.fetch("https://other.example.test/catalog"),
+                    "a source must not reach an undeclared host");
+            counter.expectSourcePermission(
+                    () -> source.fetch("https://api.example.test:8443/catalog"),
+                    "a source grant must include the exact port");
+            counter.check(application.capability(SourceCapabilities.REGISTRY)
+                            .extensions().getFirst().manifest().equals(extensionManifest),
+                    "the registry must retain the permission manifest for shared UIs");
+        }
+
+        SourceExtensionManifest offlineManifest = SourceExtensionManifest.offline(
+                ComponentDescriptor.of("extension.offline", "Offline", "1.0.0"),
+                SourceId.of("test.offline"));
+        SourceExtensionPlugin denied = new SourceExtensionPlugin(offlineManifest, context -> {
+            context.httpClient();
+            return source("test.offline", "Offline", SourceSdk.API_VERSION);
+        });
+        counter.expectStartupFailure(() -> new DefaultPluginEngine().start(List.of(
+                new SourceSdkPlugin(),
+                denied)),
+                "an offline source factory must not obtain the HTTP capability");
+        counter.expectStartupFailure(() -> new DefaultPluginEngine().start(List.of(
+                new SourceSdkPlugin(),
+                extension)),
+                "a networked source Bundle must declare the product network capability");
+    }
+
+    private static void rejectsInvalidExtensionDeclarations(Counter counter) {
+        ComponentDescriptor component = ComponentDescriptor.of(
+                "extension.invalid-permissions",
+                "Invalid permissions",
+                "1.0.0");
+        counter.expectIllegalArgument(() -> new SourceExtensionManifest(
+                        component,
+                        SourceId.of("test.no-origin"),
+                        Set.of(SourcePermission.NETWORK),
+                        Set.of()),
+                "NETWORK permission must declare at least one exact origin");
+        counter.expectIllegalArgument(() -> new SourceExtensionManifest(
+                        component,
+                        SourceId.of("test.cleartext"),
+                        Set.of(SourcePermission.NETWORK),
+                        Set.of(SourceNetworkOrigin.http("example.test"))),
+                "HTTP origins must declare the cleartext permission visibly");
+        SourceExtensionPlugin mismatched = new SourceExtensionPlugin(
+                SourceExtensionManifest.offline(component, SourceId.of("test.expected")),
+                context -> source("test.actual", "Actual", SourceSdk.API_VERSION));
+        counter.expectStartupFailure(() -> new DefaultPluginEngine().start(List.of(
+                new SourceSdkPlugin(),
+                mismatched)),
+                "a source factory must create exactly the identity declared by its Bundle");
+    }
+
+    private static AnilibPlugin networkProvider(AtomicInteger exchanges) {
+        AnilibHttpClient client = request -> {
+            exchanges.incrementAndGet();
+            return new HttpResponse(204, Map.of(), new byte[0], false);
+        };
+        return new AnilibPlugin() {
+            private final PluginManifest manifest = PluginManifest.builder(
+                            ComponentDescriptor.of("test.network", "Test network", "1.0.0"))
+                    .provides(NetworkCapabilities.HTTP_CLIENT)
+                    .build();
+
+            @Override
+            public PluginManifest manifest() {
+                return manifest;
+            }
+
+            @Override
+            public void install(fr.vriege.anilib.kernel.PluginInstallationContext context) {
+                context.publish(NetworkCapabilities.HTTP_CLIENT, client);
+            }
+        };
     }
 
     private static SourceExtensionPlugin extension(String componentId, Source source) {
@@ -119,6 +244,14 @@ final class SourceExtensionSdkTest {
     }
 
     private record TestSource(SourceDescriptor descriptor) implements Source {
+    }
+
+    private record TestNetworkSource(
+            SourceDescriptor descriptor,
+            AnilibHttpClient client) implements Source {
+        private HttpResponse fetch(String uri) {
+            return client.execute(HttpRequest.builder(URI.create(uri)).build());
+        }
     }
 
     private static final class Counter {
@@ -154,6 +287,15 @@ final class SourceExtensionSdkTest {
                 action.run();
                 throw new AssertionError(message);
             } catch (IllegalStateException expected) {
+                value++;
+            }
+        }
+
+        private void expectSourcePermission(Runnable action, String message) {
+            try {
+                action.run();
+                throw new AssertionError(message);
+            } catch (SourcePermissionException expected) {
                 value++;
             }
         }

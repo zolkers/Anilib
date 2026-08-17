@@ -50,7 +50,7 @@ public final class UrlConnectionHttpTransport implements HttpTransport {
             connection.setRequestMethod(request.method().name());
             connection.setConnectTimeout(timeoutMillis(request));
             connection.setReadTimeout(timeoutMillis(request));
-            connection.setInstanceFollowRedirects(true);
+            connection.setInstanceFollowRedirects(false);
             connection.setUseCaches(false);
             return connection;
         } catch (IOException exception) {

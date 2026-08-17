@@ -175,6 +175,10 @@ final class HttpFrameworkTest {
                     "refresh policy must replace a cached response from the network");
             counter.check(client.execute(cachedRequest).bodyAsUtf8().equals("response-2"),
                     "refreshed response must become the next preferred cache value");
+            HttpResponse jdkRedirect = client.execute(
+                    HttpRequest.builder(root.resolve("/redirect")).build());
+            counter.check(jdkRedirect.statusCode() == 302,
+                    "JDK transport must expose redirects for source origin authorization");
 
             AnilibHttpClient portableClient = new DefaultAnilibHttpClient(
                     new UrlConnectionHttpTransport(),
@@ -185,6 +189,10 @@ final class HttpFrameworkTest {
                     HttpRequest.builder(root.resolve("/cache")).build());
             counter.check(portable.bodyAsUtf8().equals("response-3"),
                     "URL connection transport must execute the Android-compatible path");
+            HttpResponse portableRedirect = portableClient.execute(
+                    HttpRequest.builder(root.resolve("/redirect")).build());
+            counter.check(portableRedirect.statusCode() == 302,
+                    "Android-compatible transport must not bypass source origin authorization");
         } finally {
             server.stop(0);
             deleteTree(directory);
@@ -204,6 +212,11 @@ final class HttpFrameworkTest {
             });
             server.createContext("/cache", exchange ->
                     respond(exchange, "response-" + cacheRequests.incrementAndGet()));
+            server.createContext("/redirect", exchange -> {
+                exchange.getResponseHeaders().add("Location", "/cache");
+                exchange.sendResponseHeaders(302, -1);
+                exchange.close();
+            });
             server.start();
             return server;
         } catch (IOException exception) {

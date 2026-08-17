@@ -4,6 +4,7 @@ import fr.vriege.anilib.feature.discovery.SourcePreferenceSnapshot;
 import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.source.SourceCatalogueItem;
 import fr.vriege.anilib.feature.source.SourceContentKind;
+import fr.vriege.anilib.feature.source.InstalledSourceExtension;
 import fr.vriege.anilib.feature.source.SourceFilterDefinition;
 import fr.vriege.anilib.feature.source.SourceFilterValue;
 import fr.vriege.anilib.feature.source.SourceId;
@@ -16,6 +17,8 @@ import java.util.Map;
 /** Platform-neutral snapshots and actions for the shared Browse experience. */
 public interface DiscoveryPresentation {
     List<DiscoverySourceSection> sourceSections(SourceContentKind contentKind);
+
+    List<InstalledSourceExtension> extensions(SourceContentKind contentKind);
 
     boolean supportsLatest(SourceId sourceId);
 

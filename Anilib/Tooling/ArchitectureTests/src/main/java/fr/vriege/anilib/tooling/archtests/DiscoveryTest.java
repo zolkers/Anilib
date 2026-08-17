@@ -87,6 +87,10 @@ final class DiscoveryTest {
                     "catalogue sources must be grouped in deterministic language order");
             counter.check(presentation.sourceSections(SourceContentKind.MANGA).size() == 2,
                     "the shared presentation must expose language sections");
+            counter.check(presentation.extensions(SourceContentKind.MANGA).size() == 1
+                            && presentation.extensions(SourceContentKind.MANGA)
+                                    .getFirst().source().id().equals(REMOTE_SOURCE),
+                    "the shared presentation must expose selected extension Bundles but not built-ins");
             counter.check(discovery.supportsLatest(LOCAL_SOURCE),
                     "local catalogue must expose its latest listing");
 

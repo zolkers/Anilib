@@ -20,7 +20,7 @@ public final class JdkHttpTransport implements HttpTransport {
 
     public JdkHttpTransport() {
         transport = java.net.http.HttpClient.newBuilder()
-                .followRedirects(java.net.http.HttpClient.Redirect.NORMAL)
+                .followRedirects(java.net.http.HttpClient.Redirect.NEVER)
                 .version(java.net.http.HttpClient.Version.HTTP_2)
                 .build();
     }

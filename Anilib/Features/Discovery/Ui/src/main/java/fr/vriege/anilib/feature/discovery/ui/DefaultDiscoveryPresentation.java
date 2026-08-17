@@ -5,6 +5,7 @@ import fr.vriege.anilib.feature.discovery.SourcePreferenceSnapshot;
 import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.source.SourceCatalogueItem;
 import fr.vriege.anilib.feature.source.SourceContentKind;
+import fr.vriege.anilib.feature.source.InstalledSourceExtension;
 import fr.vriege.anilib.feature.source.SourceFilterDefinition;
 import fr.vriege.anilib.feature.source.SourceFilterValue;
 import fr.vriege.anilib.feature.source.SourceId;
@@ -33,6 +34,11 @@ public final class DefaultDiscoveryPresentation implements DiscoveryPresentation
         return grouped.entrySet().stream()
                 .map(entry -> new DiscoverySourceSection(entry.getKey(), entry.getValue()))
                 .toList();
+    }
+
+    @Override
+    public List<InstalledSourceExtension> extensions(SourceContentKind contentKind) {
+        return service.extensions(contentKind);
     }
 
     @Override

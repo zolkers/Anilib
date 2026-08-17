@@ -10,6 +10,7 @@ import fr.vriege.anilib.feature.library.LibraryTitleMetadata;
 import fr.vriege.anilib.feature.library.MediaKind;
 import fr.vriege.anilib.feature.library.PublicationStatus;
 import fr.vriege.anilib.feature.source.CatalogueSource;
+import fr.vriege.anilib.feature.source.InstalledSourceExtension;
 import fr.vriege.anilib.feature.source.SourceBrowseRequest;
 import fr.vriege.anilib.feature.source.SourceCatalogueItem;
 import fr.vriege.anilib.feature.source.SourceContentKind;
@@ -56,6 +57,20 @@ public final class DefaultDiscoveryService implements DiscoveryService {
                 .sorted(java.util.Comparator.comparing(SourceDescriptor::languageTag)
                         .thenComparing(SourceDescriptor::displayName, String.CASE_INSENSITIVE_ORDER)
                         .thenComparing(SourceDescriptor::id))
+                .toList();
+    }
+
+    @Override
+    public List<InstalledSourceExtension> extensions(SourceContentKind contentKind) {
+        Objects.requireNonNull(contentKind, "contentKind must not be null");
+        return registry.extensions().stream()
+                .filter(extension -> extension.source().contentKinds().contains(contentKind))
+                .sorted(java.util.Comparator
+                        .comparing((InstalledSourceExtension extension) -> extension.source().languageTag())
+                        .thenComparing(
+                                extension -> extension.manifest().component().displayName(),
+                                String.CASE_INSENSITIVE_ORDER)
+                        .thenComparing(extension -> extension.source().id()))
                 .toList();
     }
 
