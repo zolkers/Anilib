@@ -1,4 +1,38 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.plugin.compose'
+}
+
+repositories {
+    google()
+    mavenCentral()
+}
+
+android {
+    namespace = 'fr.vriege.anilib.platform.android'
+    compileSdk = 37
+
+    defaultConfig {
+        applicationId = 'fr.vriege.anilib'
+        minSdk = 26
+        targetSdk = 37
+        versionCode = 1
+        versionName = '0.1.0'
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
+    }
+
+    buildFeatures {
+        compose = true
+    }
+}
+
 dependencies {
-    api project(':Anilib:Configurations:Standard')
-    api project(':Anilib:Kernel:Api')
+    implementation project(':Anilib:Configurations:Standard')
+    implementation project(':Anilib:Features:Library:Ui')
+    implementation project(':Anilib:Platforms:Compose')
+    implementation 'androidx.activity:activity-compose:1.13.0'
 }

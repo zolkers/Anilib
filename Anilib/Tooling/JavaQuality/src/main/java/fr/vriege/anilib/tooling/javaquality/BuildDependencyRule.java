@@ -20,13 +20,13 @@ public final class BuildDependencyRule implements AnilibJavaRule {
             "^\\s*id\\s+['\"]([^'\"]+)['\"](?:\\s+version\\s+['\"]([^'\"]+)['\"])?(?:\\s+apply\\s+false)?\\s*$");
     private static final Pattern REPOSITORY = Pattern.compile("^\\s*(google|mavenCentral)\\(\\)\\s*$");
     private static final Set<String> ALLOWED_PLUGINS = Set.of("application", "base", "java", "java-library");
-    private static final String ANDROID_APP_BUILD = "Anilib/Platforms/AndroidApp/build.gradle";
+    private static final String ANDROID_BUILD = "Anilib/Platforms/Android/build.gradle";
     private static final String COMPOSE_BUILD = "Anilib/Platforms/Compose/build.gradle";
     private static final String DESKTOP_BUILD = "Anilib/Platforms/Desktop/build.gradle";
     private static final String ROOT_BUILD = "build.gradle";
     private static final Map<String, Set<String>> ALLOWED_EXTERNAL_DEPENDENCIES = Map.ofEntries(
             Map.entry(
-                    ANDROID_APP_BUILD,
+                    ANDROID_BUILD,
                     Set.of("'androidx.activity:activity-compose:1.13.0'")),
             Map.entry(
                     COMPOSE_BUILD,
@@ -36,7 +36,7 @@ public final class BuildDependencyRule implements AnilibJavaRule {
                     Set.of("compose.desktop.currentOs")));
     private static final Map<String, Set<String>> ALLOWED_EXTERNAL_PLUGINS = Map.ofEntries(
             Map.entry(
-                    ANDROID_APP_BUILD,
+                    ANDROID_BUILD,
                     Set.of(
                             "com.android.application@null",
                             "org.jetbrains.kotlin.plugin.compose@null")),
@@ -63,7 +63,7 @@ public final class BuildDependencyRule implements AnilibJavaRule {
                             "org.jetbrains.kotlin.multiplatform@2.4.10",
                             "org.jetbrains.kotlin.plugin.compose@2.4.10")));
     private static final Set<String> ALLOWED_REPOSITORY_BUILDS = Set.of(
-            ANDROID_APP_BUILD,
+            ANDROID_BUILD,
             COMPOSE_BUILD,
             DESKTOP_BUILD);
 

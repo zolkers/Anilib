@@ -1,38 +1,37 @@
-package fr.vriege.anilib.platform.androidapp
+package fr.vriege.anilib.platform.android
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import fr.vriege.anilib.configuration.standard.StandardAnilib
 import fr.vriege.anilib.feature.library.ui.LibraryUiCapabilities
-import fr.vriege.anilib.platform.android.AndroidProductHost
 import fr.vriege.anilib.platform.compose.AnilibApp
 
-/** Android lifecycle adapter for the shared Anilib product and Compose shell. */
+/** Android launcher for the shared Anilib product and adaptive Compose shell. */
 class MainActivity : ComponentActivity() {
-    private var productHost: AndroidProductHost? = null
+    private var product: AutoCloseable? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        val host = AndroidProductHost(filesDir.toPath())
-        host.start()
-        productHost = host
-
-        val presentation = host.capability(LibraryUiCapabilities.PRESENTATION)
+        val started = StandardAnilib.start(filesDir.toPath())
+        product = started
+        val presentation = started.capability(LibraryUiCapabilities.PRESENTATION)
+        val componentCount = started.components().size
         setContent {
             AnilibApp(
                 presentation = presentation,
-                componentCount = host.componentCount(),
+                componentCount = componentCount,
             )
         }
     }
 
     override fun onDestroy() {
         try {
-            productHost?.close()
-            productHost = null
+            product?.close()
+            product = null
         } finally {
             super.onDestroy()
         }

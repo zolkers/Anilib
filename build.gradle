@@ -16,7 +16,7 @@ subprojects {
 
     def platformManagedBuild = project.path in [
             ':Anilib:Platforms:Compose',
-            ':Anilib:Platforms:AndroidApp'
+            ':Anilib:Platforms:Android'
     ]
     if (!platformManagedBuild) {
         apply plugin: 'java-library'

@@ -42,7 +42,6 @@ public final class ArchitectureTestMain {
         assertions += LocalSourceTest.run();
         assertions += CoverCacheTest.run();
         assertions += LibraryPresentationTest.run();
-        assertions += AndroidProductHostTest.run();
         System.out.println("Architecture tests: " + assertions + " assertions passed.");
     }
 

@@ -27,7 +27,7 @@ Use Java 21 from the repository root:
 ```powershell
 .\gradlew.bat --no-daemon --console=plain check
 .\gradlew.bat --no-daemon --console=plain :Anilib:Platforms:Desktop:run
-.\gradlew.bat --no-daemon --console=plain :Anilib:Platforms:AndroidApp:assembleDebug
+.\gradlew.bat --no-daemon --console=plain :Anilib:Platforms:Android:assembleDebug
 .\gradlew.bat --no-daemon --console=plain javaQuality
 ```
 
