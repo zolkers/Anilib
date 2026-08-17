@@ -29,4 +29,3 @@ public record ComponentId(String value) implements Comparable<ComponentId> {
         return value;
     }
 }
-

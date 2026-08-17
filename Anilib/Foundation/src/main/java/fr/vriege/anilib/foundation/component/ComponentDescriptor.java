@@ -14,4 +14,3 @@ public record ComponentDescriptor(ComponentId id, String displayName, String ver
         return new ComponentDescriptor(ComponentId.of(id), displayName, version);
     }
 }
-
