@@ -94,7 +94,9 @@ final class SourceExtensionSdkTest {
                 "current Source API must support its catalogue contract");
         counter.check(SourceSdk.API_VERSION.supports(new SourceApiVersion(1, 2)),
                 "current Source API must support its permission contract");
-        counter.check(!SourceSdk.API_VERSION.supports(new SourceApiVersion(1, 3)),
+        counter.check(SourceSdk.API_VERSION.supports(new SourceApiVersion(1, 3)),
+                "current Source API must support its paged-content contract");
+        counter.check(!SourceSdk.API_VERSION.supports(new SourceApiVersion(1, 4)),
                 "current Source API must reject a newer minor contract");
     }
 

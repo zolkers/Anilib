@@ -7,15 +7,19 @@ import fr.vriege.anilib.feature.localsource.LocalPublicationId;
 import fr.vriege.anilib.feature.localsource.LocalPublicationType;
 import fr.vriege.anilib.feature.localsource.LocalSourceException;
 import fr.vriege.anilib.feature.source.CatalogueSource;
+import fr.vriege.anilib.feature.source.PagedSource;
 import fr.vriege.anilib.feature.source.SourceBrowseRequest;
 import fr.vriege.anilib.feature.source.SourceCatalogueItem;
 import fr.vriege.anilib.feature.source.SourceCatalogueItemId;
+import fr.vriege.anilib.feature.source.SourceContentUnit;
+import fr.vriege.anilib.feature.source.SourceContentUnitId;
 import fr.vriege.anilib.feature.source.SourceContentKind;
 import fr.vriege.anilib.feature.source.SourceDescriptor;
 import fr.vriege.anilib.feature.source.SourceFilterDefinition;
 import fr.vriege.anilib.feature.source.SourceFilterType;
 import fr.vriege.anilib.feature.source.SourceId;
 import fr.vriege.anilib.feature.source.SourcePage;
+import fr.vriege.anilib.feature.source.SourcePageResource;
 import fr.vriege.anilib.feature.source.SourcePreferenceDefinition;
 import fr.vriege.anilib.feature.source.SourcePreferenceType;
 import fr.vriege.anilib.feature.source.SourceSdk;
@@ -39,7 +43,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 /** JDK-only local content source for folders and ZIP-compatible archives. */
-public final class FileSystemLocalContentSource implements LocalContentSource, CatalogueSource {
+public final class FileSystemLocalContentSource implements LocalContentSource, CatalogueSource, PagedSource {
     private static final SourceDescriptor DESCRIPTOR = new SourceDescriptor(
             SourceId.of("anilib.local"),
             "Local library",
@@ -155,6 +159,39 @@ public final class FileSystemLocalContentSource implements LocalContentSource, C
     }
 
     @Override
+    public List<SourceContentUnit> contentUnits(SourceCatalogueItemId itemId) {
+        LocalPublicationId publicationId = publicationId(itemId);
+        resolvePublication(publicationId);
+        return List.of(new SourceContentUnit(
+                new SourceContentUnitId(itemId, "local-content"),
+                "Local content",
+                Optional.empty()));
+    }
+
+    @Override
+    public List<SourcePageResource> pages(SourceContentUnitId contentUnitId) {
+        Objects.requireNonNull(contentUnitId, "contentUnitId must not be null");
+        if (!contentUnitId.value().equals("local-content")) {
+            throw new LocalSourceException("Unknown local content unit: " + contentUnitId.value());
+        }
+        LocalPublicationId publicationId = publicationId(contentUnitId.itemId());
+        return pages(publicationId).stream()
+                .map(page -> new SourcePageResource(
+                        contentUnitId,
+                        page.entryName(),
+                        page.index(),
+                        page.size()))
+                .toList();
+    }
+
+    @Override
+    public byte[] readPage(SourcePageResource page) {
+        Objects.requireNonNull(page, "page must not be null");
+        LocalPublicationId publicationId = publicationId(page.contentUnitId().itemId());
+        return read(new LocalPage(publicationId, page.value(), page.index(), page.estimatedBytes()));
+    }
+
+    @Override
     public List<LocalPage> pages(LocalPublicationId publicationId) {
         Objects.requireNonNull(publicationId, "publicationId must not be null");
         Path publication = resolvePublication(publicationId);
@@ -226,6 +263,23 @@ public final class FileSystemLocalContentSource implements LocalContentSource, C
                 description,
                 Optional.empty(),
                 SourceContentKind.MANGA);
+    }
+
+    private static LocalPublicationId publicationId(SourceCatalogueItemId itemId) {
+        Objects.requireNonNull(itemId, "itemId must not be null");
+        if (!itemId.sourceId().equals(DESCRIPTOR.id())) {
+            throw new LocalSourceException("Catalogue item belongs to another source: " + itemId.sourceId());
+        }
+        int separator = itemId.value().indexOf(':');
+        if (separator < 1 || separator == itemId.value().length() - 1) {
+            throw new LocalSourceException("Invalid local catalogue identity: " + itemId.value());
+        }
+        try {
+            LocalPublicationType type = LocalPublicationType.valueOf(itemId.value().substring(0, separator));
+            return new LocalPublicationId(type, itemId.value().substring(separator + 1));
+        } catch (IllegalArgumentException exception) {
+            throw new LocalSourceException("Invalid local catalogue identity: " + itemId.value(), exception);
+        }
     }
 
     private long lastModified(LocalPublication publication) {

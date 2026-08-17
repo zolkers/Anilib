@@ -6,7 +6,9 @@ identity only. API version `1.1` adds the optional `CatalogueSource` contract
 for browse, latest, search, filters, and preferences without breaking a source
 that implements only `Source`. API version `1.2` adds capability-limited source
 factories, exact network-origin grants, and observable installed-extension
-metadata.
+metadata. API version `1.3` adds the optional `PagedSource` contract used by
+the Reader for ordered content units, opaque page resources, and source-owned
+page bytes.
 
 ## Extension shape
 
@@ -64,3 +66,11 @@ Filter schemas cover headers, separators, text, checkboxes, tri-state values,
 select lists, and sorts. Preference schemas cover switches, text, and select
 lists. Platforms render those schemas; extensions never import Compose,
 Android, or desktop UI types.
+
+## Paged content shape
+
+A manga-capable source may additionally implement `PagedSource`. Content units
+and pages retain the source-scoped catalogue identity, page indexes are
+contiguous, and resource values remain opaque to the Reader. The source owns
+all I/O; the Reader validates sequences, enforces configured byte limits,
+defensively copies returned bytes, and keeps only a bounded per-session cache.
