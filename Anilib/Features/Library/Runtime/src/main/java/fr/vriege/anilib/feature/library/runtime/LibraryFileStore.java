@@ -2,7 +2,11 @@ package fr.vriege.anilib.feature.library.runtime;
 
 import fr.vriege.anilib.feature.library.LibraryItem;
 import fr.vriege.anilib.feature.library.LibraryItemId;
+import fr.vriege.anilib.feature.library.LibraryHistoryEntry;
+import fr.vriege.anilib.feature.library.LibraryProgress;
+import fr.vriege.anilib.feature.library.LibraryTitleMetadata;
 import fr.vriege.anilib.feature.library.MediaKind;
+import fr.vriege.anilib.feature.library.PublicationStatus;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -24,15 +28,18 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 /** Owns the versioned on-disk format and atomic replacement protocol. */
 final class LibraryFileStore {
     static final int MAGIC = 0x414E494C;
-    static final int CURRENT_VERSION = 1;
+    static final int CURRENT_VERSION = 2;
 
     private static final int MAX_ITEMS = 1_000_000;
     private static final int MAX_CATEGORIES_PER_ITEM = 1_000;
+    private static final int MAX_HISTORY_ENTRIES_PER_ITEM = 100_000;
+    private static final int MAX_PEOPLE_PER_ITEM = 10_000;
     private final Path file;
 
     LibraryFileStore(Path file) {
@@ -51,7 +58,8 @@ final class LibraryFileStore {
             int version = input.readInt();
             List<LibraryItem> items = switch (version) {
                 case 0 -> readVersionZero(input);
-                case CURRENT_VERSION -> readVersionOne(input);
+                case 1 -> readVersionOne(input);
+                case CURRENT_VERSION -> readVersionTwo(input);
                 default -> throw new IOException("Unsupported Anilib library version: " + version);
             };
             if (input.read() != -1) {
@@ -91,7 +99,7 @@ final class LibraryFileStore {
             output.writeInt(CURRENT_VERSION);
             output.writeInt(ordered.size());
             for (LibraryItem item : ordered) {
-                writeVersionOneItem(output, item);
+                writeVersionTwoItem(output, item);
             }
             output.flush();
             channel.force(true);
@@ -147,6 +155,37 @@ final class LibraryFileStore {
         return List.copyOf(items);
     }
 
+    private static List<LibraryItem> readVersionTwo(DataInputStream input) throws IOException {
+        int itemCount = readCount(input, MAX_ITEMS, "item");
+        List<LibraryItem> items = new ArrayList<>(itemCount);
+        Set<LibraryItemId> identifiers = new HashSet<>();
+        for (int index = 0; index < itemCount; index++) {
+            LibraryItemId id = new LibraryItemId(input.readUTF());
+            String title = input.readUTF();
+            MediaKind kind = MediaKind.valueOf(input.readUTF());
+            Instant addedAt = readInstant(input);
+            Set<String> categories = readUniqueStrings(
+                    input,
+                    MAX_CATEGORIES_PER_ITEM,
+                    "category");
+            boolean favorite = input.readBoolean();
+            Optional<LibraryProgress> progress = readProgress(input);
+            List<LibraryHistoryEntry> history = readHistory(input);
+            LibraryTitleMetadata metadata = readMetadata(input);
+            addUnique(items, identifiers, new LibraryItem(
+                    id,
+                    title,
+                    kind,
+                    addedAt,
+                    categories,
+                    favorite,
+                    progress,
+                    history,
+                    metadata));
+        }
+        return List.copyOf(items);
+    }
+
     private static void addUnique(
             List<LibraryItem> items,
             Set<LibraryItemId> identifiers,
@@ -165,16 +204,133 @@ final class LibraryFileStore {
         return count;
     }
 
-    private static void writeVersionOneItem(DataOutputStream output, LibraryItem item) throws IOException {
+    private static void writeVersionTwoItem(DataOutputStream output, LibraryItem item) throws IOException {
         output.writeUTF(item.id().value());
         output.writeUTF(item.title());
         output.writeUTF(item.kind().name());
-        output.writeLong(item.addedAt().getEpochSecond());
-        output.writeInt(item.addedAt().getNano());
-        List<String> categories = item.categories().stream().sorted().toList();
-        output.writeInt(categories.size());
-        for (String category : categories) {
-            output.writeUTF(category);
+        writeInstant(output, item.addedAt());
+        writeStrings(
+                output,
+                item.categories().stream().sorted().toList(),
+                MAX_CATEGORIES_PER_ITEM,
+                "category");
+        output.writeBoolean(item.favorite());
+        writeProgress(output, item.progress());
+        writeHistory(output, item.history());
+        writeMetadata(output, item.metadata());
+    }
+
+    private static Optional<LibraryProgress> readProgress(DataInputStream input) throws IOException {
+        if (!input.readBoolean()) {
+            return Optional.empty();
+        }
+        return Optional.of(new LibraryProgress(
+                input.readUTF(),
+                input.readLong(),
+                input.readLong(),
+                readInstant(input)));
+    }
+
+    private static List<LibraryHistoryEntry> readHistory(DataInputStream input) throws IOException {
+        int count = readCount(input, MAX_HISTORY_ENTRIES_PER_ITEM, "history entry");
+        List<LibraryHistoryEntry> history = new ArrayList<>(count);
+        for (int index = 0; index < count; index++) {
+            history.add(new LibraryHistoryEntry(input.readUTF(), readInstant(input), input.readLong()));
+        }
+        return List.copyOf(history);
+    }
+
+    private static LibraryTitleMetadata readMetadata(DataInputStream input) throws IOException {
+        String description = input.readUTF();
+        List<String> authors = readStrings(input, MAX_PEOPLE_PER_ITEM, "author");
+        List<String> artists = readStrings(input, MAX_PEOPLE_PER_ITEM, "artist");
+        PublicationStatus status = PublicationStatus.valueOf(input.readUTF());
+        return new LibraryTitleMetadata(description, authors, artists, status);
+    }
+
+    private static Set<String> readUniqueStrings(
+            DataInputStream input,
+            int maximum,
+            String label) throws IOException {
+        List<String> values = readStrings(input, maximum, label);
+        Set<String> unique = new HashSet<>(values);
+        if (unique.size() != values.size()) {
+            throw new IOException("Duplicate " + label + " in Anilib library file");
+        }
+        return Set.copyOf(unique);
+    }
+
+    private static List<String> readStrings(
+            DataInputStream input,
+            int maximum,
+            String label) throws IOException {
+        int count = readCount(input, maximum, label);
+        List<String> values = new ArrayList<>(count);
+        for (int index = 0; index < count; index++) {
+            values.add(input.readUTF());
+        }
+        return List.copyOf(values);
+    }
+
+    private static Instant readInstant(DataInputStream input) throws IOException {
+        return Instant.ofEpochSecond(input.readLong(), input.readInt());
+    }
+
+    private static void writeProgress(
+            DataOutputStream output,
+            Optional<LibraryProgress> progress) throws IOException {
+        output.writeBoolean(progress.isPresent());
+        if (progress.isEmpty()) {
+            return;
+        }
+        LibraryProgress value = progress.orElseThrow();
+        output.writeUTF(value.contentId());
+        output.writeLong(value.position());
+        output.writeLong(value.extent());
+        writeInstant(output, value.updatedAt());
+    }
+
+    private static void writeHistory(
+            DataOutputStream output,
+            List<LibraryHistoryEntry> history) throws IOException {
+        validateCount(history.size(), MAX_HISTORY_ENTRIES_PER_ITEM, "history entry");
+        output.writeInt(history.size());
+        for (LibraryHistoryEntry entry : history) {
+            output.writeUTF(entry.contentId());
+            writeInstant(output, entry.openedAt());
+            output.writeLong(entry.position());
+        }
+    }
+
+    private static void writeMetadata(
+            DataOutputStream output,
+        LibraryTitleMetadata metadata) throws IOException {
+        output.writeUTF(metadata.description());
+        writeStrings(output, metadata.authors(), MAX_PEOPLE_PER_ITEM, "author");
+        writeStrings(output, metadata.artists(), MAX_PEOPLE_PER_ITEM, "artist");
+        output.writeUTF(metadata.publicationStatus().name());
+    }
+
+    private static void writeStrings(
+            DataOutputStream output,
+            List<String> values,
+            int maximum,
+            String label) throws IOException {
+        validateCount(values.size(), maximum, label);
+        output.writeInt(values.size());
+        for (String value : values) {
+            output.writeUTF(value);
+        }
+    }
+
+    private static void writeInstant(DataOutputStream output, Instant instant) throws IOException {
+        output.writeLong(instant.getEpochSecond());
+        output.writeInt(instant.getNano());
+    }
+
+    private static void validateCount(int count, int maximum, String label) throws IOException {
+        if (count > maximum) {
+            throw new IOException("Too many " + label + " values: " + count);
         }
     }
 
