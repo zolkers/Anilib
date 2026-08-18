@@ -72,6 +72,7 @@ import fr.vriege.anilib.feature.reader.ui.ReaderController
 import fr.vriege.anilib.feature.reader.ui.ReaderPresentation
 import fr.vriege.anilib.feature.player.ui.PlayerPresentation
 import fr.vriege.anilib.feature.tracker.ui.TrackerPresentation
+import fr.vriege.anilib.feature.updates.ui.UpdatePresentation
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -93,6 +94,7 @@ fun AnilibApp(
     downloads: DownloadPresentation,
     backup: BackupPresentation,
     tracking: TrackerPresentation,
+    updates: UpdatePresentation,
     pageDecoder: (ByteArray) -> ImageBitmap?,
     componentCount: Int,
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -175,6 +177,7 @@ fun AnilibApp(
                             downloads,
                             backup,
                             tracking,
+                            updates,
                             destination,
                             section,
                             componentCount,
@@ -200,6 +203,7 @@ fun AnilibApp(
                             downloads,
                             backup,
                             tracking,
+                            updates,
                             destination,
                             section,
                             componentCount,
@@ -232,6 +236,7 @@ private fun ExpandedShell(
     downloads: DownloadPresentation,
     backup: BackupPresentation,
     tracking: TrackerPresentation,
+    updates: UpdatePresentation,
     destination: LibraryNavigationState,
     section: AppSection,
     componentCount: Int,
@@ -260,6 +265,7 @@ private fun ExpandedShell(
                 downloads,
                 backup,
                 tracking,
+                updates,
                 destination,
                 section,
                 componentCount,
@@ -289,6 +295,7 @@ private fun CompactShell(
     downloads: DownloadPresentation,
     backup: BackupPresentation,
     tracking: TrackerPresentation,
+    updates: UpdatePresentation,
     destination: LibraryNavigationState,
     section: AppSection,
     componentCount: Int,
@@ -315,6 +322,7 @@ private fun CompactShell(
                 downloads,
                 backup,
                 tracking,
+                updates,
                 destination,
                 section,
                 componentCount,
@@ -387,6 +395,7 @@ private fun AppDestination(
     downloads: DownloadPresentation,
     backup: BackupPresentation,
     tracking: TrackerPresentation,
+    updates: UpdatePresentation,
     destination: LibraryNavigationState,
     section: AppSection,
     componentCount: Int,
@@ -423,7 +432,7 @@ private fun AppDestination(
             )
             else -> LibraryPageContent(presentation.library(), componentCount, navigate)
         }
-        AppSection.UPDATES -> PlaceholderPage("Updates", "New chapters and episodes will appear here.")
+        AppSection.UPDATES -> UpdatesScreen(updates)
         AppSection.HISTORY -> HistoryPage(presentation) { transition ->
             navigate(transition)
             openSection(AppSection.LIBRARY)

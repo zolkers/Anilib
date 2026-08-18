@@ -40,6 +40,8 @@ dependencies {
     implementation project(':Anilib:Features:Downloads:Ui')
     implementation project(':Anilib:Features:Backup:Ui')
     implementation project(':Anilib:Features:Tracker:Ui')
+    implementation project(':Anilib:Features:Updates:Api')
+    implementation project(':Anilib:Features:Updates:Ui')
     implementation project(':Anilib:Platforms:Compose')
     implementation 'androidx.activity:activity-compose:1.13.0'
 }

@@ -1,6 +1,9 @@
 package fr.vriege.anilib.platform.android
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.Build
 import android.graphics.BitmapFactory
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -15,6 +18,7 @@ import fr.vriege.anilib.feature.player.ui.PlayerUiCapabilities
 import fr.vriege.anilib.feature.downloads.ui.DownloadUiCapabilities
 import fr.vriege.anilib.feature.backup.ui.BackupUiCapabilities
 import fr.vriege.anilib.feature.tracker.ui.TrackerUiCapabilities
+import fr.vriege.anilib.feature.updates.ui.UpdateUiCapabilities
 import fr.vriege.anilib.framework.http.runtime.UrlConnectionHttpTransport
 import fr.vriege.anilib.platform.compose.AnilibApp
 import fr.vriege.anilib.platform.compose.ComposePlayerBackend
@@ -26,11 +30,18 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        LibraryUpdateReceiver.schedule(this)
+        if (Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), NOTIFICATION_PERMISSION_REQUEST)
+        }
 
         val started = StandardAnilib.start(
             filesDir.toPath(),
             UrlConnectionHttpTransport(),
             ComposePlayerBackend(),
+            AndroidLibraryUpdateNotifier(this),
             emptyList(),
         )
         product = started
@@ -41,6 +52,7 @@ class MainActivity : ComponentActivity() {
         val downloads = started.capability(DownloadUiCapabilities.PRESENTATION)
         val backup = started.capability(BackupUiCapabilities.PRESENTATION)
         val tracking = started.capability(TrackerUiCapabilities.PRESENTATION)
+        val updates = started.capability(UpdateUiCapabilities.PRESENTATION)
         val componentCount = started.components().size
         setContent {
             AnilibApp(
@@ -51,6 +63,7 @@ class MainActivity : ComponentActivity() {
                 downloads = downloads,
                 backup = backup,
                 tracking = tracking,
+                updates = updates,
                 pageDecoder = ::decodePage,
                 componentCount = componentCount,
             )
@@ -64,6 +77,10 @@ class MainActivity : ComponentActivity() {
         } finally {
             super.onDestroy()
         }
+    }
+
+    private companion object {
+        const val NOTIFICATION_PERMISSION_REQUEST = 104
     }
 }
 

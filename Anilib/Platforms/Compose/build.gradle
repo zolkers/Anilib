@@ -45,6 +45,8 @@ kotlin {
                 implementation project(':Anilib:Features:Backup:Ui')
                 implementation project(':Anilib:Features:Tracker:Ui')
                 implementation project(':Anilib:Features:Tracker:Api')
+                implementation project(':Anilib:Features:Updates:Api')
+                implementation project(':Anilib:Features:Updates:Ui')
                 implementation project(':Anilib:Framework:Http:Runtime')
                 implementation compose.foundation
                 implementation compose.material3
@@ -70,6 +72,8 @@ kotlin {
                 implementation project(':Anilib:Features:Backup:Ui')
                 implementation project(':Anilib:Features:Tracker:Ui')
                 implementation project(':Anilib:Features:Tracker:Api')
+                implementation project(':Anilib:Features:Updates:Api')
+                implementation project(':Anilib:Features:Updates:Ui')
                 implementation project(':Anilib:Framework:Http:Runtime')
                 implementation compose.foundation
                 implementation compose.material3
