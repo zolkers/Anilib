@@ -2,8 +2,13 @@ package fr.vriege.anilib.feature.settings.ui;
 
 import fr.vriege.anilib.feature.settings.SettingsService;
 import fr.vriege.anilib.feature.settings.SettingsSnapshot;
+import fr.vriege.anilib.feature.settings.AccentColor;
+import fr.vriege.anilib.feature.settings.LanguagePack;
+import fr.vriege.anilib.feature.settings.NavigationStyle;
 import fr.vriege.anilib.feature.settings.StartScreen;
+import fr.vriege.anilib.feature.settings.ThemeFamily;
 import fr.vriege.anilib.feature.settings.ThemeMode;
+import fr.vriege.anilib.feature.settings.TypographyScale;
 import fr.vriege.anilib.feature.settings.UnusedDataCleanupResult;
 import fr.vriege.anilib.feature.settings.UnusedDataMaintenance;
 
@@ -34,8 +39,33 @@ public final class DefaultSettingsPresentation implements SettingsPresentation {
     }
 
     @Override
+    public void setLanguagePack(LanguagePack languagePack) {
+        service.replace(service.snapshot().withLanguagePack(languagePack));
+    }
+
+    @Override
     public void setThemeMode(ThemeMode themeMode) {
         service.replace(service.snapshot().withThemeMode(themeMode));
+    }
+
+    @Override
+    public void setThemeFamily(ThemeFamily themeFamily) {
+        service.replace(service.snapshot().withThemeFamily(themeFamily));
+    }
+
+    @Override
+    public void setAccentColor(AccentColor accentColor) {
+        service.replace(service.snapshot().withAccentColor(accentColor));
+    }
+
+    @Override
+    public void setTypographyScale(TypographyScale typographyScale) {
+        service.replace(service.snapshot().withTypographyScale(typographyScale));
+    }
+
+    @Override
+    public void setNavigationStyle(NavigationStyle navigationStyle) {
+        service.replace(service.snapshot().withNavigationStyle(navigationStyle));
     }
 
     @Override

@@ -3,48 +3,111 @@ package fr.vriege.anilib.feature.settings;
 import java.util.Objects;
 
 public record SettingsSnapshot(
+        LanguagePack languagePack,
         ThemeMode themeMode,
+        ThemeFamily themeFamily,
+        AccentColor accentColor,
+        TypographyScale typographyScale,
+        NavigationStyle navigationStyle,
         StartScreen startScreen,
         boolean showAdultContent,
         boolean incognitoMode,
         boolean downloadOnlyOnWifi,
         boolean updateOnlyOnWifi) {
     public SettingsSnapshot {
+        Objects.requireNonNull(languagePack, "languagePack must not be null");
         Objects.requireNonNull(themeMode, "themeMode must not be null");
+        Objects.requireNonNull(themeFamily, "themeFamily must not be null");
+        Objects.requireNonNull(accentColor, "accentColor must not be null");
+        Objects.requireNonNull(typographyScale, "typographyScale must not be null");
+        Objects.requireNonNull(navigationStyle, "navigationStyle must not be null");
         Objects.requireNonNull(startScreen, "startScreen must not be null");
     }
 
     public static SettingsSnapshot defaults() {
-        return new SettingsSnapshot(ThemeMode.SYSTEM, StartScreen.LIBRARY, false, false, true, true);
+        return new SettingsSnapshot(
+                LanguagePack.SYSTEM,
+                ThemeMode.SYSTEM,
+                ThemeFamily.MATERIAL,
+                AccentColor.DEFAULT,
+                TypographyScale.STANDARD,
+                NavigationStyle.ADAPTIVE,
+                StartScreen.LIBRARY,
+                false,
+                false,
+                true,
+                true);
+    }
+
+    public SettingsSnapshot withLanguagePack(LanguagePack value) {
+        return copy(value, themeMode, themeFamily, accentColor, typographyScale, navigationStyle,
+                startScreen, showAdultContent, incognitoMode, downloadOnlyOnWifi, updateOnlyOnWifi);
     }
 
     public SettingsSnapshot withThemeMode(ThemeMode value) {
-        return new SettingsSnapshot(
-                value, startScreen, showAdultContent, incognitoMode, downloadOnlyOnWifi, updateOnlyOnWifi);
+        return copy(languagePack, value, themeFamily, accentColor, typographyScale, navigationStyle,
+                startScreen, showAdultContent, incognitoMode, downloadOnlyOnWifi, updateOnlyOnWifi);
+    }
+
+    public SettingsSnapshot withThemeFamily(ThemeFamily value) {
+        return copy(languagePack, themeMode, value, accentColor, typographyScale, navigationStyle,
+                startScreen, showAdultContent, incognitoMode, downloadOnlyOnWifi, updateOnlyOnWifi);
+    }
+
+    public SettingsSnapshot withAccentColor(AccentColor value) {
+        return copy(languagePack, themeMode, themeFamily, value, typographyScale, navigationStyle,
+                startScreen, showAdultContent, incognitoMode, downloadOnlyOnWifi, updateOnlyOnWifi);
+    }
+
+    public SettingsSnapshot withTypographyScale(TypographyScale value) {
+        return copy(languagePack, themeMode, themeFamily, accentColor, value, navigationStyle,
+                startScreen, showAdultContent, incognitoMode, downloadOnlyOnWifi, updateOnlyOnWifi);
+    }
+
+    public SettingsSnapshot withNavigationStyle(NavigationStyle value) {
+        return copy(languagePack, themeMode, themeFamily, accentColor, typographyScale, value,
+                startScreen, showAdultContent, incognitoMode, downloadOnlyOnWifi, updateOnlyOnWifi);
     }
 
     public SettingsSnapshot withStartScreen(StartScreen value) {
-        return new SettingsSnapshot(
-                themeMode, value, showAdultContent, incognitoMode, downloadOnlyOnWifi, updateOnlyOnWifi);
+        return copy(languagePack, themeMode, themeFamily, accentColor, typographyScale, navigationStyle,
+                value, showAdultContent, incognitoMode, downloadOnlyOnWifi, updateOnlyOnWifi);
     }
 
     public SettingsSnapshot withShowAdultContent(boolean value) {
-        return new SettingsSnapshot(
-                themeMode, startScreen, value, incognitoMode, downloadOnlyOnWifi, updateOnlyOnWifi);
+        return copy(languagePack, themeMode, themeFamily, accentColor, typographyScale, navigationStyle,
+                startScreen, value, incognitoMode, downloadOnlyOnWifi, updateOnlyOnWifi);
     }
 
     public SettingsSnapshot withIncognitoMode(boolean value) {
-        return new SettingsSnapshot(
-                themeMode, startScreen, showAdultContent, value, downloadOnlyOnWifi, updateOnlyOnWifi);
+        return copy(languagePack, themeMode, themeFamily, accentColor, typographyScale, navigationStyle,
+                startScreen, showAdultContent, value, downloadOnlyOnWifi, updateOnlyOnWifi);
     }
 
     public SettingsSnapshot withDownloadOnlyOnWifi(boolean value) {
-        return new SettingsSnapshot(
-                themeMode, startScreen, showAdultContent, incognitoMode, value, updateOnlyOnWifi);
+        return copy(languagePack, themeMode, themeFamily, accentColor, typographyScale, navigationStyle,
+                startScreen, showAdultContent, incognitoMode, value, updateOnlyOnWifi);
     }
 
     public SettingsSnapshot withUpdateOnlyOnWifi(boolean value) {
-        return new SettingsSnapshot(
-                themeMode, startScreen, showAdultContent, incognitoMode, downloadOnlyOnWifi, value);
+        return copy(languagePack, themeMode, themeFamily, accentColor, typographyScale, navigationStyle,
+                startScreen, showAdultContent, incognitoMode, downloadOnlyOnWifi, value);
+    }
+
+    private static SettingsSnapshot copy(
+            LanguagePack languagePack,
+            ThemeMode themeMode,
+            ThemeFamily themeFamily,
+            AccentColor accentColor,
+            TypographyScale typographyScale,
+            NavigationStyle navigationStyle,
+            StartScreen startScreen,
+            boolean showAdultContent,
+            boolean incognitoMode,
+            boolean downloadOnlyOnWifi,
+            boolean updateOnlyOnWifi) {
+        return new SettingsSnapshot(languagePack, themeMode, themeFamily, accentColor, typographyScale,
+                navigationStyle, startScreen, showAdultContent, incognitoMode, downloadOnlyOnWifi,
+                updateOnlyOnWifi);
     }
 }

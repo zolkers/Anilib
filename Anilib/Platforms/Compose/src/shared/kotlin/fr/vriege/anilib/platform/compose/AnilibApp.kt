@@ -34,6 +34,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -54,6 +55,7 @@ import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -61,7 +63,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -93,7 +98,11 @@ import fr.vriege.anilib.feature.library.ui.LibraryPage
 import fr.vriege.anilib.feature.library.ui.LibraryPresentation
 import fr.vriege.anilib.feature.network.NetworkMaintenance
 import fr.vriege.anilib.feature.settings.SettingsSnapshot
+import fr.vriege.anilib.feature.settings.AccentColor
+import fr.vriege.anilib.feature.settings.LanguagePack
+import fr.vriege.anilib.feature.settings.NavigationStyle
 import fr.vriege.anilib.feature.settings.StartScreen
+import fr.vriege.anilib.feature.settings.ThemeFamily
 import fr.vriege.anilib.feature.settings.ThemeMode
 import fr.vriege.anilib.feature.settings.ui.SettingsPresentation
 import fr.vriege.anilib.feature.source.SourceContentKind
@@ -201,8 +210,15 @@ fun AnilibApp(
         ThemeMode.LIGHT -> false
         ThemeMode.DARK -> true
     }
-    MaterialTheme(colorScheme = if (useDarkTheme) darkColorScheme() else lightColorScheme()) {
-        Surface(modifier = Modifier.fillMaxSize()) {
+    val currentDensity = LocalDensity.current
+    CompositionLocalProvider(
+        LocalDensity provides Density(
+            currentDensity.density,
+            currentDensity.fontScale * settings.typographyScale().multiplier(),
+        ),
+    ) {
+        MaterialTheme(colorScheme = appColorScheme(settings, useDarkTheme)) {
+            Surface(modifier = Modifier.fillMaxSize()) {
             val controller = activeReader
             val playerTitle = activePlayerTitle
             val trackingTitle = activeTrackingTitle
@@ -267,7 +283,12 @@ fun AnilibApp(
                         .onFailure { playerError = it.message ?: "The episode list could not be opened." }
                 }
                 BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                    if (maxWidth >= 720.dp) {
+                    val useNavigationRail = when (settings.navigationStyle()) {
+                        NavigationStyle.ADAPTIVE -> maxWidth >= 720.dp
+                        NavigationStyle.BOTTOM_BAR -> false
+                        NavigationStyle.NAVIGATION_RAIL -> true
+                    }
+                    if (useNavigationRail) {
                         ExpandedShell(
                             presentation,
                             discovery,
@@ -347,6 +368,7 @@ fun AnilibApp(
         }
     }
 }
+}
 
 @Composable
 private fun ExpandedShell(
@@ -386,7 +408,7 @@ private fun ExpandedShell(
     closeMore: () -> Unit,
 ) {
     Row(modifier = Modifier.fillMaxSize()) {
-        AnilibNavigationRail(section, openSection)
+        AnilibNavigationRail(section, settings.languagePack(), openSection)
         VerticalDivider()
         Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
             AppDestination(
@@ -506,13 +528,14 @@ private fun CompactShell(
             )
         }
         HorizontalDivider()
-        AnilibNavigationBar(section, openSection)
+        AnilibNavigationBar(section, settings.languagePack(), openSection)
     }
 }
 
 @Composable
 private fun AnilibNavigationRail(
     section: AppSection,
+    settingsLanguage: LanguagePack,
     openSection: (AppSection) -> Unit,
 ) {
     NavigationRail(header = {
@@ -528,7 +551,7 @@ private fun AnilibNavigationRail(
                 selected = section == item,
                 onClick = { openSection(item) },
                 icon = { Icon(item.icon(), contentDescription = null) },
-                label = { Text(item.label) },
+                label = { Text(item.label(settingsLanguage)) },
             )
         }
     }
@@ -537,6 +560,7 @@ private fun AnilibNavigationRail(
 @Composable
 private fun AnilibNavigationBar(
     section: AppSection,
+    settingsLanguage: LanguagePack,
     openSection: (AppSection) -> Unit,
 ) {
     NavigationBar {
@@ -545,7 +569,7 @@ private fun AnilibNavigationBar(
                 selected = section == item,
                 onClick = { openSection(item) },
                 icon = { Icon(item.icon(), contentDescription = null) },
-                label = { Text(item.label) },
+                label = { Text(item.label(settingsLanguage)) },
             )
         }
     }
@@ -1908,12 +1932,89 @@ private fun formatEnum(value: Enum<*>): String = value.name
     .lowercase(Locale.ROOT)
     .replaceFirstChar(Char::uppercase)
 
-private enum class AppSection(val label: String) {
-    LIBRARY("Library"),
-    UPDATES("Updates"),
-    HISTORY("History"),
-    BROWSE("Browse"),
-    MORE("More"),
+private enum class AppSection {
+    LIBRARY,
+    UPDATES,
+    HISTORY,
+    BROWSE,
+    MORE,
+}
+
+private fun AppSection.label(language: LanguagePack): String {
+    val selected = if (language == LanguagePack.SYSTEM) {
+        when (Locale.getDefault().language.lowercase(Locale.ROOT)) {
+            "fr" -> LanguagePack.FRENCH
+            "de" -> LanguagePack.GERMAN
+            "es" -> LanguagePack.SPANISH
+            "ja" -> LanguagePack.JAPANESE
+            else -> LanguagePack.ENGLISH
+        }
+    } else {
+        language
+    }
+    return when (selected) {
+        LanguagePack.FRENCH -> when (this) {
+            AppSection.LIBRARY -> "Bibliothèque"
+            AppSection.UPDATES -> "Mises à jour"
+            AppSection.HISTORY -> "Historique"
+            AppSection.BROWSE -> "Parcourir"
+            AppSection.MORE -> "Plus"
+        }
+        LanguagePack.GERMAN -> when (this) {
+            AppSection.LIBRARY -> "Bibliothek"
+            AppSection.UPDATES -> "Updates"
+            AppSection.HISTORY -> "Verlauf"
+            AppSection.BROWSE -> "Entdecken"
+            AppSection.MORE -> "Mehr"
+        }
+        LanguagePack.SPANISH -> when (this) {
+            AppSection.LIBRARY -> "Biblioteca"
+            AppSection.UPDATES -> "Novedades"
+            AppSection.HISTORY -> "Historial"
+            AppSection.BROWSE -> "Explorar"
+            AppSection.MORE -> "Más"
+        }
+        LanguagePack.JAPANESE -> when (this) {
+            AppSection.LIBRARY -> "ライブラリ"
+            AppSection.UPDATES -> "更新"
+            AppSection.HISTORY -> "履歴"
+            AppSection.BROWSE -> "探す"
+            AppSection.MORE -> "その他"
+        }
+        LanguagePack.SYSTEM, LanguagePack.ENGLISH -> when (this) {
+            AppSection.LIBRARY -> "Library"
+            AppSection.UPDATES -> "Updates"
+            AppSection.HISTORY -> "History"
+            AppSection.BROWSE -> "Browse"
+            AppSection.MORE -> "More"
+        }
+    }
+}
+
+private fun appColorScheme(settings: SettingsSnapshot, dark: Boolean): ColorScheme {
+    val accent = when (settings.accentColor()) {
+        AccentColor.DEFAULT -> if (dark) Color(0xFFD0BCFF) else Color(0xFF6750A4)
+        AccentColor.OCEAN -> if (dark) Color(0xFF76D1FF) else Color(0xFF00658A)
+        AccentColor.FOREST -> if (dark) Color(0xFF8FD49A) else Color(0xFF296B38)
+        AccentColor.SAKURA -> if (dark) Color(0xFFFFB1C8) else Color(0xFF9B405F)
+    }
+    val scheme = if (dark) darkColorScheme(primary = accent) else lightColorScheme(primary = accent)
+    return when (settings.themeFamily()) {
+        ThemeFamily.MATERIAL -> scheme
+        ThemeFamily.TONAL -> scheme.copy(
+            secondary = accent,
+            tertiary = if (dark) Color(0xFFFFB95C) else Color(0xFF805500),
+        )
+        ThemeFamily.AMOLED -> if (dark) {
+            scheme.copy(
+                background = Color.Black,
+                surface = Color.Black,
+                surfaceVariant = Color(0xFF111111),
+            )
+        } else {
+            scheme
+        }
+    }
 }
 
 private fun StartScreen.appSection(): AppSection = when (this) {

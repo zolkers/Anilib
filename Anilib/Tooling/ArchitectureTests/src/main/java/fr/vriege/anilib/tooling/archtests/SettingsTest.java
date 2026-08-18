@@ -1,8 +1,13 @@
 package fr.vriege.anilib.tooling.archtests;
 
 import fr.vriege.anilib.feature.settings.SettingsSnapshot;
+import fr.vriege.anilib.feature.settings.AccentColor;
+import fr.vriege.anilib.feature.settings.LanguagePack;
+import fr.vriege.anilib.feature.settings.NavigationStyle;
 import fr.vriege.anilib.feature.settings.StartScreen;
+import fr.vriege.anilib.feature.settings.ThemeFamily;
 import fr.vriege.anilib.feature.settings.ThemeMode;
+import fr.vriege.anilib.feature.settings.TypographyScale;
 import fr.vriege.anilib.feature.settings.runtime.FileSettingsService;
 import fr.vriege.anilib.feature.settings.runtime.DefaultUnusedDataMaintenance;
 import fr.vriege.anilib.feature.settings.ui.DefaultSettingsPresentation;
@@ -34,25 +39,40 @@ final class SettingsTest {
             counter.check(observations.get() == 1,
                     "settings observers must receive the current snapshot immediately");
 
+            presentation.setLanguagePack(LanguagePack.FRENCH);
             presentation.setThemeMode(ThemeMode.DARK);
+            presentation.setThemeFamily(ThemeFamily.AMOLED);
+            presentation.setAccentColor(AccentColor.SAKURA);
+            presentation.setTypographyScale(TypographyScale.LARGE);
+            presentation.setNavigationStyle(NavigationStyle.NAVIGATION_RAIL);
             presentation.setStartScreen(StartScreen.BROWSE);
             presentation.setShowAdultContent(true);
             presentation.setIncognitoMode(true);
             presentation.setDownloadOnlyOnWifi(false);
             presentation.setUpdateOnlyOnWifi(false);
-            counter.check(observations.get() == 7,
+            counter.check(observations.get() == 12,
                     "every settings change must publish one immutable snapshot");
             close(observation);
 
             SettingsSnapshot expected = new SettingsSnapshot(
-                    ThemeMode.DARK, StartScreen.BROWSE, true, true, false, false);
+                    LanguagePack.FRENCH,
+                    ThemeMode.DARK,
+                    ThemeFamily.AMOLED,
+                    AccentColor.SAKURA,
+                    TypographyScale.LARGE,
+                    NavigationStyle.NAVIGATION_RAIL,
+                    StartScreen.BROWSE,
+                    true,
+                    true,
+                    false,
+                    false);
             counter.check(service.snapshot().equals(expected),
                     "settings actions must update the in-memory snapshot");
             counter.check(new FileSettingsService(file).snapshot().equals(expected),
                     "settings must survive a service restart");
 
             presentation.setThemeMode(ThemeMode.LIGHT);
-            counter.check(observations.get() == 7,
+            counter.check(observations.get() == 12,
                     "closed settings observations must stop receiving changes");
             return counter.value;
         } finally {

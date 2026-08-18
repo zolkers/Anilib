@@ -262,9 +262,11 @@ composition unit.
 Settings is a removable vertical rather than platform-owned preferences. Its
 Java service atomically stores immutable snapshots and publishes observations
 through a narrow capability. One platform-neutral presentation owns mutation
-actions; the shared Compose shell observes it to apply system, light, or dark
-appearance immediately and select the persisted initial destination on Android
-and desktop. The searchable Settings home routes into dedicated shared pages;
+actions; the shared Compose shell observes it to apply language packs, theme
+mode/family/accent palettes, typography scale, and adaptive or forced navigation
+immediately and select the persisted initial destination on Android and desktop.
+Library remains the owner of category defaults and per-category exceptions. The
+searchable Settings home routes into dedicated shared pages;
 platform launchers still own no preference behavior. Feature policy values
 remain owned here as user choices. Downloads and library updates combine their Wi-Fi
 preferences with a platform-supplied network status; Reader and Player suppress

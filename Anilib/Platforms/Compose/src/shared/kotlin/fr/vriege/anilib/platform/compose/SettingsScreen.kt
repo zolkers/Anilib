@@ -35,7 +35,9 @@ import androidx.compose.ui.unit.dp
 import com.multiplatform.webview.cookie.WebViewCookieManager
 import fr.vriege.anilib.feature.network.NetworkMaintenance
 import fr.vriege.anilib.feature.settings.SettingsSnapshot
+import fr.vriege.anilib.feature.settings.LanguagePack
 import fr.vriege.anilib.feature.settings.ThemeMode
+import fr.vriege.anilib.feature.settings.TypographyScale
 import fr.vriege.anilib.feature.settings.ui.SettingsPresentation
 import kotlinx.coroutines.launch
 
@@ -249,7 +251,11 @@ private fun SettingsDetail(
                             presentation.setStartScreen(settings.startScreen().next())
                         }
                     }
-                    item { SettingsRow("Language", "System language") }
+                    item {
+                        SettingsRow("Language", languageLabel(settings.languagePack())) {
+                            presentation.setLanguagePack(settings.languagePack().next())
+                        }
+                    }
                     item { SettingsHint("Start screen changes apply the next time Anilib opens.") }
                 }
                 SettingsDestination.APPEARANCE -> {
@@ -259,7 +265,27 @@ private fun SettingsDetail(
                             presentation.setThemeMode(settings.themeMode().next())
                         }
                     }
-                    item { SettingsHint("The shared theme applies immediately on Android and desktop.") }
+                    item {
+                        SettingsRow("Theme family", settings.themeFamily().displayName()) {
+                            presentation.setThemeFamily(settings.themeFamily().next())
+                        }
+                    }
+                    item {
+                        SettingsRow("Accent color", settings.accentColor().displayName()) {
+                            presentation.setAccentColor(settings.accentColor().next())
+                        }
+                    }
+                    item {
+                        SettingsRow("Typography", typographyLabel(settings.typographyScale())) {
+                            presentation.setTypographyScale(settings.typographyScale().next())
+                        }
+                    }
+                    item {
+                        SettingsRow("Navigation", settings.navigationStyle().displayName()) {
+                            presentation.setNavigationStyle(settings.navigationStyle().next())
+                        }
+                    }
+                    item { SettingsHint("Appearance changes apply immediately on Android and desktop.") }
                 }
                 SettingsDestination.PRIVACY -> {
                     item { SettingsSection("Content") }
@@ -432,6 +458,21 @@ private fun themeLabel(settings: SettingsSnapshot): String = when (settings.them
     ThemeMode.SYSTEM -> "Follow the system theme"
     ThemeMode.LIGHT -> "Light"
     ThemeMode.DARK -> "Dark"
+}
+
+private fun languageLabel(language: LanguagePack): String = when (language) {
+    LanguagePack.SYSTEM -> "System language"
+    LanguagePack.ENGLISH -> "English"
+    LanguagePack.FRENCH -> "Français"
+    LanguagePack.GERMAN -> "Deutsch"
+    LanguagePack.SPANISH -> "Español"
+    LanguagePack.JAPANESE -> "日本語"
+}
+
+private fun typographyLabel(scale: TypographyScale): String = when (scale) {
+    TypographyScale.COMPACT -> "Compact (90%)"
+    TypographyScale.STANDARD -> "Standard (100%)"
+    TypographyScale.LARGE -> "Large (115%)"
 }
 
 private fun Enum<*>.displayName(): String = name

@@ -2,8 +2,13 @@ package fr.vriege.anilib.feature.settings.runtime;
 
 import fr.vriege.anilib.feature.settings.SettingsService;
 import fr.vriege.anilib.feature.settings.SettingsSnapshot;
+import fr.vriege.anilib.feature.settings.AccentColor;
+import fr.vriege.anilib.feature.settings.LanguagePack;
+import fr.vriege.anilib.feature.settings.NavigationStyle;
 import fr.vriege.anilib.feature.settings.StartScreen;
+import fr.vriege.anilib.feature.settings.ThemeFamily;
 import fr.vriege.anilib.feature.settings.ThemeMode;
+import fr.vriege.anilib.feature.settings.TypographyScale;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -24,7 +29,12 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
 public final class FileSettingsService implements SettingsService {
+    private static final String LANGUAGE = "appearance.language";
     private static final String THEME = "appearance.theme";
+    private static final String THEME_FAMILY = "appearance.theme-family";
+    private static final String ACCENT = "appearance.accent";
+    private static final String TYPOGRAPHY = "appearance.typography";
+    private static final String NAVIGATION = "appearance.navigation";
     private static final String START_SCREEN = "appearance.start-screen";
     private static final String ADULT_CONTENT = "content.show-adult";
     private static final String INCOGNITO = "privacy.incognito";
@@ -81,8 +91,13 @@ public final class FileSettingsService implements SettingsService {
             throw failure("load settings", exception);
         }
         return new SettingsSnapshot(
-                theme(values.getProperty(THEME), defaults.themeMode()),
-                startScreen(values.getProperty(START_SCREEN), defaults.startScreen()),
+                enumValue(values.getProperty(LANGUAGE), defaults.languagePack(), LanguagePack.class),
+                enumValue(values.getProperty(THEME), defaults.themeMode(), ThemeMode.class),
+                enumValue(values.getProperty(THEME_FAMILY), defaults.themeFamily(), ThemeFamily.class),
+                enumValue(values.getProperty(ACCENT), defaults.accentColor(), AccentColor.class),
+                enumValue(values.getProperty(TYPOGRAPHY), defaults.typographyScale(), TypographyScale.class),
+                enumValue(values.getProperty(NAVIGATION), defaults.navigationStyle(), NavigationStyle.class),
+                enumValue(values.getProperty(START_SCREEN), defaults.startScreen(), StartScreen.class),
                 flag(values, ADULT_CONTENT, defaults.showAdultContent()),
                 flag(values, INCOGNITO, defaults.incognitoMode()),
                 flag(values, DOWNLOAD_WIFI, defaults.downloadOnlyOnWifi()),
@@ -91,7 +106,12 @@ public final class FileSettingsService implements SettingsService {
 
     private void persist(SettingsSnapshot settings) {
         Properties values = new Properties();
+        values.setProperty(LANGUAGE, setting(settings.languagePack()));
         values.setProperty(THEME, settings.themeMode().name().toLowerCase(Locale.ROOT));
+        values.setProperty(THEME_FAMILY, setting(settings.themeFamily()));
+        values.setProperty(ACCENT, setting(settings.accentColor()));
+        values.setProperty(TYPOGRAPHY, setting(settings.typographyScale()));
+        values.setProperty(NAVIGATION, setting(settings.navigationStyle()));
         values.setProperty(START_SCREEN, settings.startScreen().name().toLowerCase(Locale.ROOT));
         values.setProperty(ADULT_CONTENT, Boolean.toString(settings.showAdultContent()));
         values.setProperty(INCOGNITO, Boolean.toString(settings.incognitoMode()));
@@ -119,23 +139,16 @@ public final class FileSettingsService implements SettingsService {
         }
     }
 
-    private static ThemeMode theme(String value, ThemeMode fallback) {
-        if (value == null) {
-            return fallback;
-        }
-        try {
-            return ThemeMode.valueOf(value.strip().toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException exception) {
-            return fallback;
-        }
+    private static String setting(Enum<?> value) {
+        return value.name().toLowerCase(Locale.ROOT);
     }
 
-    private static StartScreen startScreen(String value, StartScreen fallback) {
+    private static <E extends Enum<E>> E enumValue(String value, E fallback, Class<E> type) {
         if (value == null) {
             return fallback;
         }
         try {
-            return StartScreen.valueOf(value.strip().toUpperCase(Locale.ROOT));
+            return Enum.valueOf(type, value.strip().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException exception) {
             return fallback;
         }

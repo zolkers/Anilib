@@ -245,7 +245,7 @@ platform-specific.
 
 ### 7. Settings, network, WebView, and diagnostics
 
-- [ ] add language packs, theme families, color schemes, typography, navigation
+- [x] add language packs, theme families, color schemes, typography, navigation
   style, and remaining category defaults and exceptions
 - [ ] add configurable user agent, proxy, DNS-over-HTTPS, timeout, cache, and
   per-source network diagnostics
