@@ -70,6 +70,7 @@ explicit so an architectural seam cannot be mistaken for a finished workflow.
 - [x] Split Settings into searchable dedicated destinations and added a durable start-screen choice.
 - [x] Localized every shared UI label and icon description in the advertised English/French packs and added a repository gate against untranslated additions.
 - [x] Added deterministic pixel and semantics captures with real clicks for the shared navigation routes at compact and expanded sizes.
+- [x] Added content-rich local manga, reader, anime, player, catalogue, and offline WebView fixtures to both adaptive capture sizes.
 - [x] Kept every result shared by Android and desktop; no feature behavior was copied into a platform launcher.
 
 The audit is intentionally grouped by user workflow. Aniyomi currently spreads

@@ -24,9 +24,27 @@ import fr.vriege.anilib.feature.applicationupdate.ApplicationArtifact
 import fr.vriege.anilib.feature.applicationupdate.ApplicationUpdateVerification
 import fr.vriege.anilib.feature.library.LibraryCapabilities
 import fr.vriege.anilib.feature.library.LibraryItem
+import fr.vriege.anilib.feature.library.LibraryOrigin
 import fr.vriege.anilib.feature.library.MediaKind
+import fr.vriege.anilib.feature.player.PlayerBackend
+import fr.vriege.anilib.feature.player.PlayerMedia
+import fr.vriege.anilib.feature.player.PlayerPlayback
+import fr.vriege.anilib.feature.player.PlayerPlaybackSnapshot
+import fr.vriege.anilib.feature.player.PlayerPlaybackStatus
 import fr.vriege.anilib.feature.settings.BrowserPolicy
 import fr.vriege.anilib.feature.settings.SettingsCapabilities
+import fr.vriege.anilib.feature.source.SourceContentKind
+import fr.vriege.anilib.feature.source.CatalogueSource
+import fr.vriege.anilib.feature.source.SourceBrowseRequest
+import fr.vriege.anilib.feature.source.SourceDescriptor
+import fr.vriege.anilib.feature.source.SourceExtensionPlugin
+import fr.vriege.anilib.feature.source.SourceId
+import fr.vriege.anilib.feature.source.SourcePage
+import fr.vriege.anilib.feature.source.SourceSdk
+import fr.vriege.anilib.feature.source.SourceSearchRequest
+import fr.vriege.anilib.feature.source.WebSource
+import fr.vriege.anilib.foundation.component.ComponentDescriptor
+import fr.vriege.anilib.framework.http.jdk.JdkHttpTransport
 import fr.vriege.anilib.platform.compose.ApplicationUpdatePlatformController
 import fr.vriege.anilib.platform.compose.BackupImportPicker
 import fr.vriege.anilib.platform.compose.BrowserDataClearResult
@@ -37,8 +55,11 @@ import fr.vriege.anilib.platform.compose.BrowserRuntimeStatus
 import fr.vriege.anilib.platform.compose.ShareController
 import java.nio.file.Files
 import java.nio.file.Path
+import java.net.URI
+import java.util.Base64
 import java.util.Comparator
 import java.util.Locale
+import java.util.Optional
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -57,11 +78,34 @@ class UiRouteScreenshotTest {
         Locale.setDefault(Locale.US)
         System.setProperty("anilib.theme", "light")
         try {
-            StandardAnilib.start(directory).use { started ->
+            prepareLocalContent(directory)
+            StandardAnilib.start(
+                directory,
+                JdkHttpTransport(),
+                AcceptancePlayerBackend(),
+                listOf(
+                    SourceExtensionPlugin(
+                        ComponentDescriptor.of(
+                            "acceptance.web-source",
+                            "Acceptance web source",
+                            "1.0.0",
+                        ),
+                        AcceptanceWebSource(),
+                    ),
+                ),
+            ).use { started ->
                 val settings = started.capability(SettingsCapabilities.SERVICE)
                 settings.replace(settings.snapshot().withReducedMotion(true))
-                started.capability(LibraryCapabilities.CATALOG).save(
-                    LibraryItem.create("Acceptance title", MediaKind.MANGA),
+                val library = started.capability(LibraryCapabilities.CATALOG)
+                library.save(
+                    LibraryItem.create("Acceptance manga", MediaKind.MANGA)
+                        .withOrigin(LibraryOrigin("anilib.local", "DIRECTORY:Acceptance manga")),
+                )
+                library.save(
+                    LibraryItem.create("Acceptance anime", MediaKind.ANIME)
+                        .withOrigin(
+                            LibraryOrigin("anilib.local", "ANIME_SERIES:localanime/Acceptance anime"),
+                        ),
                 )
                 setContent {
                     Box(Modifier.requiredSize(width.dp, height.dp)) {
@@ -82,8 +126,26 @@ class UiRouteScreenshotTest {
                 }
 
                 captureStable("Library")
-                onNodeWithText("Acceptance title").performClick()
-                captureStable("Anime and manga details")
+                onNodeWithText("Acceptance manga").performClick()
+                scrollToText("Read")
+                captureStable("Manga details with local chapters")
+                onNodeWithText("Read").performClick()
+                waitForContentDescription("Close reader")
+                captureStable("Reader with decoded local page")
+                onNodeWithContentDescription("Close reader").performClick()
+                goBack()
+
+                onNodeWithText("Acceptance anime").performClick()
+                scrollToText("Watch")
+                captureStable("Anime details with local episodes")
+                onNodeWithText("Watch").performClick()
+                waitForText("First episode")
+                captureStable("Episode catalogue")
+                onNodeWithText("First episode").performClick()
+                waitForText("No media backend is available.")
+                captureStable("Player session")
+                goBack()
+                goBack()
                 goBack()
 
                 visitPrimary("Updates")
@@ -100,6 +162,20 @@ class UiRouteScreenshotTest {
                 ).forEach { tab ->
                     onNodeWithText(tab).performClick()
                     captureStable(tab)
+                    if (tab == "Manga sources") {
+                        onNodeWithText("Acceptance web").performClick()
+                        waitForContentDescription("Open source website")
+                        onNodeWithContentDescription("Open source website").performClick()
+                        waitForText("WebView unavailable")
+                        captureStable("WebView unavailable state")
+                        onNodeWithContentDescription("Close browser").performClick()
+                        goBack()
+                        waitForText("Local library")
+                        onNodeWithText("Local library").performClick()
+                        waitForText("Acceptance catalogue manga")
+                        captureStable("Local source catalogue")
+                        goBack()
+                    }
                 }
 
                 onNodeWithText("More").performClick()
@@ -164,6 +240,18 @@ class UiRouteScreenshotTest {
         }
     }
 
+    private fun androidx.compose.ui.test.ComposeUiTest.waitForText(label: String) {
+        waitUntil(timeoutMillis = 5_000) {
+            onAllNodes(hasText(label)).fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
+    private fun androidx.compose.ui.test.ComposeUiTest.waitForContentDescription(label: String) {
+        waitUntil(timeoutMillis = 5_000) {
+            runCatching { onNodeWithContentDescription(label).fetchSemanticsNode() }.isSuccess
+        }
+    }
+
     private fun androidx.compose.ui.test.ComposeUiTest.captureStable(route: String) {
         waitForIdle()
         waitUntil(timeoutMillis = 5_000) {
@@ -211,6 +299,115 @@ class UiRouteScreenshotTest {
 
             override fun install(verification: ApplicationUpdateVerification) = Unit
         }
+
+    private fun prepareLocalContent(directory: Path) {
+        val image = Base64.getDecoder().decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+        )
+        val legacyManga = Files.createDirectories(
+            directory.resolve("local-content").resolve("Acceptance manga"),
+        )
+        Files.write(legacyManga.resolve("001.png"), image)
+        Files.write(legacyManga.resolve("002.png"), image)
+
+        val catalogueManga = Files.createDirectories(
+            directory.resolve("local-content").resolve("local")
+                .resolve("Acceptance catalogue manga").resolve("chapter_1"),
+        )
+        Files.write(catalogueManga.resolve("001.png"), image)
+        Files.writeString(
+            catalogueManga.parent.resolve("details.json"),
+            """{"title":"Acceptance catalogue manga","description":"Structured local fixture"}""",
+        )
+        Files.writeString(
+            catalogueManga.parent.resolve("chapters.json"),
+            """[{"chapter_number":1,"name":"Opening chapter"}]""",
+        )
+
+        val anime = Files.createDirectories(
+            directory.resolve("local-content").resolve("localanime").resolve("Acceptance anime"),
+        )
+        Files.write(anime.resolve("ep01.mp4"), byteArrayOf(0))
+        Files.writeString(
+            anime.resolve("details.json"),
+            """{"title":"Acceptance anime","description":"Structured local anime fixture"}""",
+        )
+        Files.writeString(
+            anime.resolve("episodes.json"),
+            """[{"episode_number":1,"name":"First episode"}]""",
+        )
+    }
+
+    private class AcceptancePlayerBackend : PlayerBackend {
+        override fun id() = "acceptance-player"
+
+        override fun available() = true
+
+        override fun open(media: PlayerMedia): PlayerPlayback = AcceptancePlayback(media)
+    }
+
+    private class AcceptanceWebSource : CatalogueSource, WebSource {
+        private val descriptor = SourceDescriptor(
+            SourceId.of("acceptance.web"),
+            "Acceptance web",
+            "1.0.0",
+            "en",
+            setOf(SourceContentKind.MANGA),
+            SourceSdk.API_VERSION,
+        )
+
+        override fun descriptor() = descriptor
+
+        override fun homePage(): URI = URI.create("https://acceptance.invalid/")
+
+        override fun popular(request: SourceBrowseRequest) = SourcePage(emptyList(), false)
+
+        override fun search(request: SourceSearchRequest) = SourcePage(emptyList(), false)
+    }
+
+    private class AcceptancePlayback(
+        private val media: PlayerMedia,
+    ) : PlayerPlayback {
+        private var status = PlayerPlaybackStatus.PAUSED
+        private var position = media.startPositionMillis()
+        private var volume = 1f
+        private var speed = 1f
+
+        override fun media() = media
+
+        override fun snapshot() = PlayerPlaybackSnapshot(
+            status,
+            position,
+            60_000L,
+            volume,
+            speed,
+            Optional.empty(),
+        )
+
+        override fun play() {
+            status = PlayerPlaybackStatus.PLAYING
+        }
+
+        override fun pause() {
+            status = PlayerPlaybackStatus.PAUSED
+        }
+
+        override fun seekTo(positionMillis: Long) {
+            position = positionMillis.coerceIn(0L, 60_000L)
+        }
+
+        override fun setVolume(volume: Float) {
+            this.volume = volume
+        }
+
+        override fun setPlaybackSpeed(speed: Float) {
+            this.speed = speed
+        }
+
+        override fun selectSubtitle(subtitleId: Optional<String>) = Unit
+
+        override fun close() = Unit
+    }
 
     private fun deleteTree(directory: Path) {
         Files.walk(directory).use { paths ->
