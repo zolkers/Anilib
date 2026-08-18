@@ -2,6 +2,9 @@ package fr.vriege.anilib.tooling.archtests;
 
 import fr.vriege.anilib.configuration.standard.StandardAnilib;
 import fr.vriege.anilib.feature.downloads.DownloadCapabilities;
+import fr.vriege.anilib.feature.downloads.AutomaticDownloadCategoryRule;
+import fr.vriege.anilib.feature.downloads.AutomaticDownloadPolicy;
+import fr.vriege.anilib.feature.downloads.DownloadCleanupPolicy;
 import fr.vriege.anilib.feature.downloads.DownloadException;
 import fr.vriege.anilib.feature.downloads.DownloadId;
 import fr.vriege.anilib.feature.downloads.DownloadJobSnapshot;
@@ -65,10 +68,58 @@ final class DownloadTest {
         verifiesStandardOfflineReading(counter);
         verifiesResumableQueue(counter);
         verifiesPriorityMetricsAndRecovery(counter);
+        verifiesAutomaticRules(counter);
         verifiesStorageLimit(counter);
         enforcesLargeTransferPolicy(counter);
         cleansOrphanedDownloads(counter);
         return counter.value;
+    }
+
+    private static void verifiesAutomaticRules(Counter counter) {
+        Path root = null;
+        try {
+            root = Files.createTempDirectory("anilib-automatic-downloads");
+            MemoryLibraryCatalog library = new MemoryLibraryCatalog();
+            LibraryItem item = LibraryItem.create("Automatic", MediaKind.MANGA)
+                    .withCategories(Set.of("Weekly"))
+                    .withOrigin(new LibraryOrigin("test.queue", "title"));
+            library.save(item);
+            QueuedPagedSource source = new QueuedPagedSource(false, false);
+            DownloadStoragePolicy storage = new DownloadStoragePolicy(4096, 1024, 1, true, true);
+            AutomaticDownloadPolicy automatic = new AutomaticDownloadPolicy(
+                    true,
+                    false,
+                    false,
+                    0,
+                    1,
+                    DownloadCleanupPolicy.KEEP_LATEST,
+                    1,
+                    List.of(new AutomaticDownloadCategoryRule("Weekly", 0, 2)));
+            try (DefaultDownloadService downloads = new DefaultDownloadService(
+                    new SingleSourceRegistry(source), library, root, storage)) {
+                downloads.configureAutomaticDownloads(automatic);
+                List<DownloadJobSnapshot> jobs = downloads.snapshot().jobs();
+                counter.check(jobs.size() == 2
+                                && jobs.stream().map(job -> job.contentUnit().id().value()).collect(
+                                        java.util.stream.Collectors.toSet()).equals(Set.of("b", "c")),
+                        "automatic category rules must queue only the configured latest chapter limit");
+                for (DownloadJobSnapshot job : jobs) {
+                    await(downloads, job.id(), value -> value.status() == DownloadStatus.COMPLETED);
+                }
+                counter.check(downloads.cleanAutomaticDownloads() == 1
+                                && downloads.snapshot().jobs().size() == 1,
+                        "automatic cleanup must retain only the configured latest completed item");
+            }
+            try (DefaultDownloadService restarted = new DefaultDownloadService(
+                    new SingleSourceRegistry(source), library, root, storage)) {
+                counter.check(restarted.automaticPolicy().equals(automatic),
+                        "automatic download rules must survive a service restart");
+            }
+        } catch (IOException exception) {
+            throw new AssertionError("Unable to prepare automatic download test", exception);
+        } finally {
+            deleteTree(root);
+        }
     }
 
     private static void verifiesPriorityMetricsAndRecovery(Counter counter) {

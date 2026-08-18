@@ -1,5 +1,9 @@
 package fr.vriege.anilib.feature.downloads.runtime;
 
+import fr.vriege.anilib.feature.downloads.AutomaticDownloadCategoryRule;
+import fr.vriege.anilib.feature.downloads.AutomaticDownloadPolicy;
+import fr.vriege.anilib.feature.downloads.AutomaticDownloadResult;
+import fr.vriege.anilib.feature.downloads.DownloadCleanupPolicy;
 import fr.vriege.anilib.feature.downloads.DownloadException;
 import fr.vriege.anilib.feature.downloads.DownloadId;
 import fr.vriege.anilib.feature.downloads.DownloadIndexRepairResult;
@@ -15,6 +19,7 @@ import fr.vriege.anilib.feature.library.LibraryCatalog;
 import fr.vriege.anilib.feature.library.LibraryItem;
 import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.library.LibraryOrigin;
+import fr.vriege.anilib.feature.library.MediaKind;
 import fr.vriege.anilib.feature.reader.ReaderContent;
 import fr.vriege.anilib.feature.reader.ReaderContentProvider;
 import fr.vriege.anilib.feature.source.PagedSource;
@@ -34,6 +39,7 @@ import java.nio.file.StandardCopyOption;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -68,6 +74,7 @@ public final class DefaultDownloadService
     private final Clock clock;
     private final FileDownloadQueueStore store;
     private final FileDownloadStorageLocationStore locationStore;
+    private final FileAutomaticDownloadPolicyStore automaticPolicyStore;
     private final ExecutorService workers;
     private final BooleanSupplier largeTransfersAllowed;
     private final Map<DownloadId, DownloadRecord> records = new LinkedHashMap<>();
@@ -75,6 +82,7 @@ public final class DefaultDownloadService
     private final Set<Runnable> listeners = new HashSet<>();
     private long usedStorageBytes;
     private long nextQueueOrder;
+    private AutomaticDownloadPolicy automaticPolicy;
     private boolean offlineMode;
     private boolean closed;
 
@@ -124,6 +132,8 @@ public final class DefaultDownloadService
                 "largeTransfersAllowed must not be null");
         this.store = new FileDownloadQueueStore(normalizedRoot.resolve("queue.anilib"));
         this.locationStore = new FileDownloadStorageLocationStore(normalizedRoot.resolve("storage-location.anilib"));
+        this.automaticPolicyStore = new FileAutomaticDownloadPolicyStore(
+                normalizedRoot.resolve("automatic-downloads.anilib"));
         load();
     }
 
@@ -436,6 +446,102 @@ public final class DefaultDownloadService
         } catch (IOException exception) {
             throw new DownloadException("Unable to repair download index", exception);
         }
+    }
+
+    @Override
+    public synchronized AutomaticDownloadPolicy automaticPolicy() {
+        ensureOpen();
+        return automaticPolicy;
+    }
+
+    @Override
+    public synchronized void configureAutomaticDownloads(AutomaticDownloadPolicy nextPolicy) {
+        ensureOpen();
+        automaticPolicy = Objects.requireNonNull(nextPolicy, "policy must not be null");
+        persistAutomaticPolicy();
+        notifyListeners();
+        if (automaticPolicy.enabled()) {
+            synchronizeAutomaticDownloads();
+        } else {
+            cleanAutomaticDownloads();
+        }
+    }
+
+    @Override
+    public synchronized AutomaticDownloadResult synchronizeAutomaticDownloads() {
+        ensureOpen();
+        int removed = cleanAutomaticDownloads();
+        if (!automaticPolicy.enabled() || offlineMode || !largeTransfersAllowed.getAsBoolean()) {
+            return new AutomaticDownloadResult(0, removed, List.of());
+        }
+        int enqueued = 0;
+        List<String> failures = new ArrayList<>();
+        for (LibraryItem item : library.snapshot()) {
+            int limit = automaticLimit(item);
+            if (limit == 0 || automaticPolicy.favoritesOnly() && !item.favorite()) {
+                continue;
+            }
+            try {
+                LibraryOrigin origin = item.origin().orElseThrow(
+                        () -> new DownloadException("Title has no source origin"));
+                SourceCatalogueItemId itemId = new SourceCatalogueItemId(
+                        SourceId.of(origin.sourceId()),
+                        origin.sourceItemKey());
+                PagedSource source = pagedSource(itemId.sourceId());
+                List<SourceContentUnit> units = validatedUnits(source, itemId);
+                int first = Math.max(0, units.size() - limit);
+                for (SourceContentUnit unit : units.subList(first, units.size())) {
+                    if (hasDownload(unit.id())) {
+                        continue;
+                    }
+                    try {
+                        enqueue(item.id(), unit.id());
+                        enqueued++;
+                    } catch (DownloadException exception) {
+                        failures.add(item.title() + " · " + unit.title() + ": " + message(exception));
+                    }
+                }
+            } catch (DownloadException exception) {
+                failures.add(item.title() + ": " + message(exception));
+            }
+        }
+        return new AutomaticDownloadResult(enqueued, removed, failures);
+    }
+
+    @Override
+    public synchronized int cleanAutomaticDownloads() {
+        ensureOpen();
+        if (automaticPolicy.cleanupPolicy() == DownloadCleanupPolicy.KEEP_ALL) {
+            return 0;
+        }
+        List<DownloadRecord> removable = new ArrayList<>();
+        Map<LibraryItemId, List<DownloadRecord>> completedByTitle = new LinkedHashMap<>();
+        records.values().stream()
+                .filter(record -> record.status == DownloadStatus.COMPLETED)
+                .forEach(record -> completedByTitle
+                        .computeIfAbsent(record.libraryItemId, ignored -> new ArrayList<>())
+                        .add(record));
+        if (automaticPolicy.cleanupPolicy() == DownloadCleanupPolicy.KEEP_LATEST) {
+            completedByTitle.values().forEach(completed -> {
+                completed.sort(Comparator
+                        .comparing((DownloadRecord record) ->
+                                record.contentUnit.publishedAt().orElse(Instant.MIN))
+                        .thenComparing(record -> record.updatedAt)
+                        .reversed());
+                removable.addAll(completed.stream()
+                        .skip(automaticPolicy.retainedCompletedPerTitle())
+                        .toList());
+            });
+        } else {
+            completedByTitle.forEach((itemId, completed) -> library.find(itemId)
+                    .flatMap(LibraryItem::progress)
+                    .filter(progress -> progress.completion().orElse(0.0D) >= 1.0D)
+                    .ifPresent(progress -> completed.stream()
+                            .filter(record -> record.contentUnit.id().value().equals(progress.contentId()))
+                            .forEach(removable::add)));
+        }
+        removeRecords(removable);
+        return removable.size();
     }
 
     @Override
@@ -801,6 +907,7 @@ public final class DefaultDownloadService
 
     private void load() {
         try {
+            automaticPolicy = automaticPolicyStore.load();
             storageRoot = locationStore.load().orElse(defaultStorageRoot);
             storageRoot = validateStorageRoot(storageRoot);
             contentRoot = storageRoot.resolve("content").normalize();
@@ -1059,6 +1166,57 @@ public final class DefaultDownloadService
 
     private static String pageFileName(int index) {
         return String.format(java.util.Locale.ROOT, "%08d.page", index);
+    }
+
+    private int automaticLimit(LibraryItem item) {
+        if (item.categories().isEmpty()) {
+            return automaticPolicy.includeUncategorized() ? defaultAutomaticLimit(item.kind()) : 0;
+        }
+        return automaticPolicy.categoryRules().stream()
+                .filter(rule -> item.categories().contains(rule.category()))
+                .mapToInt(rule -> automaticLimit(item.kind(), rule))
+                .max()
+                .orElse(0);
+    }
+
+    private int defaultAutomaticLimit(MediaKind kind) {
+        return kind == MediaKind.ANIME
+                ? automaticPolicy.defaultEpisodeLimit()
+                : automaticPolicy.defaultChapterLimit();
+    }
+
+    private static int automaticLimit(MediaKind kind, AutomaticDownloadCategoryRule rule) {
+        return kind == MediaKind.ANIME ? rule.episodeLimit() : rule.chapterLimit();
+    }
+
+    private boolean hasDownload(SourceContentUnitId id) {
+        return records.values().stream()
+                .anyMatch(record -> record.contentUnit.id().equals(id)
+                        && record.status != DownloadStatus.CANCELLED);
+    }
+
+    private void removeRecords(Collection<DownloadRecord> removable) {
+        if (removable.isEmpty()) {
+            return;
+        }
+        removable.forEach(record -> record.status = DownloadStatus.CANCELLED);
+        removable.forEach(this::deleteFiles);
+        removable.forEach(record -> records.remove(record.id));
+        persist();
+        notifyListeners();
+    }
+
+    private void persistAutomaticPolicy() {
+        try {
+            automaticPolicyStore.save(automaticPolicy);
+        } catch (IOException exception) {
+            throw new DownloadException("Unable to persist automatic download policy", exception);
+        }
+    }
+
+    private static String message(RuntimeException exception) {
+        String value = exception.getMessage();
+        return value == null || value.isBlank() ? exception.getClass().getSimpleName() : value;
     }
 
     private static long saturatedRate(long bytes, long elapsedNanos) {

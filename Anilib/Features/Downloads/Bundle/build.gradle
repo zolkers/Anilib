@@ -7,6 +7,7 @@ dependencies {
     implementation project(':Anilib:Features:Reader:Api')
     implementation project(':Anilib:Features:Settings:Api')
     implementation project(':Anilib:Features:Source:Api')
+    implementation project(':Anilib:Features:Updates:Api')
     implementation project(':Anilib:Features:Downloads:Runtime')
     implementation project(':Anilib:Features:Downloads:Ui')
 }

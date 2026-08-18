@@ -44,6 +44,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import fr.vriege.anilib.feature.downloads.AutomaticDownloadCategoryRule
+import fr.vriege.anilib.feature.downloads.AutomaticDownloadPolicy
+import fr.vriege.anilib.feature.downloads.DownloadCleanupPolicy
 import fr.vriege.anilib.feature.downloads.DownloadJobSnapshot
 import fr.vriege.anilib.feature.downloads.DownloadPriority
 import fr.vriege.anilib.feature.downloads.DownloadRecoveryMode
@@ -61,6 +64,7 @@ internal fun DownloadsScreen(presentation: DownloadPresentation, goBack: () -> U
     var filter by remember(presentation) { mutableStateOf(DownloadFilter.ALL) }
     var confirmRemoveAll by remember(presentation) { mutableStateOf(false) }
     var storageDialog by remember(presentation) { mutableStateOf(false) }
+    var automationDialog by remember(presentation) { mutableStateOf(false) }
     var repairMessage by remember(presentation) { mutableStateOf<String?>(null) }
     var confirmRemoveTitle by remember(presentation) {
         mutableStateOf<Pair<LibraryItemId, String>?>(null)
@@ -98,6 +102,7 @@ internal fun DownloadsScreen(presentation: DownloadPresentation, goBack: () -> U
                 resumeAll = { command(presentation::resumeAll) },
                 removeAll = { confirmRemoveAll = true },
                 openStorage = { storageDialog = true },
+                openAutomation = { automationDialog = true },
                 setOfflineMode = { enabled -> command { presentation.setOfflineMode(enabled) } },
             )
             Text(
@@ -208,6 +213,32 @@ internal fun DownloadsScreen(presentation: DownloadPresentation, goBack: () -> U
             close = { storageDialog = false },
         )
     }
+    if (automationDialog) {
+        AutomaticDownloadDialog(
+            presentation = presentation,
+            save = { policy ->
+                var error: String? = null
+                runCatching { presentation.configureAutomaticDownloads(policy) }
+                    .onSuccess { automationDialog = false }
+                    .onFailure { error = it.message ?: "Unable to save automatic download rules." }
+                error
+            },
+            synchronize = {
+                runCatching { presentation.synchronizeAutomaticDownloads() }
+                    .onSuccess { result ->
+                        repairMessage = "Automatic downloads: ${result.enqueuedJobs()} queued, " +
+                            "${result.removedJobs()} cleaned, ${result.failures().size} failed"
+                    }
+                    .onFailure { commandError = it.message ?: "Automatic download scan failed." }
+            },
+            clean = {
+                runCatching { presentation.cleanAutomaticDownloads() }
+                    .onSuccess { removed -> repairMessage = "$removed downloads cleaned" }
+                    .onFailure { commandError = it.message ?: "Download cleanup failed." }
+            },
+            close = { automationDialog = false },
+        )
+    }
     confirmRemoveTitle?.let { (itemId, title) ->
         AlertDialog(
             onDismissRequest = { confirmRemoveTitle = null },
@@ -233,6 +264,7 @@ private fun DownloadQueueControls(
     resumeAll: () -> Unit,
     removeAll: () -> Unit,
     openStorage: () -> Unit,
+    openAutomation: () -> Unit,
     setOfflineMode: (Boolean) -> Unit,
 ) {
     Row(
@@ -251,11 +283,155 @@ private fun DownloadQueueControls(
                 Icon(Icons.Default.Delete, contentDescription = "Delete all")
             }
             TextButton(onClick = openStorage) { Text("Storage") }
+            TextButton(onClick = openAutomation) { Text("Automatic") }
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Offline mode", fontWeight = FontWeight.Medium)
             Switch(checked = offlineMode, onCheckedChange = setOfflineMode)
         }
+    }
+}
+
+@Composable
+private fun AutomaticDownloadDialog(
+    presentation: DownloadPresentation,
+    save: (AutomaticDownloadPolicy) -> String?,
+    synchronize: () -> Unit,
+    clean: () -> Unit,
+    close: () -> Unit,
+) {
+    val current = remember(presentation) { presentation.automaticPolicy() }
+    var enabled by remember(presentation) { mutableStateOf(current.enabled()) }
+    var favoritesOnly by remember(presentation) { mutableStateOf(current.favoritesOnly()) }
+    var includeUncategorized by remember(presentation) {
+        mutableStateOf(current.includeUncategorized())
+    }
+    var episodeLimit by remember(presentation) {
+        mutableStateOf(current.defaultEpisodeLimit().toString())
+    }
+    var chapterLimit by remember(presentation) {
+        mutableStateOf(current.defaultChapterLimit().toString())
+    }
+    var retention by remember(presentation) {
+        mutableStateOf(current.retainedCompletedPerTitle().toString())
+    }
+    var cleanup by remember(presentation) { mutableStateOf(current.cleanupPolicy()) }
+    var categoryRules by remember(presentation) {
+        mutableStateOf(current.categoryRules().joinToString("\n") {
+            "${it.category()}:${it.episodeLimit()}:${it.chapterLimit()}"
+        })
+    }
+    var error by remember(presentation) { mutableStateOf<String?>(null) }
+    AlertDialog(
+        onDismissRequest = close,
+        title = { Text("Automatic downloads") },
+        text = {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                item {
+                    AutomaticToggleRow("Enable after successful library updates", enabled) { enabled = it }
+                    AutomaticToggleRow("Favorites only", favoritesOnly) { favoritesOnly = it }
+                    AutomaticToggleRow("Include titles without a category", includeUncategorized) {
+                        includeUncategorized = it
+                    }
+                }
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = episodeLimit,
+                            onValueChange = { episodeLimit = it },
+                            label = { Text("Episode limit") },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                        )
+                        OutlinedTextField(
+                            value = chapterLimit,
+                            onValueChange = { chapterLimit = it },
+                            label = { Text("Chapter limit") },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                        )
+                    }
+                }
+                item {
+                    Text("Cleanup policy", fontWeight = FontWeight.Medium)
+                    Row(modifier = Modifier.horizontalScroll(rememberScrollState())) {
+                        DownloadCleanupPolicy.entries.forEach { value ->
+                            FilterChip(
+                                selected = cleanup == value,
+                                onClick = { cleanup = value },
+                                label = {
+                                    Text(value.name.replace('_', ' ').lowercase().replaceFirstChar {
+                                        it.uppercase()
+                                    })
+                                },
+                                modifier = Modifier.padding(end = 6.dp),
+                            )
+                        }
+                    }
+                    if (cleanup == DownloadCleanupPolicy.KEEP_LATEST) {
+                        OutlinedTextField(
+                            value = retention,
+                            onValueChange = { retention = it },
+                            label = { Text("Completed items retained per title") },
+                            singleLine = true,
+                        )
+                    }
+                }
+                item {
+                    OutlinedTextField(
+                        value = categoryRules,
+                        onValueChange = { categoryRules = it },
+                        label = { Text("Category rules") },
+                        supportingText = { Text("One per line: category:episodes:chapters") },
+                        minLines = 3,
+                    )
+                    error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                    Row {
+                        TextButton(onClick = synchronize) { Text("Run now") }
+                        TextButton(onClick = clean) { Text("Clean now") }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                error = runCatching {
+                    AutomaticDownloadPolicy(
+                        enabled,
+                        favoritesOnly,
+                        includeUncategorized,
+                        episodeLimit.toInt(),
+                        chapterLimit.toInt(),
+                        cleanup,
+                        retention.toInt(),
+                        parseAutomaticRules(categoryRules),
+                    )
+                }.fold(save) { it.message ?: "Invalid automatic download rules." }
+            }) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = close) { Text("Cancel") } },
+    )
+}
+
+private fun parseAutomaticRules(value: String): List<AutomaticDownloadCategoryRule> =
+    value.lineSequence()
+        .filter(String::isNotBlank)
+        .map { line ->
+            val parts = line.split(':')
+            require(parts.size == 3) { "Each category rule needs a name and two limits." }
+            AutomaticDownloadCategoryRule(parts[0].trim(), parts[1].trim().toInt(), parts[2].trim().toInt())
+        }
+        .toList()
+
+@Composable
+private fun AutomaticToggleRow(label: String, checked: Boolean, change: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, modifier = Modifier.weight(1f))
+        Switch(checked = checked, onCheckedChange = change)
     }
 }
 

@@ -6,6 +6,8 @@ import fr.vriege.anilib.feature.downloads.DownloadPriority;
 import fr.vriege.anilib.feature.downloads.DownloadRecoveryMode;
 import fr.vriege.anilib.feature.downloads.DownloadIndexRepairResult;
 import fr.vriege.anilib.feature.downloads.DownloadStorageSnapshot;
+import fr.vriege.anilib.feature.downloads.AutomaticDownloadPolicy;
+import fr.vriege.anilib.feature.downloads.AutomaticDownloadResult;
 import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.source.SourceContentUnitId;
 
@@ -41,6 +43,14 @@ public interface DownloadPresentation {
     void changeStorageLocation(Path location);
 
     DownloadIndexRepairResult repairIndex();
+
+    AutomaticDownloadPolicy automaticPolicy();
+
+    void configureAutomaticDownloads(AutomaticDownloadPolicy policy);
+
+    AutomaticDownloadResult synchronizeAutomaticDownloads();
+
+    int cleanAutomaticDownloads();
 
     void pauseTitle(LibraryItemId libraryItemId);
 

@@ -36,6 +36,14 @@ public interface DownloadService {
 
     DownloadIndexRepairResult repairIndex();
 
+    AutomaticDownloadPolicy automaticPolicy();
+
+    void configureAutomaticDownloads(AutomaticDownloadPolicy policy);
+
+    AutomaticDownloadResult synchronizeAutomaticDownloads();
+
+    int cleanAutomaticDownloads();
+
     void pauseTitle(LibraryItemId libraryItemId);
 
     void resumeTitle(LibraryItemId libraryItemId);

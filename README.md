@@ -58,7 +58,9 @@ tracker scores and persisted player duration without failing on unavailable sour
 Downloads use a durable grouped priority queue with manual ordering, confirmed
 delete-all, measured speed/ETA, and resume-or-restart recovery for partial jobs.
 Their validated storage location can be migrated safely, repaired from the
-managed files, and controlled title by title.
+managed files, and controlled title by title. Persistent automatic rules run
+after successful library updates with category-specific episode/chapter limits,
+favourite filtering, and explicit retention or read-content cleanup.
 Browse shows live source-extension update badges and actions, compact fixed-density
 rows, richer overflow menus, and asynchronous loading, retry, and error states.
 Source catalogues retain their grid/list choice independently and expose item

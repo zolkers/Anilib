@@ -7,6 +7,8 @@ import fr.vriege.anilib.feature.downloads.DownloadRecoveryMode;
 import fr.vriege.anilib.feature.downloads.DownloadIndexRepairResult;
 import fr.vriege.anilib.feature.downloads.DownloadStorageSnapshot;
 import fr.vriege.anilib.feature.downloads.DownloadService;
+import fr.vriege.anilib.feature.downloads.AutomaticDownloadPolicy;
+import fr.vriege.anilib.feature.downloads.AutomaticDownloadResult;
 import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.source.SourceContentUnitId;
 
@@ -93,6 +95,26 @@ public final class DefaultDownloadPresentation implements DownloadPresentation {
     @Override
     public DownloadIndexRepairResult repairIndex() {
         return downloads.repairIndex();
+    }
+
+    @Override
+    public AutomaticDownloadPolicy automaticPolicy() {
+        return downloads.automaticPolicy();
+    }
+
+    @Override
+    public void configureAutomaticDownloads(AutomaticDownloadPolicy policy) {
+        downloads.configureAutomaticDownloads(policy);
+    }
+
+    @Override
+    public AutomaticDownloadResult synchronizeAutomaticDownloads() {
+        return downloads.synchronizeAutomaticDownloads();
+    }
+
+    @Override
+    public int cleanAutomaticDownloads() {
+        return downloads.cleanAutomaticDownloads();
     }
 
     @Override

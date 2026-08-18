@@ -229,7 +229,7 @@ platform-specific.
   partial/error recovery
 - [x] add user-selectable storage locations, validation, migration, index repair,
   and per-title download management
-- [ ] complete automatic-download rules, category rules, episode/chapter limits,
+- [x] complete automatic-download rules, category rules, episode/chapter limits,
   and cleanup policies
 - [ ] add update date grouping, selection actions, skipped-reason views,
   per-item download actions, exceptions, and full schedule controls

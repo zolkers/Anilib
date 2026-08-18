@@ -137,10 +137,13 @@ Reading directions and controller state stay platform-neutral; Compose renders
 one immersive screen on Android and desktop, while each outer adapter performs
 only its native encoded-image decoding.
 
-Downloads is a removable vertical over Library, Source, and Reader. Its Bundle
+Downloads is a removable vertical over Library, Source, Reader, and Updates. Its Bundle
 owns the durable job queue, atomic metadata writes, page files, concurrent-job
 limit, per-page and total-storage policies, pause/cancel/resume transitions, and
-restart reconciliation of partial jobs. It registers one typed content provider
+restart reconciliation of partial jobs. Durable automatic rules select recent
+content by category and media-specific limits after successful library updates;
+cleanup retains a bounded latest set or removes completed read content. It
+registers one typed content provider
 through Reader's installation capability: completed local pages take priority,
 while the original `PagedSource` remains the online fallback. Offline mode
 disables that fallback without making Reader depend on Downloads, and removing

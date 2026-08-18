@@ -3,6 +3,7 @@ package fr.vriege.anilib.feature.downloads.bundle;
 import fr.vriege.anilib.feature.downloads.DownloadCapabilities;
 import fr.vriege.anilib.feature.downloads.DownloadStoragePolicy;
 import fr.vriege.anilib.feature.downloads.runtime.DefaultDownloadService;
+import fr.vriege.anilib.feature.downloads.runtime.AutomaticDownloadUpdateCoordinator;
 import fr.vriege.anilib.feature.downloads.ui.DefaultDownloadPresentation;
 import fr.vriege.anilib.feature.downloads.ui.DownloadUiCapabilities;
 import fr.vriege.anilib.feature.library.LibraryCapabilities;
@@ -16,6 +17,8 @@ import fr.vriege.anilib.feature.source.SourceRegistry;
 import fr.vriege.anilib.feature.settings.SettingsCapabilities;
 import fr.vriege.anilib.feature.settings.SettingsService;
 import fr.vriege.anilib.feature.settings.UnusedDataRegistrar;
+import fr.vriege.anilib.feature.updates.LibraryUpdateService;
+import fr.vriege.anilib.feature.updates.UpdateCapabilities;
 import fr.vriege.anilib.foundation.component.ComponentDescriptor;
 import fr.vriege.anilib.kernel.AnilibPlugin;
 import fr.vriege.anilib.kernel.PluginInstallationContext;
@@ -33,6 +36,7 @@ public final class DownloadPlugin implements AnilibPlugin {
             .requires(NetworkCapabilities.STATUS)
             .requires(SettingsCapabilities.SERVICE)
             .requires(SettingsCapabilities.UNUSED_DATA_REGISTRAR)
+            .requires(UpdateCapabilities.SERVICE)
             .provides(DownloadCapabilities.SERVICE)
             .provides(DownloadUiCapabilities.PRESENTATION)
             .build();
@@ -64,12 +68,14 @@ public final class DownloadPlugin implements AnilibPlugin {
         NetworkStatus network = context.require(NetworkCapabilities.STATUS);
         SettingsService settings = context.require(SettingsCapabilities.SERVICE);
         UnusedDataRegistrar cleanup = context.require(SettingsCapabilities.UNUSED_DATA_REGISTRAR);
+        LibraryUpdateService updates = context.require(UpdateCapabilities.SERVICE);
         DefaultDownloadService service = context.own(new DefaultDownloadService(
                 sources,
                 library,
                 storageDirectory,
                 policy,
                 () -> !settings.snapshot().downloadOnlyOnWifi() || network.allowsLargeTransfers()));
+        context.own(new AutomaticDownloadUpdateCoordinator(service, updates));
         context.own(registrar.register(service));
         context.own(cleanup.register("downloads", service::cleanUnusedData));
         context.publish(DownloadCapabilities.SERVICE, service);
