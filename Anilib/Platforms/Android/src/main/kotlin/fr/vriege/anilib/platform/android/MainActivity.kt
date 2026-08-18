@@ -20,6 +20,7 @@ import fr.vriege.anilib.feature.reader.ui.ReaderUiCapabilities
 import fr.vriege.anilib.feature.reader.ReaderOrientationPolicy
 import fr.vriege.anilib.feature.settings.ui.SettingsUiCapabilities
 import fr.vriege.anilib.feature.player.ui.PlayerUiCapabilities
+import fr.vriege.anilib.feature.player.PlayerOrientationPolicy
 import fr.vriege.anilib.feature.downloads.ui.DownloadUiCapabilities
 import fr.vriege.anilib.feature.backup.ui.BackupUiCapabilities
 import fr.vriege.anilib.feature.tracker.ui.TrackerUiCapabilities
@@ -95,6 +96,7 @@ class MainActivity : ComponentActivity() {
                 shareController = AndroidShareController(this),
                 pageDecoder = ::decodePage,
                 applyReaderOrientationPolicy = ::applyReaderOrientationPolicy,
+                applyPlayerOrientationPolicy = ::applyPlayerOrientationPolicy,
                 componentCount = componentCount,
             )
         }
@@ -115,6 +117,15 @@ class MainActivity : ComponentActivity() {
             ReaderOrientationPolicy.PORTRAIT -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
             ReaderOrientationPolicy.LANDSCAPE -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
             ReaderOrientationPolicy.SENSOR -> ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR
+        }
+    }
+
+    private fun applyPlayerOrientationPolicy(policy: PlayerOrientationPolicy) {
+        requestedOrientation = when (policy) {
+            PlayerOrientationPolicy.SYSTEM -> ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            PlayerOrientationPolicy.PORTRAIT -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            PlayerOrientationPolicy.LANDSCAPE -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+            PlayerOrientationPolicy.SENSOR -> ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR
         }
     }
 

@@ -30,7 +30,7 @@ explicit so an architectural seam cannot be mistaken for a finished workflow.
 | Appearance settings | [x] | Partial | Live system/light/dark selection and a persistent Library/Updates/History/Browse/More start screen are available; add language packs, theme families, colors, typography, and navigation style |
 | Library and update settings | [x] | Partial | Wi-Fi policies and the complete update schedule/skip controls are live; add category defaults, exceptions, and automatic-download depth |
 | Reader settings and reader | [x] | Complete | Immersive pages, resume, slider, navigation modes, persisted gestures/display profiles, filters, transitions, Android orientation, chapter lists and navigation, durable read state, exact downloads, and complete menus are live |
-| Player settings and player | [x] | Partial | Searchable/unwatched episode list, qualities, subtitles, resume, protected media relay, and native Android/desktop playback are live; add complete controls, gestures, decoder/audio policy, PiP, and custom buttons |
+| Player settings and player | [x] | Partial | Searchable episodes, quality/subtitles/resume, protected media, native playback, complete transport/seek controls, gestures, speed, orientation, brightness, volume, lock, fullscreen, and configurable buttons are live; add decoder/audio policies, intro/outro skipping, PiP, and platform-advanced controls |
 | Data, storage, and advanced settings | [x] | Partial | A dedicated page owns confirmed cookie/cache/WebView/database cleanup plus backup and About routes; add storage inspection, user agent, proxy/DoH, diagnostics, and crash logs |
 | WebView | [x] | Partial | Navigation, reload, progress, source headers/User-Agent, cookie transfer, challenge completion, and platform cleanup are live; add automatic challenge retry, file chooser, pop-ups, downloads, and browser settings |
 | About, help, and application updates | [x] | Partial | Version, platform, stable-channel check, release-page hand-off, project, and issue links are live; add licences, changelog, automatic installation, and channel choice |
@@ -57,6 +57,7 @@ explicit so an architectural seam cannot be mistaken for a finished workflow.
 - [x] Added persisted Reader scale, fit, border crop, split/dual-page, rotation, and webtoon-spacing controls.
 - [x] Added Reader color/brightness filters, transitions, Android orientation policy, and durable per-title overrides.
 - [x] Added Reader chapter lists/navigation, durable read/unread actions, exact chapter downloads, and complete menus.
+- [x] Added complete Player transport controls, gestures, speed/orientation, brightness/volume, lock, and configurable buttons.
 - [x] Added episode search/unwatched filtering, download status filtering, and reader page retry.
 - [x] Verified backup inspection/rollback/import, tracking edit flows, and browser cookie/challenge handling.
 - [x] Added settings search and connected Sources, Tracking, Backup, and About to their working screens.

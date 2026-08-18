@@ -104,6 +104,7 @@ import fr.vriege.anilib.feature.reader.ui.ReaderController
 import fr.vriege.anilib.feature.reader.ui.ReaderPresentation
 import fr.vriege.anilib.feature.reader.ReaderOrientationPolicy
 import fr.vriege.anilib.feature.player.ui.PlayerPresentation
+import fr.vriege.anilib.feature.player.PlayerOrientationPolicy
 import fr.vriege.anilib.feature.tracker.ui.TrackerPresentation
 import fr.vriege.anilib.feature.updates.ui.UpdatePresentation
 import fr.vriege.anilib.feature.applicationupdate.ui.ApplicationUpdatePresentation
@@ -158,6 +159,7 @@ fun AnilibApp(
     shareController: ShareController,
     pageDecoder: (ByteArray) -> ImageBitmap?,
     applyReaderOrientationPolicy: (ReaderOrientationPolicy) -> Unit,
+    applyPlayerOrientationPolicy: (PlayerOrientationPolicy) -> Unit,
     componentCount: Int,
     darkTheme: Boolean = isSystemInDarkTheme(),
 ) {
@@ -210,7 +212,9 @@ fun AnilibApp(
                     downloads::enqueue,
                 ) { activeReader = null }
             } else if (playerTitle != null) {
-                EpisodeScreen(player, playerTitle) { activePlayerTitle = null }
+                EpisodeScreen(player, playerTitle, applyPlayerOrientationPolicy) {
+                    activePlayerTitle = null
+                }
             } else if (trackingTitle != null) {
                 val details = presentation.details(trackingTitle).orElse(null)
                 if (details == null) {

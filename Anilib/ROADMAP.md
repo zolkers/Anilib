@@ -215,7 +215,7 @@ platform-specific.
 
 ### 4. Player
 
-- [ ] complete transport controls, gestures, seeking, speed, orientation,
+- [x] complete transport controls, gestures, seeking, speed, orientation,
   brightness, volume, lock, and custom-button behavior
 - [ ] add decoder, audio, subtitle, quality, skip-intro/outro, and per-title
   preference policies

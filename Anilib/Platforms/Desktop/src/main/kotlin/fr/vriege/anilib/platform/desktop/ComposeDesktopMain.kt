@@ -91,6 +91,7 @@ fun main() {
                 shareController = DesktopShareController(),
                 pageDecoder = ::decodePage,
                 applyReaderOrientationPolicy = {},
+                applyPlayerOrientationPolicy = {},
                 componentCount = started.components().size,
                 darkTheme = desktopDarkTheme(),
             )

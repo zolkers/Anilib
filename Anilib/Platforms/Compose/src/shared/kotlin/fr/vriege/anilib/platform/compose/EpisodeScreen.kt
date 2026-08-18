@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import fr.vriege.anilib.feature.library.LibraryItemId
 import fr.vriege.anilib.feature.player.EpisodeSnapshot
 import fr.vriege.anilib.feature.player.PlaybackState
+import fr.vriege.anilib.feature.player.PlayerOrientationPolicy
 import fr.vriege.anilib.feature.player.ui.PlayerController
 import fr.vriege.anilib.feature.player.ui.PlayerPresentation
 import java.util.Optional
@@ -51,6 +52,7 @@ import kotlin.math.roundToInt
 internal fun EpisodeScreen(
     presentation: PlayerPresentation,
     libraryItemId: LibraryItemId,
+    applyOrientationPolicy: (PlayerOrientationPolicy) -> Unit,
     goBack: () -> Unit,
 ) {
     var revision by remember(presentation, libraryItemId) { mutableIntStateOf(0) }
@@ -69,7 +71,7 @@ internal fun EpisodeScreen(
     }
     val controller = activeController
     if (controller != null) {
-        PlayerSelectionScreen(controller) { activeController = null }
+        PlayerSelectionScreen(controller, applyOrientationPolicy) { activeController = null }
         return
     }
     val episodesResult = remember(presentation, libraryItemId, revision) {
@@ -180,6 +182,7 @@ private fun EpisodeCard(episode: EpisodeSnapshot, open: () -> Unit) {
 @Composable
 private fun PlayerSelectionScreen(
     controller: PlayerController,
+    applyOrientationPolicy: (PlayerOrientationPolicy) -> Unit,
     goBack: () -> Unit,
 ) {
     var revision by remember(controller) { mutableIntStateOf(0) }
@@ -221,7 +224,7 @@ private fun PlayerSelectionScreen(
             modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item { PlayerVideoSurface(controller, controller.playback()) }
+            item { PlayerVideoSurface(controller, controller.playback(), applyOrientationPolicy) }
             item {
                 Text(snapshot.title(), fontWeight = FontWeight.Bold)
                 Text(

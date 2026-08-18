@@ -1,7 +1,9 @@
 package fr.vriege.anilib.platform.compose
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,30 +15,44 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.Forward10
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Replay10
+import androidx.compose.material.icons.filled.ScreenRotation
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import fr.vriege.anilib.feature.player.PlayerPlayback
+import fr.vriege.anilib.feature.player.PlayerOrientationPolicy
 import fr.vriege.anilib.feature.player.ui.PlayerController
 import io.github.kdroidfilter.composemediaplayer.VideoPlayerSurface
 import io.github.kdroidfilter.composemediaplayer.rememberVideoPlayerState
+import kotlin.math.abs
 
 private const val PROGRESS_INTERVAL_MILLIS = 2_000L
 
@@ -44,6 +60,7 @@ private const val PROGRESS_INTERVAL_MILLIS = 2_000L
 internal fun PlayerVideoSurface(
     controller: PlayerController,
     playback: PlayerPlayback,
+    applyOrientationPolicy: (PlayerOrientationPolicy) -> Unit,
 ) {
     val bridge = playback as? ComposePlayerPlayback
     if (bridge == null) {
@@ -52,6 +69,19 @@ internal fun PlayerVideoSurface(
     }
     val player = rememberVideoPlayerState()
     var controlsVisible by remember(bridge) { mutableStateOf(true) }
+    var locked by remember(bridge) { mutableStateOf(false) }
+    var brightness by remember(bridge) { mutableFloatStateOf(1f) }
+    var volume by remember(bridge) { mutableFloatStateOf(bridge.snapshot().volume()) }
+    var orientation by remember(bridge) { mutableStateOf(PlayerOrientationPolicy.SYSTEM) }
+    var customMenu by remember(bridge) { mutableStateOf(false) }
+    var leftAction by remember(bridge) { mutableStateOf(PlayerCustomAction.SEEK_BACK) }
+    var rightAction by remember(bridge) { mutableStateOf(PlayerCustomAction.SEEK_FORWARD) }
+    var drag by remember(bridge) { mutableStateOf(Offset.Zero) }
+    var dragStartX by remember(bridge) { mutableFloatStateOf(0f) }
+    DisposableEffect(orientation, applyOrientationPolicy) {
+        applyOrientationPolicy(orientation)
+        onDispose { applyOrientationPolicy(PlayerOrientationPolicy.SYSTEM) }
+    }
     DisposableEffect(bridge, player) {
         bridge.attach(player)
         onDispose {
@@ -75,33 +105,123 @@ internal fun PlayerVideoSurface(
         }
     }
 
+    fun seekBy(deltaMillis: Long) {
+        val state = bridge.snapshot()
+        val maximum = if (state.durationMillis() > 0) state.durationMillis() else Long.MAX_VALUE
+        controller.seekTo((state.positionMillis() + deltaMillis).coerceIn(0L, maximum))
+    }
+
+    fun togglePlayback() {
+        if (player.isPlaying) controller.pause() else controller.play()
+    }
+
+    fun cycleSpeed() {
+        val speeds = floatArrayOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
+        val current = bridge.snapshot().playbackSpeed()
+        val index = speeds.indexOfFirst { it > current + 0.01f }
+        controller.setPlaybackSpeed(if (index < 0) speeds.first() else speeds[index])
+    }
+
+    fun cycleOrientation() {
+        val values = PlayerOrientationPolicy.entries
+        orientation = values[(orientation.ordinal + 1) % values.size]
+    }
+
+    fun execute(action: PlayerCustomAction) {
+        when (action) {
+            PlayerCustomAction.SEEK_BACK -> seekBy(-10_000L)
+            PlayerCustomAction.SEEK_FORWARD -> seekBy(10_000L)
+            PlayerCustomAction.PLAY_PAUSE -> togglePlayback()
+            PlayerCustomAction.SPEED -> cycleSpeed()
+            PlayerCustomAction.MUTE -> {
+                volume = if (volume > 0f) 0f else 1f
+                controller.setVolume(volume)
+            }
+            PlayerCustomAction.ORIENTATION -> cycleOrientation()
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(16f / 9f)
-            .background(Color.Black),
+            .background(Color.Black)
+            .pointerInput(locked) {
+                detectTapGestures(
+                    onTap = { if (!locked) controlsVisible = !controlsVisible },
+                    onDoubleTap = { position ->
+                        if (!locked) {
+                            when {
+                                position.x < size.width / 3f -> seekBy(-10_000L)
+                                position.x > size.width * 2f / 3f -> seekBy(10_000L)
+                                else -> togglePlayback()
+                            }
+                        }
+                    },
+                )
+            }
+            .pointerInput(locked, brightness, volume) {
+                detectDragGestures(
+                    onDragStart = {
+                        drag = Offset.Zero
+                        dragStartX = it.x
+                    },
+                    onDrag = { change, amount ->
+                        change.consume()
+                        drag += amount
+                    },
+                    onDragEnd = {
+                        if (!locked && abs(drag.x) > abs(drag.y) && abs(drag.x) >= 48f) {
+                            seekBy(if (drag.x < 0f) -10_000L else 10_000L)
+                        } else if (!locked && abs(drag.y) >= 48f) {
+                            val delta = -drag.y / size.height.coerceAtLeast(1)
+                            if (dragStartX < size.width / 2f) {
+                                brightness = (brightness + delta).coerceIn(0.25f, 1.5f)
+                            } else {
+                                volume = (volume + delta).coerceIn(0f, 1f)
+                                controller.setVolume(volume)
+                            }
+                        }
+                    },
+                )
+            },
     ) {
         VideoPlayerSurface(playerState = player, modifier = Modifier.fillMaxSize())
-        Box(
-            modifier = Modifier.fillMaxSize().clickable { controlsVisible = !controlsVisible },
-        ) {
+        if (brightness < 1f) {
+            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 1f - brightness)))
+        } else if (brightness > 1f) {
+            Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = (brightness - 1f) * 0.5f)))
+        }
+        Box(modifier = Modifier.fillMaxSize()) {
             if (player.isLoading) {
                 CircularProgressIndicator(
                     modifier = Modifier.align(Alignment.Center),
                     color = Color.White,
                 )
             }
-            if (controlsVisible) {
-                IconButton(
-                    onClick = { if (player.isPlaying) controller.pause() else controller.play() },
-                    modifier = Modifier.align(Alignment.Center).size(64.dp),
+            if (locked) {
+                IconButton(onClick = { locked = false }, modifier = Modifier.align(Alignment.Center)) {
+                    Icon(Icons.Default.LockOpen, "Unlock controls", tint = Color.White)
+                }
+            } else if (controlsVisible) {
+                Row(
+                    modifier = Modifier.align(Alignment.Center),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(
-                        if (player.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = if (player.isPlaying) "Pause" else "Play",
-                        tint = Color.White,
-                        modifier = Modifier.size(42.dp),
-                    )
+                    IconButton(onClick = { seekBy(-10_000L) }) {
+                        Icon(Icons.Default.Replay10, "Seek back", tint = Color.White)
+                    }
+                    IconButton(onClick = ::togglePlayback, modifier = Modifier.size(64.dp)) {
+                        Icon(
+                            if (player.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = if (player.isPlaying) "Pause" else "Play",
+                            tint = Color.White,
+                            modifier = Modifier.size(42.dp),
+                        )
+                    }
+                    IconButton(onClick = { seekBy(10_000L) }) {
+                        Icon(Icons.Default.Forward10, "Seek forward", tint = Color.White)
+                    }
                 }
                 Column(
                     modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(12.dp),
@@ -115,8 +235,19 @@ internal fun PlayerVideoSurface(
                         },
                         valueRange = 0f..1000f,
                     )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Volume", color = Color.White, style = MaterialTheme.typography.bodySmall)
+                        Slider(
+                            value = volume,
+                            onValueChange = {
+                                volume = it
+                                controller.setVolume(it)
+                            },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -125,6 +256,24 @@ internal fun PlayerVideoSurface(
                             color = Color.White,
                             style = MaterialTheme.typography.bodySmall,
                         )
+                        TextButton(onClick = { execute(leftAction) }) {
+                            Text("L: ${leftAction.label}", color = Color.White)
+                        }
+                        TextButton(onClick = { execute(rightAction) }) {
+                            Text("R: ${rightAction.label}", color = Color.White)
+                        }
+                        TextButton(onClick = ::cycleSpeed) {
+                            Text("${bridge.snapshot().playbackSpeed()}×", color = Color.White)
+                        }
+                        IconButton(onClick = ::cycleOrientation) {
+                            Icon(Icons.Default.ScreenRotation, "Orientation", tint = Color.White)
+                        }
+                        IconButton(onClick = { customMenu = true }) {
+                            Icon(Icons.Default.Tune, "Custom buttons", tint = Color.White)
+                        }
+                        IconButton(onClick = { locked = true }) {
+                            Icon(Icons.Default.Lock, "Lock controls", tint = Color.White)
+                        }
                         IconButton(onClick = player::toggleFullscreen) {
                             Icon(Icons.Default.Fullscreen, "Fullscreen", tint = Color.White)
                         }
@@ -139,7 +288,55 @@ internal fun PlayerVideoSurface(
                 )
             }
         }
+        if (customMenu) {
+            PlayerCustomButtonDialog(
+                left = leftAction,
+                right = rightAction,
+                updateLeft = { leftAction = it },
+                updateRight = { rightAction = it },
+                close = { customMenu = false },
+            )
+        }
     }
+}
+
+private enum class PlayerCustomAction(val label: String) {
+    SEEK_BACK("-10s"),
+    SEEK_FORWARD("+10s"),
+    PLAY_PAUSE("Play"),
+    SPEED("Speed"),
+    MUTE("Mute"),
+    ORIENTATION("Rotate"),
+}
+
+@Composable
+private fun PlayerCustomButtonDialog(
+    left: PlayerCustomAction,
+    right: PlayerCustomAction,
+    updateLeft: (PlayerCustomAction) -> Unit,
+    updateRight: (PlayerCustomAction) -> Unit,
+    close: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = close,
+        title = { Text("Custom player buttons") },
+        text = {
+            Column {
+                TextButton(onClick = { updateLeft(nextCustomAction(left)) }) {
+                    Text("Left button: ${left.label}")
+                }
+                TextButton(onClick = { updateRight(nextCustomAction(right)) }) {
+                    Text("Right button: ${right.label}")
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = close) { Text("Done") } },
+    )
+}
+
+private fun nextCustomAction(value: PlayerCustomAction): PlayerCustomAction {
+    val values = PlayerCustomAction.entries
+    return values[(value.ordinal + 1) % values.size]
 }
 
 @Composable
