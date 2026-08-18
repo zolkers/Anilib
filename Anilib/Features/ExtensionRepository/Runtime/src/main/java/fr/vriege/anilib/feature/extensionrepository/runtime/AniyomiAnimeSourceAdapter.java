@@ -25,6 +25,7 @@ import fr.vriege.anilib.kernel.AnilibPlugin;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.net.URI;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -34,7 +35,11 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.BooleanSupplier;
 
 /**
@@ -46,6 +51,7 @@ import java.util.function.BooleanSupplier;
  */
 public final class AniyomiAnimeSourceAdapter {
     private static final SourceApiVersion REQUIRED_API = new SourceApiVersion(1, 4);
+    private static final long SUSPEND_TIMEOUT_SECONDS = 60L;
 
     private AniyomiAnimeSourceAdapter() {
     }
@@ -117,10 +123,10 @@ public final class AniyomiAnimeSourceAdapter {
                     language(invokeOptional(delegate, "getLang").orElse("und")),
                     Set.of(SourceContentKind.ANIME),
                     REQUIRED_API);
-            requireMethod(delegate, "fetchPopularAnime", 1);
-            requireMethod(delegate, "fetchSearchAnime", 3);
-            requireMethod(delegate, "fetchEpisodeList", 1);
-            requireMethod(delegate, "fetchVideoList", 1);
+            requireEitherMethod(delegate, "getPopularAnime", 2, "fetchPopularAnime", 1);
+            requireEitherMethod(delegate, "getSearchAnime", 4, "fetchSearchAnime", 3);
+            requireEpisodeMethod(delegate);
+            requireVideoMethod(delegate);
         }
 
         @Override
@@ -132,7 +138,7 @@ public final class AniyomiAnimeSourceAdapter {
         public SourcePage popular(SourceBrowseRequest request) {
             requireAuthorized();
             Preconditions.requireNonNull(request, "request");
-            return page(await(invoke(delegate, "fetchPopularAnime", request.page())));
+            return page(invokeModernOrRx(delegate, "getPopularAnime", "fetchPopularAnime", request.page()));
         }
 
         @Override
@@ -149,7 +155,7 @@ public final class AniyomiAnimeSourceAdapter {
             if (!supportsLatest()) {
                 return CatalogueSource.super.latest(request);
             }
-            return page(await(invoke(delegate, "fetchLatestUpdates", request.page())));
+            return page(invokeModernOrRx(delegate, "getLatestUpdates", "fetchLatestUpdates", request.page()));
         }
 
         @Override
@@ -157,13 +163,14 @@ public final class AniyomiAnimeSourceAdapter {
             requireAuthorized();
             Preconditions.requireNonNull(request, "request");
             Object filters = invoke(delegate, "getFilterList");
-            Object result = invoke(
+            Object result = invokeModernOrRx(
                     delegate,
+                    "getSearchAnime",
                     "fetchSearchAnime",
                     request.browseRequest().page(),
                     request.query(),
                     filters);
-            return page(await(result));
+            return page(result);
         }
 
         @Override
@@ -176,7 +183,7 @@ public final class AniyomiAnimeSourceAdapter {
                         "APK source item must be opened from a catalogue result before loading episodes: "
                                 + itemId.value());
             }
-            List<?> values = list(await(invoke(delegate, "fetchEpisodeList", anime)), "episode list");
+            List<?> values = episodeList(anime);
             List<SourceEpisode> episodes = new ArrayList<>(values.size());
             for (Object value : values) {
                 String url = text(invoke(value, "getUrl"), "episode URL");
@@ -202,12 +209,49 @@ public final class AniyomiAnimeSourceAdapter {
                 throw new IllegalStateException(
                         "APK source episode must be loaded before resolving streams: " + episodeId.value());
             }
-            List<?> values = list(await(invoke(delegate, "fetchVideoList", episode)), "video list");
+            List<?> values = videoList(episode);
             List<SourceVideoStream> streams = new ArrayList<>(values.size());
             for (int index = 0; index < values.size(); index++) {
                 streams.add(stream(values.get(index), index));
             }
             return List.copyOf(streams);
+        }
+
+        private List<?> episodeList(Object anime) {
+            if (hasMethod(delegate, "getAnimeEpisodeUpdate", 5)) {
+                Object update = invokeSuspend(
+                        delegate,
+                        "getAnimeEpisodeUpdate",
+                        anime,
+                        List.of(),
+                        false,
+                        true);
+                return list(invoke(update, "getEpisodes"), "episode update");
+            }
+            if (hasMethod(delegate, "getEpisodeList", 2)) {
+                return list(invokeSuspend(delegate, "getEpisodeList", anime), "episode list");
+            }
+            return list(await(invoke(delegate, "fetchEpisodeList", anime)), "episode list");
+        }
+
+        private List<?> videoList(Object episode) {
+            if (supportsHosters(delegate) && hasCompatibleSuspendMethod(delegate, "getHosterList", episode)) {
+                List<?> hosters = list(invokeSuspend(delegate, "getHosterList", episode), "hoster list");
+                List<Object> videos = new ArrayList<>();
+                for (Object hoster : hosters) {
+                    Optional<Object> eagerVideos = invokeOptional(hoster, "getVideoList");
+                    if (eagerVideos.isPresent()) {
+                        videos.addAll(list(eagerVideos.get(), "hoster video list"));
+                    } else {
+                        videos.addAll(list(invokeSuspend(delegate, "getVideoList", hoster), "hoster video list"));
+                    }
+                }
+                return List.copyOf(videos);
+            }
+            if (hasCompatibleSuspendMethod(delegate, "getVideoList", episode)) {
+                return list(invokeSuspend(delegate, "getVideoList", episode), "video list");
+            }
+            return list(await(invoke(delegate, "fetchVideoList", episode)), "video list");
         }
 
         private SourcePage page(Object value) {
@@ -287,19 +331,68 @@ public final class AniyomiAnimeSourceAdapter {
         return blocking.map(result -> invoke(result, "single")).orElse(value);
     }
 
+    private static Object invokeModernOrRx(
+            Object target,
+            String suspendMethod,
+            String rxMethod,
+            Object... arguments) {
+        if (hasCompatibleSuspendMethod(target, suspendMethod, arguments)) {
+            return invokeSuspend(target, suspendMethod, arguments);
+        }
+        return await(invoke(target, rxMethod, arguments));
+    }
+
+    private static Object invokeSuspend(Object target, String methodName, Object... arguments) {
+        Object value = Preconditions.requireNonNull(target, "reflection target");
+        Method method = compatibleSuspendMethod(value.getClass(), methodName, arguments)
+                .orElseThrow(() -> new IllegalStateException(
+                        "Aniyomi suspend ABI method is missing: " + value.getClass().getName() + "." + methodName));
+        CoroutineCompletion completion = CoroutineCompletion.create(method.getParameterTypes()[arguments.length]);
+        Object[] callArguments = new Object[arguments.length + 1];
+        System.arraycopy(arguments, 0, callArguments, 0, arguments.length);
+        callArguments[arguments.length] = completion.continuation();
+        Object result = invokeMethod(value, method, callArguments);
+        if (!isCoroutineSuspended(result, method.getDeclaringClass().getClassLoader())) {
+            return result;
+        }
+        return completion.await(methodName);
+    }
+
+    private static Object invokeMethod(Object target, Method method, Object[] arguments) {
+        try {
+            return method.invoke(target, arguments);
+        } catch (IllegalAccessException exception) {
+            throw new IllegalStateException("Aniyomi ABI method is inaccessible: " + method.getName(), exception);
+        } catch (InvocationTargetException exception) {
+            Throwable cause = exception.getCause() == null ? exception : exception.getCause();
+            throw new IllegalStateException("Aniyomi source call failed: " + method.getName(), cause);
+        }
+    }
+
+    private static boolean isCoroutineSuspended(Object value, ClassLoader classLoader) {
+        if (value == null) {
+            return false;
+        }
+        try {
+            Class<?> intrinsics = Class.forName(
+                    "kotlin.coroutines.intrinsics.IntrinsicsKt",
+                    false,
+                    classLoader);
+            Object marker = intrinsics.getMethod("getCOROUTINE_SUSPENDED").invoke(null);
+            return marker == value;
+        } catch (ClassNotFoundException | NoSuchMethodException | IllegalAccessException ignored) {
+            return "COROUTINE_SUSPENDED".equals(String.valueOf(value));
+        } catch (InvocationTargetException exception) {
+            throw new IllegalStateException("Unable to inspect Kotlin coroutine state", exception.getCause());
+        }
+    }
+
     private static Object invoke(Object target, String methodName, Object... arguments) {
         Object value = Preconditions.requireNonNull(target, "reflection target");
         Method method = compatibleMethod(value.getClass(), methodName, arguments)
                 .orElseThrow(() -> new IllegalStateException(
                         "Aniyomi ABI method is missing: " + value.getClass().getName() + "." + methodName));
-        try {
-            return method.invoke(value, arguments);
-        } catch (IllegalAccessException exception) {
-            throw new IllegalStateException("Aniyomi ABI method is inaccessible: " + methodName, exception);
-        } catch (InvocationTargetException exception) {
-            Throwable cause = exception.getCause() == null ? exception : exception.getCause();
-            throw new IllegalStateException("Aniyomi source call failed: " + methodName, cause);
-        }
+        return invokeMethod(value, method, arguments);
     }
 
     private static Optional<Object> invokeOptional(Object target, String methodName) {
@@ -310,14 +403,91 @@ public final class AniyomiAnimeSourceAdapter {
         return method.map(ignored -> invoke(target, methodName));
     }
 
-    private static void requireMethod(Object target, String methodName, int parameterCount) {
-        boolean present = List.of(target.getClass().getMethods()).stream()
+    private static void requireEitherMethod(
+            Object target,
+            String firstMethod,
+            int firstParameterCount,
+            String secondMethod,
+            int secondParameterCount) {
+        if (!hasMethod(target, firstMethod, firstParameterCount)
+                && !hasMethod(target, secondMethod, secondParameterCount)) {
+            throw new IllegalArgumentException(
+                    "Object is not a supported Aniyomi anime source; missing "
+                            + firstMethod + " or " + secondMethod);
+        }
+    }
+
+    private static void requireEpisodeMethod(Object target) {
+        if (!hasMethod(target, "getAnimeEpisodeUpdate", 5)
+                && !hasMethod(target, "getEpisodeList", 2)
+                && !hasMethod(target, "fetchEpisodeList", 1)) {
+            throw new IllegalArgumentException(
+                    "Object is not a supported Aniyomi anime source; missing episode API");
+        }
+    }
+
+    private static void requireVideoMethod(Object target) {
+        if (!hasMethod(target, "getHosterList", 2)
+                && !hasMethod(target, "getVideoList", 2)
+                && !hasMethod(target, "fetchVideoList", 1)) {
+            throw new IllegalArgumentException(
+                    "Object is not a supported Aniyomi anime source; missing video API");
+        }
+    }
+
+    private static boolean hasMethod(Object target, String methodName, int parameterCount) {
+        return List.of(target.getClass().getMethods()).stream()
                 .anyMatch(method -> method.getName().equals(methodName)
                         && method.getParameterCount() == parameterCount);
-        if (!present) {
-            throw new IllegalArgumentException(
-                    "Object is not a supported Aniyomi anime source; missing " + methodName);
+    }
+
+    private static boolean supportsHosters(Object target) {
+        Class<?> current = target.getClass();
+        while (current != null && !current.equals(Object.class)) {
+            String name = current.getName();
+            if (name.equals("eu.kanade.tachiyomi.animesource.online.AnimeHttpSource")
+                    || name.equals("eu.kanade.tachiyomi.animesource.online.ParsedAnimeHttpSource")) {
+                return false;
+            }
+            boolean declared = List.of(current.getDeclaredMethods()).stream()
+                    .map(Method::getName)
+                    .anyMatch(Set.of("getHosterList", "hosterListRequest", "hosterListParse")::contains);
+            if (declared) {
+                return true;
+            }
+            current = current.getSuperclass();
         }
+        return false;
+    }
+
+    private static boolean hasCompatibleSuspendMethod(Object target, String methodName, Object... arguments) {
+        return compatibleSuspendMethod(target.getClass(), methodName, arguments).isPresent();
+    }
+
+    private static Optional<Method> compatibleSuspendMethod(
+            Class<?> type,
+            String methodName,
+            Object[] arguments) {
+        for (Method method : type.getMethods()) {
+            Class<?>[] parameterTypes = method.getParameterTypes();
+            if (method.getName().equals(methodName)
+                    && parameterTypes.length == arguments.length + 1
+                    && continuationType(parameterTypes[parameterTypes.length - 1])
+                    && compatiblePrefix(parameterTypes, arguments)) {
+                return Optional.of(method);
+            }
+        }
+        return Optional.empty();
+    }
+
+    private static boolean continuationType(Class<?> type) {
+        return type.getName().equals("kotlin.coroutines.Continuation") || type.equals(Object.class);
+    }
+
+    private static boolean compatiblePrefix(Class<?>[] parameterTypes, Object[] arguments) {
+        Class<?>[] prefix = new Class<?>[arguments.length];
+        System.arraycopy(parameterTypes, 0, prefix, 0, arguments.length);
+        return compatible(prefix, arguments);
     }
 
     private static Optional<Method> compatibleMethod(
@@ -494,5 +664,83 @@ public final class AniyomiAnimeSourceAdapter {
     private static String language(Object value) {
         String language = nullableText(value).strip();
         return language.isEmpty() || language.equalsIgnoreCase("all") ? "und" : language;
+    }
+
+    private static final class CoroutineCompletion {
+        private final Object continuation;
+        private final CompletableFuture<Object> result;
+
+        private CoroutineCompletion(Object continuation, CompletableFuture<Object> result) {
+            this.continuation = continuation;
+            this.result = result;
+        }
+
+        private static CoroutineCompletion create(Class<?> continuationType) {
+            CompletableFuture<Object> result = new CompletableFuture<>();
+            if (continuationType.equals(Object.class)) {
+                return new CoroutineCompletion(new Object(), result);
+            }
+            ClassLoader classLoader = continuationType.getClassLoader();
+            Object continuation = Proxy.newProxyInstance(
+                    classLoader,
+                    new Class<?>[]{continuationType},
+                    (proxy, method, arguments) -> switch (method.getName()) {
+                        case "resumeWith" -> {
+                            complete(result, arguments == null ? null : arguments[0], classLoader);
+                            yield null;
+                        }
+                        case "getContext" -> emptyCoroutineContext(classLoader);
+                        case "toString" -> "AnilibAniyomiContinuation";
+                        case "hashCode" -> System.identityHashCode(proxy);
+                        case "equals" -> proxy == (arguments == null ? null : arguments[0]);
+                        default -> throw new UnsupportedOperationException(
+                                "Unsupported Kotlin continuation method: " + method.getName());
+                    });
+            return new CoroutineCompletion(continuation, result);
+        }
+
+        private static void complete(
+                CompletableFuture<Object> result,
+                Object value,
+                ClassLoader classLoader) {
+            try {
+                Class<?> resultSupport = Class.forName("kotlin.ResultKt", false, classLoader);
+                resultSupport.getMethod("throwOnFailure", Object.class).invoke(null, value);
+                result.complete(value);
+            } catch (ClassNotFoundException | NoSuchMethodException | IllegalAccessException exception) {
+                result.completeExceptionally(new IllegalStateException(
+                        "Kotlin coroutine result support is unavailable",
+                        exception));
+            } catch (InvocationTargetException exception) {
+                result.completeExceptionally(exception.getCause() == null ? exception : exception.getCause());
+            }
+        }
+
+        private static Object emptyCoroutineContext(ClassLoader classLoader) {
+            try {
+                Class<?> context = Class.forName("kotlin.coroutines.EmptyCoroutineContext", false, classLoader);
+                return context.getField("INSTANCE").get(null);
+            } catch (ClassNotFoundException | NoSuchFieldException | IllegalAccessException exception) {
+                throw new IllegalStateException("Kotlin empty coroutine context is unavailable", exception);
+            }
+        }
+
+        private Object continuation() {
+            return continuation;
+        }
+
+        private Object await(String methodName) {
+            try {
+                return result.get(SUSPEND_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("Aniyomi suspend call was interrupted: " + methodName, exception);
+            } catch (ExecutionException exception) {
+                Throwable cause = exception.getCause() == null ? exception : exception.getCause();
+                throw new IllegalStateException("Aniyomi suspend call failed: " + methodName, cause);
+            } catch (TimeoutException exception) {
+                throw new IllegalStateException("Aniyomi suspend call timed out: " + methodName, exception);
+            }
+        }
     }
 }

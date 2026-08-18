@@ -72,6 +72,7 @@ final class ExtensionRepositoryTest {
         installsOnlyTrustedPortableBundles(counter);
         modelsInstalledApkDiscovery(counter);
         adaptsAbiReadyAnimeSource(counter);
+        adaptsModernSuspendAndHosterAnimeSource(counter);
         return counter.value;
     }
 
@@ -327,6 +328,26 @@ final class ExtensionRepositoryTest {
         counter.expectSecurity(
                 () -> catalogue.popular(new SourceBrowseRequest(1, 20, List.of(), Map.of())),
                 "revoking APK certificate trust must block subsequent adapted source calls");
+    }
+
+    private static void adaptsModernSuspendAndHosterAnimeSource(Counter counter) {
+        AniyomiAnimeSourceAdapter.AdaptedSource adapted = AniyomiAnimeSourceAdapter.adapt(
+                "eu.kanade.tachiyomi.animeextension.fr.modern",
+                "17.0",
+                new AniyomiAdapterFixture.ModernSource());
+        CatalogueSource catalogue = (CatalogueSource) adapted.source();
+        SourcePage page = catalogue.latest(new SourceBrowseRequest(1, 20, List.of(), Map.of()));
+        StreamingSource streaming = (StreamingSource) adapted.source();
+        List<SourceEpisode> episodes = streaming.episodes(page.items().getFirst().id());
+        var streams = streaming.streams(episodes.getFirst().id());
+        counter.check(page.items().size() == 1
+                        && adapted.source().descriptor().languageTag().equals("fr")
+                        && episodes.size() == 1,
+                "an ext-lib 17 suspend source must adapt catalogue and combined episode updates");
+        counter.check(streams.size() == 1
+                        && streams.getFirst().format().name().equals("HLS")
+                        && streams.getFirst().subtitles().size() == 1,
+                "an ext-lib 17 source must resolve hosters into Anilib video streams");
     }
 
     private static ExtensionPackageMetadata portablePackage(byte[] bundle, KeyPair keyPair, long versionCode) {

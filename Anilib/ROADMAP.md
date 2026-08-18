@@ -80,6 +80,12 @@ platform-specific.
   headers, and subtitles into explicit Anilib Source Bundles
 - [ ] execute discovered Aniyomi sources through a compatibility runtime without
   importing Aniyomi's external host dependency graph into shared Anilib modules
+  - [x] adapt ext-lib 17 suspend catalogue, combined episode-update, hoster, and
+    video calls while retaining the ext-lib 16 RxJava path
+  - [ ] provide the exact Android host classes and external runtime ABI required
+    to load current extension bytecode
+  - [ ] project extension filters and source preferences into shared Anilib models
+  - [ ] add the equivalent trusted APK bridge for manga extensions
 - [x] shared Settings Bundle with durable appearance and feature-policy preferences
 - [x] live Android and desktop theme selection from shared settings
 - [ ] enforce Wi-Fi, incognito, and adult-content policies in their owning Bundles

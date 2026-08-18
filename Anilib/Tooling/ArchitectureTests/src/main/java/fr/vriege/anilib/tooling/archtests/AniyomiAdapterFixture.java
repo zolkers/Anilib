@@ -50,6 +50,69 @@ public final class AniyomiAdapterFixture {
         }
     }
 
+    public static final class ModernSource {
+        public long getId() {
+            return 84L;
+        }
+
+        public String getName() {
+            return "Modern Example";
+        }
+
+        public String getLang() {
+            return "fr";
+        }
+
+        public boolean getSupportsLatest() {
+            return true;
+        }
+
+        public Object getFilterList() {
+            return new Object();
+        }
+
+        public Page getPopularAnime(int page, Object continuation) {
+            return new Page(List.of(new Anime()), true);
+        }
+
+        public Page getLatestUpdates(int page, Object continuation) {
+            return getPopularAnime(page, continuation);
+        }
+
+        public Page getSearchAnime(int page, String query, Object filters, Object continuation) {
+            return getPopularAnime(page, continuation);
+        }
+
+        public EpisodeUpdate getAnimeEpisodeUpdate(
+                Anime anime,
+                List<Episode> episodes,
+                boolean fetchDetails,
+                boolean fetchEpisodes,
+                Object continuation) {
+            return new EpisodeUpdate(anime, List.of(new Episode()));
+        }
+
+        public List<Hoster> getHosterList(Episode episode, Object continuation) {
+            return List.of(new Hoster());
+        }
+
+        public List<Video> getVideoList(Hoster hoster, Object continuation) {
+            return List.of(new Video());
+        }
+    }
+
+    public record EpisodeUpdate(Anime anime, List<Episode> episodes) {
+        public List<Episode> getEpisodes() {
+            return episodes;
+        }
+    }
+
+    public static final class Hoster {
+        public List<Video> getVideoList() {
+            return null;
+        }
+    }
+
     public record Page(List<Anime> animes, boolean hasNextPage) {
         public List<Anime> getAnimes() {
             return animes;
