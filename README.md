@@ -62,6 +62,10 @@ experience. User-trusted Ed25519 publisher keys protect portable downloads,
 whose checksum, signature, Source API compatibility, and internal descriptor
 are verified before durable install, update, disable, or removal. Anilib ships
 with no third-party source catalogue.
+The shared Settings surface now exposes the full top-level Aniyomi-style
+hierarchy and working, confirmed actions for clearing the common HTTP cookie
+jar and response cache; deeper persistent policies remain tracked explicitly
+in the parity matrix.
 The repository also contains the dependency-free
 `AnilibJava` quality checker. Kotlin and audited UI dependencies are confined
 to outer platform renderers; shared contracts and behavior remain Java 21.

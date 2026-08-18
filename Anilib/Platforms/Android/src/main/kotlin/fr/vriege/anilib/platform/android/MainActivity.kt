@@ -67,6 +67,7 @@ class MainActivity : ComponentActivity() {
                 discovery = discovery,
                 extensionRepositories = extensionRepositories,
                 legacyExtensionInstaller = legacyExtensionInstaller,
+                networkMaintenance = started.capability(NetworkCapabilities.MAINTENANCE),
                 reader = reader,
                 player = player,
                 downloads = downloads,

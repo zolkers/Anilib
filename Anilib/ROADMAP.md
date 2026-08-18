@@ -73,7 +73,8 @@ platform-specific.
   for user-supplied Aniyomi extension APKs
 - [ ] best-effort Android discovery and Aniyomi extension API compatibility adapter
 - [ ] shared Settings hierarchy with persistent appearance and feature policy
-- [ ] clear HTTP cache, cookies, WebView data, and unused database entries
+- [x] user-confirmed clear actions for shared HTTP cache and cookies
+- [ ] clear WebView data and unused database entries
 - [ ] source and title WebView with shared browser-session cookies
 - [ ] per-screen parity audit against the current Aniyomi information architecture
 

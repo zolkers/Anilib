@@ -105,6 +105,8 @@ public final class ArchitectureTestMain {
                     "standard product must expose the local source by stable id");
             check(application.capability(NetworkCapabilities.HTTP_CLIENT) != null,
                     "standard product must publish the HTTP client capability");
+            check(application.capability(NetworkCapabilities.MAINTENANCE) != null,
+                    "standard product must publish user-facing network maintenance");
             check(application.capability(LibraryUiCapabilities.PRESENTATION).library().titles().size() == 1,
                     "Library Bundle must publish its presentation capability");
             check(application.capability(LibraryCapabilities.BACKUP_CODEC) != null,

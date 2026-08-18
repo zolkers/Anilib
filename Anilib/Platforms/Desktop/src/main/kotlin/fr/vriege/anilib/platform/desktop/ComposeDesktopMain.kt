@@ -12,6 +12,7 @@ import fr.vriege.anilib.feature.discovery.ui.DiscoveryUiCapabilities
 import fr.vriege.anilib.feature.extensionrepository.ui.ExtensionRepositoryUiCapabilities
 import fr.vriege.anilib.feature.extensionrepository.ui.LegacyExtensionInstallers
 import fr.vriege.anilib.feature.library.ui.LibraryUiCapabilities
+import fr.vriege.anilib.feature.network.NetworkCapabilities
 import fr.vriege.anilib.feature.reader.ui.ReaderUiCapabilities
 import fr.vriege.anilib.feature.player.ui.PlayerUiCapabilities
 import fr.vriege.anilib.feature.downloads.ui.DownloadUiCapabilities
@@ -61,6 +62,7 @@ fun main() {
                 discovery = discovery,
                 extensionRepositories = extensionRepositories,
                 legacyExtensionInstaller = LegacyExtensionInstallers.unavailable(),
+                networkMaintenance = started.capability(NetworkCapabilities.MAINTENANCE),
                 reader = reader,
                 player = player,
                 downloads = downloads,

@@ -16,6 +16,8 @@ public final class NetworkCapabilities {
             CapabilityKey.of("feature.network.rate-limiter", HttpRateLimiter.class);
     public static final CapabilityKey<HttpResponseCache> RESPONSE_CACHE =
             CapabilityKey.of("feature.network.response-cache", HttpResponseCache.class);
+    public static final CapabilityKey<NetworkMaintenance> MAINTENANCE =
+            CapabilityKey.of("feature.network.maintenance", NetworkMaintenance.class);
 
     private NetworkCapabilities() {
     }

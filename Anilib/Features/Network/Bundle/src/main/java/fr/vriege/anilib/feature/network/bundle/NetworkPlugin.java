@@ -26,6 +26,7 @@ public final class NetworkPlugin implements AnilibPlugin {
             .provides(NetworkCapabilities.COOKIES)
             .provides(NetworkCapabilities.RATE_LIMITER)
             .provides(NetworkCapabilities.RESPONSE_CACHE)
+            .provides(NetworkCapabilities.MAINTENANCE)
             .build();
 
     private final Path cacheDirectory;
@@ -55,6 +56,7 @@ public final class NetworkPlugin implements AnilibPlugin {
         context.publish(NetworkCapabilities.COOKIES, cookies);
         context.publish(NetworkCapabilities.RESPONSE_CACHE, cache);
         context.publish(NetworkCapabilities.RATE_LIMITER, rateLimiter);
+        context.publish(NetworkCapabilities.MAINTENANCE, new DefaultNetworkMaintenance(cookies, cache));
         context.publish(
                 NetworkCapabilities.HTTP_CLIENT,
                 new DefaultAnilibHttpClient(transport, cookies, cache, rateLimiter));

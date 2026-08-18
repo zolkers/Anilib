@@ -18,8 +18,8 @@ workflow or settings depth is not yet complete.
 | Local source | Partial | Local folders and CBZ reading | Full Aniyomi folder conventions, local anime metadata, covers, episode JSON, and rescan actions |
 | Extension repositories | Partial | User-managed HTTPS indexes, shared catalogue, Ed25519 publisher trust, SHA-256/signature/API/archive verification, and durable install/update/disable/remove actions | Load enabled portable code into the Source registry, APK bridge, and repository language/pinning controls |
 | Legacy Aniyomi extensions | Partial | Android-only HTTPS APK download, bounded redirect handling, unknown-source permission flow, and user-confirmed PackageInstaller hand-off | Discover installed APKs and implement the best-effort Aniyomi API adapter; portable Anilib bundles remain required for desktop |
-| Settings | Missing | Feature-local controls and a non-functional Settings row | Appearance, library, reader, player, downloads, tracking, backup, security/privacy, advanced, and about trees |
-| Network maintenance | Partial | Shared cookies, response cache, rate limits, and clear operations in Java APIs | User actions for clearing cache/cookies, default user agent, proxy/DoH policy, and diagnostics |
+| Settings | Partial | Reachable shared hierarchy for appearance, library, reader, player, downloads, tracking, backup, privacy, advanced, and about; advanced network actions work | Persist appearance and feature policies, then connect every remaining row to its owning Bundle |
+| Network maintenance | Partial | Shared cookies/cache/rate limits plus confirmed Android/desktop actions to clear HTTP cookies and cached responses | Default user agent, proxy/DoH policy, WebView data, unused database cleanup, and diagnostics |
 | WebView | Missing | No embedded browser | Android System WebView, desktop browser adapter, shared cookie handoff, source/title navigation, CAPTCHA flow, and clear-data action |
 | Release products | Partial | MSI/DEB/DMG matrix and Android APK pipeline | Release publication, app update channels, extension update channels, and production signing operations |
 

@@ -70,6 +70,7 @@ import fr.vriege.anilib.feature.library.ui.LibraryNavigator
 import fr.vriege.anilib.feature.library.ui.LibraryOverview
 import fr.vriege.anilib.feature.library.ui.LibraryPage
 import fr.vriege.anilib.feature.library.ui.LibraryPresentation
+import fr.vriege.anilib.feature.network.NetworkMaintenance
 import fr.vriege.anilib.feature.reader.ui.ReaderController
 import fr.vriege.anilib.feature.reader.ui.ReaderPresentation
 import fr.vriege.anilib.feature.player.ui.PlayerPresentation
@@ -93,6 +94,7 @@ fun AnilibApp(
     discovery: DiscoveryPresentation,
     extensionRepositories: ExtensionRepositoryPresentation,
     legacyExtensionInstaller: LegacyExtensionInstaller,
+    networkMaintenance: NetworkMaintenance,
     reader: ReaderPresentation,
     player: PlayerPresentation,
     downloads: DownloadPresentation,
@@ -178,6 +180,7 @@ fun AnilibApp(
                             discovery,
                             extensionRepositories,
                             legacyExtensionInstaller,
+                            networkMaintenance,
                             reader,
                             player,
                             downloads,
@@ -206,6 +209,7 @@ fun AnilibApp(
                             discovery,
                             extensionRepositories,
                             legacyExtensionInstaller,
+                            networkMaintenance,
                             reader,
                             player,
                             downloads,
@@ -241,6 +245,7 @@ private fun ExpandedShell(
     discovery: DiscoveryPresentation,
     extensionRepositories: ExtensionRepositoryPresentation,
     legacyExtensionInstaller: LegacyExtensionInstaller,
+    networkMaintenance: NetworkMaintenance,
     reader: ReaderPresentation,
     player: PlayerPresentation,
     downloads: DownloadPresentation,
@@ -272,6 +277,7 @@ private fun ExpandedShell(
                 discovery,
                 extensionRepositories,
                 legacyExtensionInstaller,
+                networkMaintenance,
                 reader,
                 player,
                 downloads,
@@ -304,6 +310,7 @@ private fun CompactShell(
     discovery: DiscoveryPresentation,
     extensionRepositories: ExtensionRepositoryPresentation,
     legacyExtensionInstaller: LegacyExtensionInstaller,
+    networkMaintenance: NetworkMaintenance,
     reader: ReaderPresentation,
     player: PlayerPresentation,
     downloads: DownloadPresentation,
@@ -333,6 +340,7 @@ private fun CompactShell(
                 discovery,
                 extensionRepositories,
                 legacyExtensionInstaller,
+                networkMaintenance,
                 reader,
                 player,
                 downloads,
@@ -408,6 +416,7 @@ private fun AppDestination(
     discovery: DiscoveryPresentation,
     extensionRepositories: ExtensionRepositoryPresentation,
     legacyExtensionInstaller: LegacyExtensionInstaller,
+    networkMaintenance: NetworkMaintenance,
     reader: ReaderPresentation,
     player: PlayerPresentation,
     downloads: DownloadPresentation,
@@ -465,12 +474,14 @@ private fun AppDestination(
                 legacyExtensionInstaller,
                 closeMore,
             )
+            MoreDestination.SETTINGS -> SettingsScreen(networkMaintenance, closeMore)
             null -> MorePage(
                 componentCount,
                 { openMore(MoreDestination.DOWNLOADS) },
                 { openMore(MoreDestination.BACKUP) },
                 { openMore(MoreDestination.TRACKING) },
                 { openMore(MoreDestination.EXTENSION_REPOSITORIES) },
+                { openMore(MoreDestination.SETTINGS) },
             )
         }
     }
@@ -762,6 +773,7 @@ private fun MorePage(
     openBackup: () -> Unit,
     openTracking: () -> Unit,
     openExtensionRepositories: () -> Unit,
+    openSettings: () -> Unit,
 ) {
     Scaffold(topBar = { TopAppBar(title = { Text("More") }) }) { padding ->
         LazyColumn(modifier = Modifier.fillMaxSize().padding(padding)) {
@@ -777,7 +789,7 @@ private fun MorePage(
             }
             item { MoreRow("Categories", "Organize anime and manga in your library") }
             item { MoreRow("Statistics", "Library and reading activity") }
-            item { MoreRow("Settings", "Appearance, library, reader, player, and tracking") }
+            item { MoreRow("Settings", "Appearance, library, reader, player, and tracking", openSettings) }
             item { MoreRow("About", "$componentCount feature bundles active") }
         }
     }
@@ -847,6 +859,7 @@ private enum class MoreDestination {
     BACKUP,
     TRACKING,
     EXTENSION_REPOSITORIES,
+    SETTINGS,
 }
 
 private fun AppSection.icon(): ImageVector = when (this) {
