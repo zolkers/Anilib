@@ -16,6 +16,7 @@ dependencies {
     implementation project(':Anilib:Framework:Http:JdkRuntime')
     implementation project(':Anilib:Configurations:Standard')
     implementation project(':Anilib:Features:CoverCache:Bundle')
+    implementation project(':Anilib:Features:Library:Api')
     implementation project(':Anilib:Features:Discovery:Ui')
     implementation project(':Anilib:Features:ExtensionRepository:Ui')
     implementation project(':Anilib:Features:Network:Api')
@@ -34,6 +35,8 @@ dependencies {
     implementation project(':Anilib:Platforms:Compose')
     implementation compose.desktop.currentOs
     implementation 'io.github.kevinnzou:compose-webview-multiplatform:2.0.3'
+    testImplementation 'org.jetbrains.kotlin:kotlin-test:2.4.10'
+    testImplementation compose.uiTest
 }
 
 kotlin {

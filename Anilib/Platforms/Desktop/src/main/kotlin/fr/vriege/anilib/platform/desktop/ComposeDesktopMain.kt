@@ -24,8 +24,14 @@ import fr.vriege.anilib.feature.applicationupdate.ui.ApplicationUpdateUiCapabili
 import fr.vriege.anilib.framework.http.jdk.JdkHttpTransport
 import fr.vriege.anilib.kernel.StartedAnilib
 import fr.vriege.anilib.platform.compose.AnilibApp
+import fr.vriege.anilib.platform.compose.ApplicationUpdatePlatformController
+import fr.vriege.anilib.platform.compose.BackupImportPicker
+import fr.vriege.anilib.platform.compose.BrowserDataController
+import fr.vriege.anilib.platform.compose.BrowserPlatformController
+import fr.vriege.anilib.platform.compose.BrowserRuntimeStatus
 import fr.vriege.anilib.platform.compose.ComposePlayerBackend
 import fr.vriege.anilib.platform.compose.DesktopBrowserRuntime
+import fr.vriege.anilib.platform.compose.ShareController
 import java.awt.GraphicsEnvironment
 import org.jetbrains.skia.Image
 
@@ -44,17 +50,6 @@ fun main() {
         return
     }
     val browserRuntimeStatus = DesktopBrowserRuntime.initialize(dataDirectory)
-    val browserDataController = DesktopBrowserDataController(dataDirectory)
-    val applicationUpdatePlatformController = DesktopApplicationUpdateController(dataDirectory)
-    val presentation = started.capability(LibraryUiCapabilities.PRESENTATION)
-    val discovery = started.capability(DiscoveryUiCapabilities.PRESENTATION)
-    val extensionRepositories = started.capability(ExtensionRepositoryUiCapabilities.PRESENTATION)
-    val reader = started.capability(ReaderUiCapabilities.PRESENTATION)
-    val player = started.capability(PlayerUiCapabilities.PRESENTATION)
-    val downloads = started.capability(DownloadUiCapabilities.PRESENTATION)
-    val backup = started.capability(BackupUiCapabilities.PRESENTATION)
-    val tracking = started.capability(TrackerUiCapabilities.PRESENTATION)
-    val updates = started.capability(UpdateUiCapabilities.PRESENTATION)
     application {
         Window(
             onCloseRequest = {
@@ -70,41 +65,62 @@ fun main() {
             },
             title = "Anilib",
         ) {
-            AnilibApp(
-                presentation = presentation,
-                discovery = discovery,
-                extensionRepositories = extensionRepositories,
-                apkExtensionPlatform = ApkExtensionPlatforms.unavailable(),
-                networkMaintenance = started.capability(NetworkCapabilities.MAINTENANCE),
-                browserCookies = started.capability(NetworkCapabilities.COOKIES),
+            DesktopAnilibContent(
+                started = started,
                 browserRuntimeStatus = browserRuntimeStatus,
-                browserDataController = browserDataController,
+                browserDataController = DesktopBrowserDataController(dataDirectory),
                 browserPlatformController = DesktopBrowserPlatformController(),
-                settingsPresentation = started.capability(SettingsUiCapabilities.PRESENTATION),
-                reader = reader,
-                player = player,
-                downloads = downloads,
-                backup = backup,
                 backupImportPicker = DesktopBackupImportPicker(),
-                tracking = tracking,
-                updates = updates,
-                applicationUpdates = started.capability(ApplicationUpdateUiCapabilities.PRESENTATION),
-                applicationUpdatePlatformController = applicationUpdatePlatformController,
-                httpClient = started.capability(NetworkCapabilities.HTTP_CLIENT),
+                applicationUpdatePlatformController = DesktopApplicationUpdateController(dataDirectory),
                 shareController = DesktopShareController(),
-                pageDecoder = ::decodePage,
-                applyReaderOrientationPolicy = {},
-                applyPlayerOrientationPolicy = {},
-                requestPlayerPictureInPicture = {},
-                setPlayerActive = {},
-                setPlayerBackgroundAudio = {},
-                enableAndroidPlayerControls = false,
-                enableDesktopPlayerControls = true,
-                componentCount = started.components().size,
-                darkTheme = desktopDarkTheme(),
             )
         }
     }
+}
+
+@Composable
+internal fun DesktopAnilibContent(
+    started: StartedAnilib,
+    browserRuntimeStatus: BrowserRuntimeStatus,
+    browserDataController: BrowserDataController,
+    browserPlatformController: BrowserPlatformController,
+    backupImportPicker: BackupImportPicker,
+    applicationUpdatePlatformController: ApplicationUpdatePlatformController,
+    shareController: ShareController,
+) {
+    AnilibApp(
+        presentation = started.capability(LibraryUiCapabilities.PRESENTATION),
+        discovery = started.capability(DiscoveryUiCapabilities.PRESENTATION),
+        extensionRepositories = started.capability(ExtensionRepositoryUiCapabilities.PRESENTATION),
+        apkExtensionPlatform = ApkExtensionPlatforms.unavailable(),
+        networkMaintenance = started.capability(NetworkCapabilities.MAINTENANCE),
+        browserCookies = started.capability(NetworkCapabilities.COOKIES),
+        browserRuntimeStatus = browserRuntimeStatus,
+        browserDataController = browserDataController,
+        browserPlatformController = browserPlatformController,
+        settingsPresentation = started.capability(SettingsUiCapabilities.PRESENTATION),
+        reader = started.capability(ReaderUiCapabilities.PRESENTATION),
+        player = started.capability(PlayerUiCapabilities.PRESENTATION),
+        downloads = started.capability(DownloadUiCapabilities.PRESENTATION),
+        backup = started.capability(BackupUiCapabilities.PRESENTATION),
+        backupImportPicker = backupImportPicker,
+        tracking = started.capability(TrackerUiCapabilities.PRESENTATION),
+        updates = started.capability(UpdateUiCapabilities.PRESENTATION),
+        applicationUpdates = started.capability(ApplicationUpdateUiCapabilities.PRESENTATION),
+        applicationUpdatePlatformController = applicationUpdatePlatformController,
+        httpClient = started.capability(NetworkCapabilities.HTTP_CLIENT),
+        shareController = shareController,
+        pageDecoder = ::decodePage,
+        applyReaderOrientationPolicy = {},
+        applyPlayerOrientationPolicy = {},
+        requestPlayerPictureInPicture = {},
+        setPlayerActive = {},
+        setPlayerBackgroundAudio = {},
+        enableAndroidPlayerControls = false,
+        enableDesktopPlayerControls = true,
+        componentCount = started.components().size,
+        darkTheme = desktopDarkTheme(),
+    )
 }
 
 private fun decodePage(bytes: ByteArray): ImageBitmap? =

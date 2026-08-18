@@ -60,3 +60,13 @@ GitHub/Sigstore provenance attestation before creating one GitHub Release.
 Backup import and export use native AWT file dialogs. Sharing puts the selected
 archive on the operating-system file clipboard without changing the managed
 backup copy.
+
+The desktop-hosted Compose acceptance test renders fixed 480x720 compact and
+1000x720 expanded surfaces, clicks through the shared navigation routes, and
+compares consecutive pixel buffers and semantics trees. Run it with:
+
+```powershell
+.\gradlew.bat --no-daemon --console=plain `
+  :Anilib:Platforms:Desktop:test `
+  --tests fr.vriege.anilib.platform.desktop.UiRouteScreenshotTest
+```

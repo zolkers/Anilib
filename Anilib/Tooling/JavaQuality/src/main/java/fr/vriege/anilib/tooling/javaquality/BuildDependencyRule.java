@@ -44,6 +44,8 @@ public final class BuildDependencyRule implements AnilibJavaRule {
                     DESKTOP_BUILD,
                     Set.of(
                             "compose.desktop.currentOs",
+                            "compose.uiTest",
+                            "'org.jetbrains.kotlin:kotlin-test:2.4.10'",
                             "'io.github.kevinnzou:compose-webview-multiplatform:2.0.3'")));
     private static final Map<String, Set<String>> ALLOWED_EXTERNAL_PLUGINS = Map.ofEntries(
             Map.entry(

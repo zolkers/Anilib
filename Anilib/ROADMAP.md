@@ -278,6 +278,11 @@ platform-specific.
 
 - [ ] add deterministic screenshot and interaction tests for every audited route
   on compact and expanded layouts
+  - [x] capture pixel and semantic stability while interacting through the shared
+    library/details, primary navigation, all Browse tabs, More destinations, and
+    Settings routes at deterministic 480x720 and 1000x720 desktop-host sizes
+  - [ ] add content-rich Reader, Player, source catalogue, local-source, and
+    WebView fixtures, then execute the same suite in the packaged Android host
 - [ ] add end-to-end tests for repository install, browse, read/play, download,
   backup/restore, update, and offline restart on Android and desktop
   - [x] dependency-free workflow fixtures cover every shared service boundary
