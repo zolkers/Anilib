@@ -74,6 +74,7 @@ public final class ArchitectureTestMain {
         assertions += PortableBundleLoadingTest.run();
         assertions += DiscoveryTest.run();
         assertions += HttpFrameworkTest.run();
+        assertions += NetworkPolicyTest.run();
         assertions += ReaderTest.run();
         assertions += PlayerTest.run();
         assertions += TrackerTest.run();

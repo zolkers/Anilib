@@ -8,14 +8,27 @@ import fr.vriege.anilib.framework.http.HttpTransport;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
+import java.net.InetSocketAddress;
+import java.net.Proxy;
+import java.net.URI;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.Supplier;
 
 public final class UrlConnectionHttpTransport implements HttpTransport {
     private static final int MAX_RESPONSE_BYTES = 16 * 1024 * 1024;
 
+    private final Supplier<Optional<URI>> proxy;
+
     public UrlConnectionHttpTransport() {
+        this(Optional::empty);
+    }
+
+    public UrlConnectionHttpTransport(Supplier<Optional<URI>> proxy) {
+        this.proxy = Objects.requireNonNull(proxy, "proxy must not be null");
     }
 
     @Override
@@ -43,9 +56,12 @@ public final class UrlConnectionHttpTransport implements HttpTransport {
         }
     }
 
-    private static HttpURLConnection open(HttpRequest request) {
+    private HttpURLConnection open(HttpRequest request) {
         try {
-            HttpURLConnection connection = (HttpURLConnection) request.uri().toURL().openConnection();
+            Optional<URI> configured = Objects.requireNonNull(proxy.get(), "proxy supplied null");
+            HttpURLConnection connection = configured.isPresent()
+                    ? (HttpURLConnection) request.uri().toURL().openConnection(asProxy(configured.orElseThrow()))
+                    : (HttpURLConnection) request.uri().toURL().openConnection();
             connection.setRequestMethod(request.method().name());
             connection.setConnectTimeout(timeoutMillis(request));
             connection.setReadTimeout(timeoutMillis(request));
@@ -55,6 +71,11 @@ public final class UrlConnectionHttpTransport implements HttpTransport {
         } catch (IOException exception) {
             throw new HttpException("Unable to open an HTTP URL connection", exception);
         }
+    }
+
+    private static Proxy asProxy(URI uri) {
+        int port = uri.getPort() < 0 ? 80 : uri.getPort();
+        return new Proxy(Proxy.Type.HTTP, InetSocketAddress.createUnresolved(uri.getHost(), port));
     }
 
     private static int timeoutMillis(HttpRequest request) {

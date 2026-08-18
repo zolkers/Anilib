@@ -247,7 +247,7 @@ platform-specific.
 
 - [x] add language packs, theme families, color schemes, typography, navigation
   style, and remaining category defaults and exceptions
-- [ ] add configurable user agent, proxy, DNS-over-HTTPS, timeout, cache, and
+- [x] add configurable user agent, proxy, DNS-over-HTTPS, timeout, cache, and
   per-source network diagnostics
 - [ ] add storage inspection, logs, crash reports, exportable diagnostics, and
   safe reset flows

@@ -22,6 +22,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
 
 public final class DefaultAnilibHttpClient implements AnilibHttpClient {
     private static final HexFormat HEX = HexFormat.of();
@@ -30,16 +32,32 @@ public final class DefaultAnilibHttpClient implements AnilibHttpClient {
     private final HttpCookieJar cookies;
     private final HttpResponseCache cache;
     private final HttpRateLimiter rateLimiter;
+    private final Supplier<String> userAgent;
+    private final BooleanSupplier responseCacheEnabled;
 
     public DefaultAnilibHttpClient(
             HttpTransport transport,
             HttpCookieJar cookies,
             HttpResponseCache cache,
             HttpRateLimiter rateLimiter) {
+        this(transport, cookies, cache, rateLimiter, () -> "Anilib/0.1", () -> true);
+    }
+
+    public DefaultAnilibHttpClient(
+            HttpTransport transport,
+            HttpCookieJar cookies,
+            HttpResponseCache cache,
+            HttpRateLimiter rateLimiter,
+            Supplier<String> userAgent,
+            BooleanSupplier responseCacheEnabled) {
         this.transport = Objects.requireNonNull(transport, "transport must not be null");
         this.cookies = Objects.requireNonNull(cookies, "cookies must not be null");
         this.cache = Objects.requireNonNull(cache, "cache must not be null");
         this.rateLimiter = Objects.requireNonNull(rateLimiter, "rateLimiter must not be null");
+        this.userAgent = Objects.requireNonNull(userAgent, "userAgent must not be null");
+        this.responseCacheEnabled = Objects.requireNonNull(
+                responseCacheEnabled,
+                "responseCacheEnabled must not be null");
     }
 
     @Override
@@ -48,7 +66,8 @@ public final class DefaultAnilibHttpClient implements AnilibHttpClient {
         Map<String, List<String>> headers = mergedHeaders(request);
         String cacheKey = cacheKey(request, headers);
         HttpCachePolicy policy = request.cachePolicy();
-        if (policy.reads()) {
+        boolean cacheEnabled = responseCacheEnabled.getAsBoolean();
+        if (cacheEnabled && policy.reads()) {
             HttpCacheEntry cached = cache.find(cacheKey).orElse(null);
             if (cached != null && cached.isFresh(Instant.now())) {
                 return cached.response().asCached();
@@ -61,7 +80,7 @@ public final class DefaultAnilibHttpClient implements AnilibHttpClient {
         rateLimiter.acquire(request.uri(), request.minimumInterval());
         HttpResponse response = transport.exchange(request, headers).asNetworkResponse();
         cookies.store(request.uri(), response.headers());
-        if (policy.writes() && response.statusCode() >= 200 && response.statusCode() < 300) {
+        if (cacheEnabled && policy.writes() && response.statusCode() >= 200 && response.statusCode() < 300) {
             cache.store(cacheKey, new HttpCacheEntry(response, Instant.now().plus(policy.timeToLive())));
         }
         return response;
@@ -74,7 +93,8 @@ public final class DefaultAnilibHttpClient implements AnilibHttpClient {
             String normalized = name.toLowerCase(Locale.ROOT);
             headers.computeIfAbsent(normalized, ignored -> new ArrayList<>()).addAll(values);
         });
-        headers.computeIfAbsent("user-agent", ignored -> new ArrayList<>()).add("Anilib/0.1");
+        headers.computeIfAbsent("user-agent", ignored -> new ArrayList<>())
+                .add(Objects.requireNonNull(userAgent.get(), "userAgent supplied null"));
         Map<String, List<String>> immutable = new LinkedHashMap<>();
         headers.forEach((name, values) -> immutable.put(name, List.copyOf(values)));
         return Map.copyOf(immutable);

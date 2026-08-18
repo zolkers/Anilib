@@ -259,6 +259,13 @@ The Network Bundle publishes the resulting capabilities, so source code never
 imports either platform mechanism and configurations still select one explicit
 composition unit.
 
+Network policy is persisted beside the shared cache and read for every request.
+The shared client owns default User-Agent and cache admission; a transport
+decorator owns timeout caps, HTTP proxy routing, and an RFC 8484 DNS-over-HTTPS
+resolution gate before the selected platform transport runs. Diagnostics use
+the same configured client and retain a bounded, source-identified in-memory
+history, so their result describes the path real source requests take.
+
 Settings is a removable vertical rather than platform-owned preferences. Its
 Java service atomically stores immutable snapshots and publishes observations
 through a narrow capability. One platform-neutral presentation owns mutation

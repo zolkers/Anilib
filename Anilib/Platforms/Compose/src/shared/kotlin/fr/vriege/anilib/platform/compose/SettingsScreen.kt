@@ -1,6 +1,8 @@
 package fr.vriege.anilib.platform.compose
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -34,12 +36,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.multiplatform.webview.cookie.WebViewCookieManager
 import fr.vriege.anilib.feature.network.NetworkMaintenance
+import fr.vriege.anilib.feature.network.NetworkPolicy
 import fr.vriege.anilib.feature.settings.SettingsSnapshot
 import fr.vriege.anilib.feature.settings.LanguagePack
 import fr.vriege.anilib.feature.settings.ThemeMode
 import fr.vriege.anilib.feature.settings.TypographyScale
 import fr.vriege.anilib.feature.settings.ui.SettingsPresentation
 import kotlinx.coroutines.launch
+import java.net.URI
+import java.time.Duration
+import java.util.Optional
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,6 +64,7 @@ internal fun SettingsScreen(
     var destination by remember { mutableStateOf<SettingsDestination?>(null) }
     var confirmation by remember { mutableStateOf<MaintenanceAction?>(null) }
     var result by remember { mutableStateOf<String?>(null) }
+    var networkPolicyDialog by remember { mutableStateOf(false) }
     val browserCookies = remember { WebViewCookieManager() }
     val scope = rememberCoroutineScope()
 
@@ -118,6 +125,7 @@ internal fun SettingsScreen(
             openBackup = openBackup,
             openAbout = openAbout,
             requestMaintenance = { confirmation = it },
+            openNetworkPolicy = { networkPolicyDialog = true },
             goBack = { destination = null },
         )
     }
@@ -137,6 +145,9 @@ internal fun SettingsScreen(
             },
             dismissButton = { TextButton(onClick = { confirmation = null }) { Text("Cancel") } },
         )
+    }
+    if (networkPolicyDialog) {
+        NetworkPolicyDialog(maintenance, close = { networkPolicyDialog = false })
     }
 }
 
@@ -239,6 +250,7 @@ private fun SettingsDetail(
     openBackup: () -> Unit,
     openAbout: () -> Unit,
     requestMaintenance: (MaintenanceAction) -> Unit,
+    openNetworkPolicy: () -> Unit,
     goBack: () -> Unit,
 ) {
     Scaffold(topBar = { SettingsTopBar(destination.title, goBack) }) { padding ->
@@ -347,6 +359,13 @@ private fun SettingsDetail(
                 SettingsDestination.ADVANCED -> {
                     item { SettingsSection("Network and browser") }
                     item {
+                        SettingsRow(
+                            "Network policy",
+                            "User agent, proxy, DNS-over-HTTPS, timeout, cache, and diagnostics",
+                            openNetworkPolicy,
+                        )
+                    }
+                    item {
                         SettingsRow("Clear cookies", "Sign out browser sessions for every source") {
                             requestMaintenance(MaintenanceAction.COOKIES)
                         }
@@ -374,6 +393,65 @@ private fun SettingsDetail(
             }
         }
     }
+}
+
+@Composable
+private fun NetworkPolicyDialog(maintenance: NetworkMaintenance, close: () -> Unit) {
+    val initial = remember(maintenance) { maintenance.policy() }
+    var userAgent by remember { mutableStateOf(initial.userAgent()) }
+    var proxy by remember { mutableStateOf(initial.proxy().map(URI::toASCIIString).orElse("")) }
+    var doh by remember { mutableStateOf(initial.dnsOverHttps().map(URI::toASCIIString).orElse("")) }
+    var timeout by remember { mutableStateOf(initial.timeout().toSeconds().toString()) }
+    var cacheEnabled by remember { mutableStateOf(initial.responseCacheEnabled()) }
+    var sourceId by remember { mutableStateOf("") }
+    var endpoint by remember { mutableStateOf("") }
+    var feedback by remember { mutableStateOf<String?>(null) }
+    AlertDialog(
+        onDismissRequest = close,
+        title = { Text("Network policy") },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                OutlinedTextField(userAgent, { userAgent = it }, label = { Text("User agent") })
+                OutlinedTextField(proxy, { proxy = it }, label = { Text("HTTP proxy (optional)") })
+                OutlinedTextField(doh, { doh = it }, label = { Text("DNS-over-HTTPS URL (optional)") })
+                OutlinedTextField(timeout, { timeout = it }, label = { Text("Timeout in seconds") })
+                SettingsSwitchRow(
+                    "Response cache",
+                    "Read and write shared HTTP cache entries",
+                    cacheEnabled,
+                    { cacheEnabled = it },
+                )
+                SettingsSection("Per-source diagnostic")
+                OutlinedTextField(sourceId, { sourceId = it }, label = { Text("Source ID") })
+                OutlinedTextField(endpoint, { endpoint = it }, label = { Text("HTTPS endpoint") })
+                TextButton(onClick = {
+                    feedback = runCatching {
+                        val diagnostic = maintenance.diagnose(sourceId, URI.create(endpoint))
+                        "${diagnostic.sourceId()}: ${diagnostic.message()} in ${diagnostic.elapsed().toMillis()} ms"
+                    }.fold({ it }, { it.message ?: "Diagnostic failed" })
+                }) { Text("Run diagnostic") }
+                feedback?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                feedback = runCatching {
+                    maintenance.savePolicy(
+                        NetworkPolicy(
+                            userAgent,
+                            Optional.ofNullable(proxy.trim().takeIf(String::isNotEmpty)?.let(URI::create)),
+                            Optional.ofNullable(doh.trim().takeIf(String::isNotEmpty)?.let(URI::create)),
+                            Duration.ofSeconds(timeout.toLong()),
+                            cacheEnabled,
+                        ),
+                    )
+                    close()
+                    "Saved"
+                }.exceptionOrNull()?.message ?: feedback
+            }) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = close) { Text("Cancel") } },
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

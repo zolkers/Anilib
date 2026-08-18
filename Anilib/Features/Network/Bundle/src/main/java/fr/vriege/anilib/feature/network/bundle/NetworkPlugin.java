@@ -61,13 +61,25 @@ public final class NetworkPlugin implements AnilibPlugin {
         HttpCookieJar cookies = new JdkHttpCookieJar();
         HttpResponseCache cache = new FileHttpResponseCache(cacheDirectory);
         HttpRateLimiter rateLimiter = new HostHttpRateLimiter();
+        NetworkPolicyStore policyStore = new NetworkPolicyStore(
+                cacheDirectory.resolveSibling("network.properties"));
+        DefaultNetworkMaintenance maintenance = new DefaultNetworkMaintenance(cookies, cache, policyStore);
+        HttpTransport configuredTransport = new PolicyHttpTransport(transport, maintenance::policy);
+        DefaultAnilibHttpClient client = new DefaultAnilibHttpClient(
+                configuredTransport,
+                cookies,
+                cache,
+                rateLimiter,
+                () -> maintenance.policy().userAgent(),
+                () -> maintenance.policy().responseCacheEnabled());
+        maintenance.attach(client);
         context.publish(NetworkCapabilities.COOKIES, cookies);
         context.publish(NetworkCapabilities.RESPONSE_CACHE, cache);
         context.publish(NetworkCapabilities.RATE_LIMITER, rateLimiter);
-        context.publish(NetworkCapabilities.MAINTENANCE, new DefaultNetworkMaintenance(cookies, cache));
+        context.publish(NetworkCapabilities.MAINTENANCE, maintenance);
         context.publish(NetworkCapabilities.STATUS, status);
         context.publish(
                 NetworkCapabilities.HTTP_CLIENT,
-                new DefaultAnilibHttpClient(transport, cookies, cache, rateLimiter));
+                client);
     }
 }
