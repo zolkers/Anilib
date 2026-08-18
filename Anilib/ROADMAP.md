@@ -40,7 +40,7 @@ modularity behind the UI; Aniyomi remains the product reference.
 
 - [x] reader models, page pipeline, prefetch, and reading directions
 - [x] download queue, resumable jobs, storage policies, and offline mode
-- [ ] backup/restore with versioned, self-owned codecs
+- [x] backup/restore with versioned, self-owned codecs
 
 ## Phase 4 — video and tracking
 

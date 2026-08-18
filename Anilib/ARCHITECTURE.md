@@ -114,6 +114,20 @@ the Downloads Bundle removes both the queue capability and the registration.
 The Java presentation model is rendered by one Aniyomi-style queue screen on
 Android and desktop.
 
+Backup is a removable coordinator rather than the owner of another feature's
+serialization. Framework exposes the narrow `BackupSectionCodec` and prepared
+restore contracts; Library and Discovery each publish an independently
+versioned codec capability from their own Bundle. The Backup Bundle explicitly
+requires those capabilities and assembles a bounded archive with deterministic
+section order, per-section SHA-256 checksums, and a whole-archive checksum.
+Creation uses atomic replacement. Restore validates every known section before
+mutation, merges imported user state, commits sections in order, and rolls back
+already committed sections in reverse order if a later commit fails. Unknown
+future sections remain inspectable and are skipped, while malformed or
+unsupported known sections fail before mutation. One shared screen on Android
+and desktop provides local creation, preview, confirmed restore, and confirmed
+deletion.
+
 HTTP is split at the platform boundary. Framework contracts own immutable
 requests and responses plus cookie, cache, rate-limit, and low-level transport
 ports. One shared policy engine applies those contracts. Desktop injects the

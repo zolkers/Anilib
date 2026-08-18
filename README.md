@@ -31,6 +31,9 @@ vertical, and webtoon navigation, plus one immersive shared reader screen.
 The removable Downloads Bundle adds a durable queue, bounded concurrent jobs,
 pause/cancel/resume controls, restart-safe partial downloads, storage quotas,
 and offline reading through the same Reader on Android and desktop.
+The removable Backup Bundle creates checksum-verified local archives from
+feature-owned versioned codecs, previews their contents, and restores Library
+and source preferences with merge semantics and cross-section rollback.
 The repository also contains the dependency-free
 `AnilibJava` quality checker. Kotlin and audited UI dependencies are confined
 to outer platform renderers; shared contracts and behavior remain Java 21.
