@@ -152,7 +152,8 @@ public final class StandardAnilib {
         plugins.add(new PlayerPlugin(playbackState, playerPreferences, playerBackend));
         plugins.add(new TrackerPlugin(trackingState));
         plugins.add(new UpdatePlugin(updateState, updateNotifier));
-        plugins.add(ApplicationUpdatePlugin.currentRuntime());
+        plugins.add(ApplicationUpdatePlugin.currentRuntime(
+                dataDirectory.toAbsolutePath().normalize().resolve("application-update.channel")));
         plugins.add(new BackupPlugin(
                 backups,
                 List.of(

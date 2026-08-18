@@ -165,6 +165,7 @@ fun AnilibApp(
     tracking: TrackerPresentation,
     updates: UpdatePresentation,
     applicationUpdates: ApplicationUpdatePresentation,
+    applicationUpdatePlatformController: ApplicationUpdatePlatformController,
     httpClient: AnilibHttpClient,
     shareController: ShareController,
     pageDecoder: (ByteArray) -> ImageBitmap?,
@@ -219,6 +220,7 @@ fun AnilibApp(
         ),
         LocalBrowserPolicy provides settings.browserPolicy(),
         LocalBrowserPlatformController provides browserPlatformController,
+        LocalApplicationUpdatePlatformController provides applicationUpdatePlatformController,
     ) {
         MaterialTheme(colorScheme = appColorScheme(settings, useDarkTheme)) {
             Surface(modifier = Modifier.fillMaxSize()) {

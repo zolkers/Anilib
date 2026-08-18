@@ -1,0 +1,5 @@
+name=Anilib
+subtitle=Anime and manga library
+description=Browse user-configured sources, read manga, play anime, manage offline downloads, create backups, and connect optional trackers.
+primaryCategory=public.app-category.entertainment
+privacyPolicyUrl=REQUIRED_BEFORE_STORE_SUBMISSION

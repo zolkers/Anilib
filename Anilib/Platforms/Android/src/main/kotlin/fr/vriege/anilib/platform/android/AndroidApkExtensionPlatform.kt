@@ -150,7 +150,7 @@ class AnilibApkInstallReceiver : BroadcastReceiver() {
             return
         }
         val message = if (status == PackageInstaller.STATUS_SUCCESS) {
-            "APK extension installed for Anilib by Android."
+            "Package installed for Anilib by Android."
         } else {
             intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE) ?: "APK installation failed."
         }

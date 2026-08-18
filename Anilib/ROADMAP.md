@@ -263,15 +263,15 @@ platform-specific.
 
 ### 9. Release and application updates
 
-- [ ] add signed in-application artifact download with checksum and provenance
+- [x] add signed in-application artifact download with checksum and provenance
   verification
-- [ ] add platform-owned installation hand-off: PackageInstaller on Android,
+- [x] add platform-owned installation hand-off: PackageInstaller on Android,
   installer launch on Windows/Linux, and notarized DMG hand-off on macOS
-- [ ] decide and implement stable/beta channel policy plus changelog and licence
+- [x] decide and implement stable/beta channel policy plus changelog and licence
   presentation
 - [ ] configure real production secrets, execute a tagged release on all four
   targets, install every artifact, and record the release acceptance checklist
-- [ ] prepare store metadata and optional Play Store, Microsoft Store, and macOS
+- [x] prepare store metadata and optional Play Store, Microsoft Store, and macOS
   distribution paths without making stores mandatory
 
 ### 10. Product hardening

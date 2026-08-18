@@ -2,7 +2,10 @@ package fr.vriege.anilib.feature.applicationupdate.ui;
 
 import fr.vriege.anilib.feature.applicationupdate.ApplicationUpdateService;
 import fr.vriege.anilib.feature.applicationupdate.ApplicationUpdateSnapshot;
+import fr.vriege.anilib.feature.applicationupdate.ApplicationUpdateChannel;
+import fr.vriege.anilib.feature.applicationupdate.ApplicationUpdateVerification;
 
+import java.nio.file.Path;
 import java.util.Objects;
 
 public final class DefaultApplicationUpdatePresentation implements ApplicationUpdatePresentation {
@@ -20,5 +23,15 @@ public final class DefaultApplicationUpdatePresentation implements ApplicationUp
     @Override
     public ApplicationUpdateSnapshot checkNow() {
         return service.checkNow();
+    }
+
+    @Override
+    public ApplicationUpdateSnapshot setChannel(ApplicationUpdateChannel channel) {
+        return service.setChannel(channel);
+    }
+
+    @Override
+    public ApplicationUpdateVerification verifyDownloadedArtifact(Path artifact) {
+        return service.verifyDownloadedArtifact(artifact);
     }
 }

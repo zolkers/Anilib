@@ -29,6 +29,7 @@ dependencies {
     implementation project(':Anilib:Features:Updates:Api')
     implementation project(':Anilib:Features:Updates:Ui')
     implementation project(':Anilib:Features:ApplicationUpdate:Ui')
+    implementation project(':Anilib:Features:ApplicationUpdate:Api')
     implementation project(':Anilib:Kernel:Api')
     implementation project(':Anilib:Platforms:Compose')
     implementation compose.desktop.currentOs

@@ -25,6 +25,12 @@ final class ApplicationReleaseRuleTest {
                     require-signing: true
                     actions/download-artifact@v8.0.1
                     sha256sum --check SHA256SUMS
+                    ANILIB_UPDATE_PRIVATE_KEY_BASE64
+                    anilib-update.manifest
+                    anilib-update.manifest.sig
+                    openssl pkeyutl -sign -rawin
+                    -beta.[0-9]+
+                    --prerelease
                     actions/attest@v4
                     attestations: write
                     gh release create

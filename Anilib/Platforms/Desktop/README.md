@@ -12,6 +12,11 @@ ratio, and deinterlacing through the same platform-neutral contract.
 - `anilib_<version>-1_amd64.deb` on Linux;
 - `Anilib-<version>.dmg` on macOS.
 
+Application updates download only the installer named and hashed by the signed
+release manifest. After shared verification, Desktop opens the MSI, DEB, or
+notarized DMG with the operating system's registered installer. Elevation,
+package policy, Gatekeeper, and final confirmation remain platform-owned.
+
 Cross-compilation is deliberately not attempted because the native packaging
 toolchain requires its target operating system. The
 `.github/workflows/desktop-release.yml` matrix uses fixed Windows, Ubuntu, and

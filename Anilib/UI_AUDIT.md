@@ -34,7 +34,7 @@ explicit so an architectural seam cannot be mistaken for a finished workflow.
 | Player settings and player | [x] | Complete | Searchable episodes, protected native playback, complete controls and gestures, persistent policies, intro/outro skipping, Android PiP/background audio, and capability-negotiated desktop controls are live |
 | Data, storage, and advanced settings | [x] | Complete | Durable network policy, per-source diagnostics, bounded storage inspection, logs/crash reports, native ZIP export, allowlisted plan/confirm resets, cleanup, backup, and About routes are live |
 | WebView | [x] | Complete | Navigation, reload, progress, durable JavaScript/DOM/files/pop-up/download/text-zoom policy, cookie transfer, platform handlers, cleanup, and cookie-driven automatic challenge retry are live |
-| About, help, and application updates | [x] | Partial | Version, platform, stable-channel check, release-page hand-off, project, and issue links are live; add licences, changelog, automatic installation, and channel choice |
+| About, help, and application updates | [x] | Complete | Version, platform, stable/beta choice, signed download verification, progress, changelog, licence, source commit, release links, and platform-owned installation hand-off are live |
 
 ## Completed in the first pass
 
@@ -66,7 +66,7 @@ explicit so an architectural seam cannot be mistaken for a finished workflow.
 - [x] Added grouped priority downloads, manual ordering, delete-all, live speed/ETA, and explicit partial recovery.
 - [x] Verified backup inspection/rollback/import, tracking edit flows, and browser cookie/challenge handling.
 - [x] Added settings search and connected Sources, Tracking, Backup, and About to their working screens.
-- [x] Added one shared stable application-update check with version comparison and release-page hand-off.
+- [x] Added stable/beta application-update checks, signed downloads, changelog/licence presentation, and platform-owned installation.
 - [x] Split Settings into searchable dedicated destinations and added a durable start-screen choice.
 - [x] Kept every result shared by Android and desktop; no feature behavior was copied into a platform launcher.
 

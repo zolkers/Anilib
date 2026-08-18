@@ -22,7 +22,7 @@ exists but the corresponding Aniyomi workflow or settings depth is incomplete.
 | Settings | Partial | Removable Settings Bundle, atomic persistence, dedicated shared destinations, complete appearance and browser policy, category defaults/exceptions, enforced policies, bounded diagnostics, native export, and allowlisted two-phase resets | Complete user-facing localization and legal depth |
 | Network maintenance | Complete | Durable live User-Agent, HTTP proxy, RFC 8484 DNS-over-HTTPS resolution gate, timeout and response-cache policy; bounded per-source diagnostics; shared cookies/rate limits; and confirmed Android/desktop cleanup actions | — |
 | WebView | Complete | Source API 1.6 source/title entry points, durable browser policy, Android System WebView, desktop KCEF, navigation controls, bidirectional cookies, per-source headers/User-Agent, platform file chooser/pop-up/download handling, and automatic cookie-driven challenge retry without provider code | — |
-| Release products | Partial | MSI/DEB/DMG and Android APK publish atomically from version tags; production requires Android signing, Windows Authenticode, macOS signing/notarization, SHA-256 verification, and signed provenance; the app checks the stable GitHub channel | Automatic in-application download and installation |
+| Release products | Complete | MSI/DEB/DMG and Android APK publish atomically from stable or beta tags with production signing, SHA-256, GitHub provenance, and an Ed25519-signed update manifest; the app verifies, downloads, and hands installers to each operating system | — |
 
 ## Compatibility policy
 

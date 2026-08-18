@@ -76,6 +76,7 @@ class MainActivity : ComponentActivity() {
         )
         val browserDataController = AndroidBrowserDataController(this)
         val browserPlatformController = AndroidBrowserPlatformController()
+        val applicationUpdatePlatformController = AndroidApplicationUpdateController(this)
         val backupImportPicker = AndroidBackupImportPicker(this)
         val componentCount = started.components().size
         setContent {
@@ -98,6 +99,7 @@ class MainActivity : ComponentActivity() {
                 tracking = tracking,
                 updates = updates,
                 applicationUpdates = started.capability(ApplicationUpdateUiCapabilities.PRESENTATION),
+                applicationUpdatePlatformController = applicationUpdatePlatformController,
                 httpClient = started.capability(NetworkCapabilities.HTTP_CLIENT),
                 shareController = AndroidShareController(this),
                 pageDecoder = ::decodePage,

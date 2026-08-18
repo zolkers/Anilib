@@ -94,11 +94,12 @@ jobs:
           REQUESTED_VERSION: ${{ inputs.version }}
         run: |
           VERSION="${REQUESTED_VERSION#v}"
+          PACKAGE_VERSION="${VERSION%%-*}"
           if [[ "$RUNNER_OS" == "macOS" && "${{ inputs['require-signing'] }}" == "true" ]]; then
             ./gradlew --no-daemon --console=plain check \
               :Anilib:Platforms:Desktop:notarizeDmg \
               -PanilibVersion="$VERSION" \
-              -PanilibPackageVersion="$VERSION" \
+              -PanilibPackageVersion="$PACKAGE_VERSION" \
               -Pcompose.desktop.mac.sign=true \
               -Pcompose.desktop.mac.signing.identity="$MACOS_SIGNING_IDENTITY" \
               -Pcompose.desktop.mac.signing.keychain="$RUNNER_TEMP/anilib-signing.keychain-db" \
@@ -109,7 +110,7 @@ jobs:
             ./gradlew --no-daemon --console=plain check \
               :Anilib:Platforms:Desktop:writeDesktopReleaseChecksums \
               -PanilibVersion="$VERSION" \
-              -PanilibPackageVersion="$VERSION"
+              -PanilibPackageVersion="$PACKAGE_VERSION"
           fi
       - name: Sign and verify Windows installer
         if: runner.os == 'Windows' && inputs['require-signing']

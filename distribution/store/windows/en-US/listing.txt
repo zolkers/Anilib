@@ -1,0 +1,5 @@
+productName=Anilib
+shortDescription=Anime and manga library, reader, player, and offline manager
+description=Anilib manages local and user-configured anime and manga sources with reading, playback, downloads, backups, and optional tracker synchronization.
+category=Entertainment
+privacyPolicyUrl=REQUIRED_BEFORE_STORE_SUBMISSION

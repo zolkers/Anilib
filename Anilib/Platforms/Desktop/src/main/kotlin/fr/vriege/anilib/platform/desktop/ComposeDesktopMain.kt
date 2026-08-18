@@ -45,6 +45,7 @@ fun main() {
     }
     val browserRuntimeStatus = DesktopBrowserRuntime.initialize(dataDirectory)
     val browserDataController = DesktopBrowserDataController(dataDirectory)
+    val applicationUpdatePlatformController = DesktopApplicationUpdateController(dataDirectory)
     val presentation = started.capability(LibraryUiCapabilities.PRESENTATION)
     val discovery = started.capability(DiscoveryUiCapabilities.PRESENTATION)
     val extensionRepositories = started.capability(ExtensionRepositoryUiCapabilities.PRESENTATION)
@@ -88,6 +89,7 @@ fun main() {
                 tracking = tracking,
                 updates = updates,
                 applicationUpdates = started.capability(ApplicationUpdateUiCapabilities.PRESENTATION),
+                applicationUpdatePlatformController = applicationUpdatePlatformController,
                 httpClient = started.capability(NetworkCapabilities.HTTP_CLIENT),
                 shareController = DesktopShareController(),
                 pageDecoder = ::decodePage,

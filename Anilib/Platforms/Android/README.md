@@ -12,6 +12,12 @@ audio control starts a declared media-playback foreground service and visible
 notification before the activity leaves the foreground; disabling it or leaving
 the player stops the service.
 
+Application updates download only the APK named and hashed by the signed
+release manifest. After shared verification, Android writes it through a
+PackageInstaller session for `fr.vriege.anilib`. The operating system owns the
+unknown-source permission screen and final confirmation; Anilib bypasses
+neither boundary.
+
 ## Local package
 
 Use JDK 21 and an Android SDK containing platform 37, then run from the

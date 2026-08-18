@@ -43,6 +43,7 @@ import fr.vriege.anilib.feature.player.ui.PlayerPresentation
 import fr.vriege.anilib.feature.source.SourceId
 import fr.vriege.anilib.feature.tracker.ui.TrackerPresentation
 import fr.vriege.anilib.feature.applicationupdate.ui.ApplicationUpdatePresentation
+import fr.vriege.anilib.feature.applicationupdate.ApplicationUpdateChannel
 import java.time.Duration
 import java.time.Instant
 import java.util.Locale
@@ -437,8 +438,12 @@ internal fun AboutScreen(
 ) {
     var snapshot by remember(updates) { mutableStateOf(updates.snapshot()) }
     var checking by remember(updates) { mutableStateOf(false) }
+    var installing by remember(updates) { mutableStateOf(false) }
+    var downloadedBytes by remember(updates) { mutableStateOf(0L) }
+    var updateMessage by remember(updates) { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val uriHandler = LocalUriHandler.current
+    val platformController = LocalApplicationUpdatePlatformController.current
     val available = snapshot.availableRelease().orElse(null)
     MoreScaffold("About", goBack) { padding ->
         Column(
@@ -452,12 +457,31 @@ internal fun AboutScreen(
             )
             SummaryCard("Runtime", "$componentCount feature bundles active")
             SummaryCard("Version", snapshot.currentVersion().display())
-            SummaryCard("Update channel", "Stable · ${snapshot.platform().name.lowercase()}")
+            SummaryCard(
+                "Update channel",
+                "${snapshot.channel().name.lowercase().replaceFirstChar(Char::uppercase)} · " +
+                    snapshot.platform().name.lowercase(),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ApplicationUpdateChannel.entries.forEach { channel ->
+                    TextButton(
+                        enabled = !checking && !installing && snapshot.channel() != channel,
+                        onClick = {
+                            snapshot = updates.setChannel(channel)
+                            updateMessage = "${channel.name.lowercase().replaceFirstChar(Char::uppercase)} " +
+                                "channel selected"
+                        },
+                    ) {
+                        Text(channel.name.lowercase().replaceFirstChar(Char::uppercase))
+                    }
+                }
+            }
             SummaryCard("Source format", "Signed portable Anilib Bundles")
             SummaryCard("Platforms", "Android and desktop")
             snapshot.error().orElse(null)?.let { error ->
                 Text(error, color = MaterialTheme.colorScheme.error)
             }
+            updateMessage?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
             if (available == null) {
                 Button(
                     enabled = !checking,
@@ -477,8 +501,45 @@ internal fun AboutScreen(
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.SemiBold,
                 )
+                if (available.changelog().isNotBlank()) {
+                    SummaryCard("Changelog", available.changelog())
+                }
+                available.artifact().orElse(null)?.let { artifact ->
+                    if (installing) {
+                        Text("Downloaded $downloadedBytes of ${artifact.sizeBytes()} bytes")
+                    }
+                    Button(
+                        enabled = !installing,
+                        onClick = {
+                            installing = true
+                            downloadedBytes = 0L
+                            updateMessage = "Downloading the signed installer…"
+                            scope.launch {
+                                runCatching {
+                                    val path = platformController.download(artifact) {
+                                        scope.launch { downloadedBytes = it }
+                                    }
+                                    val verification = withContext(Dispatchers.IO) {
+                                        updates.verifyDownloadedArtifact(path)
+                                    }
+                                    platformController.install(verification)
+                                }.onSuccess {
+                                    updateMessage = "Installer verified; complete installation in the system prompt."
+                                }.onFailure {
+                                    updateMessage = it.message ?: "Application update failed"
+                                }
+                                installing = false
+                            }
+                        },
+                    ) {
+                        Text(if (installing) "Preparing…" else "Download and install")
+                    }
+                }
                 Button(onClick = { uriHandler.openUri(available.releasePage().toString()) }) {
                     Text("Open release")
+                }
+                TextButton(onClick = { uriHandler.openUri(available.licensePage().toString()) }) {
+                    Text("Licence")
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
