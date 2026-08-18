@@ -14,6 +14,7 @@ import fr.vriege.anilib.feature.extensionrepository.ExtensionArtifactFormat
 import fr.vriege.anilib.feature.extensionrepository.ExtensionPackageMetadata
 import fr.vriege.anilib.feature.extensionrepository.ui.LegacyExtensionInstaller
 import fr.vriege.anilib.feature.extensionrepository.ui.LegacyExtensionPackage
+import fr.vriege.anilib.feature.extensionrepository.ui.LegacyExtensionRuntimeReport
 import fr.vriege.anilib.framework.http.AnilibHttpClient
 import fr.vriege.anilib.framework.http.HttpCachePolicy
 import fr.vriege.anilib.framework.http.HttpRequest
@@ -26,10 +27,23 @@ internal class AndroidAniyomiApkInstaller(
     private val activity: ComponentActivity,
     private val client: AnilibHttpClient,
     private val inventory: AndroidAniyomiExtensionInventory = AndroidAniyomiExtensionInventory(activity),
+    private val runtimePreflight: AndroidAniyomiRuntimePreflight = AndroidAniyomiRuntimePreflight(activity),
 ) : LegacyExtensionInstaller {
     override fun available(): Boolean = true
 
     override fun discoverInstalled(): List<LegacyExtensionPackage> = inventory.discover()
+
+    override fun runtimeReport(extensionPackage: LegacyExtensionPackage): LegacyExtensionRuntimeReport =
+        runtimePreflight.report(extensionPackage)
+
+    override fun trustCertificate(
+        extensionPackage: LegacyExtensionPackage,
+        certificateSha256: String,
+    ): LegacyExtensionRuntimeReport = runtimePreflight.trust(extensionPackage, certificateSha256)
+
+    override fun forgetCertificateTrust(
+        extensionPackage: LegacyExtensionPackage,
+    ): LegacyExtensionRuntimeReport = runtimePreflight.forget(extensionPackage)
 
     override fun install(extensionPackage: ExtensionPackageMetadata): CompletableFuture<String> {
         if (!activity.packageManager.canRequestPackageInstalls()) {

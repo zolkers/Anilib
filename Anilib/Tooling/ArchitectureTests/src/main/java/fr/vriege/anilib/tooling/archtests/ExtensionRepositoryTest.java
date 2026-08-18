@@ -17,6 +17,8 @@ import fr.vriege.anilib.feature.extensionrepository.runtime.FileInstalledExtensi
 import fr.vriege.anilib.feature.extensionrepository.ui.LegacyExtensionCompatibility;
 import fr.vriege.anilib.feature.extensionrepository.ui.LegacyExtensionInstallers;
 import fr.vriege.anilib.feature.extensionrepository.ui.LegacyExtensionPackage;
+import fr.vriege.anilib.feature.extensionrepository.ui.LegacyExtensionRuntimeReport;
+import fr.vriege.anilib.feature.extensionrepository.ui.LegacyExtensionRuntimeState;
 import fr.vriege.anilib.framework.http.AnilibHttpClient;
 import fr.vriege.anilib.framework.http.HttpRequest;
 import fr.vriege.anilib.framework.http.HttpResponse;
@@ -237,6 +239,25 @@ final class ExtensionRepositoryTest {
                 "Android discovery metadata must retain the Aniyomi extension contract");
         counter.check(LegacyExtensionInstallers.unavailable().discoverInstalled().isEmpty(),
                 "platforms without APK support must expose an empty legacy inventory");
+        LegacyExtensionRuntimeReport preflight = new LegacyExtensionRuntimeReport(
+                extension.packageName(),
+                LegacyExtensionRuntimeState.HOST_ABI_MISSING,
+                List.of("rx.Observable", "eu.kanade.tachiyomi.animesource.AnimeSource"),
+                Optional.of(SHA_256));
+        counter.check(preflight.missingHostClasses().getFirst()
+                        .equals("eu.kanade.tachiyomi.animesource.AnimeSource")
+                        && preflight.trustedCertificateSha256().orElseThrow().equals(SHA_256),
+                "legacy runtime preflight must retain deterministic ABI and certificate evidence");
+        counter.check(LegacyExtensionInstallers.unavailable().runtimeReport(extension).state()
+                        == LegacyExtensionRuntimeState.UNSUPPORTED_PLATFORM,
+                "platforms without an APK runtime must report it explicitly");
+        counter.expectIllegalArgument(
+                () -> new LegacyExtensionRuntimeReport(
+                        extension.packageName(),
+                        LegacyExtensionRuntimeState.HOST_ABI_MISSING,
+                        List.of(),
+                        Optional.of(SHA_256)),
+                "missing-host-ABI reports must identify at least one absent class");
         counter.expectIllegalArgument(
                 () -> new LegacyExtensionPackage(
                         " ",

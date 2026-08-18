@@ -14,6 +14,9 @@ public final class AndroidReleaseRule implements AnilibJavaRule {
     private static final Path ANDROID_MODULE = Path.of("Anilib", "Platforms", "Android", "module.properties");
     private static final Path MANIFEST = Path.of(
             "Anilib", "Platforms", "Android", "src", "main", "AndroidManifest.xml");
+    private static final Path LEGACY_RUNTIME_PREFLIGHT = Path.of(
+            "Anilib", "Platforms", "Android", "src", "main", "kotlin", "fr", "vriege", "anilib",
+            "platform", "android", "AndroidAniyomiRuntimePreflight.kt");
     private static final Path WORKFLOW = Path.of(".github", "workflows", "android-release.yml");
 
     public AndroidReleaseRule() {
@@ -60,6 +63,13 @@ public final class AndroidReleaseRule implements AnilibJavaRule {
                 MANIFEST,
                 diagnostics,
                 "android.permission.QUERY_ALL_PACKAGES");
+        requireTokens(
+                repository,
+                LEGACY_RUNTIME_PREFLIGHT,
+                diagnostics,
+                "extension.signingCertificateSha256()::contains",
+                "Class.forName(className, false, applicationContext.classLoader)",
+                "LegacyExtensionRuntimeState.HOST_ABI_MISSING");
         requireTokens(
                 repository,
                 WORKFLOW,

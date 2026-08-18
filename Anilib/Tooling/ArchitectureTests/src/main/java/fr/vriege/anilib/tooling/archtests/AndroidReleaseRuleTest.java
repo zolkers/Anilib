@@ -34,6 +34,14 @@ final class AndroidReleaseRuleTest {
             write(manifest, """
                     android:usesCleartextTraffic="false" android:exported="false"
                     """);
+            Path preflight = repository.resolve(
+                    "Anilib/Platforms/Android/src/main/kotlin/fr/vriege/anilib/platform/android/"
+                            + "AndroidAniyomiRuntimePreflight.kt");
+            write(preflight, """
+                    extension.signingCertificateSha256()::contains
+                    Class.forName(className, false, applicationContext.classLoader)
+                    LegacyExtensionRuntimeState.HOST_ABI_MISSING
+                    """);
             Path workflow = repository.resolve(".github/workflows/android-release.yml");
             write(workflow, """
                     ubuntu-24.04 actions/checkout@v6.0.2 actions/setup-java@v5.6.0
@@ -64,7 +72,15 @@ final class AndroidReleaseRuleTest {
             check(rule.analyze(snapshot).stream()
                             .anyMatch(diagnostic -> diagnostic.message().contains("broad package visibility")),
                     "Android discovery must not gain unrestricted package visibility");
-            return 4;
+            write(manifest, """
+                    android:usesCleartextTraffic="false" android:exported="false"
+                    """);
+            write(preflight, "Class.forName(className, false, applicationContext.classLoader)");
+            check(rule.analyze(snapshot).stream()
+                            .anyMatch(diagnostic -> diagnostic.message().contains(
+                                    "extension.signingCertificateSha256()::contains")),
+                    "legacy runtime preflight must retain certificate binding before activation");
+            return 5;
         } catch (IOException exception) {
             throw new AssertionError("Unable to run Android release rule test", exception);
         } finally {

@@ -72,6 +72,8 @@ platform-specific.
 - [x] Android-only HTTPS download and user-confirmed PackageInstaller hand-off
   for user-supplied Aniyomi extension APKs
 - [x] best-effort Android discovery and metadata compatibility for visible Aniyomi APKs
+- [x] explicit per-package signing-certificate trust and host-ABI preflight
+  without loading legacy extension classes
 - [ ] execute discovered Aniyomi sources through a compatibility runtime without
   importing Aniyomi's external host dependency graph into shared Anilib modules
 - [x] shared Settings Bundle with durable appearance and feature-policy preferences

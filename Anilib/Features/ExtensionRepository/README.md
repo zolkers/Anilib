@@ -51,6 +51,14 @@ SHA-256 signing-certificate metadata into a Java UI contract, and labels malform
 or unsupported packages. Discovery never loads extension bytecode and Anilib does
 not request `QUERY_ALL_PACKAGES`.
 
+Metadata compatibility does not grant trust. The shared screen displays the
+complete current certificate fingerprint in a confirmation dialog before the
+Android adapter stores a package-specific decision. A signer change invalidates
+that decision. Trusted packages receive a non-initializing host-ABI preflight;
+missing Aniyomi, RxJava, OkHttp, jsoup, Injekt, NanoHTTPD, coroutine,
+serialization, preference, and torrent classes remain visible as a blocked
+runtime state. Forgetting trust is immediate.
+
 This is metadata compatibility only. Existing Aniyomi APKs compile against the
 Aniyomi source API and host-provided external libraries, so they are not executed
 until a separately isolated Android compatibility runtime can satisfy that ABI.

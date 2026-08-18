@@ -72,6 +72,9 @@ content flags, and signing-certificate fingerprints. This metadata-only bridge
 does not load legacy bytecode or request unrestricted package visibility;
 executing those APKs still requires an isolated implementation of Aniyomi's
 host ABI. Portable Anilib Bundles are the executable cross-platform format.
+Before that future bridge may activate anything, Android requires explicit
+package-certificate trust and performs a non-initializing audit of the required
+host-ABI groups. A signing-certificate change invalidates the stored decision.
 The removable Settings Bundle atomically persists shared appearance and policy
 preferences. System, light, and dark themes apply live on Android and desktop;
 the shared Aniyomi-style hierarchy also provides confirmed actions for clearing

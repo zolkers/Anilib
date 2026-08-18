@@ -115,13 +115,7 @@ internal class AndroidAniyomiExtensionInventory(
     @Suppress("DEPRECATION")
     private fun signatures(packageInfo: PackageInfo): List<String> {
         val values = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            packageInfo.signingInfo?.let { signingInfo ->
-                if (signingInfo.hasMultipleSigners()) {
-                    signingInfo.apkContentsSigners
-                } else {
-                    signingInfo.signingCertificateHistory
-                }
-            }
+            packageInfo.signingInfo?.apkContentsSigners
         } else {
             packageInfo.signatures
         }

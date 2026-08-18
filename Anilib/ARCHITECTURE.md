@@ -256,9 +256,14 @@ APKs that Android already makes visible to Anilib. It reads their feature,
 entrypoint/factory, library-version, content, documentation, torrent, and
 signing-certificate metadata without loading their classes. Anilib deliberately
 does not request unrestricted package visibility. A metadata-compatible result
-is therefore discovery evidence, not an execution claim: those classes still
-expect the Aniyomi host ABI and its external runtime dependency graph. Portable
-Anilib Bundles remain the executable cross-platform source format.
+is therefore discovery evidence, not an execution claim. Users must separately
+confirm the package's complete SHA-256 signing-certificate fingerprint; trust is
+stored per package and ceases to match when its current signer changes. Only
+then does a non-initializing preflight check the Aniyomi, RxJava, HTTP, parser,
+injection, coroutine, serialization, preference, and optional torrent host ABI.
+AnilibJava keeps that certificate binding and `Class.forName(..., false, ...)`
+contract present. The classes still expect Aniyomi's external runtime dependency
+graph, so portable Anilib Bundles remain the executable cross-platform format.
 
 ## External dependency policy
 
