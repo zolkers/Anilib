@@ -1,0 +1,181 @@
+package fr.vriege.anilib.platform.compose
+
+import fr.vriege.anilib.feature.player.PlaybackState
+import fr.vriege.anilib.feature.player.PlayerBackend
+import fr.vriege.anilib.feature.player.PlayerException
+import fr.vriege.anilib.feature.player.PlayerMedia
+import fr.vriege.anilib.feature.player.PlayerPlayback
+import fr.vriege.anilib.feature.player.PlayerPlaybackSnapshot
+import fr.vriege.anilib.feature.player.PlayerPlaybackStatus
+import io.github.kdroidfilter.composemediaplayer.InitialPlayerState
+import io.github.kdroidfilter.composemediaplayer.SubtitleTrack
+import io.github.kdroidfilter.composemediaplayer.VideoPlayerState
+import java.util.Optional
+import kotlin.math.roundToLong
+
+/** Media3/native backend shared by the Android and desktop Compose adapters. */
+class ComposePlayerBackend : PlayerBackend {
+    override fun id(): String = "compose-native"
+
+    override fun available(): Boolean = true
+
+    override fun open(media: PlayerMedia): PlayerPlayback = ComposePlayerPlayback(media)
+}
+
+internal class ComposePlayerPlayback(
+    private val media: PlayerMedia,
+) : PlayerPlayback {
+    @Volatile
+    private var state: VideoPlayerState? = null
+    private var requestedVolume = 1f
+    private var requestedSpeed = 1f
+    private var requestedSubtitle = media.subtitleId()
+    @Volatile
+    private var ended = false
+    private var closed = false
+
+    override fun media(): PlayerMedia = synchronized(this) {
+        ensureOpen()
+        media
+    }
+
+    override fun snapshot(): PlayerPlaybackSnapshot = synchronized(this) {
+        ensureOpen()
+        val player = state ?: return@synchronized PlayerPlaybackSnapshot(
+            PlayerPlaybackStatus.LOADING,
+            media.startPositionMillis(),
+            PlaybackState.UNKNOWN_DURATION,
+            requestedVolume,
+            requestedSpeed,
+            Optional.empty(),
+        )
+        val error = player.error
+        val status = when {
+            error != null -> PlayerPlaybackStatus.FAILED
+            ended -> PlayerPlaybackStatus.ENDED
+            player.isLoading -> PlayerPlaybackStatus.LOADING
+            player.isPlaying -> PlayerPlaybackStatus.PLAYING
+            else -> PlayerPlaybackStatus.PAUSED
+        }
+        PlayerPlaybackSnapshot(
+            status,
+            player.currentTime.coerceAtLeast(0.0).roundToLong(),
+            durationMillis(player),
+            player.volume,
+            player.playbackSpeed,
+            Optional.ofNullable(error?.toString()),
+        )
+    }
+
+    override fun play() = synchronized(this) {
+        ensureOpen()
+        ended = false
+        state?.play()
+        Unit
+    }
+
+    override fun pause() = synchronized(this) {
+        ensureOpen()
+        state?.pause()
+        Unit
+    }
+
+    override fun seekTo(positionMillis: Long) = synchronized(this) {
+        ensureOpen()
+        require(positionMillis >= 0) { "positionMillis must not be negative" }
+        seek(state, positionMillis)
+        ended = false
+    }
+
+    override fun setVolume(volume: Float) = synchronized(this) {
+        ensureOpen()
+        require(volume.isFinite() && volume in 0f..1f) { "volume must be between zero and one" }
+        requestedVolume = volume
+        state?.volume = volume
+    }
+
+    override fun setPlaybackSpeed(speed: Float) = synchronized(this) {
+        ensureOpen()
+        require(speed.isFinite() && speed in 0.25f..2f) {
+            "playbackSpeed must be between 0.25 and 2.0"
+        }
+        requestedSpeed = speed
+        state?.playbackSpeed = speed
+    }
+
+    override fun selectSubtitle(subtitleId: Optional<String>) = synchronized(this) {
+        ensureOpen()
+        val requested = subtitleId.map(String::trim).filter(String::isNotEmpty)
+        if (requested.isPresent && media.stream().subtitles().none { it.id() == requested.get() }) {
+            throw PlayerException("Subtitle does not belong to the selected stream")
+        }
+        requestedSubtitle = requested
+        applySubtitle(state)
+    }
+
+    fun attach(player: VideoPlayerState) = synchronized(this) {
+        ensureOpen()
+        state = player
+        ended = false
+        player.volume = requestedVolume
+        player.playbackSpeed = requestedSpeed
+        player.onPlaybackEnded = { ended = true }
+        player.openUri(media.stream().location().toString(), InitialPlayerState.PLAY)
+        applySubtitle(player)
+    }
+
+    fun resumeWhenReady() = synchronized(this) {
+        ensureOpen()
+        if (media.startPositionMillis() > 0) {
+            seek(state, media.startPositionMillis())
+        }
+    }
+
+    fun detach(player: VideoPlayerState) = synchronized(this) {
+        if (state === player) {
+            player.onPlaybackEnded = null
+            player.pause()
+            state = null
+        }
+    }
+
+    private fun applySubtitle(player: VideoPlayerState?) {
+        if (player == null) return
+        val selectedId = requestedSubtitle.orElse(null)
+        val sourceTrack = media.stream().subtitles().firstOrNull { it.id() == selectedId }
+        if (sourceTrack == null) {
+            player.disableSubtitles()
+            return
+        }
+        player.selectSubtitleTrack(
+            SubtitleTrack(
+                label = sourceTrack.label(),
+                language = sourceTrack.language().orElse("und"),
+                src = sourceTrack.location().toString(),
+            ),
+        )
+    }
+
+    private fun seek(player: VideoPlayerState?, positionMillis: Long) {
+        if (player == null || player.duration <= 0.0) return
+        val duration = durationMillis(player)
+        if (duration > 0) {
+            player.seekTo((positionMillis.toDouble() / duration * 1000.0).coerceIn(0.0, 1000.0).toFloat())
+        }
+    }
+
+    private fun durationMillis(player: VideoPlayerState): Long =
+        if (player.duration > 0.0) (player.duration * 1000.0).roundToLong()
+        else PlaybackState.UNKNOWN_DURATION
+
+    private fun ensureOpen() {
+        if (closed) throw PlayerException("Player playback is closed")
+    }
+
+    override fun close() = synchronized(this) {
+        if (!closed) {
+            state?.let { detach(it) }
+            closed = true
+        }
+    }
+}

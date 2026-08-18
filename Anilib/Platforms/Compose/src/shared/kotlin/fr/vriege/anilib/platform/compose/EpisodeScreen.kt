@@ -200,6 +200,7 @@ private fun PlayerSelectionScreen(
             modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            item { PlayerVideoSurface(controller, controller.playback()) }
             item {
                 Text(snapshot.title(), fontWeight = FontWeight.Bold)
                 Text(

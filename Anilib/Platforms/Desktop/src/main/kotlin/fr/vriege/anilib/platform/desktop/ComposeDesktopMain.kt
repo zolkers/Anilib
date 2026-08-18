@@ -17,6 +17,7 @@ import fr.vriege.anilib.feature.backup.ui.BackupUiCapabilities
 import fr.vriege.anilib.framework.http.jdk.JdkHttpTransport
 import fr.vriege.anilib.kernel.StartedAnilib
 import fr.vriege.anilib.platform.compose.AnilibApp
+import fr.vriege.anilib.platform.compose.ComposePlayerBackend
 import java.awt.GraphicsEnvironment
 import org.jetbrains.skia.Image
 
@@ -25,6 +26,7 @@ fun main() {
     val started = StandardAnilib.start(
         dataDirectory,
         JdkHttpTransport(),
+        ComposePlayerBackend(),
         listOf(CoverCachePlugin(dataDirectory.resolve("cache").resolve("covers"))),
     )
     if (GraphicsEnvironment.isHeadless()) {

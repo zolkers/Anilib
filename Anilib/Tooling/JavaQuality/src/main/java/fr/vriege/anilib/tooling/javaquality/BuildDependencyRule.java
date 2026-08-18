@@ -30,7 +30,12 @@ public final class BuildDependencyRule implements AnilibJavaRule {
                     Set.of("'androidx.activity:activity-compose:1.13.0'")),
             Map.entry(
                     COMPOSE_BUILD,
-                    Set.of("compose.foundation", "compose.material3", "compose.materialIconsExtended")),
+                    Set.of(
+                            "compose.foundation",
+                            "compose.material3",
+                            "compose.materialIconsExtended",
+                            "'androidx.media3:media3-exoplayer-hls:1.10.1'",
+                            "'io.github.kdroidfilter:composemediaplayer:0.11.4'")),
             Map.entry(
                     DESKTOP_BUILD,
                     Set.of("compose.desktop.currentOs")));
@@ -58,7 +63,7 @@ public final class BuildDependencyRule implements AnilibJavaRule {
                     Set.of(
                             "com.android.application@9.1.1",
                             "com.android.kotlin.multiplatform.library@9.1.1",
-                            "org.jetbrains.compose@1.11.0",
+                            "org.jetbrains.compose@1.11.1",
                             "org.jetbrains.kotlin.jvm@2.4.10",
                             "org.jetbrains.kotlin.multiplatform@2.4.10",
                             "org.jetbrains.kotlin.plugin.compose@2.4.10")));

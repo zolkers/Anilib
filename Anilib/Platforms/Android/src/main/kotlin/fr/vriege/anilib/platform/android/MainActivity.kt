@@ -16,6 +16,7 @@ import fr.vriege.anilib.feature.downloads.ui.DownloadUiCapabilities
 import fr.vriege.anilib.feature.backup.ui.BackupUiCapabilities
 import fr.vriege.anilib.framework.http.runtime.UrlConnectionHttpTransport
 import fr.vriege.anilib.platform.compose.AnilibApp
+import fr.vriege.anilib.platform.compose.ComposePlayerBackend
 
 /** Android launcher for the shared Anilib product and adaptive Compose shell. */
 class MainActivity : ComponentActivity() {
@@ -28,6 +29,7 @@ class MainActivity : ComponentActivity() {
         val started = StandardAnilib.start(
             filesDir.toPath(),
             UrlConnectionHttpTransport(),
+            ComposePlayerBackend(),
             emptyList(),
         )
         product = started
