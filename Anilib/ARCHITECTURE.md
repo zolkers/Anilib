@@ -207,6 +207,17 @@ changing dependencies fail resolution, and every host publishes deterministic
 SHA-256 metadata with its package. AnilibJava owns the repository rule that
 keeps this release contract and its three target hosts present.
 
+Android release packaging compiles the same Standard product and shared Compose
+surface into one versioned APK. The Android adapter owns only application
+lifecycle, notifications, alarms, encoded-image decoding, HTTP transport, and
+the allowlisted UI/media integrations; feature behavior remains in Java modules
+with no Android imports. Release keys enter only through environment variables,
+so an unconfigured build produces an explicit unsigned APK instead of creating
+or committing credentials. A fixed Linux workflow installs the pinned Android
+platform, runs the complete gate, packages the APK, and publishes a SHA-256
+manifest. AnilibJava keeps the SDK, platform boundary, network policy, signing
+seam, checksum task, and workflow versions present.
+
 ## External dependency policy
 
 Foundation, Framework, Kernel, Features, Configurations, Tooling, and tests may

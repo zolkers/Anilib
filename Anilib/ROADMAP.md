@@ -52,7 +52,7 @@ modularity behind the UI; Aniyomi remains the product reference.
 ## Phase 5 — release products
 
 - [x] reproducible desktop packages for Windows, Linux, and macOS
-- [ ] Android APK using only Android SDK/platform APIs beyond shared Anilib code
+- [x] Android APK using only Android SDK/platform APIs beyond shared Anilib code
 - [ ] extension signing, compatibility metadata, and update channels
 - [ ] import compatibility for user-owned Aniyomi backups where legally and
   technically feasible
