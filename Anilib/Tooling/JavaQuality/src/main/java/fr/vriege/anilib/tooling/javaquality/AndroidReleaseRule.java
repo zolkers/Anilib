@@ -16,6 +16,9 @@ public final class AndroidReleaseRule implements AnilibJavaRule {
     private static final Path APK_RUNTIME_PREFLIGHT = Path.of(
             "Anilib", "Platforms", "Android", "src", "main", "kotlin", "fr", "vriege", "anilib",
             "platform", "android", "AndroidAniyomiRuntimePreflight.kt");
+    private static final Path APK_EXTENSION_INVENTORY = Path.of(
+            "Anilib", "Platforms", "Android", "src", "main", "kotlin", "fr", "vriege", "anilib",
+            "platform", "android", "AndroidAniyomiExtensionInventory.kt");
     private static final Path APK_SOURCE_RUNTIME = Path.of(
             "Anilib", "Platforms", "Android", "src", "main", "kotlin", "fr", "vriege", "anilib",
             "platform", "android", "AndroidAniyomiSourceRuntime.kt");
@@ -70,11 +73,21 @@ public final class AndroidReleaseRule implements AnilibJavaRule {
                 "android.permission.QUERY_ALL_PACKAGES");
         requireTokens(
                 repository,
+                APK_EXTENSION_INVENTORY,
+                diagnostics,
+                "tachiyomi.animeextension",
+                "tachiyomi.extension",
+                "ExtensionContentKind.ANIME",
+                "ExtensionContentKind.MANGA");
+        requireTokens(
+                repository,
                 APK_RUNTIME_PREFLIGHT,
                 diagnostics,
                 "extension.signingCertificateSha256()::contains",
                 "Class.forName(className, false, applicationContext.classLoader)",
-                "ApkExtensionRuntimeState.HOST_ABI_MISSING");
+                "ApkExtensionRuntimeState.HOST_ABI_MISSING",
+                "ANIME_HOST_CLASSES",
+                "MANGA_HOST_CLASSES");
         requireTokens(
                 repository,
                 APK_SOURCE_RUNTIME,

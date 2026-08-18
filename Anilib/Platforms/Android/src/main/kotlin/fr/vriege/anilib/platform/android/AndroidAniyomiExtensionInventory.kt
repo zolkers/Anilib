@@ -6,6 +6,7 @@ import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import fr.vriege.anilib.feature.extensionrepository.ExtensionContentKind
 import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionCompatibility
 import fr.vriege.anilib.feature.extensionrepository.ui.InstalledApkExtension
 import java.security.MessageDigest
@@ -74,8 +75,16 @@ internal class AndroidAniyomiExtensionInventory(
             0
         })
 
-    private fun isAniyomiExtension(packageInfo: PackageInfo): Boolean =
-        packageInfo.reqFeatures.orEmpty().any { it.name == EXTENSION_FEATURE }
+    private fun isAniyomiExtension(packageInfo: PackageInfo): Boolean = extensionKind(packageInfo) != null
+
+    private fun extensionKind(packageInfo: PackageInfo): ExtensionContentKind? {
+        val features = packageInfo.reqFeatures.orEmpty().map { it.name }.toSet()
+        return when {
+            ANIME_EXTENSION_FEATURE in features -> ExtensionContentKind.ANIME
+            MANGA_EXTENSION_FEATURE in features -> ExtensionContentKind.MANGA
+            else -> null
+        }
+    }
 
     private fun extensionMetadata(
         packageManager: PackageManager,
@@ -84,7 +93,9 @@ internal class AndroidAniyomiExtensionInventory(
         val applicationInfo = packageInfo.applicationInfo ?: return null
         val metadata = applicationInfo.metaData ?: return null
         val packageName = packageInfo.packageName
-        val entrypoints = metadata.getString(METADATA_SOURCE_CLASS)
+        val contentKind = extensionKind(packageInfo) ?: return null
+        val contract = metadataContract(contentKind)
+        val entrypoints = metadata.getString(contract.sourceClass)
             .orEmpty()
             .split(';')
             .map(String::trim)
@@ -92,24 +103,25 @@ internal class AndroidAniyomiExtensionInventory(
             .map { if (it.startsWith('.')) packageName + it else it }
             .distinct()
         val versionName = packageInfo.versionName?.takeIf(String::isNotBlank) ?: "unknown"
-        val libraryVersion = metadata.getString(METADATA_EXTENSION_LIB)
+        val libraryVersion = metadata.getString(contract.extensionLibrary)
             ?.takeIf(String::isNotBlank)
             ?: versionName.substringBeforeLast('.', "unknown")
         val signatures = signatures(packageInfo)
         val compatibility = when {
             signatures.isEmpty() -> ApkExtensionCompatibility.UNSIGNED
             entrypoints.isEmpty() -> ApkExtensionCompatibility.MISSING_ENTRYPOINT
-            libraryVersion.toDoubleOrNull() !in SUPPORTED_LIBRARY_VERSIONS ->
+            !supportedLibrary(contentKind, libraryVersion) ->
                 ApkExtensionCompatibility.UNSUPPORTED_LIBRARY
             else -> ApkExtensionCompatibility.COMPATIBLE_METADATA
         }
         val metadataName = metadata.getString(METADATA_NAME)?.takeIf(String::isNotBlank)
-        val sourceFactory = metadata.getString(METADATA_SOURCE_FACTORY)
+        val sourceFactory = metadata.getString(contract.sourceFactory)
             ?.takeIf(String::isNotBlank)
             ?.let { if (it.startsWith('.')) packageName + it else it }
         val applicationLabel = packageManager.getApplicationLabel(applicationInfo)
             .toString()
             .removePrefix("Aniyomi: ")
+            .removePrefix("Tachiyomi: ")
             .takeIf(String::isNotBlank)
         return InstalledApkExtension(
             packageName,
@@ -117,16 +129,49 @@ internal class AndroidAniyomiExtensionInventory(
             versionCode(packageInfo),
             versionName,
             libraryVersion,
-            metadataFlag(metadata, METADATA_CONTENT_WARNING) || metadataFlag(metadata, METADATA_NSFW),
+            metadataFlag(metadata, METADATA_CONTENT_WARNING) || metadataFlag(metadata, contract.nsfw),
             metadataFlag(metadata, METADATA_IS_TORRENT) || metadataFlag(metadata, METADATA_TORRENT),
+            contentKind,
             entrypoints,
             Optional.ofNullable(sourceFactory),
-            metadataFlag(metadata, METADATA_HAS_README),
-            metadataFlag(metadata, METADATA_HAS_CHANGELOG),
+            metadataFlag(metadata, contract.hasReadme),
+            metadataFlag(metadata, contract.hasChangelog),
             signatures,
             compatibility,
         )
     }
+
+    private fun supportedLibrary(contentKind: ExtensionContentKind, libraryVersion: String): Boolean =
+        libraryVersion.toDoubleOrNull() in when (contentKind) {
+            ExtensionContentKind.ANIME -> SUPPORTED_ANIME_LIBRARY_VERSIONS
+            ExtensionContentKind.MANGA -> SUPPORTED_MANGA_LIBRARY_VERSIONS
+            ExtensionContentKind.MIXED,
+            ExtensionContentKind.UNKNOWN,
+            -> emptySet()
+        }
+
+    private fun metadataContract(contentKind: ExtensionContentKind): MetadataContract =
+        when (contentKind) {
+            ExtensionContentKind.ANIME -> MetadataContract(
+                METADATA_ANIME_SOURCE_CLASS,
+                METADATA_ANIME_SOURCE_FACTORY,
+                METADATA_ANIME_EXTENSION_LIB,
+                METADATA_ANIME_NSFW,
+                METADATA_ANIME_HAS_README,
+                METADATA_ANIME_HAS_CHANGELOG,
+            )
+            ExtensionContentKind.MANGA -> MetadataContract(
+                METADATA_MANGA_SOURCE_CLASS,
+                METADATA_MANGA_SOURCE_FACTORY,
+                METADATA_MANGA_EXTENSION_LIB,
+                METADATA_MANGA_NSFW,
+                METADATA_MANGA_HAS_README,
+                METADATA_MANGA_HAS_CHANGELOG,
+            )
+            ExtensionContentKind.MIXED,
+            ExtensionContentKind.UNKNOWN,
+            -> error("APK extension cannot use mixed or unknown metadata")
+        }
 
     private fun metadataFlag(metadata: Bundle, key: String): Boolean = when (val value = metadata.get(key)) {
         is Boolean -> value
@@ -161,18 +206,35 @@ internal class AndroidAniyomiExtensionInventory(
         .joinToString("") { byte -> (byte.toInt() and 0xff).toString(16).padStart(2, '0') }
 
     private companion object {
-        const val EXTENSION_FEATURE = "tachiyomi.animeextension"
-        const val METADATA_SOURCE_CLASS = "tachiyomi.animeextension.class"
-        const val METADATA_SOURCE_FACTORY = "tachiyomi.animeextension.factory"
-        const val METADATA_NSFW = "tachiyomi.animeextension.nsfw"
+        const val ANIME_EXTENSION_FEATURE = "tachiyomi.animeextension"
+        const val MANGA_EXTENSION_FEATURE = "tachiyomi.extension"
+        const val METADATA_ANIME_SOURCE_CLASS = "tachiyomi.animeextension.class"
+        const val METADATA_ANIME_SOURCE_FACTORY = "tachiyomi.animeextension.factory"
+        const val METADATA_ANIME_EXTENSION_LIB = "aniyomix.extensionLib"
+        const val METADATA_ANIME_NSFW = "tachiyomi.animeextension.nsfw"
+        const val METADATA_ANIME_HAS_README = "tachiyomi.animeextension.hasReadme"
+        const val METADATA_ANIME_HAS_CHANGELOG = "tachiyomi.animeextension.hasChangelog"
+        const val METADATA_MANGA_SOURCE_CLASS = "tachiyomi.extension.class"
+        const val METADATA_MANGA_SOURCE_FACTORY = "tachiyomi.extension.factory"
+        const val METADATA_MANGA_EXTENSION_LIB = "tachiyomi.extension.lib"
+        const val METADATA_MANGA_NSFW = "tachiyomi.extension.nsfw"
+        const val METADATA_MANGA_HAS_README = "tachiyomi.extension.hasReadme"
+        const val METADATA_MANGA_HAS_CHANGELOG = "tachiyomi.extension.hasChangelog"
         const val METADATA_TORRENT = "tachiyomi.animeextension.torrent"
-        const val METADATA_HAS_README = "tachiyomi.animeextension.hasReadme"
-        const val METADATA_HAS_CHANGELOG = "tachiyomi.animeextension.hasChangelog"
         const val METADATA_NAME = "aniyomix.name"
-        const val METADATA_EXTENSION_LIB = "aniyomix.extensionLib"
         const val METADATA_CONTENT_WARNING = "aniyomix.contentWarning"
         const val METADATA_IS_TORRENT = "aniyomix.torrent"
         const val MAX_VISIBLE_PACKAGES = 10_000
-        val SUPPORTED_LIBRARY_VERSIONS = setOf(14.0, 16.0)
+        val SUPPORTED_ANIME_LIBRARY_VERSIONS = setOf(14.0, 16.0, 17.0)
+        val SUPPORTED_MANGA_LIBRARY_VERSIONS = setOf(1.4, 1.6)
     }
 }
+
+private data class MetadataContract(
+    val sourceClass: String,
+    val sourceFactory: String,
+    val extensionLibrary: String,
+    val nsfw: String,
+    val hasReadme: String,
+    val hasChangelog: String,
+)

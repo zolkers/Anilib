@@ -346,7 +346,8 @@ private fun ApkExtensionCard(
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
             Text(extension.displayName(), fontWeight = FontWeight.Medium)
             Text(
-                "v${extension.versionName()} - Aniyomi library ${extension.libraryVersion()}"
+                "${extension.contentKind().name.lowercase()} - v${extension.versionName()}" +
+                    " - external library ${extension.libraryVersion()}"
                     + if (extension.adult()) " - 18+" else ""
                     + if (extension.torrent()) " - torrent" else "",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

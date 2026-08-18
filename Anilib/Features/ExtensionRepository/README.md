@@ -66,12 +66,14 @@ the repository-shape and Android host-ABI compatibility adapters.
 ## Android APK extension discovery
 
 On Android, the shared repository screen also lists separately installed
-Aniyomi extension APKs that are visible under Android's normal package-visibility
-rules. The platform adapter recognizes the `tachiyomi.animeextension` feature,
+Aniyomi and Mihon-compatible extension APKs that are visible under Android's
+normal package-visibility rules. The platform adapter recognizes the
+`tachiyomi.animeextension` and `tachiyomi.extension` features,
 projects entrypoint/factory, library, content, documentation, torrent, and
 SHA-256 signing-certificate metadata into a Java UI contract, and labels malformed
-or unsupported packages. Discovery never loads extension bytecode and Anilib does
-not request `QUERY_ALL_PACKAGES`.
+or unsupported packages. Anime and manga packages receive separate library-version
+and host-class preflights. Discovery never loads extension bytecode and Anilib
+does not request `QUERY_ALL_PACKAGES`.
 
 Metadata compatibility does not grant trust. The shared screen displays the
 complete current certificate fingerprint in a confirmation dialog before the

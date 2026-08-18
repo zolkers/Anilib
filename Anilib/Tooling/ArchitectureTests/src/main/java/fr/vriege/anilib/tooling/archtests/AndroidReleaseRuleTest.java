@@ -40,6 +40,14 @@ final class AndroidReleaseRuleTest {
                     extension.signingCertificateSha256()::contains
                     Class.forName(className, false, applicationContext.classLoader)
                     ApkExtensionRuntimeState.HOST_ABI_MISSING
+                    ANIME_HOST_CLASSES MANGA_HOST_CLASSES
+                    """);
+            Path inventory = repository.resolve(
+                    "Anilib/Platforms/Android/src/main/kotlin/fr/vriege/anilib/platform/android/"
+                            + "AndroidAniyomiExtensionInventory.kt");
+            write(inventory, """
+                    tachiyomi.animeextension tachiyomi.extension
+                    ExtensionContentKind.ANIME ExtensionContentKind.MANGA
                     """);
             Path sourceRuntime = repository.resolve(
                     "Anilib/Platforms/Android/src/main/kotlin/fr/vriege/anilib/platform/android/"
@@ -101,6 +109,7 @@ final class AndroidReleaseRuleTest {
                     extension.signingCertificateSha256()::contains
                     Class.forName(className, false, applicationContext.classLoader)
                     ApkExtensionRuntimeState.HOST_ABI_MISSING
+                    ANIME_HOST_CLASSES MANGA_HOST_CLASSES
                     """);
             write(sourceRuntime, "PathClassLoader preflight.report(extension)");
             check(rule.analyze(snapshot).stream()

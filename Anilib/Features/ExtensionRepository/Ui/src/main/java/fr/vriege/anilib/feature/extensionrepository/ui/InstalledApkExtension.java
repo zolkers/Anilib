@@ -1,5 +1,6 @@
 package fr.vriege.anilib.feature.extensionrepository.ui;
 
+import fr.vriege.anilib.feature.extensionrepository.ExtensionContentKind;
 import fr.vriege.anilib.foundation.validation.Preconditions;
 
 import java.util.List;
@@ -13,6 +14,7 @@ public record InstalledApkExtension(
         String libraryVersion,
         boolean adult,
         boolean torrent,
+        ExtensionContentKind contentKind,
         List<String> sourceEntrypoints,
         Optional<String> sourceFactory,
         boolean hasReadme,
@@ -27,6 +29,10 @@ public record InstalledApkExtension(
         }
         versionName = Preconditions.requireNonBlank(versionName, "versionName");
         libraryVersion = Preconditions.requireNonBlank(libraryVersion, "libraryVersion");
+        contentKind = Preconditions.requireNonNull(contentKind, "contentKind");
+        if (contentKind != ExtensionContentKind.ANIME && contentKind != ExtensionContentKind.MANGA) {
+            throw new IllegalArgumentException("APK extension contentKind must be anime or manga");
+        }
         sourceEntrypoints = List.copyOf(Preconditions.requireNonNull(sourceEntrypoints, "sourceEntrypoints"));
         sourceFactory = Preconditions.requireNonNull(sourceFactory, "sourceFactory")
                 .map(value -> Preconditions.requireNonBlank(value, "sourceFactory"));

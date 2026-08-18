@@ -105,6 +105,8 @@ platform-specific.
     filters into shared Anilib models and apply selected values during search
   - [x] project switch, text, and select source preferences into shared Anilib
     models and apply their values before extension requests
+  - [x] discover manga extension APK metadata and preflight its host ABI separately
+    from the anime contract
   - [ ] add the equivalent trusted APK bridge for manga extensions
 - [x] shared Settings Bundle with durable appearance and feature-policy preferences
 - [x] live Android and desktop theme selection from shared settings

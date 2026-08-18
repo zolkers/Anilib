@@ -1,6 +1,7 @@
 package fr.vriege.anilib.platform.android
 
 import android.content.Context
+import fr.vriege.anilib.feature.extensionrepository.ExtensionContentKind
 import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionCompatibility
 import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionRuntimeReport
 import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionRuntimeState
@@ -77,7 +78,16 @@ internal class AndroidAniyomiRuntimePreflight(
     )
 
     private fun requiredHostClasses(extension: InstalledApkExtension): List<String> = buildList {
-        addAll(REQUIRED_HOST_CLASSES)
+        addAll(COMMON_HOST_CLASSES)
+        addAll(
+            when (extension.contentKind()) {
+                ExtensionContentKind.ANIME -> ANIME_HOST_CLASSES
+                ExtensionContentKind.MANGA -> MANGA_HOST_CLASSES
+                ExtensionContentKind.MIXED,
+                ExtensionContentKind.UNKNOWN,
+                -> emptyList()
+            },
+        )
         if (extension.torrent()) {
             add(TORRENT_HOST_CLASS)
         }
@@ -95,9 +105,7 @@ internal class AndroidAniyomiRuntimePreflight(
     private companion object {
         const val PREFERENCES_NAME = "anilib-apk-extension-trust"
         val SHA_256 = Regex("[0-9a-f]{64}")
-        val REQUIRED_HOST_CLASSES = listOf(
-            "eu.kanade.tachiyomi.animesource.AnimeSource",
-            "eu.kanade.tachiyomi.animesource.AnimeSourceFactory",
+        val COMMON_HOST_CLASSES = listOf(
             "eu.kanade.tachiyomi.network.NetworkHelper",
             "rx.Observable",
             "okhttp3.OkHttpClient",
@@ -107,6 +115,15 @@ internal class AndroidAniyomiRuntimePreflight(
             "kotlinx.coroutines.BuildersKt",
             "kotlinx.serialization.json.Json",
             "androidx.preference.Preference",
+        )
+        val ANIME_HOST_CLASSES = listOf(
+            "eu.kanade.tachiyomi.animesource.AnimeSource",
+            "eu.kanade.tachiyomi.animesource.AnimeSourceFactory",
+        )
+        val MANGA_HOST_CLASSES = listOf(
+            "eu.kanade.tachiyomi.source.Source",
+            "eu.kanade.tachiyomi.source.SourceFactory",
+            "eu.kanade.tachiyomi.source.model.SManga",
         )
         const val TORRENT_HOST_CLASS = "aniyomi.core.common.torrent.TorrentServerApi"
     }

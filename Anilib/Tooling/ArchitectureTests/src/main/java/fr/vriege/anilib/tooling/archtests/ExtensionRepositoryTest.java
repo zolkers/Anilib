@@ -389,6 +389,7 @@ final class ExtensionRepositoryTest {
                 "16.0",
                 false,
                 false,
+                ExtensionContentKind.ANIME,
                 List.of("eu.kanade.tachiyomi.animeextension.en.example.Example"),
                 Optional.of("eu.kanade.tachiyomi.animeextension.en.example.ExampleFactory"),
                 true,
@@ -398,8 +399,9 @@ final class ExtensionRepositoryTest {
         counter.check(extension.sourceEntrypoints().size() == 1
                         && extension.sourceFactory().isPresent()
                         && extension.hasReadme()
+                        && extension.contentKind() == ExtensionContentKind.ANIME
                         && extension.compatibility() == ApkExtensionCompatibility.COMPATIBLE_METADATA,
-                "Android discovery metadata must retain the Aniyomi extension contract");
+                "Android discovery metadata must retain the external APK extension contract and media kind");
         counter.check(ApkExtensionPlatforms.unavailable().discoverInstalled().isEmpty(),
                 "platforms without APK support must expose an empty APK inventory");
         ApkExtensionRuntimeReport preflight = new ApkExtensionRuntimeReport(
@@ -439,6 +441,7 @@ final class ExtensionRepositoryTest {
                         "16.0",
                         false,
                         false,
+                        ExtensionContentKind.MANGA,
                         List.of(),
                         Optional.empty(),
                         false,
