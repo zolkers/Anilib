@@ -12,5 +12,7 @@ dependencies {
     implementation project(':Anilib:Features:Downloads:Bundle')
     api project(':Anilib:Features:Player:Api')
     implementation project(':Anilib:Features:Player:Bundle')
+    api project(':Anilib:Features:Tracker:Api')
+    implementation project(':Anilib:Features:Tracker:Bundle')
     implementation project(':Anilib:Features:Backup:Bundle')
 }

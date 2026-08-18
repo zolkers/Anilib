@@ -10,6 +10,8 @@ import fr.vriege.anilib.feature.player.PlayerCapabilities;
 import fr.vriege.anilib.feature.player.PlayerBackend;
 import fr.vriege.anilib.feature.player.PlayerBackends;
 import fr.vriege.anilib.feature.player.bundle.PlayerPlugin;
+import fr.vriege.anilib.feature.tracker.TrackerCapabilities;
+import fr.vriege.anilib.feature.tracker.bundle.TrackerPlugin;
 import fr.vriege.anilib.feature.backup.bundle.BackupPlugin;
 import fr.vriege.anilib.feature.source.bundle.SourceSdkPlugin;
 import fr.vriege.anilib.framework.http.HttpTransport;
@@ -69,6 +71,7 @@ public final class StandardAnilib {
         Path sourcePreferences = dataDirectory.toAbsolutePath().normalize().resolve("source-preferences.properties");
         Path downloads = dataDirectory.toAbsolutePath().normalize().resolve("downloads");
         Path playbackState = dataDirectory.toAbsolutePath().normalize().resolve("playback-state.anilib");
+        Path trackingState = dataDirectory.toAbsolutePath().normalize().resolve("tracking.anilib");
         Path backups = dataDirectory.toAbsolutePath().normalize().resolve("backups");
         List<AnilibPlugin> plugins = new ArrayList<>();
         plugins.add(new LibraryPlugin(libraryFile));
@@ -79,7 +82,10 @@ public final class StandardAnilib {
         plugins.add(new ReaderPlugin());
         plugins.add(new DownloadPlugin(downloads));
         plugins.add(new PlayerPlugin(playbackState, playerBackend));
-        plugins.add(new BackupPlugin(backups, List.of(PlayerCapabilities.BACKUP_CODEC)));
+        plugins.add(new TrackerPlugin(trackingState));
+        plugins.add(new BackupPlugin(
+                backups,
+                List.of(PlayerCapabilities.BACKUP_CODEC, TrackerCapabilities.BACKUP_CODEC)));
         plugins.addAll(additionalPlugins);
         return new DefaultPluginEngine().start(List.copyOf(plugins));
     }
