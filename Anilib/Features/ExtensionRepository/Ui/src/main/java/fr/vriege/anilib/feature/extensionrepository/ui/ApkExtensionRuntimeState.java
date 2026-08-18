@@ -1,7 +1,7 @@
 package fr.vriege.anilib.feature.extensionrepository.ui;
 
-/** Safe activation stage reached by one discovered legacy Android extension. */
-public enum LegacyExtensionRuntimeState {
+/** Safe activation stage reached by one discovered Android extension APK. */
+public enum ApkExtensionRuntimeState {
     UNSUPPORTED_PLATFORM,
     INCOMPATIBLE_METADATA,
     TRUST_REQUIRED,

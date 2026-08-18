@@ -14,11 +14,11 @@ import fr.vriege.anilib.feature.extensionrepository.runtime.DefaultExtensionRepo
 import fr.vriege.anilib.feature.extensionrepository.runtime.FileExtensionTrustStore;
 import fr.vriege.anilib.feature.extensionrepository.runtime.FileExtensionRepositoryStore;
 import fr.vriege.anilib.feature.extensionrepository.runtime.FileInstalledExtensionStore;
-import fr.vriege.anilib.feature.extensionrepository.ui.LegacyExtensionCompatibility;
-import fr.vriege.anilib.feature.extensionrepository.ui.LegacyExtensionInstallers;
-import fr.vriege.anilib.feature.extensionrepository.ui.LegacyExtensionPackage;
-import fr.vriege.anilib.feature.extensionrepository.ui.LegacyExtensionRuntimeReport;
-import fr.vriege.anilib.feature.extensionrepository.ui.LegacyExtensionRuntimeState;
+import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionCompatibility;
+import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionPlatforms;
+import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionRuntimeReport;
+import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionRuntimeState;
+import fr.vriege.anilib.feature.extensionrepository.ui.InstalledApkExtension;
 import fr.vriege.anilib.framework.http.AnilibHttpClient;
 import fr.vriege.anilib.framework.http.HttpRequest;
 import fr.vriege.anilib.framework.http.HttpResponse;
@@ -61,7 +61,7 @@ final class ExtensionRepositoryTest {
         rejectsUnsafeMetadata(counter);
         persistsAndRefreshesUserRepositories(counter);
         installsOnlyTrustedPortableBundles(counter);
-        modelsLegacyAndroidDiscovery(counter);
+        modelsInstalledApkDiscovery(counter);
         return counter.value;
     }
 
@@ -217,8 +217,8 @@ final class ExtensionRepositoryTest {
                 new FileExtensionTrustStore(directory.resolve("trusted-keys.txt")));
     }
 
-    private static void modelsLegacyAndroidDiscovery(Counter counter) {
-        LegacyExtensionPackage extension = new LegacyExtensionPackage(
+    private static void modelsInstalledApkDiscovery(Counter counter) {
+        InstalledApkExtension extension = new InstalledApkExtension(
                 "eu.kanade.tachiyomi.animeextension.en.example",
                 "Example",
                 7,
@@ -231,35 +231,35 @@ final class ExtensionRepositoryTest {
                 true,
                 true,
                 List.of(SHA_256),
-                LegacyExtensionCompatibility.COMPATIBLE_METADATA);
+                ApkExtensionCompatibility.COMPATIBLE_METADATA);
         counter.check(extension.sourceEntrypoints().size() == 1
                         && extension.sourceFactory().isPresent()
                         && extension.hasReadme()
-                        && extension.compatibility() == LegacyExtensionCompatibility.COMPATIBLE_METADATA,
+                        && extension.compatibility() == ApkExtensionCompatibility.COMPATIBLE_METADATA,
                 "Android discovery metadata must retain the Aniyomi extension contract");
-        counter.check(LegacyExtensionInstallers.unavailable().discoverInstalled().isEmpty(),
-                "platforms without APK support must expose an empty legacy inventory");
-        LegacyExtensionRuntimeReport preflight = new LegacyExtensionRuntimeReport(
+        counter.check(ApkExtensionPlatforms.unavailable().discoverInstalled().isEmpty(),
+                "platforms without APK support must expose an empty APK inventory");
+        ApkExtensionRuntimeReport preflight = new ApkExtensionRuntimeReport(
                 extension.packageName(),
-                LegacyExtensionRuntimeState.HOST_ABI_MISSING,
+                ApkExtensionRuntimeState.HOST_ABI_MISSING,
                 List.of("rx.Observable", "eu.kanade.tachiyomi.animesource.AnimeSource"),
                 Optional.of(SHA_256));
         counter.check(preflight.missingHostClasses().getFirst()
                         .equals("eu.kanade.tachiyomi.animesource.AnimeSource")
                         && preflight.trustedCertificateSha256().orElseThrow().equals(SHA_256),
-                "legacy runtime preflight must retain deterministic ABI and certificate evidence");
-        counter.check(LegacyExtensionInstallers.unavailable().runtimeReport(extension).state()
-                        == LegacyExtensionRuntimeState.UNSUPPORTED_PLATFORM,
+                "APK runtime preflight must retain deterministic ABI and certificate evidence");
+        counter.check(ApkExtensionPlatforms.unavailable().runtimeReport(extension).state()
+                        == ApkExtensionRuntimeState.UNSUPPORTED_PLATFORM,
                 "platforms without an APK runtime must report it explicitly");
         counter.expectIllegalArgument(
-                () -> new LegacyExtensionRuntimeReport(
+                () -> new ApkExtensionRuntimeReport(
                         extension.packageName(),
-                        LegacyExtensionRuntimeState.HOST_ABI_MISSING,
+                        ApkExtensionRuntimeState.HOST_ABI_MISSING,
                         List.of(),
                         Optional.of(SHA_256)),
                 "missing-host-ABI reports must identify at least one absent class");
         counter.expectIllegalArgument(
-                () -> new LegacyExtensionPackage(
+                () -> new InstalledApkExtension(
                         " ",
                         "Example",
                         1,
@@ -272,8 +272,8 @@ final class ExtensionRepositoryTest {
                         false,
                         false,
                         List.of(),
-                        LegacyExtensionCompatibility.MISSING_ENTRYPOINT),
-                "legacy extension metadata must reject blank package identities");
+                        ApkExtensionCompatibility.MISSING_ENTRYPOINT),
+                "APK extension metadata must reject blank package identities");
     }
 
     private static ExtensionPackageMetadata portablePackage(byte[] bundle, KeyPair keyPair, long versionCode) {

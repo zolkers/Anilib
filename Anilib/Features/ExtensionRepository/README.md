@@ -36,12 +36,16 @@ Aniyomi client:
 }
 ```
 
-The classic `apk` remains Android-only. The `anilib` Bundle is the portable
+The `apk` artifact remains Android-only. The `anilib` Bundle is the portable
 artifact used by Android and desktop after checksum, signature, compatibility,
 and installation validation. Repository discovery and artifact installation
 are separate capabilities so merely viewing an index never executes code.
 
-## Legacy Android APK discovery
+The active extension system belongs to Anilib: shared contracts use artifact-
+specific APK and portable Bundle terminology. `Aniyomi` names are restricted to
+the repository-shape and Android host-ABI compatibility adapters.
+
+## Android APK extension discovery
 
 On Android, the shared repository screen also lists separately installed
 Aniyomi extension APKs that are visible under Android's normal package-visibility

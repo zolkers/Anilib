@@ -12,9 +12,9 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import fr.vriege.anilib.feature.extensionrepository.ExtensionArtifactFormat
 import fr.vriege.anilib.feature.extensionrepository.ExtensionPackageMetadata
-import fr.vriege.anilib.feature.extensionrepository.ui.LegacyExtensionInstaller
-import fr.vriege.anilib.feature.extensionrepository.ui.LegacyExtensionPackage
-import fr.vriege.anilib.feature.extensionrepository.ui.LegacyExtensionRuntimeReport
+import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionPlatform
+import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionRuntimeReport
+import fr.vriege.anilib.feature.extensionrepository.ui.InstalledApkExtension
 import fr.vriege.anilib.framework.http.AnilibHttpClient
 import fr.vriege.anilib.framework.http.HttpCachePolicy
 import fr.vriege.anilib.framework.http.HttpRequest
@@ -22,28 +22,28 @@ import java.net.URI
 import java.time.Duration
 import java.util.concurrent.CompletableFuture
 
-/** Android-only, user-confirmed hand-off for legacy Aniyomi extension APKs. */
-internal class AndroidAniyomiApkInstaller(
+/** Android integration for current APK extension discovery, trust, and installation. */
+internal class AndroidApkExtensionPlatform(
     private val activity: ComponentActivity,
     private val client: AnilibHttpClient,
     private val inventory: AndroidAniyomiExtensionInventory = AndroidAniyomiExtensionInventory(activity),
     private val runtimePreflight: AndroidAniyomiRuntimePreflight = AndroidAniyomiRuntimePreflight(activity),
-) : LegacyExtensionInstaller {
+) : ApkExtensionPlatform {
     override fun available(): Boolean = true
 
-    override fun discoverInstalled(): List<LegacyExtensionPackage> = inventory.discover()
+    override fun discoverInstalled(): List<InstalledApkExtension> = inventory.discover()
 
-    override fun runtimeReport(extensionPackage: LegacyExtensionPackage): LegacyExtensionRuntimeReport =
+    override fun runtimeReport(extensionPackage: InstalledApkExtension): ApkExtensionRuntimeReport =
         runtimePreflight.report(extensionPackage)
 
     override fun trustCertificate(
-        extensionPackage: LegacyExtensionPackage,
+        extensionPackage: InstalledApkExtension,
         certificateSha256: String,
-    ): LegacyExtensionRuntimeReport = runtimePreflight.trust(extensionPackage, certificateSha256)
+    ): ApkExtensionRuntimeReport = runtimePreflight.trust(extensionPackage, certificateSha256)
 
     override fun forgetCertificateTrust(
-        extensionPackage: LegacyExtensionPackage,
-    ): LegacyExtensionRuntimeReport = runtimePreflight.forget(extensionPackage)
+        extensionPackage: InstalledApkExtension,
+    ): ApkExtensionRuntimeReport = runtimePreflight.forget(extensionPackage)
 
     override fun install(extensionPackage: ExtensionPackageMetadata): CompletableFuture<String> {
         if (!activity.packageManager.canRequestPackageInstalls()) {
@@ -106,7 +106,7 @@ internal class AndroidAniyomiApkInstaller(
             val result = PendingIntent.getBroadcast(
                 activity,
                 sessionId,
-                Intent(activity, AniyomiApkInstallReceiver::class.java),
+                Intent(activity, AnilibApkInstallReceiver::class.java),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
             )
             session.commit(result.intentSender)
@@ -130,7 +130,7 @@ internal class AndroidAniyomiApkInstaller(
 }
 
 /** Receives PackageInstaller status and launches Android's mandatory confirmation surface. */
-class AniyomiApkInstallReceiver : BroadcastReceiver() {
+class AnilibApkInstallReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)
         if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
@@ -138,7 +138,7 @@ class AniyomiApkInstallReceiver : BroadcastReceiver() {
             return
         }
         val message = if (status == PackageInstaller.STATUS_SUCCESS) {
-            "Aniyomi extension APK installed by Android."
+            "APK extension installed for Anilib by Android."
         } else {
             intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE) ?: "APK installation failed."
         }

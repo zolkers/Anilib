@@ -58,7 +58,7 @@ class MainActivity : ComponentActivity() {
         val backup = started.capability(BackupUiCapabilities.PRESENTATION)
         val tracking = started.capability(TrackerUiCapabilities.PRESENTATION)
         val updates = started.capability(UpdateUiCapabilities.PRESENTATION)
-        val legacyExtensionInstaller = AndroidAniyomiApkInstaller(
+        val apkExtensionPlatform = AndroidApkExtensionPlatform(
             this,
             started.capability(NetworkCapabilities.HTTP_CLIENT),
         )
@@ -69,7 +69,7 @@ class MainActivity : ComponentActivity() {
                 presentation = presentation,
                 discovery = discovery,
                 extensionRepositories = extensionRepositories,
-                legacyExtensionInstaller = legacyExtensionInstaller,
+                apkExtensionPlatform = apkExtensionPlatform,
                 networkMaintenance = started.capability(NetworkCapabilities.MAINTENANCE),
                 browserCookies = started.capability(NetworkCapabilities.COOKIES),
                 browserRuntimeStatus = BrowserRuntimeStatus.ready(),

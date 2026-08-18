@@ -6,8 +6,8 @@ import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import fr.vriege.anilib.feature.extensionrepository.ui.LegacyExtensionCompatibility
-import fr.vriege.anilib.feature.extensionrepository.ui.LegacyExtensionPackage
+import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionCompatibility
+import fr.vriege.anilib.feature.extensionrepository.ui.InstalledApkExtension
 import java.security.MessageDigest
 import java.util.Optional
 
@@ -17,7 +17,7 @@ internal class AndroidAniyomiExtensionInventory(
 ) {
     private val applicationContext = context.applicationContext
 
-    fun discover(): List<LegacyExtensionPackage> {
+    fun discover(): List<InstalledApkExtension> {
         val packageManager = applicationContext.packageManager
         return installedPackages(packageManager)
             .asSequence()
@@ -57,7 +57,7 @@ internal class AndroidAniyomiExtensionInventory(
     private fun extensionMetadata(
         packageManager: PackageManager,
         packageInfo: PackageInfo,
-    ): LegacyExtensionPackage? {
+    ): InstalledApkExtension? {
         val applicationInfo = packageInfo.applicationInfo ?: return null
         val metadata = applicationInfo.metaData ?: return null
         val packageName = packageInfo.packageName
@@ -74,11 +74,11 @@ internal class AndroidAniyomiExtensionInventory(
             ?: versionName.substringBeforeLast('.', "unknown")
         val signatures = signatures(packageInfo)
         val compatibility = when {
-            signatures.isEmpty() -> LegacyExtensionCompatibility.UNSIGNED
-            entrypoints.isEmpty() -> LegacyExtensionCompatibility.MISSING_ENTRYPOINT
+            signatures.isEmpty() -> ApkExtensionCompatibility.UNSIGNED
+            entrypoints.isEmpty() -> ApkExtensionCompatibility.MISSING_ENTRYPOINT
             libraryVersion.toDoubleOrNull() !in SUPPORTED_LIBRARY_VERSIONS ->
-                LegacyExtensionCompatibility.UNSUPPORTED_LIBRARY
-            else -> LegacyExtensionCompatibility.COMPATIBLE_METADATA
+                ApkExtensionCompatibility.UNSUPPORTED_LIBRARY
+            else -> ApkExtensionCompatibility.COMPATIBLE_METADATA
         }
         val metadataName = metadata.getString(METADATA_NAME)?.takeIf(String::isNotBlank)
         val sourceFactory = metadata.getString(METADATA_SOURCE_FACTORY)
@@ -88,7 +88,7 @@ internal class AndroidAniyomiExtensionInventory(
             .toString()
             .removePrefix("Aniyomi: ")
             .takeIf(String::isNotBlank)
-        return LegacyExtensionPackage(
+        return InstalledApkExtension(
             packageName,
             metadataName ?: applicationLabel ?: packageName,
             versionCode(packageInfo),

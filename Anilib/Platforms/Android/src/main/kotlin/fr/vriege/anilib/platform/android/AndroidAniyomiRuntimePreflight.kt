@@ -1,10 +1,10 @@
 package fr.vriege.anilib.platform.android
 
 import android.content.Context
-import fr.vriege.anilib.feature.extensionrepository.ui.LegacyExtensionCompatibility
-import fr.vriege.anilib.feature.extensionrepository.ui.LegacyExtensionPackage
-import fr.vriege.anilib.feature.extensionrepository.ui.LegacyExtensionRuntimeReport
-import fr.vriege.anilib.feature.extensionrepository.ui.LegacyExtensionRuntimeState
+import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionCompatibility
+import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionRuntimeReport
+import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionRuntimeState
+import fr.vriege.anilib.feature.extensionrepository.ui.InstalledApkExtension
 import java.util.Locale
 import java.util.Optional
 
@@ -15,34 +15,34 @@ internal class AndroidAniyomiRuntimePreflight(
     private val applicationContext = context.applicationContext
     private val preferences = applicationContext.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
 
-    fun report(extension: LegacyExtensionPackage): LegacyExtensionRuntimeReport {
-        if (extension.compatibility() != LegacyExtensionCompatibility.COMPATIBLE_METADATA) {
-            return report(extension, LegacyExtensionRuntimeState.INCOMPATIBLE_METADATA)
+    fun report(extension: InstalledApkExtension): ApkExtensionRuntimeReport {
+        if (extension.compatibility() != ApkExtensionCompatibility.COMPATIBLE_METADATA) {
+            return report(extension, ApkExtensionRuntimeState.INCOMPATIBLE_METADATA)
         }
         val trustedCertificate = preferences.getString(extension.packageName(), null)
             ?.takeIf(extension.signingCertificateSha256()::contains)
-            ?: return report(extension, LegacyExtensionRuntimeState.TRUST_REQUIRED)
+            ?: return report(extension, ApkExtensionRuntimeState.TRUST_REQUIRED)
         val missingClasses = requiredHostClasses(extension)
             .filterNot(::hostClassAvailable)
         if (missingClasses.isNotEmpty()) {
-            return LegacyExtensionRuntimeReport(
+            return ApkExtensionRuntimeReport(
                 extension.packageName(),
-                LegacyExtensionRuntimeState.HOST_ABI_MISSING,
+                ApkExtensionRuntimeState.HOST_ABI_MISSING,
                 missingClasses,
                 Optional.of(trustedCertificate),
             )
         }
-        return LegacyExtensionRuntimeReport(
+        return ApkExtensionRuntimeReport(
             extension.packageName(),
-            LegacyExtensionRuntimeState.HOST_ABI_AVAILABLE,
+            ApkExtensionRuntimeState.HOST_ABI_AVAILABLE,
             emptyList(),
             Optional.of(trustedCertificate),
         )
     }
 
     @Suppress("ApplySharedPref")
-    fun trust(extension: LegacyExtensionPackage, certificateSha256: String): LegacyExtensionRuntimeReport {
-        require(extension.compatibility() == LegacyExtensionCompatibility.COMPATIBLE_METADATA) {
+    fun trust(extension: InstalledApkExtension, certificateSha256: String): ApkExtensionRuntimeReport {
+        require(extension.compatibility() == ApkExtensionCompatibility.COMPATIBLE_METADATA) {
             "Only metadata-compatible extensions can be trusted"
         }
         val normalized = certificateSha256.trim().lowercase(Locale.ROOT)
@@ -51,30 +51,30 @@ internal class AndroidAniyomiRuntimePreflight(
             "Certificate fingerprint does not sign ${extension.packageName()}"
         }
         check(preferences.edit().putString(extension.packageName(), normalized).commit()) {
-            "Unable to persist legacy extension trust"
+            "Unable to persist APK extension trust"
         }
         return report(extension)
     }
 
     @Suppress("ApplySharedPref")
-    fun forget(extension: LegacyExtensionPackage): LegacyExtensionRuntimeReport {
+    fun forget(extension: InstalledApkExtension): ApkExtensionRuntimeReport {
         check(preferences.edit().remove(extension.packageName()).commit()) {
-            "Unable to remove legacy extension trust"
+            "Unable to remove APK extension trust"
         }
         return report(extension)
     }
 
     private fun report(
-        extension: LegacyExtensionPackage,
-        state: LegacyExtensionRuntimeState,
-    ): LegacyExtensionRuntimeReport = LegacyExtensionRuntimeReport(
+        extension: InstalledApkExtension,
+        state: ApkExtensionRuntimeState,
+    ): ApkExtensionRuntimeReport = ApkExtensionRuntimeReport(
         extension.packageName(),
         state,
         emptyList(),
         Optional.empty(),
     )
 
-    private fun requiredHostClasses(extension: LegacyExtensionPackage): List<String> = buildList {
+    private fun requiredHostClasses(extension: InstalledApkExtension): List<String> = buildList {
         addAll(REQUIRED_HOST_CLASSES)
         if (extension.torrent()) {
             add(TORRENT_HOST_CLASS)
@@ -91,7 +91,7 @@ internal class AndroidAniyomiRuntimePreflight(
     }
 
     private companion object {
-        const val PREFERENCES_NAME = "anilib-legacy-extension-trust"
+        const val PREFERENCES_NAME = "anilib-apk-extension-trust"
         val SHA_256 = Regex("[0-9a-f]{64}")
         val REQUIRED_HOST_CLASSES = listOf(
             "eu.kanade.tachiyomi.animesource.AnimeSource",

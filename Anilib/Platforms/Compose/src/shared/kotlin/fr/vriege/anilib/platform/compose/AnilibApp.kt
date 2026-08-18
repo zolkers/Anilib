@@ -61,7 +61,7 @@ import fr.vriege.anilib.feature.backup.ui.BackupPresentation
 import fr.vriege.anilib.feature.discovery.ui.DiscoveryPresentation
 import fr.vriege.anilib.feature.downloads.ui.DownloadPresentation
 import fr.vriege.anilib.feature.extensionrepository.ui.ExtensionRepositoryPresentation
-import fr.vriege.anilib.feature.extensionrepository.ui.LegacyExtensionInstaller
+import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionPlatform
 import fr.vriege.anilib.feature.library.ui.LibraryCard
 import fr.vriege.anilib.feature.library.ui.LibraryDetails
 import fr.vriege.anilib.feature.library.ui.LibraryHistoryRow
@@ -97,7 +97,7 @@ fun AnilibApp(
     presentation: LibraryPresentation,
     discovery: DiscoveryPresentation,
     extensionRepositories: ExtensionRepositoryPresentation,
-    legacyExtensionInstaller: LegacyExtensionInstaller,
+    apkExtensionPlatform: ApkExtensionPlatform,
     networkMaintenance: NetworkMaintenance,
     browserCookies: HttpCookieJar,
     browserRuntimeStatus: BrowserRuntimeStatus,
@@ -197,7 +197,7 @@ fun AnilibApp(
                             presentation,
                             discovery,
                             extensionRepositories,
-                            legacyExtensionInstaller,
+                            apkExtensionPlatform,
                             networkMaintenance,
                             browserCookies,
                             browserRuntimeStatus,
@@ -231,7 +231,7 @@ fun AnilibApp(
                             presentation,
                             discovery,
                             extensionRepositories,
-                            legacyExtensionInstaller,
+                            apkExtensionPlatform,
                             networkMaintenance,
                             browserCookies,
                             browserRuntimeStatus,
@@ -272,7 +272,7 @@ private fun ExpandedShell(
     presentation: LibraryPresentation,
     discovery: DiscoveryPresentation,
     extensionRepositories: ExtensionRepositoryPresentation,
-    legacyExtensionInstaller: LegacyExtensionInstaller,
+    apkExtensionPlatform: ApkExtensionPlatform,
     networkMaintenance: NetworkMaintenance,
     browserCookies: HttpCookieJar,
     browserRuntimeStatus: BrowserRuntimeStatus,
@@ -309,7 +309,7 @@ private fun ExpandedShell(
                 presentation,
                 discovery,
                 extensionRepositories,
-                legacyExtensionInstaller,
+                apkExtensionPlatform,
                 networkMaintenance,
                 browserCookies,
                 browserRuntimeStatus,
@@ -347,7 +347,7 @@ private fun CompactShell(
     presentation: LibraryPresentation,
     discovery: DiscoveryPresentation,
     extensionRepositories: ExtensionRepositoryPresentation,
-    legacyExtensionInstaller: LegacyExtensionInstaller,
+    apkExtensionPlatform: ApkExtensionPlatform,
     networkMaintenance: NetworkMaintenance,
     browserCookies: HttpCookieJar,
     browserRuntimeStatus: BrowserRuntimeStatus,
@@ -382,7 +382,7 @@ private fun CompactShell(
                 presentation,
                 discovery,
                 extensionRepositories,
-                legacyExtensionInstaller,
+                apkExtensionPlatform,
                 networkMaintenance,
                 browserCookies,
                 browserRuntimeStatus,
@@ -463,7 +463,7 @@ private fun AppDestination(
     presentation: LibraryPresentation,
     discovery: DiscoveryPresentation,
     extensionRepositories: ExtensionRepositoryPresentation,
-    legacyExtensionInstaller: LegacyExtensionInstaller,
+    apkExtensionPlatform: ApkExtensionPlatform,
     networkMaintenance: NetworkMaintenance,
     browserCookies: HttpCookieJar,
     browserRuntimeStatus: BrowserRuntimeStatus,
@@ -529,7 +529,7 @@ private fun AppDestination(
             MoreDestination.TRACKING -> TrackerAccountsScreen(tracking, closeMore)
             MoreDestination.EXTENSION_REPOSITORIES -> ExtensionRepositoriesScreen(
                 extensionRepositories,
-                legacyExtensionInstaller,
+                apkExtensionPlatform,
                 closeMore,
             )
             MoreDestination.SETTINGS -> SettingsScreen(

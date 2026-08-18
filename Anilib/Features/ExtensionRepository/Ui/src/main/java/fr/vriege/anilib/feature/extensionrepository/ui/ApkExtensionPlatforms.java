@@ -4,9 +4,9 @@ import fr.vriege.anilib.feature.extensionrepository.ExtensionPackageMetadata;
 
 import java.util.concurrent.CompletableFuture;
 
-/** Dependency-free legacy installer defaults for platforms without APK support. */
-public final class LegacyExtensionInstallers {
-    private static final LegacyExtensionInstaller UNAVAILABLE = new LegacyExtensionInstaller() {
+/** Dependency-free APK defaults for platforms without Android package support. */
+public final class ApkExtensionPlatforms {
+    private static final ApkExtensionPlatform UNAVAILABLE = new ApkExtensionPlatform() {
         @Override
         public boolean available() {
             return false;
@@ -15,14 +15,14 @@ public final class LegacyExtensionInstallers {
         @Override
         public CompletableFuture<String> install(ExtensionPackageMetadata extensionPackage) {
             return CompletableFuture.failedFuture(
-                    new UnsupportedOperationException("Aniyomi APKs can only be installed on Android"));
+                    new UnsupportedOperationException("APK extensions can only be installed on Android"));
         }
     };
 
-    private LegacyExtensionInstallers() {
+    private ApkExtensionPlatforms() {
     }
 
-    public static LegacyExtensionInstaller unavailable() {
+    public static ApkExtensionPlatform unavailable() {
         return UNAVAILABLE;
     }
 }

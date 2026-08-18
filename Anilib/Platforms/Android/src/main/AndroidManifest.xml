@@ -21,7 +21,7 @@
             </intent-filter>
         </activity>
         <receiver
-            android:name=".AniyomiApkInstallReceiver"
+            android:name=".AnilibApkInstallReceiver"
             android:exported="false" />
         <receiver
             android:name=".LibraryUpdateReceiver"

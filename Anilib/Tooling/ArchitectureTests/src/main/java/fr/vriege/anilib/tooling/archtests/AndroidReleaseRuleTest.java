@@ -40,7 +40,7 @@ final class AndroidReleaseRuleTest {
             write(preflight, """
                     extension.signingCertificateSha256()::contains
                     Class.forName(className, false, applicationContext.classLoader)
-                    LegacyExtensionRuntimeState.HOST_ABI_MISSING
+                    ApkExtensionRuntimeState.HOST_ABI_MISSING
                     """);
             Path workflow = repository.resolve(".github/workflows/android-release.yml");
             write(workflow, """
@@ -79,7 +79,7 @@ final class AndroidReleaseRuleTest {
             check(rule.analyze(snapshot).stream()
                             .anyMatch(diagnostic -> diagnostic.message().contains(
                                     "extension.signingCertificateSha256()::contains")),
-                    "legacy runtime preflight must retain certificate binding before activation");
+                    "APK runtime preflight must retain certificate binding before activation");
             return 5;
         } catch (IOException exception) {
             throw new AssertionError("Unable to run Android release rule test", exception);

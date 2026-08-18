@@ -69,7 +69,7 @@ On Android, the same screen inventories installed Aniyomi extension APKs that
 the OS already exposes, including their source entrypoints, Aniyomi library
 generation,
 content flags, and signing-certificate fingerprints. This metadata-only bridge
-does not load legacy bytecode or request unrestricted package visibility;
+does not load APK extension bytecode or request unrestricted package visibility;
 executing those APKs still requires an isolated implementation of Aniyomi's
 host ABI. Portable Anilib Bundles are the executable cross-platform format.
 Before that future bridge may activate anything, Android requires explicit

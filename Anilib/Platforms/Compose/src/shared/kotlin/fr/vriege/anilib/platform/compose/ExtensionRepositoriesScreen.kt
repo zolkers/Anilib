@@ -46,18 +46,18 @@ import fr.vriege.anilib.feature.extensionrepository.InstalledExtensionPackage
 import fr.vriege.anilib.feature.extensionrepository.ui.ExtensionRepositoryPresentation
 import fr.vriege.anilib.feature.extensionrepository.ui.ExtensionRepositoryRow
 import fr.vriege.anilib.feature.extensionrepository.ui.ExtensionRepositoryView
-import fr.vriege.anilib.feature.extensionrepository.ui.LegacyExtensionCompatibility
-import fr.vriege.anilib.feature.extensionrepository.ui.LegacyExtensionInstaller
-import fr.vriege.anilib.feature.extensionrepository.ui.LegacyExtensionPackage
-import fr.vriege.anilib.feature.extensionrepository.ui.LegacyExtensionRuntimeReport
-import fr.vriege.anilib.feature.extensionrepository.ui.LegacyExtensionRuntimeState
+import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionCompatibility
+import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionPlatform
+import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionRuntimeReport
+import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionRuntimeState
+import fr.vriege.anilib.feature.extensionrepository.ui.InstalledApkExtension
 import java.util.concurrent.CompletableFuture
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ExtensionRepositoriesScreen(
     presentation: ExtensionRepositoryPresentation,
-    legacyInstaller: LegacyExtensionInstaller,
+    apkExtensionPlatform: ApkExtensionPlatform,
     goBack: () -> Unit,
 ) {
     var view by remember { mutableStateOf(presentation.snapshot()) }
@@ -65,12 +65,12 @@ internal fun ExtensionRepositoriesScreen(
     var trusting by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    var pendingLegacyTrust by remember { mutableStateOf<LegacyExtensionPackage?>(null) }
-    var legacyExtensions by remember(legacyInstaller) {
-        mutableStateOf(runCatching(legacyInstaller::discoverInstalled).getOrDefault(emptyList()))
+    var pendingApkTrust by remember { mutableStateOf<InstalledApkExtension?>(null) }
+    var installedApkExtensions by remember(apkExtensionPlatform) {
+        mutableStateOf(runCatching(apkExtensionPlatform::discoverInstalled).getOrDefault(emptyList()))
     }
-    var legacyRuntimeReports by remember(legacyInstaller) {
-        mutableStateOf(inspectLegacyRuntimes(legacyInstaller, legacyExtensions))
+    var apkRuntimeReports by remember(apkExtensionPlatform) {
+        mutableStateOf(inspectApkRuntimes(apkExtensionPlatform, installedApkExtensions))
     }
     DisposableEffect(presentation) {
         val observation = presentation.observe { view = presentation.snapshot() }
@@ -91,10 +91,10 @@ internal fun ExtensionRepositoriesScreen(
     }
 
     fun refresh() {
-        runCatching(legacyInstaller::discoverInstalled)
+        runCatching(apkExtensionPlatform::discoverInstalled)
             .onSuccess {
-                legacyExtensions = it
-                legacyRuntimeReports = inspectLegacyRuntimes(legacyInstaller, it)
+                installedApkExtensions = it
+                apkRuntimeReports = inspectApkRuntimes(apkExtensionPlatform, it)
             }
             .onFailure { error = it.message ?: "Installed APK discovery failed." }
         complete(presentation.refreshAll())
@@ -143,18 +143,18 @@ internal fun ExtensionRepositoriesScreen(
                 }
             }
             error?.let { message -> item { Text(message, color = MaterialTheme.colorScheme.error) } }
-            if (legacyExtensions.isNotEmpty()) {
-                item { SectionTitle("Installed Aniyomi APKs") }
-                items(legacyExtensions, key = { it.packageName() }) { extension ->
-                    val runtime = legacyRuntimeReports.getValue(extension.packageName())
-                    LegacyExtensionCard(
+            if (installedApkExtensions.isNotEmpty()) {
+                item { SectionTitle("Installed APK extensions") }
+                items(installedApkExtensions, key = { it.packageName() }) { extension ->
+                    val runtime = apkRuntimeReports.getValue(extension.packageName())
+                    ApkExtensionCard(
                         extension = extension,
                         runtime = runtime,
-                        trust = { pendingLegacyTrust = extension },
+                        trust = { pendingApkTrust = extension },
                         forgetTrust = {
-                            runCatching { legacyInstaller.forgetCertificateTrust(extension) }
+                            runCatching { apkExtensionPlatform.forgetCertificateTrust(extension) }
                                 .onSuccess { report ->
-                                    legacyRuntimeReports = legacyRuntimeReports +
+                                    apkRuntimeReports = apkRuntimeReports +
                                         (report.packageName() to report)
                                 }
                                 .onFailure { error = it.message ?: "Certificate trust removal failed." }
@@ -200,11 +200,11 @@ internal fun ExtensionRepositoriesScreen(
                             runCatching { presentation.removeInstalled(extension.packageName()) }
                                 .onFailure { error = it.message ?: "Extension removal failed." }
                         },
-                        installLegacy = if (legacyInstaller.available()) {
+                        installApk = if (apkExtensionPlatform.available()) {
                             {
                                 loading = true
                                 error = null
-                                legacyInstaller.install(extension).whenComplete { message, failure ->
+                                apkExtensionPlatform.install(extension).whenComplete { message, failure ->
                                     error = if (failure == null) {
                                         message
                                     } else {
@@ -259,15 +259,15 @@ internal fun ExtensionRepositoriesScreen(
             },
         )
     }
-    pendingLegacyTrust?.let { extension ->
-        LegacyCertificateTrustDialog(
+    pendingApkTrust?.let { extension ->
+        ApkCertificateTrustDialog(
             extension = extension,
-            dismiss = { pendingLegacyTrust = null },
+            dismiss = { pendingApkTrust = null },
             trust = { certificate ->
-                runCatching { legacyInstaller.trustCertificate(extension, certificate) }
+                runCatching { apkExtensionPlatform.trustCertificate(extension, certificate) }
                     .onSuccess { report ->
-                        legacyRuntimeReports = legacyRuntimeReports + (report.packageName() to report)
-                        pendingLegacyTrust = null
+                        apkRuntimeReports = apkRuntimeReports + (report.packageName() to report)
+                        pendingApkTrust = null
                     }
                     .onFailure { error = it.message ?: "Certificate trust failed." }
             },
@@ -276,9 +276,9 @@ internal fun ExtensionRepositoriesScreen(
 }
 
 @Composable
-private fun LegacyExtensionCard(
-    extension: LegacyExtensionPackage,
-    runtime: LegacyExtensionRuntimeReport,
+private fun ApkExtensionCard(
+    extension: InstalledApkExtension,
+    runtime: ApkExtensionRuntimeReport,
     trust: () -> Unit,
     forgetTrust: () -> Unit,
 ) {
@@ -295,8 +295,8 @@ private fun LegacyExtensionCard(
                 "${extension.sourceEntrypoints().size} source entrypoint(s)"
                     + if (extension.sourceFactory().isPresent) " - factory" else ""
                     + " - "
-                    + legacyCompatibility(extension.compatibility()),
-                color = if (extension.compatibility() == LegacyExtensionCompatibility.COMPATIBLE_METADATA) {
+                    + apkCompatibility(extension.compatibility()),
+                color = if (extension.compatibility() == ApkExtensionCompatibility.COMPATIBLE_METADATA) {
                     MaterialTheme.colorScheme.primary
                 } else {
                     MaterialTheme.colorScheme.error
@@ -309,16 +309,16 @@ private fun LegacyExtensionCard(
                 )
             }
             Text(
-                legacyRuntimeStatus(runtime),
+                apkRuntimeStatus(runtime),
                 color = when (runtime.state()) {
-                    LegacyExtensionRuntimeState.HOST_ABI_AVAILABLE -> MaterialTheme.colorScheme.primary
-                    LegacyExtensionRuntimeState.HOST_ABI_MISSING -> MaterialTheme.colorScheme.tertiary
-                    LegacyExtensionRuntimeState.UNSUPPORTED_PLATFORM -> MaterialTheme.colorScheme.onSurfaceVariant
+                    ApkExtensionRuntimeState.HOST_ABI_AVAILABLE -> MaterialTheme.colorScheme.primary
+                    ApkExtensionRuntimeState.HOST_ABI_MISSING -> MaterialTheme.colorScheme.tertiary
+                    ApkExtensionRuntimeState.UNSUPPORTED_PLATFORM -> MaterialTheme.colorScheme.onSurfaceVariant
                     else -> MaterialTheme.colorScheme.error
                 },
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (runtime.state() == LegacyExtensionRuntimeState.TRUST_REQUIRED &&
+                if (runtime.state() == ApkExtensionRuntimeState.TRUST_REQUIRED &&
                     extension.signingCertificateSha256().isNotEmpty()
                 ) {
                     TextButton(onClick = trust) { Text("Trust certificate") }
@@ -331,34 +331,34 @@ private fun LegacyExtensionCard(
     }
 }
 
-private fun inspectLegacyRuntimes(
-    installer: LegacyExtensionInstaller,
-    extensions: List<LegacyExtensionPackage>,
-): Map<String, LegacyExtensionRuntimeReport> = extensions.associate { extension ->
-    extension.packageName() to installer.runtimeReport(extension)
+private fun inspectApkRuntimes(
+    platform: ApkExtensionPlatform,
+    extensions: List<InstalledApkExtension>,
+): Map<String, ApkExtensionRuntimeReport> = extensions.associate { extension ->
+    extension.packageName() to platform.runtimeReport(extension)
 }
 
-private fun legacyRuntimeStatus(runtime: LegacyExtensionRuntimeReport): String = when (runtime.state()) {
-    LegacyExtensionRuntimeState.UNSUPPORTED_PLATFORM -> "Legacy runtime unavailable on this platform"
-    LegacyExtensionRuntimeState.INCOMPATIBLE_METADATA -> "Runtime blocked by incompatible metadata"
-    LegacyExtensionRuntimeState.TRUST_REQUIRED -> "Explicit signing-certificate trust required"
-    LegacyExtensionRuntimeState.HOST_ABI_MISSING ->
+private fun apkRuntimeStatus(runtime: ApkExtensionRuntimeReport): String = when (runtime.state()) {
+    ApkExtensionRuntimeState.UNSUPPORTED_PLATFORM -> "APK extension runtime unavailable on this platform"
+    ApkExtensionRuntimeState.INCOMPATIBLE_METADATA -> "Runtime blocked by incompatible metadata"
+    ApkExtensionRuntimeState.TRUST_REQUIRED -> "Explicit signing-certificate trust required"
+    ApkExtensionRuntimeState.HOST_ABI_MISSING ->
         "Trusted; ${runtime.missingHostClasses().size} required host ABI classes are missing"
-    LegacyExtensionRuntimeState.HOST_ABI_AVAILABLE ->
+    ApkExtensionRuntimeState.HOST_ABI_AVAILABLE ->
         "Trusted; host ABI available for the future activation bridge"
 }
 
-private fun legacyCompatibility(compatibility: LegacyExtensionCompatibility): String = when (compatibility) {
-    LegacyExtensionCompatibility.COMPATIBLE_METADATA ->
+private fun apkCompatibility(compatibility: ApkExtensionCompatibility): String = when (compatibility) {
+    ApkExtensionCompatibility.COMPATIBLE_METADATA ->
         "detected; Aniyomi execution runtime still required"
-    LegacyExtensionCompatibility.UNSUPPORTED_LIBRARY -> "unsupported Aniyomi library version"
-    LegacyExtensionCompatibility.MISSING_ENTRYPOINT -> "missing source entrypoint metadata"
-    LegacyExtensionCompatibility.UNSIGNED -> "unsigned package"
+    ApkExtensionCompatibility.UNSUPPORTED_LIBRARY -> "unsupported Aniyomi library version"
+    ApkExtensionCompatibility.MISSING_ENTRYPOINT -> "missing source entrypoint metadata"
+    ApkExtensionCompatibility.UNSIGNED -> "unsigned package"
 }
 
 @Composable
-private fun LegacyCertificateTrustDialog(
-    extension: LegacyExtensionPackage,
+private fun ApkCertificateTrustDialog(
+    extension: InstalledApkExtension,
     dismiss: () -> Unit,
     trust: (String) -> Unit,
 ) {
@@ -452,7 +452,7 @@ private fun ExtensionPackageCard(
     update: () -> Unit,
     toggle: (Boolean) -> Unit,
     remove: () -> Unit,
-    installLegacy: (() -> Unit)?,
+    installApk: (() -> Unit)?,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
@@ -490,9 +490,9 @@ private fun ExtensionPackageCard(
                     }
                 }
                 if (extension.artifacts().any { it.format() == ExtensionArtifactFormat.ANIYOMI_APK }
-                    && installLegacy != null
+                    && installApk != null
                 ) {
-                    TextButton(onClick = installLegacy, enabled = !busy) { Text("Install APK") }
+                    TextButton(onClick = installApk, enabled = !busy) { Text("Install APK") }
                 }
             }
         }

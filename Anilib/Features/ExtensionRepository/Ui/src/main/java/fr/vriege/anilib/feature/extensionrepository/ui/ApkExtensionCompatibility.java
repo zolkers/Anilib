@@ -1,7 +1,7 @@
 package fr.vriege.anilib.feature.extensionrepository.ui;
 
-/** Metadata-level compatibility of one Android-installed Aniyomi extension APK. */
-public enum LegacyExtensionCompatibility {
+/** Metadata-level compatibility of one Android-installed extension APK. */
+public enum ApkExtensionCompatibility {
     COMPATIBLE_METADATA,
     UNSUPPORTED_LIBRARY,
     MISSING_ENTRYPOINT,

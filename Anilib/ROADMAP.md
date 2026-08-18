@@ -73,7 +73,9 @@ platform-specific.
   for user-supplied Aniyomi extension APKs
 - [x] best-effort Android discovery and metadata compatibility for visible Aniyomi APKs
 - [x] explicit per-package signing-certificate trust and host-ABI preflight
-  without loading legacy extension classes
+  without loading APK extension classes
+- [x] Anilib-owned extension contracts with APK compatibility isolated to
+  Android and portable Bundles shared by Android and desktop
 - [ ] execute discovered Aniyomi sources through a compatibility runtime without
   importing Aniyomi's external host dependency graph into shared Anilib modules
 - [x] shared Settings Bundle with durable appearance and feature-policy preferences

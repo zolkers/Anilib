@@ -5,8 +5,8 @@ import fr.vriege.anilib.foundation.validation.Preconditions;
 import java.util.List;
 import java.util.Optional;
 
-/** Safe metadata projection of one Android-visible Aniyomi extension APK. */
-public record LegacyExtensionPackage(
+/** Safe metadata projection of one Android-visible extension APK. */
+public record InstalledApkExtension(
         String packageName,
         String displayName,
         long versionCode,
@@ -19,8 +19,8 @@ public record LegacyExtensionPackage(
         boolean hasReadme,
         boolean hasChangelog,
         List<String> signingCertificateSha256,
-        LegacyExtensionCompatibility compatibility) {
-    public LegacyExtensionPackage {
+        ApkExtensionCompatibility compatibility) {
+    public InstalledApkExtension {
         packageName = Preconditions.requireNonBlank(packageName, "packageName");
         displayName = Preconditions.requireNonBlank(displayName, "displayName");
         if (versionCode < 0) {
