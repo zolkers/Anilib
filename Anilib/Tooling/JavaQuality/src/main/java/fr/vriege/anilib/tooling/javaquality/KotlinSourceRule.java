@@ -15,7 +15,12 @@ public final class KotlinSourceRule implements AnilibJavaRule {
     private static final String ROOT_PACKAGE = "fr.vriege.anilib";
     private static final Pattern IMPORT = Pattern.compile("^\\s*import\\s+([^ ]+)\\s*$");
     private static final Map<String, Set<String>> EXTERNAL_IMPORT_PREFIXES = Map.of(
-            "platform.android", Set.of("android.", "androidx.activity.", "androidx.compose.", "dalvik."),
+            "platform.android", Set.of(
+                    "android.",
+                    "androidx.activity.",
+                    "androidx.compose.",
+                    "androidx.preference.",
+                    "dalvik."),
             "platform.compose", Set.of(
                     "androidx.compose.",
                     "com.multiplatform.webview.",

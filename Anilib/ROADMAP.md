@@ -86,7 +86,8 @@ platform-specific.
     to load current extension bytecode
   - [x] project text, checkbox, tri-state, select, sort, and grouped extension
     filters into shared Anilib models and apply selected values during search
-  - [ ] project source preferences into shared Anilib models
+  - [x] project switch, text, and select source preferences into shared Anilib
+    models and apply their values before extension requests
   - [ ] add the equivalent trusted APK bridge for manga extensions
 - [x] shared Settings Bundle with durable appearance and feature-policy preferences
 - [x] live Android and desktop theme selection from shared settings

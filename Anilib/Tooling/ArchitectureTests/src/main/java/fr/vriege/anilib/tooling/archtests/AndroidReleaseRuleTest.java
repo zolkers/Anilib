@@ -28,7 +28,7 @@ final class AndroidReleaseRuleTest {
             write(repository.resolve("Anilib/Platforms/Android/module.properties"), """
                     layer=PLATFORM
                     language=KOTLIN
-                    externalDependencies=androidx.activity:activity-compose
+                    externalDependencies=androidx.activity:activity-compose,androidx.preference:preference-ktx
                     """);
             Path manifest = repository.resolve("Anilib/Platforms/Android/src/main/AndroidManifest.xml");
             write(manifest, """
@@ -49,6 +49,7 @@ final class AndroidReleaseRuleTest {
                     PathClassLoader preflight.report(extension)
                     ApkExtensionRuntimeState.HOST_ABI_AVAILABLE
                     AniyomiAnimeSourceAdapter.adapt
+                    preferenceBridge.project(source)
                     inventory.discover(extension.packageName())
                     ApkExtensionRuntimeReport.activationFailed
                     """);

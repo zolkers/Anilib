@@ -72,7 +72,12 @@ and subtitles into explicit Anilib Source Bundles. The reflection bridge accepts
 both ext-lib 16 RxJava calls and ext-lib 17 suspend catalogue, combined episode
 update, hoster, and video calls. Text, checkbox, tri-state, select, sort, and
 grouped extension filters are projected into the shared discovery model and
-written back to a fresh ABI filter list for each search. One package failure does not
+written back to a fresh ABI filter list for each search. Configurable anime
+sources project AndroidX switch, text, and select controls into the same Source
+preference schema used by portable Bundles. Anilib's shared Android/desktop
+screen owns the durable selection; the Android adapter commits its request
+snapshot into the APK source's expected `SharedPreferences` immediately before
+the source call. One package failure does not
 select a partial Bundle and is displayed in the shared repository screen. Each
 bridged operation rechecks the currently installed signer, so forgetting trust
 or replacing the APK immediately blocks subsequent calls.

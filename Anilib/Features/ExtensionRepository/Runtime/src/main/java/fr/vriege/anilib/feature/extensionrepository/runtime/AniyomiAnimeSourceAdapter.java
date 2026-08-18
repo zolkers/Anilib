@@ -17,6 +17,7 @@ import fr.vriege.anilib.feature.source.SourceExtensionPlugin;
 import fr.vriege.anilib.feature.source.SourceFilterDefinition;
 import fr.vriege.anilib.feature.source.SourceId;
 import fr.vriege.anilib.feature.source.SourcePage;
+import fr.vriege.anilib.feature.source.SourcePreferenceDefinition;
 import fr.vriege.anilib.feature.source.SourceSearchRequest;
 import fr.vriege.anilib.feature.source.SourceStreamFormat;
 import fr.vriege.anilib.feature.source.SourceSubtitleTrack;
@@ -61,7 +62,12 @@ public final class AniyomiAnimeSourceAdapter {
             String packageName,
             String extensionVersion,
             Object delegate) {
-        return adapt(packageName, extensionVersion, delegate, () -> true);
+        return adapt(
+                packageName,
+                extensionVersion,
+                delegate,
+                () -> true,
+                AniyomiSourcePreferences.empty());
     }
 
     public static AdaptedSource adapt(
@@ -69,15 +75,31 @@ public final class AniyomiAnimeSourceAdapter {
             String extensionVersion,
             Object delegate,
             BooleanSupplier authorized) {
+        return adapt(
+                packageName,
+                extensionVersion,
+                delegate,
+                authorized,
+                AniyomiSourcePreferences.empty());
+    }
+
+    public static AdaptedSource adapt(
+            String packageName,
+            String extensionVersion,
+            Object delegate,
+            BooleanSupplier authorized,
+            AniyomiSourcePreferences preferences) {
         Preconditions.requireNonBlank(packageName, "packageName");
         Preconditions.requireNonBlank(extensionVersion, "extensionVersion");
         Object source = Preconditions.requireNonNull(delegate, "delegate");
         BooleanSupplier authorization = Preconditions.requireNonNull(authorized, "authorized");
+        AniyomiSourcePreferences sourcePreferences = Preconditions.requireNonNull(preferences, "preferences");
         ReflectedAnimeSource bridge = new ReflectedAnimeSource(
                 packageName,
                 extensionVersion,
                 source,
-                authorization);
+                authorization,
+                sourcePreferences);
         SourceExtensionManifest manifest = SourceExtensionManifest.trustedPlatform(
                 ComponentDescriptor.of(
                         "extension." + bridge.descriptor().id(),
@@ -104,6 +126,7 @@ public final class AniyomiAnimeSourceAdapter {
     private static final class ReflectedAnimeSource implements CatalogueSource, StreamingSource {
         private final Object delegate;
         private final BooleanSupplier authorized;
+        private final AniyomiSourcePreferences preferences;
         private final SourceDescriptor descriptor;
         private final Map<SourceCatalogueItemId, Object> animeById = new ConcurrentHashMap<>();
         private final Map<SourceEpisodeId, Object> episodeById = new ConcurrentHashMap<>();
@@ -112,9 +135,11 @@ public final class AniyomiAnimeSourceAdapter {
                 String packageName,
                 String extensionVersion,
                 Object delegate,
-                BooleanSupplier authorized) {
+                BooleanSupplier authorized,
+                AniyomiSourcePreferences preferences) {
             this.delegate = delegate;
             this.authorized = authorized;
+            this.preferences = preferences;
             long numericId = number(invoke(delegate, "getId")).longValue();
             SourceId sourceId = SourceId.of(sourceId(packageName, numericId));
             descriptor = new SourceDescriptor(
@@ -139,6 +164,7 @@ public final class AniyomiAnimeSourceAdapter {
         public SourcePage popular(SourceBrowseRequest request) {
             requireAuthorized();
             Preconditions.requireNonNull(request, "request");
+            preferences.apply(request.preferences());
             return page(invokeModernOrRx(delegate, "getPopularAnime", "fetchPopularAnime", request.page()));
         }
 
@@ -156,6 +182,7 @@ public final class AniyomiAnimeSourceAdapter {
             if (!supportsLatest()) {
                 return CatalogueSource.super.latest(request);
             }
+            preferences.apply(request.preferences());
             return page(invokeModernOrRx(delegate, "getLatestUpdates", "fetchLatestUpdates", request.page()));
         }
 
@@ -163,6 +190,7 @@ public final class AniyomiAnimeSourceAdapter {
         public SourcePage search(SourceSearchRequest request) {
             requireAuthorized();
             Preconditions.requireNonNull(request, "request");
+            preferences.apply(request.browseRequest().preferences());
             AniyomiAnimeFilterAdapter.ReflectedFilters filters = reflectedFilters();
             filters.apply(request.browseRequest().filters());
             Object result = invokeModernOrRx(
@@ -179,6 +207,12 @@ public final class AniyomiAnimeSourceAdapter {
         public List<SourceFilterDefinition> filters() {
             requireAuthorized();
             return reflectedFilters().definitions();
+        }
+
+        @Override
+        public List<SourcePreferenceDefinition> preferences() {
+            requireAuthorized();
+            return preferences.definitions();
         }
 
         @Override

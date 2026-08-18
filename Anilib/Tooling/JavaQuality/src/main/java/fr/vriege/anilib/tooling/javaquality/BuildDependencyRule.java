@@ -28,7 +28,9 @@ public final class BuildDependencyRule implements AnilibJavaRule {
     private static final Map<String, Set<String>> ALLOWED_EXTERNAL_DEPENDENCIES = Map.ofEntries(
             Map.entry(
                     ANDROID_BUILD,
-                    Set.of("'androidx.activity:activity-compose:1.13.0'")),
+                    Set.of(
+                            "'androidx.activity:activity-compose:1.13.0'",
+                            "'androidx.preference:preference-ktx:1.2.1'")),
             Map.entry(
                     COMPOSE_BUILD,
                     Set.of(

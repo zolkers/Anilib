@@ -10,6 +10,7 @@ import fr.vriege.anilib.feature.extensionrepository.ExtensionSourceMetadata;
 import fr.vriege.anilib.feature.extensionrepository.InstalledExtensionPackage;
 import fr.vriege.anilib.feature.extensionrepository.runtime.AniyomiRepositoryIndexParser;
 import fr.vriege.anilib.feature.extensionrepository.runtime.AniyomiAnimeSourceAdapter;
+import fr.vriege.anilib.feature.extensionrepository.runtime.AniyomiSourcePreferences;
 import fr.vriege.anilib.feature.extensionrepository.runtime.DefaultExtensionInstallationService;
 import fr.vriege.anilib.feature.extensionrepository.runtime.DefaultExtensionRepositoryService;
 import fr.vriege.anilib.feature.extensionrepository.runtime.FileExtensionTrustStore;
@@ -30,6 +31,8 @@ import fr.vriege.anilib.feature.source.SourceFilterType;
 import fr.vriege.anilib.feature.source.SourceFilterValue;
 import fr.vriege.anilib.feature.source.SourcePage;
 import fr.vriege.anilib.feature.source.SourcePermission;
+import fr.vriege.anilib.feature.source.SourcePreferenceDefinition;
+import fr.vriege.anilib.feature.source.SourcePreferenceType;
 import fr.vriege.anilib.feature.source.SourceSearchRequest;
 import fr.vriege.anilib.feature.source.StreamingSource;
 
@@ -54,6 +57,7 @@ import java.util.Set;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -76,6 +80,7 @@ final class ExtensionRepositoryTest {
         modelsInstalledApkDiscovery(counter);
         adaptsAbiReadyAnimeSource(counter);
         adaptsModernSuspendAndHosterAnimeSource(counter);
+        adaptsConfigurableAnimeSourcePreferences(counter);
         return counter.value;
     }
 
@@ -370,6 +375,41 @@ final class ExtensionRepositoryTest {
                         && filters.get(4).groupId().equals("filter.3")
                         && modernSource.filterApplied(),
                 "Aniyomi text, checkbox, select, group, and tri-state filters must round-trip");
+    }
+
+    private static void adaptsConfigurableAnimeSourcePreferences(Counter counter) {
+        AtomicReference<Map<String, String>> applied = new AtomicReference<>(Map.of());
+        AniyomiSourcePreferences preferences = new AniyomiSourcePreferences(
+                List.of(
+                        new SourcePreferenceDefinition(
+                                "use_alt",
+                                "Use alternate host",
+                                "",
+                                SourcePreferenceType.SWITCH,
+                                List.of(),
+                                "false",
+                                false),
+                        new SourcePreferenceDefinition(
+                                "quality",
+                                "Preferred quality",
+                                "",
+                                SourcePreferenceType.SELECT,
+                                List.of("720p", "1080p"),
+                                "1080p",
+                                false)),
+                applied::set);
+        CatalogueSource catalogue = (CatalogueSource) AniyomiAnimeSourceAdapter.adapt(
+                "eu.kanade.tachiyomi.animeextension.en.configurable",
+                "17.0",
+                new AniyomiAdapterFixture.Source(),
+                () -> true,
+                preferences).source();
+        Map<String, String> selected = Map.of("use_alt", "true", "quality", "720p");
+        catalogue.popular(new SourceBrowseRequest(1, 20, List.of(), selected));
+        counter.check(catalogue.preferences().equals(preferences.definitions()),
+                "configurable APK sources must expose their preference schema through the shared Source API");
+        counter.check(applied.get().equals(selected),
+                "shared Android and desktop preference selections must reach the APK source before requests");
     }
 
     private static ExtensionPackageMetadata portablePackage(byte[] bundle, KeyPair keyPair, long versionCode) {

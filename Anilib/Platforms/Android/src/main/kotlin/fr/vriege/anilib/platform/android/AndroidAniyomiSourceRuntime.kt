@@ -29,6 +29,7 @@ internal class AndroidAniyomiSourceRuntime(
     private val preflight: AndroidAniyomiRuntimePreflight = AndroidAniyomiRuntimePreflight(context),
 ) {
     private val applicationContext = context.applicationContext
+    private val preferenceBridge = AndroidAniyomiPreferenceBridge(context)
 
     fun prepare(): AndroidApkSourceActivation {
         val bundles = mutableListOf<AnilibPlugin>()
@@ -83,11 +84,13 @@ internal class AndroidAniyomiSourceRuntime(
                     extension.packageName(),
                     extension.versionName(),
                     source,
-                ) {
-                    inventory.discover(extension.packageName())
-                        ?.let(preflight::report)
-                        ?.state() == ApkExtensionRuntimeState.HOST_ABI_AVAILABLE
-                }
+                    {
+                        inventory.discover(extension.packageName())
+                            ?.let(preflight::report)
+                            ?.state() == ApkExtensionRuntimeState.HOST_ABI_AVAILABLE
+                    },
+                    preferenceBridge.project(source),
+                )
             }
     }
 

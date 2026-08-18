@@ -265,7 +265,12 @@ AnilibJava keeps that certificate binding and `Class.forName(..., false, ...)`
 contract present. At Android startup, ABI-ready entrypoints are constructed with
 an APK class loader and reflected into ordinary Source Bundles before the Kernel
 graph freezes. The adapter translates catalogue pages, episodes, streams,
-headers, and subtitles while retaining activation failures per package. Its
+headers, and subtitles while retaining activation failures per package.
+Configurable-source AndroidX switch, text, and select controls become the same
+platform-neutral preference schema rendered for portable sources on desktop.
+Discovery owns the durable selection, and the Android boundary mirrors each
+validated request snapshot into the APK source's expected `SharedPreferences`
+immediately before invoking it. Its
 `TRUSTED_PLATFORM_RUNTIME` permission is reserved to this audited platform path
 and forbidden to portable extension modules. Every bridged operation rechecks
 the installed signer against current trust before invoking APK code. The app

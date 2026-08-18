@@ -57,7 +57,7 @@ public final class AndroidReleaseRule implements AnilibJavaRule {
                 diagnostics,
                 "layer=PLATFORM",
                 "language=KOTLIN",
-                "externalDependencies=androidx.activity:activity-compose");
+                "externalDependencies=androidx.activity:activity-compose,androidx.preference:preference-ktx");
         requireTokens(
                 repository,
                 MANIFEST,
@@ -84,6 +84,7 @@ public final class AndroidReleaseRule implements AnilibJavaRule {
                 "preflight.report(extension)",
                 "ApkExtensionRuntimeState.HOST_ABI_AVAILABLE",
                 "AniyomiAnimeSourceAdapter.adapt",
+                "preferenceBridge.project(source)",
                 "inventory.discover(extension.packageName())",
                 "ApkExtensionRuntimeReport.activationFailed");
         requireTokens(
