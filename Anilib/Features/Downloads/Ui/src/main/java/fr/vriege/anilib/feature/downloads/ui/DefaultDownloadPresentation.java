@@ -2,6 +2,8 @@ package fr.vriege.anilib.feature.downloads.ui;
 
 import fr.vriege.anilib.feature.downloads.DownloadId;
 import fr.vriege.anilib.feature.downloads.DownloadQueueSnapshot;
+import fr.vriege.anilib.feature.downloads.DownloadPriority;
+import fr.vriege.anilib.feature.downloads.DownloadRecoveryMode;
 import fr.vriege.anilib.feature.downloads.DownloadService;
 import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.source.SourceContentUnitId;
@@ -53,6 +55,26 @@ public final class DefaultDownloadPresentation implements DownloadPresentation {
     @Override
     public void remove(DownloadId id) {
         downloads.remove(id);
+    }
+
+    @Override
+    public void removeAll() {
+        downloads.removeAll();
+    }
+
+    @Override
+    public void setPriority(DownloadId id, DownloadPriority priority) {
+        downloads.setPriority(id, priority);
+    }
+
+    @Override
+    public void move(DownloadId id, int queuePosition) {
+        downloads.move(id, queuePosition);
+    }
+
+    @Override
+    public void retry(DownloadId id, DownloadRecoveryMode mode) {
+        downloads.retry(id, mode);
     }
 
     @Override

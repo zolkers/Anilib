@@ -2,6 +2,8 @@ package fr.vriege.anilib.feature.downloads.ui;
 
 import fr.vriege.anilib.feature.downloads.DownloadId;
 import fr.vriege.anilib.feature.downloads.DownloadQueueSnapshot;
+import fr.vriege.anilib.feature.downloads.DownloadPriority;
+import fr.vriege.anilib.feature.downloads.DownloadRecoveryMode;
 import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.source.SourceContentUnitId;
 
@@ -21,6 +23,14 @@ public interface DownloadPresentation {
     void cancel(DownloadId id);
 
     void remove(DownloadId id);
+
+    void removeAll();
+
+    void setPriority(DownloadId id, DownloadPriority priority);
+
+    void move(DownloadId id, int queuePosition);
+
+    void retry(DownloadId id, DownloadRecoveryMode mode);
 
     void pauseAll();
 

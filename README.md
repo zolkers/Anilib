@@ -55,6 +55,8 @@ History is grouped by local date, searchable and filterable by anime or manga,
 with media-aware resume and persistent removal actions on every visit.
 Statistics combine library status/source/language/progress and activity with
 tracker scores and persisted player duration without failing on unavailable sources.
+Downloads use a durable grouped priority queue with manual ordering, confirmed
+delete-all, measured speed/ETA, and resume-or-restart recovery for partial jobs.
 Browse shows live source-extension update badges and actions, compact fixed-density
 rows, richer overflow menus, and asynchronous loading, retry, and error states.
 Source catalogues retain their grid/list choice independently and expose item

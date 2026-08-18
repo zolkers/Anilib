@@ -5,6 +5,8 @@ import fr.vriege.anilib.feature.downloads.DownloadCapabilities;
 import fr.vriege.anilib.feature.downloads.DownloadException;
 import fr.vriege.anilib.feature.downloads.DownloadId;
 import fr.vriege.anilib.feature.downloads.DownloadJobSnapshot;
+import fr.vriege.anilib.feature.downloads.DownloadPriority;
+import fr.vriege.anilib.feature.downloads.DownloadRecoveryMode;
 import fr.vriege.anilib.feature.downloads.DownloadService;
 import fr.vriege.anilib.feature.downloads.DownloadStatus;
 import fr.vriege.anilib.feature.downloads.DownloadStoragePolicy;
@@ -47,6 +49,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Predicate;
 
 final class DownloadTest {
@@ -60,10 +63,75 @@ final class DownloadTest {
         Counter counter = new Counter();
         verifiesStandardOfflineReading(counter);
         verifiesResumableQueue(counter);
+        verifiesPriorityMetricsAndRecovery(counter);
         verifiesStorageLimit(counter);
         enforcesLargeTransferPolicy(counter);
         cleansOrphanedDownloads(counter);
         return counter.value;
+    }
+
+    private static void verifiesPriorityMetricsAndRecovery(Counter counter) {
+        Path queueRoot = null;
+        Path recoveryRoot = null;
+        try {
+            queueRoot = Files.createTempDirectory("anilib-download-priority");
+            MemoryLibraryCatalog library = new MemoryLibraryCatalog();
+            LibraryItem item = LibraryItem.create("Queue", MediaKind.MANGA)
+                    .withOrigin(new LibraryOrigin("test.queue", "title"));
+            library.save(item);
+            QueuedPagedSource source = new QueuedPagedSource(false, true);
+            DownloadStoragePolicy policy = new DownloadStoragePolicy(4096, 1024, 1, true, true);
+            try (DefaultDownloadService downloads = new DefaultDownloadService(
+                    new SingleSourceRegistry(source), library, queueRoot, policy)) {
+                DownloadId first = downloads.enqueue(item.id(), source.unit("a").id());
+                counter.check(source.awaitBlocked(), "priority test must block after its first persisted page");
+                DownloadJobSnapshot active = await(downloads, first, job -> job.completedPages() == 1);
+                counter.check(active.bytesPerSecond() > 0 && active.estimatedRemainingMillis().isPresent(),
+                        "active downloads must expose measured speed and ETA");
+                DownloadId second = downloads.enqueue(item.id(), source.unit("b").id());
+                DownloadId third = downloads.enqueue(item.id(), source.unit("c").id());
+                downloads.setPriority(third, DownloadPriority.HIGH);
+                downloads.move(second, 0);
+                DownloadJobSnapshot prioritized = downloads.snapshot().jobs().stream()
+                        .filter(job -> job.id().equals(third))
+                        .findFirst()
+                        .orElseThrow();
+                counter.check(prioritized.priority() == DownloadPriority.HIGH,
+                        "download priorities must be visible in queue snapshots");
+                source.release();
+                await(downloads, first, job -> job.status() == DownloadStatus.COMPLETED);
+                await(downloads, second, job -> job.status() == DownloadStatus.COMPLETED);
+                await(downloads, third, job -> job.status() == DownloadStatus.COMPLETED);
+                counter.check(source.completionOrder().equals(List.of("a", "c", "b")),
+                        "high-priority queued work must run before manually reordered normal work");
+                downloads.removeAll();
+                counter.check(downloads.snapshot().jobs().isEmpty()
+                                && downloads.snapshot().usedStorageBytes() == 0L,
+                        "delete-all must clear queue metadata and downloaded files");
+            }
+
+            recoveryRoot = Files.createTempDirectory("anilib-download-recovery");
+            QueuedPagedSource flaky = new QueuedPagedSource(true, false);
+            try (DefaultDownloadService downloads = new DefaultDownloadService(
+                    new SingleSourceRegistry(flaky), library, recoveryRoot, policy)) {
+                DownloadId id = downloads.enqueue(item.id(), flaky.unit("b").id());
+                DownloadJobSnapshot failed = await(
+                        downloads,
+                        id,
+                        job -> job.status() == DownloadStatus.FAILED);
+                counter.check(failed.hasPartialData() && failed.failedPageIndex().orElseThrow() == 1,
+                        "failed downloads must identify resumable partial data and the failed page");
+                downloads.retry(id, DownloadRecoveryMode.RESTART);
+                await(downloads, id, job -> job.status() == DownloadStatus.COMPLETED);
+                counter.check(Collections.frequency(flaky.readUnits(), "b:0") == 2,
+                        "restart recovery must discard and fetch partial pages again");
+            }
+        } catch (IOException exception) {
+            throw new AssertionError("Unable to prepare priority and recovery download test", exception);
+        } finally {
+            deleteTree(queueRoot);
+            deleteTree(recoveryRoot);
+        }
     }
 
     private static void verifiesStandardOfflineReading(Counter counter) {
@@ -370,6 +438,110 @@ final class DownloadTest {
 
         private List<Integer> readIndexes() {
             return List.copyOf(readIndexes);
+        }
+    }
+
+    private static final class QueuedPagedSource implements PagedSource {
+        private final SourceCatalogueItemId itemId = new SourceCatalogueItemId(
+                SourceId.of("test.queue"),
+                "title");
+        private final List<SourceContentUnit> units = List.of(
+                contentUnit("a"),
+                contentUnit("b"),
+                contentUnit("c"));
+        private final boolean failBOnce;
+        private final boolean blockA;
+        private final AtomicBoolean failed = new AtomicBoolean();
+        private final CountDownLatch blocked = new CountDownLatch(1);
+        private final CountDownLatch released = new CountDownLatch(1);
+        private final List<String> reads = Collections.synchronizedList(new ArrayList<>());
+        private final List<String> completed = Collections.synchronizedList(new ArrayList<>());
+
+        private QueuedPagedSource(boolean failBOnce, boolean blockA) {
+            this.failBOnce = failBOnce;
+            this.blockA = blockA;
+        }
+
+        @Override
+        public SourceDescriptor descriptor() {
+            return new SourceDescriptor(
+                    itemId.sourceId(),
+                    "Queue test",
+                    "1.0.0",
+                    "und",
+                    Set.of(SourceContentKind.MANGA),
+                    SourceSdk.API_VERSION);
+        }
+
+        @Override
+        public List<SourceContentUnit> contentUnits(SourceCatalogueItemId requested) {
+            return requested.equals(itemId) ? units : List.of();
+        }
+
+        @Override
+        public List<SourcePageResource> pages(SourceContentUnitId requested) {
+            return List.of(
+                    new SourcePageResource(requested, requested.value() + "-0", 0, 4L),
+                    new SourcePageResource(requested, requested.value() + "-1", 1, 4L));
+        }
+
+        @Override
+        public byte[] readPage(SourcePageResource page) {
+            String unit = page.contentUnitId().value();
+            reads.add(unit + ":" + page.index());
+            if (unit.equals("a") && page.index() == 1 && blockA) {
+                blocked.countDown();
+                try {
+                    if (!released.await(3, TimeUnit.SECONDS)) {
+                        throw new DownloadException("Timed out waiting to release priority test");
+                    }
+                } catch (InterruptedException exception) {
+                    Thread.currentThread().interrupt();
+                    throw new DownloadException("Interrupted priority test", exception);
+                }
+            }
+            if (unit.equals("b") && page.index() == 1 && failBOnce && failed.compareAndSet(false, true)) {
+                throw new DownloadException("Synthetic second-page failure");
+            }
+            if (page.index() == 1) {
+                completed.add(unit);
+            }
+            return new byte[] {1, 2, 3, 4};
+        }
+
+        private SourceContentUnit unit(String id) {
+            return units.stream()
+                    .filter(unit -> unit.id().value().equals(id))
+                    .findFirst()
+                    .orElseThrow();
+        }
+
+        private boolean awaitBlocked() {
+            try {
+                return blocked.await(3, TimeUnit.SECONDS);
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                throw new AssertionError("Interrupted while awaiting priority download", exception);
+            }
+        }
+
+        private void release() {
+            released.countDown();
+        }
+
+        private List<String> completionOrder() {
+            return List.copyOf(completed);
+        }
+
+        private List<String> readUnits() {
+            return List.copyOf(reads);
+        }
+
+        private SourceContentUnit contentUnit(String id) {
+            return new SourceContentUnit(
+                    new SourceContentUnitId(itemId, id),
+                    "Chapter " + id,
+                    Optional.of(Instant.EPOCH));
         }
     }
 

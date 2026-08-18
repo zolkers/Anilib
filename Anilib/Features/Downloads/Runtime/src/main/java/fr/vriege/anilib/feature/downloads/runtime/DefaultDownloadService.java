@@ -2,7 +2,10 @@ package fr.vriege.anilib.feature.downloads.runtime;
 
 import fr.vriege.anilib.feature.downloads.DownloadException;
 import fr.vriege.anilib.feature.downloads.DownloadId;
+import fr.vriege.anilib.feature.downloads.DownloadJobSnapshot;
 import fr.vriege.anilib.feature.downloads.DownloadQueueSnapshot;
+import fr.vriege.anilib.feature.downloads.DownloadPriority;
+import fr.vriege.anilib.feature.downloads.DownloadRecoveryMode;
 import fr.vriege.anilib.feature.downloads.DownloadService;
 import fr.vriege.anilib.feature.downloads.DownloadStatus;
 import fr.vriege.anilib.feature.downloads.DownloadStoragePolicy;
@@ -46,7 +49,12 @@ public final class DefaultDownloadService
         implements DownloadService, ReaderContentProvider, AutoCloseable {
     private static final Comparator<DownloadRecord> DISPLAY_ORDER =
             Comparator.comparing((DownloadRecord record) -> record.status == DownloadStatus.DOWNLOADING).reversed()
-                    .thenComparing(record -> record.updatedAt, Comparator.reverseOrder())
+                    .thenComparing((DownloadRecord record) -> record.priority, Comparator.reverseOrder())
+                    .thenComparingLong(record -> record.queueOrder)
+                    .thenComparing(record -> record.id);
+    private static final Comparator<DownloadRecord> QUEUE_ORDER =
+            Comparator.comparing((DownloadRecord record) -> record.priority, Comparator.reverseOrder())
+                    .thenComparingLong(record -> record.queueOrder)
                     .thenComparing(record -> record.id);
 
     private final SourceRegistry sources;
@@ -61,6 +69,7 @@ public final class DefaultDownloadService
     private final Set<DownloadId> scheduled = new HashSet<>();
     private final Set<Runnable> listeners = new HashSet<>();
     private long usedStorageBytes;
+    private long nextQueueOrder;
     private boolean offlineMode;
     private boolean closed;
 
@@ -113,8 +122,19 @@ public final class DefaultDownloadService
     @Override
     public synchronized DownloadQueueSnapshot snapshot() {
         ensureOpen();
+        List<DownloadRecord> ordered = records.values().stream().sorted(DISPLAY_ORDER).toList();
+        List<DownloadRecord> queueOrder = records.values().stream()
+                .sorted(Comparator.comparingLong(record -> record.queueOrder))
+                .toList();
+        Map<DownloadId, Integer> positions = new LinkedHashMap<>();
+        for (int index = 0; index < queueOrder.size(); index++) {
+            positions.put(queueOrder.get(index).id, index);
+        }
+        List<DownloadJobSnapshot> jobs = ordered.stream()
+                .map(record -> record.snapshot(positions.get(record.id)))
+                .toList();
         return new DownloadQueueSnapshot(
-                records.values().stream().sorted(DISPLAY_ORDER).map(DownloadRecord::snapshot).toList(),
+                jobs,
                 offlineMode,
                 usedStorageBytes,
                 policy.maximumStorageBytes());
@@ -189,6 +209,8 @@ public final class DefaultDownloadService
                 itemId,
                 unit,
                 pages,
+                DownloadPriority.NORMAL,
+                nextQueueOrder++,
                 DownloadStatus.QUEUED,
                 0,
                 0,
@@ -239,10 +261,76 @@ public final class DefaultDownloadService
     @Override
     public synchronized void remove(DownloadId id) {
         DownloadRecord record = record(id);
+        record.status = DownloadStatus.CANCELLED;
         deleteFiles(record);
         records.remove(record.id);
         persist();
         notifyListeners();
+    }
+
+    @Override
+    public synchronized void removeAll() {
+        ensureOpen();
+        if (records.isEmpty()) {
+            return;
+        }
+        List<DownloadRecord> removed = List.copyOf(records.values());
+        removed.forEach(record -> record.status = DownloadStatus.CANCELLED);
+        removed.forEach(this::deleteFiles);
+        records.clear();
+        scheduled.clear();
+        persist();
+        notifyListeners();
+    }
+
+    @Override
+    public synchronized void setPriority(DownloadId id, DownloadPriority priority) {
+        DownloadRecord record = record(id);
+        DownloadPriority requested = Objects.requireNonNull(priority, "priority must not be null");
+        if (record.priority != requested) {
+            record.priority = requested;
+            record.updatedAt = clock.instant();
+            persist();
+            notifyListeners();
+            schedule(record);
+        }
+    }
+
+    @Override
+    public synchronized void move(DownloadId id, int queuePosition) {
+        DownloadRecord selected = record(id);
+        List<DownloadRecord> ordered = records.values().stream()
+                .sorted(Comparator.comparingLong(record -> record.queueOrder))
+                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+        ordered.remove(selected);
+        ordered.add(Math.max(0, Math.min(queuePosition, ordered.size())), selected);
+        for (int index = 0; index < ordered.size(); index++) {
+            ordered.get(index).queueOrder = index;
+        }
+        nextQueueOrder = ordered.size();
+        selected.updatedAt = clock.instant();
+        persist();
+        notifyListeners();
+        schedule(selected);
+    }
+
+    @Override
+    public synchronized void retry(DownloadId id, DownloadRecoveryMode mode) {
+        DownloadRecord record = record(id);
+        DownloadRecoveryMode requested = Objects.requireNonNull(mode, "mode must not be null");
+        ensureOnline();
+        if (record.status != DownloadStatus.FAILED
+                && record.status != DownloadStatus.CANCELLED
+                && record.status != DownloadStatus.PAUSED) {
+            throw new DownloadException("Only failed, cancelled, or paused downloads can be retried");
+        }
+        if (requested == DownloadRecoveryMode.RESTART) {
+            deleteFiles(record);
+            record.completedPages = 0;
+            record.downloadedBytes = 0L;
+        }
+        transition(record, DownloadStatus.QUEUED, null);
+        schedule(record);
     }
 
     @Override
@@ -385,6 +473,8 @@ public final class DefaultDownloadService
                     return;
                 }
                 transition(record, DownloadStatus.DOWNLOADING, null);
+                record.activeStartedNanos = System.nanoTime();
+                record.activeStartBytes = record.downloadedBytes;
             }
             PagedSource source = pagedSource(record.sourceItemId.sourceId());
             while (downloadNextPage(record, source)) {
@@ -403,10 +493,7 @@ public final class DefaultDownloadService
         } finally {
             synchronized (this) {
                 scheduled.remove(id);
-                DownloadRecord record = records.get(id);
-                if (!closed && !offlineMode && record != null && record.status == DownloadStatus.QUEUED) {
-                    schedule(record);
-                }
+                scheduleAvailable();
             }
         }
     }
@@ -414,7 +501,8 @@ public final class DefaultDownloadService
     private boolean downloadNextPage(DownloadRecord record, PagedSource source) {
         SourcePageResource page;
         synchronized (this) {
-            if (closed || offlineMode || record.status != DownloadStatus.DOWNLOADING) {
+            if (closed || offlineMode || records.get(record.id) != record
+                    || record.status != DownloadStatus.DOWNLOADING) {
                 return false;
             }
             if (!largeTransfersAllowed.getAsBoolean()) {
@@ -432,7 +520,8 @@ public final class DefaultDownloadService
         }
         byte[] bytes = Objects.requireNonNull(source.readPage(page), "paged source returned null page bytes");
         synchronized (this) {
-            if (closed || offlineMode || record.status != DownloadStatus.DOWNLOADING) {
+            if (closed || offlineMode || records.get(record.id) != record
+                    || record.status != DownloadStatus.DOWNLOADING) {
                 return false;
             }
             if (!largeTransfersAllowed.getAsBoolean()) {
@@ -449,6 +538,9 @@ public final class DefaultDownloadService
             record.completedPages++;
             record.downloadedBytes += bytes.length;
             usedStorageBytes += bytes.length;
+            long elapsedNanos = Math.max(1L, System.nanoTime() - record.activeStartedNanos);
+            long transferred = record.downloadedBytes - record.activeStartBytes;
+            record.bytesPerSecond = saturatedRate(transferred, elapsedNanos);
             record.updatedAt = clock.instant();
             if (record.completedPages == record.pages.size()) {
                 record.status = DownloadStatus.COMPLETED;
@@ -460,8 +552,24 @@ public final class DefaultDownloadService
     }
 
     private void schedule(DownloadRecord record) {
-        if (!closed && !offlineMode && largeTransfersAllowed.getAsBoolean()
-                && record.status == DownloadStatus.QUEUED && scheduled.add(record.id)) {
+        if (record.status == DownloadStatus.QUEUED) {
+            scheduleAvailable();
+        }
+    }
+
+    private void scheduleAvailable() {
+        while (!closed && !offlineMode && largeTransfersAllowed.getAsBoolean()
+                && scheduled.size() < policy.concurrentJobs()) {
+            Optional<DownloadRecord> next = records.values().stream()
+                    .filter(record -> record.status == DownloadStatus.QUEUED)
+                    .filter(record -> !scheduled.contains(record.id))
+                    .sorted(QUEUE_ORDER)
+                    .findFirst();
+            if (next.isEmpty()) {
+                return;
+            }
+            DownloadRecord record = next.orElseThrow();
+            scheduled.add(record.id);
             workers.execute(() -> run(record.id));
         }
     }
@@ -469,6 +577,9 @@ public final class DefaultDownloadService
     private void transition(DownloadRecord record, DownloadStatus status, String error) {
         record.status = status;
         record.error = error;
+        if (status != DownloadStatus.DOWNLOADING) {
+            record.bytesPerSecond = 0L;
+        }
         record.updatedAt = clock.instant();
         persist();
         notifyListeners();
@@ -545,10 +656,11 @@ public final class DefaultDownloadService
                     throw new DownloadException("Downloads queue contains duplicate job ids");
                 }
                 reconcile(record);
+                nextQueueOrder = Math.max(nextQueueOrder, record.queueOrder + 1L);
             }
             persist();
             if (!offlineMode) {
-                records.values().forEach(this::schedule);
+                scheduleAvailable();
             }
         } catch (IOException exception) {
             throw new DownloadException("Unable to load downloads queue", exception);
@@ -556,6 +668,9 @@ public final class DefaultDownloadService
     }
 
     private void reconcile(DownloadRecord record) throws IOException {
+        if (record.queueOrder < 0) {
+            throw new IOException("Download queue position must not be negative");
+        }
         int completePages = 0;
         long bytes = 0;
         while (completePages < record.pages.size()) {
@@ -677,6 +792,16 @@ public final class DefaultDownloadService
         if (closed) {
             throw new DownloadException("Download service is closed");
         }
+    }
+
+    private static long saturatedRate(long bytes, long elapsedNanos) {
+        if (bytes <= 0L) {
+            return 0L;
+        }
+        long scaled = bytes > Long.MAX_VALUE / 1_000_000_000L
+                ? Long.MAX_VALUE
+                : bytes * 1_000_000_000L;
+        return Math.max(1L, scaled / elapsedNanos);
     }
 
     @Override

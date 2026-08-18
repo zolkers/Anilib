@@ -2,6 +2,7 @@ package fr.vriege.anilib.feature.downloads.runtime;
 
 import fr.vriege.anilib.feature.downloads.DownloadId;
 import fr.vriege.anilib.feature.downloads.DownloadJobSnapshot;
+import fr.vriege.anilib.feature.downloads.DownloadPriority;
 import fr.vriege.anilib.feature.downloads.DownloadStatus;
 import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.source.SourceCatalogueItemId;
@@ -19,11 +20,16 @@ final class DownloadRecord {
     final SourceCatalogueItemId sourceItemId;
     final SourceContentUnit contentUnit;
     final List<SourcePageResource> pages;
+    DownloadPriority priority;
+    long queueOrder;
     DownloadStatus status;
     int completedPages;
     long downloadedBytes;
     String error;
     Instant updatedAt;
+    long bytesPerSecond;
+    long activeStartedNanos;
+    long activeStartBytes;
 
     DownloadRecord(
             DownloadId id,
@@ -32,6 +38,8 @@ final class DownloadRecord {
             SourceCatalogueItemId sourceItemId,
             SourceContentUnit contentUnit,
             List<SourcePageResource> pages,
+            DownloadPriority priority,
+            long queueOrder,
             DownloadStatus status,
             int completedPages,
             long downloadedBytes,
@@ -43,6 +51,8 @@ final class DownloadRecord {
         this.sourceItemId = sourceItemId;
         this.contentUnit = contentUnit;
         this.pages = List.copyOf(pages);
+        this.priority = priority;
+        this.queueOrder = queueOrder;
         this.status = status;
         this.completedPages = completedPages;
         this.downloadedBytes = downloadedBytes;
@@ -50,7 +60,7 @@ final class DownloadRecord {
         this.updatedAt = updatedAt;
     }
 
-    DownloadJobSnapshot snapshot() {
+    DownloadJobSnapshot snapshot(int queuePosition) {
         return new DownloadJobSnapshot(
                 id,
                 libraryItemId,
@@ -58,10 +68,49 @@ final class DownloadRecord {
                 sourceItemId,
                 contentUnit,
                 status,
+                priority,
+                queuePosition,
                 completedPages,
                 pages.size(),
                 downloadedBytes,
                 Optional.ofNullable(error),
+                status == DownloadStatus.DOWNLOADING ? bytesPerSecond : 0L,
+                estimatedRemainingMillis(),
                 updatedAt);
+    }
+
+    private Optional<Long> estimatedRemainingMillis() {
+        if (status != DownloadStatus.DOWNLOADING || bytesPerSecond < 1 || completedPages >= pages.size()) {
+            return Optional.empty();
+        }
+        long knownBytes = 0L;
+        int unknownPages = 0;
+        for (int index = completedPages; index < pages.size(); index++) {
+            long estimate = pages.get(index).estimatedBytes();
+            if (estimate < 0) {
+                unknownPages++;
+            } else {
+                knownBytes = saturatedAdd(knownBytes, estimate);
+            }
+        }
+        long averagePageBytes = completedPages == 0 ? 0L : downloadedBytes / completedPages;
+        long remainingBytes = saturatedAdd(knownBytes, saturatedMultiply(averagePageBytes, unknownPages));
+        return remainingBytes == 0L
+                ? Optional.empty()
+                : Optional.of(Math.max(1L, saturatedMultiply(remainingBytes, 1000L) / bytesPerSecond));
+    }
+
+    private static long saturatedAdd(long left, long right) {
+        if (right > 0 && left > Long.MAX_VALUE - right) {
+            return Long.MAX_VALUE;
+        }
+        return left + right;
+    }
+
+    private static long saturatedMultiply(long left, long right) {
+        if (left == 0L || right == 0L) {
+            return 0L;
+        }
+        return left > Long.MAX_VALUE / right ? Long.MAX_VALUE : left * right;
     }
 }

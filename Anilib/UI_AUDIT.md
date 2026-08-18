@@ -23,7 +23,7 @@ explicit so an architectural seam cannot be mistaken for a finished workflow.
 | More hub | [x] | Partial | Core ordering and actions are live; add storage and help destinations plus richer download state |
 | Categories | [x] | Partial | The shared screen shows real counts plus create, rename, reorder, delete, display, and update policies |
 | Statistics | [x] | Complete | The shared screen reports real totals plus status, source, language, tracker-score bands, watched/known duration, average progress, and 7/30/365-day activity |
-| Downloads | [x] | Partial | Durable queue, storage usage, offline mode, pause/resume/cancel/remove, errors, and status filters are live; add grouping, reorder, storage location, delete-all, and speed/ETA states |
+| Downloads | [x] | Partial | Durable grouped priority queue, reorder/delete-all, speed/ETA, partial restart, storage usage, offline mode, controls, errors, and status filters are live; add storage locations, index repair, per-title management, and automatic policies |
 | Backup and restore | [x] | Partial | Creation, inspection, confirmed restore/delete, rollback, and Anilib/Aniyomi import are live; add automatic scheduling, destinations, content selection, and sharing |
 | Tracking | [x] | Partial | Account authentication seam, search/bind/edit/refresh/remove, progress, score, dates, and privacy are live; add first-party provider bundles, icons, richer dialogs, and automatic sync preferences |
 | Settings home | [x] | Partial | Search and dedicated General, Appearance, Privacy, Library, Reader, Player, Downloads, Services, Data/storage, and About routes are live; add exact Aniyomi icons and summary density |
@@ -62,6 +62,7 @@ explicit so an architectural seam cannot be mistaken for a finished workflow.
 - [x] Added Android automatic/manual picture-in-picture and explicit background-audio service behavior.
 - [x] Added desktop loop/restart controls and an mpv-compatible negotiated contract for frame, delay, aspect, and deinterlace commands.
 - [x] Added episode search/unwatched filtering, download status filtering, and reader page retry.
+- [x] Added grouped priority downloads, manual ordering, delete-all, live speed/ETA, and explicit partial recovery.
 - [x] Verified backup inspection/rollback/import, tracking edit flows, and browser cookie/challenge handling.
 - [x] Added settings search and connected Sources, Tracking, Backup, and About to their working screens.
 - [x] Added one shared stable application-update check with version comparison and release-page hand-off.

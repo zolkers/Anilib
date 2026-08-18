@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -43,6 +44,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import fr.vriege.anilib.feature.downloads.DownloadJobSnapshot
+import fr.vriege.anilib.feature.downloads.DownloadPriority
+import fr.vriege.anilib.feature.downloads.DownloadRecoveryMode
 import fr.vriege.anilib.feature.downloads.DownloadStatus
 import fr.vriege.anilib.feature.downloads.ui.DownloadPresentation
 import java.util.Locale
@@ -53,6 +56,7 @@ internal fun DownloadsScreen(presentation: DownloadPresentation, goBack: () -> U
     var revision by remember(presentation) { mutableIntStateOf(0) }
     var commandError by remember(presentation) { mutableStateOf<String?>(null) }
     var filter by remember(presentation) { mutableStateOf(DownloadFilter.ALL) }
+    var confirmRemoveAll by remember(presentation) { mutableStateOf(false) }
     DisposableEffect(presentation) {
         val registration = presentation.observe { revision++ }
         onDispose { runCatching { registration.close() } }
@@ -84,6 +88,7 @@ internal fun DownloadsScreen(presentation: DownloadPresentation, goBack: () -> U
                 offlineMode = queue.offlineMode(),
                 pauseAll = { command(presentation::pauseAll) },
                 resumeAll = { command(presentation::resumeAll) },
+                removeAll = { confirmRemoveAll = true },
                 setOfflineMode = { enabled -> command { presentation.setOfflineMode(enabled) } },
             )
             Text(
@@ -117,19 +122,49 @@ internal fun DownloadsScreen(presentation: DownloadPresentation, goBack: () -> U
                 EmptyPage("No downloads match the active filter.")
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    items(jobs, key = { it.id().toString() }) { job ->
-                        DownloadJobCard(
-                            job = job,
-                            offlineMode = queue.offlineMode(),
-                            pause = { command { presentation.pause(job.id()) } },
-                            resume = { command { presentation.resume(job.id()) } },
-                            cancel = { command { presentation.cancel(job.id()) } },
-                            remove = { command { presentation.remove(job.id()) } },
-                        )
+                    jobs.groupBy { it.libraryItemId() }.values.forEach { group ->
+                        item(key = "group-${group.first().libraryItemId().value()}") {
+                            Text(
+                                "${group.first().title()} · ${group.size}",
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(top = 8.dp),
+                            )
+                        }
+                        items(group, key = { it.id().toString() }) { job ->
+                            DownloadJobCard(
+                                job = job,
+                                offlineMode = queue.offlineMode(),
+                                pause = { command { presentation.pause(job.id()) } },
+                                resume = { command { presentation.resume(job.id()) } },
+                                retry = { mode -> command { presentation.retry(job.id(), mode) } },
+                                setPriority = { priority ->
+                                    command { presentation.setPriority(job.id(), priority) }
+                                },
+                                move = { position -> command { presentation.move(job.id(), position) } },
+                                cancel = { command { presentation.cancel(job.id()) } },
+                                remove = { command { presentation.remove(job.id()) } },
+                            )
+                        }
                     }
                 }
             }
         }
+    }
+    if (confirmRemoveAll) {
+        AlertDialog(
+            onDismissRequest = { confirmRemoveAll = false },
+            title = { Text("Delete all downloads?") },
+            text = { Text("Completed files and partial data will be permanently removed.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    command(presentation::removeAll)
+                    confirmRemoveAll = false
+                }) { Text("Delete all") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmRemoveAll = false }) { Text("Cancel") }
+            },
+        )
     }
 }
 
@@ -138,6 +173,7 @@ private fun DownloadQueueControls(
     offlineMode: Boolean,
     pauseAll: () -> Unit,
     resumeAll: () -> Unit,
+    removeAll: () -> Unit,
     setOfflineMode: (Boolean) -> Unit,
 ) {
     Row(
@@ -151,6 +187,9 @@ private fun DownloadQueueControls(
             }
             IconButton(onClick = resumeAll, enabled = !offlineMode) {
                 Icon(Icons.Default.PlayArrow, contentDescription = "Resume all")
+            }
+            IconButton(onClick = removeAll) {
+                Icon(Icons.Default.Delete, contentDescription = "Delete all")
             }
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -166,6 +205,9 @@ private fun DownloadJobCard(
     offlineMode: Boolean,
     pause: () -> Unit,
     resume: () -> Unit,
+    retry: (DownloadRecoveryMode) -> Unit,
+    setPriority: (DownloadPriority) -> Unit,
+    move: (Int) -> Unit,
     cancel: () -> Unit,
     remove: () -> Unit,
 ) {
@@ -187,11 +229,25 @@ private fun DownloadJobCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 6.dp),
             )
+            if (job.bytesPerSecond() > 0L) {
+                val eta = job.estimatedRemainingMillis().map(::formatDuration).orElse("Calculating ETA")
+                Text(
+                    "${formatBytes(job.bytesPerSecond())}/s · $eta",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             val error = job.error().orElse(null)
             if (error != null) {
                 Text(error, color = MaterialTheme.colorScheme.error)
             }
             Row(modifier = Modifier.align(Alignment.End)) {
+                TextButton(onClick = { setPriority(nextPriority(job.priority())) }) {
+                    Text(job.priority().name.lowercase().replaceFirstChar(Char::uppercase))
+                }
+                TextButton(onClick = { move((job.queuePosition() - 1).coerceAtLeast(0)) }) {
+                    Text("↑")
+                }
+                TextButton(onClick = { move(job.queuePosition() + 1) }) { Text("↓") }
                 when (job.status()) {
                     DownloadStatus.QUEUED,
                     DownloadStatus.DOWNLOADING,
@@ -204,6 +260,11 @@ private fun DownloadJobCard(
                         Icon(Icons.Default.PlayArrow, contentDescription = "Resume")
                     }
                     else -> Unit
+                }
+                if (job.status() == DownloadStatus.FAILED && job.hasPartialData()) {
+                    TextButton(onClick = { retry(DownloadRecoveryMode.RESTART) }) {
+                        Text("Restart")
+                    }
                 }
                 if (job.status() != DownloadStatus.COMPLETED &&
                     job.status() != DownloadStatus.CANCELLED
@@ -222,6 +283,17 @@ private fun DownloadJobCard(
             }
         }
     }
+}
+
+private fun nextPriority(priority: DownloadPriority): DownloadPriority {
+    val values = DownloadPriority.entries
+    return values[(priority.ordinal + 1) % values.size]
+}
+
+private fun formatDuration(milliseconds: Long): String {
+    val seconds = milliseconds / 1000L
+    val minutes = seconds / 60L
+    return if (minutes > 0L) "${minutes}m ${seconds % 60L}s left" else "${seconds}s left"
 }
 
 private fun formatStatus(status: DownloadStatus): String = status.name

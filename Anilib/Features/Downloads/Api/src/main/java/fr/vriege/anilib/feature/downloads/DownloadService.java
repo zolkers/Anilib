@@ -20,6 +20,14 @@ public interface DownloadService {
 
     void remove(DownloadId id);
 
+    void removeAll();
+
+    void setPriority(DownloadId id, DownloadPriority priority);
+
+    void move(DownloadId id, int queuePosition);
+
+    void retry(DownloadId id, DownloadRecoveryMode mode);
+
     void pauseAll();
 
     void resumeAll();

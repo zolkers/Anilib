@@ -225,7 +225,7 @@ platform-specific.
 
 ### 5. Downloads and library updates
 
-- [ ] add queue grouping, reorder, priority, delete-all, speed, ETA, and richer
+- [x] add queue grouping, reorder, priority, delete-all, speed, ETA, and richer
   partial/error recovery
 - [ ] add user-selectable storage locations, validation, migration, index repair,
   and per-title download management

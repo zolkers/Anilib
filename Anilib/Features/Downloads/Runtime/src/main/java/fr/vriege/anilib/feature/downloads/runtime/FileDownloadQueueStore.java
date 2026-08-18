@@ -1,6 +1,7 @@
 package fr.vriege.anilib.feature.downloads.runtime;
 
 import fr.vriege.anilib.feature.downloads.DownloadId;
+import fr.vriege.anilib.feature.downloads.DownloadPriority;
 import fr.vriege.anilib.feature.downloads.DownloadStatus;
 import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.source.SourceCatalogueItemId;
@@ -24,7 +25,8 @@ import java.util.List;
 import java.util.Optional;
 
 final class FileDownloadQueueStore {
-    private static final String HEADER = "ANILIB_DOWNLOADS\t1\t";
+    private static final String HEADER_V1 = "ANILIB_DOWNLOADS\t1\t";
+    private static final String HEADER_V2 = "ANILIB_DOWNLOADS\t2\t";
     private static final Base64.Encoder ENCODER = Base64.getUrlEncoder().withoutPadding();
     private static final Base64.Decoder DECODER = Base64.getUrlDecoder();
     private final Path file;
@@ -38,14 +40,18 @@ final class FileDownloadQueueStore {
             return new LoadResult(false, List.of());
         }
         List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
-        if (lines.isEmpty() || !lines.getFirst().startsWith(HEADER)) {
+        if (lines.isEmpty()
+                || !lines.getFirst().startsWith(HEADER_V1)
+                && !lines.getFirst().startsWith(HEADER_V2)) {
             throw new IOException("Unsupported downloads queue format");
         }
-        boolean offline = Boolean.parseBoolean(lines.getFirst().substring(HEADER.length()));
+        boolean versionTwo = lines.getFirst().startsWith(HEADER_V2);
+        String header = versionTwo ? HEADER_V2 : HEADER_V1;
+        boolean offline = Boolean.parseBoolean(lines.getFirst().substring(header.length()));
         List<DownloadRecord> records = new ArrayList<>();
         for (int index = 1; index < lines.size(); index++) {
             if (!lines.get(index).isBlank()) {
-                records.add(decode(lines.get(index)));
+                records.add(decode(lines.get(index), index - 1L, versionTwo));
             }
         }
         return new LoadResult(offline, List.copyOf(records));
@@ -57,8 +63,12 @@ final class FileDownloadQueueStore {
             Files.createDirectories(parent);
         }
         List<String> lines = new ArrayList<>();
-        lines.add(HEADER + offlineMode);
-        records.stream().sorted(Comparator.comparing(record -> record.id)).map(this::encode).forEach(lines::add);
+        lines.add(HEADER_V2 + offlineMode);
+        records.stream()
+                .sorted(Comparator.comparingLong((DownloadRecord record) -> record.queueOrder)
+                        .thenComparing(record -> record.id))
+                .map(this::encode)
+                .forEach(lines::add);
         Path temporary = file.resolveSibling(file.getFileName() + ".tmp");
         Files.write(temporary, lines, StandardCharsets.UTF_8);
         try {
@@ -89,13 +99,16 @@ final class FileDownloadQueueStore {
                 text(record.error == null ? "" : record.error),
                 record.updatedAt.toString(),
                 pageValues,
-                pageSizes);
+                pageSizes,
+                record.priority.name(),
+                Long.toString(record.queueOrder));
     }
 
-    private DownloadRecord decode(String line) throws IOException {
+    private DownloadRecord decode(String line, long fallbackOrder, boolean versionTwo) throws IOException {
         try {
             String[] fields = line.split("\t", -1);
-            if (fields.length != 16 || !fields[0].equals("JOB")) {
+            int expectedFields = versionTwo ? 18 : 16;
+            if (fields.length != expectedFields || !fields[0].equals("JOB")) {
                 throw new IllegalArgumentException("invalid job field count");
             }
             SourceCatalogueItemId itemId = new SourceCatalogueItemId(
@@ -127,6 +140,8 @@ final class FileDownloadQueueStore {
                     itemId,
                     unit,
                     pages,
+                    versionTwo ? DownloadPriority.valueOf(fields[16]) : DownloadPriority.NORMAL,
+                    versionTwo ? Long.parseLong(fields[17]) : fallbackOrder,
                     DownloadStatus.valueOf(fields[9]),
                     Integer.parseInt(fields[10]),
                     Long.parseLong(fields[11]),
