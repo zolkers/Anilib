@@ -16,10 +16,10 @@ explicit so an architectural seam cannot be mistaken for a finished workflow.
 | Anime and manga details | [x] | Complete | Shared artwork, facts, editable metadata, chapter/episode lists, related titles, reader/player/download/tracking actions, sharing, and title/source WebView entry points are live |
 | Updates | [x] | Partial | Scheduling, refresh/cancel, failures, progress, read state, and anime/manga/unread filters are live; add date grouping, selection actions, skipped reasons, and per-item download controls |
 | History | [x] | Complete | Search, Today/Yesterday/date grouping, anime/manga filters and labels, title navigation, media-aware resume, and targeted removal are live |
-| Browse landing and sources | [x] | Partial | Anime/manga source, extension, and migration tabs plus global search, language filters, pinning, latest, and repository navigation are live; add update badges, richer source menus, and exact density |
+| Browse landing and sources | [x] | Complete | Anime/manga source, extension, and migration tabs expose update-count badges, fixed-density rows, source/extension overflow actions, global search, languages, pinning, latest, WebView, and repository navigation |
 | Source catalogue, search, and filters | [x] | Partial | Popular/latest, paging, search, filters, source preferences, list/grid, web entry, and library admission are live; add item menus and persisted display choice |
 | Migration | [x] | Partial | Source/title selection and migration are live; add batch options, seasonal anime handling, comparison detail, and progress states |
-| Extensions and repositories | [x] | Partial | Repository catalogue, language/pin ordering, trust, install/update/enable/remove, APK hand-off, and source navigation are live; add a dedicated extension detail route and richer progress/error actions |
+| Extensions and repositories | [x] | Partial | Repository catalogue, language/pin ordering, trust, install/update/enable/remove, APK hand-off, source navigation, Browse update badges, in-place update progress, and errors are live; add a dedicated extension detail route |
 | More hub | [x] | Partial | Core ordering and actions are live; add storage and help destinations plus richer download state |
 | Categories | [x] | Partial | The shared screen shows real counts plus create, rename, reorder, delete, display, and update policies |
 | Statistics | [x] | Complete | The shared screen reports real totals plus status, source, language, tracker-score bands, watched/known duration, average progress, and 7/30/365-day activity |

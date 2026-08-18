@@ -193,7 +193,7 @@ platform-specific.
 
 ### 2. Browse, sources, extensions, and migration
 
-- [ ] add source and extension update badges, richer overflow actions, and exact
+- [x] add source and extension update badges, richer overflow actions, and exact
   Aniyomi density and loading/error states
 - [ ] add a dedicated extension detail route with permissions, trust identity,
   versions, changelog, install progress, retry, and failure diagnostics

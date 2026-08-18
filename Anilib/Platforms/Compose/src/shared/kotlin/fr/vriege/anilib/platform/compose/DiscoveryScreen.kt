@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -25,7 +26,7 @@ import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.GridView
-import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -35,6 +36,9 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -51,10 +55,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -65,6 +72,10 @@ import androidx.compose.ui.unit.sp
 import fr.vriege.anilib.feature.discovery.SourcePreferenceSnapshot
 import fr.vriege.anilib.feature.discovery.ui.DiscoveryPresentation
 import fr.vriege.anilib.feature.discovery.ui.DiscoverySourceSection
+import fr.vriege.anilib.feature.extensionrepository.ExtensionContentKind
+import fr.vriege.anilib.feature.extensionrepository.ExtensionPackageMetadata
+import fr.vriege.anilib.feature.extensionrepository.ExtensionUpdateCandidate
+import fr.vriege.anilib.feature.extensionrepository.ui.ExtensionRepositoryPresentation
 import fr.vriege.anilib.feature.library.MediaKind
 import fr.vriege.anilib.feature.library.ui.LibraryCard
 import fr.vriege.anilib.feature.library.ui.LibraryPresentation
@@ -83,6 +94,9 @@ import fr.vriege.anilib.feature.source.SourceId
 import fr.vriege.anilib.feature.source.SourceWebPage
 import fr.vriege.anilib.framework.http.HttpCookieJar
 import java.util.Locale
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private enum class BrowseSection(val label: String, val kind: SourceContentKind?) {
     ANIME_SOURCES("Anime sources", SourceContentKind.ANIME),
@@ -98,6 +112,7 @@ private enum class BrowseSection(val label: String, val kind: SourceContentKind?
 internal fun DiscoveryScreen(
     presentation: DiscoveryPresentation,
     library: LibraryPresentation,
+    extensionRepositories: ExtensionRepositoryPresentation,
     browserCookies: HttpCookieJar,
     browserRuntimeStatus: BrowserRuntimeStatus,
     manageExtensions: () -> Unit,
@@ -111,6 +126,42 @@ internal fun DiscoveryScreen(
     var filteringSourceLanguages by remember { mutableStateOf(false) }
     var browseError by remember { mutableStateOf<String?>(null) }
     var browserPage by remember { mutableStateOf<SourceWebPage?>(null) }
+    var extensionRevision by remember { mutableIntStateOf(0) }
+    var updatingSources by remember { mutableStateOf<Set<SourceId>>(emptySet()) }
+    val scope = rememberCoroutineScope()
+    DisposableEffect(extensionRepositories) {
+        val observation = extensionRepositories.observe { extensionRevision++ }
+        onDispose { runCatching { observation.close() } }
+    }
+    val extensionView = remember(extensionRepositories, extensionRevision) {
+        extensionRepositories.snapshot()
+    }
+    val updatesBySource = remember(extensionView) {
+        extensionView.updates().flatMap { candidate ->
+            candidate.available().sources().map { source -> source.sourceId() to candidate }
+        }.toMap()
+    }
+    val packagesBySource = remember(extensionView) {
+        extensionView.packages().flatMap { extension ->
+            extension.sources().map { source -> source.sourceId() to extension }
+        }.toMap()
+    }
+    fun updateSource(sourceId: SourceId) {
+        val candidate = updatesBySource[sourceId.toString()] ?: return
+        updatingSources = updatingSources + sourceId
+        scope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    extensionRepositories.update(candidate.available()).get()
+                }
+            }.onSuccess {
+                browseError = null
+            }.onFailure {
+                browseError = it.message ?: "Extension update failed."
+            }
+            updatingSources = updatingSources - sourceId
+        }
+    }
 
     browserPage?.let { page ->
         BrowserScreen(page, browserCookies, browserRuntimeStatus) { browserPage = null }
@@ -185,7 +236,16 @@ internal fun DiscoveryScreen(
                             globalSearch = false
                             globalQuery = ""
                         },
-                        text = { Text(tab.label) },
+                            text = {
+                                val count = extensionView.updates().count { candidate ->
+                                    candidate.available().contentKind().matches(tab.kind)
+                                }
+                                Text(if (count > 0 && (tab.sourceTab() || tab.extensionTab())) {
+                                    "${tab.label} ($count)"
+                                } else {
+                                    tab.label
+                                })
+                            },
                     )
                 }
             }
@@ -199,40 +259,96 @@ internal fun DiscoveryScreen(
             if (globalSearch && globalQuery.isNotBlank() && section.sourceTab()) {
                 GlobalSearchContent(presentation, section.kind!!, globalQuery)
             } else if (globalSearch && section.extensionTab()) {
-                ExtensionList(presentation.extensions(section.kind!!), globalQuery)
+                ExtensionList(
+                    presentation.extensions(section.kind!!),
+                    globalQuery,
+                    updatesBySource,
+                    packagesBySource,
+                    extensionView.pinnedPackages(),
+                    updatingSources,
+                    togglePinned = { extension ->
+                        extensionRepositories.setPinned(
+                            extension.packageName(),
+                            extension.packageName() !in extensionView.pinnedPackages(),
+                        )
+                    },
+                    update = ::updateSource,
+                    manage = manageExtensions,
+                )
             } else {
                 when (section) {
                     BrowseSection.ANIME_SOURCES,
                     BrowseSection.MANGA_SOURCES,
-                    -> SourceList(
-                        sections = remember(section, sourceBrowseRevision) {
-                            presentation.sourceSections(section.kind!!)
-                        },
-                        supportsLatest = presentation::supportsLatest,
-                        pinnedSources = remember(sourceBrowseRevision) { presentation.pinnedSources() },
-                        togglePinned = { sourceId ->
-                            runCatching {
-                                val pinned = sourceId in presentation.pinnedSources()
-                                presentation.setSourcePinned(sourceId, !pinned)
-                            }.onSuccess {
-                                browseError = null
-                                sourceBrowseRevision++
-                            }.onFailure {
-                                browseError = it.message ?: "Source pinning failed."
+                    -> {
+                        val sectionsResult = remember(section, sourceBrowseRevision) {
+                            runCatching { presentation.sourceSections(section.kind!!) }
+                        }
+                        LaunchedEffect(sectionsResult) {
+                            sectionsResult.exceptionOrNull()?.let {
+                                browseError = it.message ?: "Sources could not be loaded."
                             }
-                        },
-                        open = { descriptor, nextListing ->
-                            selectedSource = descriptor
-                            listing = nextListing
-                        },
-                    )
+                        }
+                        SourceList(
+                            sections = sectionsResult.getOrDefault(emptyList()),
+                            supportsLatest = presentation::supportsLatest,
+                            pinnedSources = remember(sourceBrowseRevision) {
+                                presentation.pinnedSources()
+                            },
+                            updatesBySource = updatesBySource,
+                            updatingSources = updatingSources,
+                            togglePinned = { sourceId ->
+                                runCatching {
+                                    val pinned = sourceId in presentation.pinnedSources()
+                                    presentation.setSourcePinned(sourceId, !pinned)
+                                }.onSuccess {
+                                    browseError = null
+                                    sourceBrowseRevision++
+                                }.onFailure {
+                                    browseError = it.message ?: "Source pinning failed."
+                                }
+                            },
+                            open = { descriptor, nextListing ->
+                                selectedSource = descriptor
+                                listing = nextListing
+                            },
+                            openWeb = { descriptor ->
+                                presentation.sourceWebPage(descriptor.id())
+                                    .ifPresent { browserPage = it }
+                            },
+                            update = ::updateSource,
+                        )
+                    }
                     BrowseSection.ANIME_EXTENSIONS -> ExtensionList(
                         presentation.extensions(SourceContentKind.ANIME),
                         "",
+                        updatesBySource,
+                        packagesBySource,
+                        extensionView.pinnedPackages(),
+                        updatingSources,
+                        togglePinned = { extension ->
+                            extensionRepositories.setPinned(
+                                extension.packageName(),
+                                extension.packageName() !in extensionView.pinnedPackages(),
+                            )
+                        },
+                        update = ::updateSource,
+                        manage = manageExtensions,
                     )
                     BrowseSection.MANGA_EXTENSIONS -> ExtensionList(
                         presentation.extensions(SourceContentKind.MANGA),
                         "",
+                        updatesBySource,
+                        packagesBySource,
+                        extensionView.pinnedPackages(),
+                        updatingSources,
+                        togglePinned = { extension ->
+                            extensionRepositories.setPinned(
+                                extension.packageName(),
+                                extension.packageName() !in extensionView.pinnedPackages(),
+                            )
+                        },
+                        update = ::updateSource,
+                        manage = manageExtensions,
                     )
                     BrowseSection.MIGRATE_ANIME -> MigrationContent(
                         SourceContentKind.ANIME,
@@ -276,8 +392,12 @@ private fun SourceList(
     sections: List<DiscoverySourceSection>,
     supportsLatest: (SourceId) -> Boolean,
     pinnedSources: Set<SourceId>,
+    updatesBySource: Map<String, ExtensionUpdateCandidate>,
+    updatingSources: Set<SourceId>,
     togglePinned: (SourceId) -> Unit,
     open: (SourceDescriptor, SourceListing) -> Unit,
+    openWeb: (SourceDescriptor) -> Unit,
+    update: (SourceId) -> Unit,
 ) {
     if (sections.isEmpty()) {
         EmptyDiscovery("No sources installed")
@@ -295,11 +415,14 @@ private fun SourceList(
             }
             val orderedSources = section.sources().sortedByDescending { it.id() in pinnedSources }
             items(orderedSources, key = { it.id().toString() }) { source ->
+                var menuExpanded by remember(source.id()) { mutableStateOf(false) }
+                val updateAvailable = updatesBySource[source.id().toString()] != null
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .heightIn(min = 64.dp)
                         .clickable { open(source, SourceListing.POPULAR) }
-                        .padding(horizontal = 20.dp, vertical = 12.dp),
+                        .padding(horizontal = 20.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     SourceBadge(source)
@@ -312,21 +435,62 @@ private fun SourceList(
                             fontSize = 13.sp,
                         )
                     }
-                    if (supportsLatest(source.id())) {
-                        TextButton(onClick = { open(source, SourceListing.LATEST) }) {
-                            Text("Latest")
-                        }
-                    }
-                    IconButton(onClick = { togglePinned(source.id()) }) {
-                        Icon(
-                            Icons.Default.PushPin,
-                            contentDescription = if (source.id() in pinnedSources) "Unpin source" else "Pin source",
-                            tint = if (source.id() in pinnedSources) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
+                    if (updateAvailable) {
+                        Text(
+                            if (source.id() in updatingSources) "Updating…" else "Update",
+                            color = MaterialTheme.colorScheme.primary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
                         )
+                    }
+                    Box {
+                        IconButton(onClick = { menuExpanded = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "Source actions")
+                        }
+                        DropdownMenu(menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                            DropdownMenuItem(
+                                text = { Text("Popular") },
+                                onClick = {
+                                    menuExpanded = false
+                                    open(source, SourceListing.POPULAR)
+                                },
+                            )
+                            if (supportsLatest(source.id())) {
+                                DropdownMenuItem(
+                                    text = { Text("Latest") },
+                                    onClick = {
+                                        menuExpanded = false
+                                        open(source, SourceListing.LATEST)
+                                    },
+                                )
+                            }
+                            DropdownMenuItem(
+                                text = { Text("Open in WebView") },
+                                onClick = {
+                                    menuExpanded = false
+                                    openWeb(source)
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = {
+                                    Text(if (source.id() in pinnedSources) "Unpin" else "Pin")
+                                },
+                                onClick = {
+                                    menuExpanded = false
+                                    togglePinned(source.id())
+                                },
+                            )
+                            if (updateAvailable) {
+                                DropdownMenuItem(
+                                    text = { Text("Update extension") },
+                                    enabled = source.id() !in updatingSources,
+                                    onClick = {
+                                        menuExpanded = false
+                                        update(source.id())
+                                    },
+                                )
+                            }
+                        }
                     }
                 }
                 HorizontalDivider(modifier = Modifier.padding(start = 72.dp))
@@ -399,19 +563,34 @@ private fun SourceCatalogueScreen(
     var showPreferences by remember(source.id()) { mutableStateOf(false) }
     var filterValues by remember(source.id()) { mutableStateOf<Map<String, String>>(emptyMap()) }
     var preferenceRevision by remember(source.id()) { mutableIntStateOf(0) }
+    var requestRevision by remember(source.id()) { mutableIntStateOf(0) }
     var notice by remember(source.id()) { mutableStateOf<String?>(null) }
     val definitions = remember(source.id()) { presentation.filters(source.id()) }
     val preferenceDefinitions = remember(source.id(), preferenceRevision) {
         presentation.preferences(source.id())
     }
     val sourceWebPage = remember(source.id()) { presentation.sourceWebPage(source.id()).orElse(null) }
-    val result = remember(source.id(), listing, query, page, filterValues, preferenceRevision) {
-        runCatching {
-            val filters = filterValues.map { SourceFilterValue(it.key, it.value) }
-            if (query.isBlank()) {
-                presentation.browse(source.id(), listing, page, 30, filters)
-            } else {
-                presentation.search(source.id(), query, page, 30, filters)
+    var result by remember(source.id(), listing, query, page, filterValues, preferenceRevision) {
+        mutableStateOf<Result<SourcePage>?>(null)
+    }
+    LaunchedEffect(
+        source.id(),
+        listing,
+        query,
+        page,
+        filterValues,
+        preferenceRevision,
+        requestRevision,
+    ) {
+        result = null
+        result = withContext(Dispatchers.IO) {
+            runCatching {
+                val filters = filterValues.map { SourceFilterValue(it.key, it.value) }
+                if (query.isBlank()) {
+                    presentation.browse(source.id(), listing, page, 30, filters)
+                } else {
+                    presentation.search(source.id(), query, page, 30, filters)
+                }
             }
         }
     }
@@ -506,10 +685,13 @@ private fun SourceCatalogueScreen(
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
                 )
             }
-            val sourcePage = result.getOrNull()
-            if (sourcePage == null) {
-                EmptyDiscovery(result.exceptionOrNull()?.message ?: "Unable to load this source")
-            } else {
+            val sourcePage = result?.getOrNull()
+            when {
+                result == null -> DiscoveryLoading("Loading ${source.displayName()}…")
+                sourcePage == null -> DiscoveryFailure(
+                    result?.exceptionOrNull()?.message ?: "Unable to load this source",
+                ) { requestRevision++ }
+                else -> {
                 CatalogueContent(
                     page = sourcePage,
                     grid = grid,
@@ -521,6 +703,7 @@ private fun SourceCatalogueScreen(
                     openWebPage = openWebPage,
                 )
                 Pagination(page, sourcePage.hasNextPage()) { next -> page = next }
+                }
             }
         }
     }
@@ -753,15 +936,28 @@ private fun GlobalSearchContent(
     kind: SourceContentKind,
     query: String,
 ) {
-    val result = remember(kind, query) { runCatching { presentation.globalSearch(kind, query, 10) } }
+    var revision by remember(kind, query) { mutableIntStateOf(0) }
+    var result by remember(kind, query) {
+        mutableStateOf<Result<Map<SourceId, SourcePage>>?>(null)
+    }
+    LaunchedEffect(kind, query, revision) {
+        result = null
+        result = withContext(Dispatchers.IO) {
+            runCatching { presentation.globalSearch(kind, query, 10) }
+        }
+    }
     val sourceNames = remember(kind) {
         presentation.sourceSections(kind)
             .flatMap { it.sources() }
             .associate { it.id() to it.displayName() }
     }
-    val sources = result.getOrNull()
-    if (sources == null) {
-        EmptyDiscovery(result.exceptionOrNull()?.message ?: "Global search failed")
+    val sources = result?.getOrNull()
+    if (result == null) {
+        DiscoveryLoading("Searching installed sources…")
+    } else if (sources == null) {
+        DiscoveryFailure(result?.exceptionOrNull()?.message ?: "Global search failed") {
+            revision++
+        }
     } else {
         LazyColumn(modifier = Modifier.fillMaxSize()) {
             sources.forEach { (sourceId, page) ->
@@ -786,7 +982,17 @@ private fun GlobalSearchContent(
 }
 
 @Composable
-private fun ExtensionList(extensions: List<InstalledSourceExtension>, query: String) {
+private fun ExtensionList(
+    extensions: List<InstalledSourceExtension>,
+    query: String,
+    updatesBySource: Map<String, ExtensionUpdateCandidate>,
+    packagesBySource: Map<String, ExtensionPackageMetadata>,
+    pinnedPackages: Set<String>,
+    updatingSources: Set<SourceId>,
+    togglePinned: (ExtensionPackageMetadata) -> Unit,
+    update: (SourceId) -> Unit,
+    manage: () -> Unit,
+) {
     val normalizedQuery = query.trim().lowercase(Locale.ROOT)
     val visible = extensions.filter { extension ->
         normalizedQuery.isEmpty()
@@ -815,9 +1021,13 @@ private fun ExtensionList(extensions: List<InstalledSourceExtension>, query: Str
         }
         items(visible, key = { it.source().id().toString() }) { extension ->
             val source = extension.source()
+            val updateAvailable = updatesBySource[source.id().toString()] != null
+            val extensionPackage = packagesBySource[source.id().toString()]
+            var menuExpanded by remember(source.id()) { mutableStateOf(false) }
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .heightIn(min = 64.dp)
                     .clickable {
                         expanded = if (source.id() in expanded) {
                             expanded - source.id()
@@ -825,7 +1035,7 @@ private fun ExtensionList(extensions: List<InstalledSourceExtension>, query: Str
                             expanded + source.id()
                         }
                     }
-                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                    .padding(horizontal = 20.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 SourceBadge(source)
@@ -837,7 +1047,61 @@ private fun ExtensionList(extensions: List<InstalledSourceExtension>, query: Str
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Text("Installed", color = MaterialTheme.colorScheme.primary, fontSize = 13.sp)
+                Text(
+                    when {
+                        source.id() in updatingSources -> "Updating…"
+                        updateAvailable -> "Update"
+                        else -> "Installed"
+                    },
+                    color = MaterialTheme.colorScheme.primary,
+                    fontSize = 13.sp,
+                )
+                Box {
+                    IconButton(onClick = { menuExpanded = true }) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "Extension actions")
+                    }
+                    DropdownMenu(menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                        DropdownMenuItem(
+                            text = { Text(if (source.id() in expanded) "Hide details" else "Details") },
+                            onClick = {
+                                menuExpanded = false
+                                expanded = if (source.id() in expanded) {
+                                    expanded - source.id()
+                                } else {
+                                    expanded + source.id()
+                                }
+                            },
+                        )
+                        if (extensionPackage != null) {
+                            DropdownMenuItem(
+                                text = {
+                                    Text(if (extensionPackage.packageName() in pinnedPackages) "Unpin" else "Pin")
+                                },
+                                onClick = {
+                                    menuExpanded = false
+                                    togglePinned(extensionPackage)
+                                },
+                            )
+                        }
+                        if (updateAvailable) {
+                            DropdownMenuItem(
+                                text = { Text("Update") },
+                                enabled = source.id() !in updatingSources,
+                                onClick = {
+                                    menuExpanded = false
+                                    update(source.id())
+                                },
+                            )
+                        }
+                        DropdownMenuItem(
+                            text = { Text("Manage repositories") },
+                            onClick = {
+                                menuExpanded = false
+                                manage()
+                            },
+                        )
+                    }
+                }
             }
             if (source.id() in expanded) {
                 ExtensionDetails(extension)
@@ -970,6 +1234,31 @@ private fun EmptyDiscovery(message: String) {
     }
 }
 
+@Composable
+private fun DiscoveryLoading(message: String) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            CircularProgressIndicator()
+            Spacer(Modifier.height(12.dp))
+            Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun DiscoveryFailure(message: String, retry: () -> Unit) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.padding(28.dp),
+        ) {
+            Text(message, color = MaterialTheme.colorScheme.error)
+            Button(onClick = retry) { Text("Retry") }
+        }
+    }
+}
+
 private fun languageName(tag: String): String = when (tag.lowercase(Locale.ROOT)) {
     "und" -> "Local"
     "en" -> "English"
@@ -984,3 +1273,10 @@ private fun BrowseSection.extensionTab(): Boolean =
     this == BrowseSection.ANIME_EXTENSIONS || this == BrowseSection.MANGA_EXTENSIONS
 
 private fun BrowseSection.searchable(): Boolean = sourceTab() || extensionTab()
+
+private fun ExtensionContentKind.matches(kind: SourceContentKind?): Boolean = when (this) {
+    ExtensionContentKind.ANIME -> kind == SourceContentKind.ANIME
+    ExtensionContentKind.MANGA -> kind == SourceContentKind.MANGA
+    ExtensionContentKind.MIXED -> kind != null
+    ExtensionContentKind.UNKNOWN -> false
+}

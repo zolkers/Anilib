@@ -606,6 +606,7 @@ private fun AppDestination(
         AppSection.BROWSE -> DiscoveryScreen(
             discovery,
             presentation,
+            extensionRepositories,
             browserCookies,
             browserRuntimeStatus,
             manageExtensions = {
