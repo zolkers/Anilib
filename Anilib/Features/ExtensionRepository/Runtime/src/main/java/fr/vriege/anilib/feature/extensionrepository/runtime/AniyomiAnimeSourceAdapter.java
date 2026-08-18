@@ -14,6 +14,7 @@ import fr.vriege.anilib.feature.source.SourceEpisode;
 import fr.vriege.anilib.feature.source.SourceEpisodeId;
 import fr.vriege.anilib.feature.source.SourceExtensionManifest;
 import fr.vriege.anilib.feature.source.SourceExtensionPlugin;
+import fr.vriege.anilib.feature.source.SourceFilterDefinition;
 import fr.vriege.anilib.feature.source.SourceId;
 import fr.vriege.anilib.feature.source.SourcePage;
 import fr.vriege.anilib.feature.source.SourceSearchRequest;
@@ -162,15 +163,22 @@ public final class AniyomiAnimeSourceAdapter {
         public SourcePage search(SourceSearchRequest request) {
             requireAuthorized();
             Preconditions.requireNonNull(request, "request");
-            Object filters = invoke(delegate, "getFilterList");
+            AniyomiAnimeFilterAdapter.ReflectedFilters filters = reflectedFilters();
+            filters.apply(request.browseRequest().filters());
             Object result = invokeModernOrRx(
                     delegate,
                     "getSearchAnime",
                     "fetchSearchAnime",
                     request.browseRequest().page(),
                     request.query(),
-                    filters);
+                    filters.abiValue());
             return page(result);
+        }
+
+        @Override
+        public List<SourceFilterDefinition> filters() {
+            requireAuthorized();
+            return reflectedFilters().definitions();
         }
 
         @Override
@@ -252,6 +260,10 @@ public final class AniyomiAnimeSourceAdapter {
                 return list(invokeSuspend(delegate, "getVideoList", episode), "video list");
             }
             return list(await(invoke(delegate, "fetchVideoList", episode)), "video list");
+        }
+
+        private AniyomiAnimeFilterAdapter.ReflectedFilters reflectedFilters() {
+            return AniyomiAnimeFilterAdapter.from(invoke(delegate, "getFilterList"));
         }
 
         private SourcePage page(Object value) {
@@ -387,7 +399,7 @@ public final class AniyomiAnimeSourceAdapter {
         }
     }
 
-    private static Object invoke(Object target, String methodName, Object... arguments) {
+    static Object invoke(Object target, String methodName, Object... arguments) {
         Object value = Preconditions.requireNonNull(target, "reflection target");
         Method method = compatibleMethod(value.getClass(), methodName, arguments)
                 .orElseThrow(() -> new IllegalStateException(
@@ -395,7 +407,7 @@ public final class AniyomiAnimeSourceAdapter {
         return invokeMethod(value, method, arguments);
     }
 
-    private static Optional<Object> invokeOptional(Object target, String methodName) {
+    static Optional<Object> invokeOptional(Object target, String methodName) {
         if (target == null) {
             return Optional.empty();
         }
@@ -535,21 +547,21 @@ public final class AniyomiAnimeSourceAdapter {
         };
     }
 
-    private static List<?> list(Object value, String label) {
+    static List<?> list(Object value, String label) {
         if (value instanceof List<?> values) {
             return values;
         }
         throw new IllegalStateException(label + " must be a List");
     }
 
-    private static Number number(Object value) {
+    static Number number(Object value) {
         if (value instanceof Number number) {
             return number;
         }
         throw new IllegalStateException("Aniyomi numeric property has an invalid type");
     }
 
-    private static boolean bool(Object value) {
+    static boolean bool(Object value) {
         if (value instanceof Boolean result) {
             return result;
         }
@@ -563,7 +575,7 @@ public final class AniyomiAnimeSourceAdapter {
         throw new IllegalStateException(label + " must be non-blank");
     }
 
-    private static String nullableText(Object value) {
+    static String nullableText(Object value) {
         return value instanceof String text ? text : "";
     }
 

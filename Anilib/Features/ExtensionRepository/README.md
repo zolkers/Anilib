@@ -70,7 +70,9 @@ green, Android now constructs the declared source or source factory before
 Standard startup and adapts catalogue pages, episodes, streams, request headers,
 and subtitles into explicit Anilib Source Bundles. The reflection bridge accepts
 both ext-lib 16 RxJava calls and ext-lib 17 suspend catalogue, combined episode
-update, hoster, and video calls. One package failure does not
+update, hoster, and video calls. Text, checkbox, tri-state, select, sort, and
+grouped extension filters are projected into the shared discovery model and
+written back to a fresh ABI filter list for each search. One package failure does not
 select a partial Bundle and is displayed in the shared repository screen. Each
 bridged operation rechecks the currently installed signer, so forgetting trust
 or replacing the APK immediately blocks subsequent calls.

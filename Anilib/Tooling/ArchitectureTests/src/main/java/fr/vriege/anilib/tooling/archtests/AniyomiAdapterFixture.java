@@ -51,6 +51,8 @@ public final class AniyomiAdapterFixture {
     }
 
     public static final class ModernSource {
+        private boolean filterApplied;
+
         public long getId() {
             return 84L;
         }
@@ -68,7 +70,13 @@ public final class AniyomiAdapterFixture {
         }
 
         public Object getFilterList() {
-            return new Object();
+            return List.of(
+                    new AnimeFilter.Text("Title", ""),
+                    new AnimeFilter.CheckBox("Dubbed", false),
+                    new AnimeFilter.Select("Order", new String[]{"Newest", "Oldest"}, 0),
+                    new AnimeFilter.Group(
+                            "Genres",
+                            List.of(new AnimeFilter.TriState("Action", 0))));
         }
 
         public Page getPopularAnime(int page, Object continuation) {
@@ -80,7 +88,17 @@ public final class AniyomiAdapterFixture {
         }
 
         public Page getSearchAnime(int page, String query, Object filters, Object continuation) {
+            List<?> values = (List<?>) filters;
+            filterApplied = ((AnimeFilter.Text) values.get(0)).getState().equals("wanted")
+                    && ((AnimeFilter.CheckBox) values.get(1)).getState()
+                    && ((AnimeFilter.Select) values.get(2)).getState() == 1
+                    && ((AnimeFilter.TriState) ((AnimeFilter.Group) values.get(3)).getState().getFirst())
+                    .getState() == 1;
             return getPopularAnime(page, continuation);
+        }
+
+        public boolean filterApplied() {
+            return filterApplied;
         }
 
         public EpisodeUpdate getAnimeEpisodeUpdate(
@@ -110,6 +128,65 @@ public final class AniyomiAdapterFixture {
     public static final class Hoster {
         public List<Video> getVideoList() {
             return null;
+        }
+    }
+
+    public abstract static class AnimeFilter<T> {
+        private final String name;
+        private T state;
+
+        protected AnimeFilter(String name, T state) {
+            this.name = name;
+            this.state = state;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public T getState() {
+            return state;
+        }
+
+        public void setState(T state) {
+            this.state = state;
+        }
+
+        public static final class Text extends AnimeFilter<String> {
+            public Text(String name, String state) {
+                super(name, state);
+            }
+        }
+
+        public static final class CheckBox extends AnimeFilter<Boolean> {
+            public CheckBox(String name, boolean state) {
+                super(name, state);
+            }
+        }
+
+        public static final class TriState extends AnimeFilter<Integer> {
+            public TriState(String name, int state) {
+                super(name, state);
+            }
+        }
+
+        public static final class Select extends AnimeFilter<Integer> {
+            private final String[] values;
+
+            public Select(String name, String[] values, int state) {
+                super(name, state);
+                this.values = values.clone();
+            }
+
+            public String[] getValues() {
+                return values.clone();
+            }
+        }
+
+        public static final class Group extends AnimeFilter<List<AnimeFilter<?>>> {
+            public Group(String name, List<AnimeFilter<?>> state) {
+                super(name, List.copyOf(state));
+            }
         }
     }
 

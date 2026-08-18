@@ -84,7 +84,9 @@ platform-specific.
     video calls while retaining the ext-lib 16 RxJava path
   - [ ] provide the exact Android host classes and external runtime ABI required
     to load current extension bytecode
-  - [ ] project extension filters and source preferences into shared Anilib models
+  - [x] project text, checkbox, tri-state, select, sort, and grouped extension
+    filters into shared Anilib models and apply selected values during search
+  - [ ] project source preferences into shared Anilib models
   - [ ] add the equivalent trusted APK bridge for manga extensions
 - [x] shared Settings Bundle with durable appearance and feature-policy preferences
 - [x] live Android and desktop theme selection from shared settings

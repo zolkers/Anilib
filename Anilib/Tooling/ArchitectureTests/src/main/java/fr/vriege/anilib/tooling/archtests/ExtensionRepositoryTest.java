@@ -26,8 +26,11 @@ import fr.vriege.anilib.framework.http.HttpResponse;
 import fr.vriege.anilib.feature.source.CatalogueSource;
 import fr.vriege.anilib.feature.source.SourceBrowseRequest;
 import fr.vriege.anilib.feature.source.SourceEpisode;
+import fr.vriege.anilib.feature.source.SourceFilterType;
+import fr.vriege.anilib.feature.source.SourceFilterValue;
 import fr.vriege.anilib.feature.source.SourcePage;
 import fr.vriege.anilib.feature.source.SourcePermission;
+import fr.vriege.anilib.feature.source.SourceSearchRequest;
 import fr.vriege.anilib.feature.source.StreamingSource;
 
 import java.io.IOException;
@@ -331,12 +334,25 @@ final class ExtensionRepositoryTest {
     }
 
     private static void adaptsModernSuspendAndHosterAnimeSource(Counter counter) {
+        AniyomiAdapterFixture.ModernSource modernSource = new AniyomiAdapterFixture.ModernSource();
         AniyomiAnimeSourceAdapter.AdaptedSource adapted = AniyomiAnimeSourceAdapter.adapt(
                 "eu.kanade.tachiyomi.animeextension.fr.modern",
                 "17.0",
-                new AniyomiAdapterFixture.ModernSource());
+                modernSource);
         CatalogueSource catalogue = (CatalogueSource) adapted.source();
         SourcePage page = catalogue.latest(new SourceBrowseRequest(1, 20, List.of(), Map.of()));
+        var filters = catalogue.filters();
+        catalogue.search(new SourceSearchRequest(
+                "example",
+                new SourceBrowseRequest(
+                        1,
+                        20,
+                        List.of(
+                                new SourceFilterValue("filter.0", "wanted"),
+                                new SourceFilterValue("filter.1", "true"),
+                                new SourceFilterValue("filter.2", "Oldest"),
+                                new SourceFilterValue("filter.3.0", "include")),
+                        Map.of())));
         StreamingSource streaming = (StreamingSource) adapted.source();
         List<SourceEpisode> episodes = streaming.episodes(page.items().getFirst().id());
         var streams = streaming.streams(episodes.getFirst().id());
@@ -348,6 +364,12 @@ final class ExtensionRepositoryTest {
                         && streams.getFirst().format().name().equals("HLS")
                         && streams.getFirst().subtitles().size() == 1,
                 "an ext-lib 17 source must resolve hosters into Anilib video streams");
+        counter.check(filters.size() == 5
+                        && filters.get(0).type() == SourceFilterType.TEXT
+                        && filters.get(3).type() == SourceFilterType.HEADER
+                        && filters.get(4).groupId().equals("filter.3")
+                        && modernSource.filterApplied(),
+                "Aniyomi text, checkbox, select, group, and tri-state filters must round-trip");
     }
 
     private static ExtensionPackageMetadata portablePackage(byte[] bundle, KeyPair keyPair, long versionCode) {
