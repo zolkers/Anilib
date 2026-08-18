@@ -12,6 +12,7 @@ import fr.vriege.anilib.feature.discovery.ui.DiscoveryUiCapabilities
 import fr.vriege.anilib.feature.library.ui.LibraryUiCapabilities
 import fr.vriege.anilib.feature.reader.ui.ReaderUiCapabilities
 import fr.vriege.anilib.feature.downloads.ui.DownloadUiCapabilities
+import fr.vriege.anilib.feature.backup.ui.BackupUiCapabilities
 import fr.vriege.anilib.framework.http.jdk.JdkHttpTransport
 import fr.vriege.anilib.kernel.StartedAnilib
 import fr.vriege.anilib.platform.compose.AnilibApp
@@ -34,6 +35,7 @@ fun main() {
     val discovery = started.capability(DiscoveryUiCapabilities.PRESENTATION)
     val reader = started.capability(ReaderUiCapabilities.PRESENTATION)
     val downloads = started.capability(DownloadUiCapabilities.PRESENTATION)
+    val backup = started.capability(BackupUiCapabilities.PRESENTATION)
     application {
         Window(
             onCloseRequest = {
@@ -47,6 +49,7 @@ fun main() {
                 discovery = discovery,
                 reader = reader,
                 downloads = downloads,
+                backup = backup,
                 pageDecoder = ::decodePage,
                 componentCount = started.components().size,
                 darkTheme = desktopDarkTheme(),

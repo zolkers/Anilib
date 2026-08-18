@@ -12,6 +12,7 @@ import fr.vriege.anilib.feature.discovery.ui.DiscoveryUiCapabilities
 import fr.vriege.anilib.feature.library.ui.LibraryUiCapabilities
 import fr.vriege.anilib.feature.reader.ui.ReaderUiCapabilities
 import fr.vriege.anilib.feature.downloads.ui.DownloadUiCapabilities
+import fr.vriege.anilib.feature.backup.ui.BackupUiCapabilities
 import fr.vriege.anilib.framework.http.runtime.UrlConnectionHttpTransport
 import fr.vriege.anilib.platform.compose.AnilibApp
 
@@ -33,6 +34,7 @@ class MainActivity : ComponentActivity() {
         val discovery = started.capability(DiscoveryUiCapabilities.PRESENTATION)
         val reader = started.capability(ReaderUiCapabilities.PRESENTATION)
         val downloads = started.capability(DownloadUiCapabilities.PRESENTATION)
+        val backup = started.capability(BackupUiCapabilities.PRESENTATION)
         val componentCount = started.components().size
         setContent {
             AnilibApp(
@@ -40,6 +42,7 @@ class MainActivity : ComponentActivity() {
                 discovery = discovery,
                 reader = reader,
                 downloads = downloads,
+                backup = backup,
                 pageDecoder = ::decodePage,
                 componentCount = componentCount,
             )

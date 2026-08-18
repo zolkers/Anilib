@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.vriege.anilib.feature.library.LibraryProgress
 import fr.vriege.anilib.feature.library.LibraryItemId
+import fr.vriege.anilib.feature.backup.ui.BackupPresentation
 import fr.vriege.anilib.feature.discovery.ui.DiscoveryPresentation
 import fr.vriege.anilib.feature.downloads.ui.DownloadPresentation
 import fr.vriege.anilib.feature.library.ui.LibraryCard
@@ -87,6 +88,7 @@ fun AnilibApp(
     discovery: DiscoveryPresentation,
     reader: ReaderPresentation,
     downloads: DownloadPresentation,
+    backup: BackupPresentation,
     pageDecoder: (ByteArray) -> ImageBitmap?,
     componentCount: Int,
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -97,14 +99,14 @@ fun AnilibApp(
     var activeReader by remember { mutableStateOf<ReaderController?>(null) }
     var readerError by remember { mutableStateOf<String?>(null) }
     var downloadError by remember { mutableStateOf<String?>(null) }
-    var downloadsOpen by remember { mutableStateOf(false) }
+    var moreDestination by remember { mutableStateOf<MoreDestination?>(null) }
     val navigate: ((LibraryNavigator) -> Unit) -> Unit = { transition ->
         transition(navigator)
         destination = navigator.state()
     }
     val openSection: (AppSection) -> Unit = { next ->
         section = next
-        if (next != AppSection.MORE) downloadsOpen = false
+        if (next != AppSection.MORE) moreDestination = null
     }
 
     MaterialTheme(colorScheme = if (darkTheme) darkColorScheme() else lightColorScheme()) {
@@ -136,6 +138,7 @@ fun AnilibApp(
                             discovery,
                             reader,
                             downloads,
+                            backup,
                             destination,
                             section,
                             componentCount,
@@ -145,9 +148,9 @@ fun AnilibApp(
                             readerError,
                             enqueueDownload,
                             downloadError,
-                            downloadsOpen,
-                            { downloadsOpen = true },
-                            { downloadsOpen = false },
+                            moreDestination,
+                            { moreDestination = it },
+                            { moreDestination = null },
                         )
                     } else {
                         CompactShell(
@@ -155,6 +158,7 @@ fun AnilibApp(
                             discovery,
                             reader,
                             downloads,
+                            backup,
                             destination,
                             section,
                             componentCount,
@@ -164,9 +168,9 @@ fun AnilibApp(
                             readerError,
                             enqueueDownload,
                             downloadError,
-                            downloadsOpen,
-                            { downloadsOpen = true },
-                            { downloadsOpen = false },
+                            moreDestination,
+                            { moreDestination = it },
+                            { moreDestination = null },
                         )
                     }
                 }
@@ -181,6 +185,7 @@ private fun ExpandedShell(
     discovery: DiscoveryPresentation,
     reader: ReaderPresentation,
     downloads: DownloadPresentation,
+    backup: BackupPresentation,
     destination: LibraryNavigationState,
     section: AppSection,
     componentCount: Int,
@@ -190,9 +195,9 @@ private fun ExpandedShell(
     readerError: String?,
     enqueueDownload: (LibraryItemId) -> Unit,
     downloadError: String?,
-    downloadsOpen: Boolean,
-    openDownloads: () -> Unit,
-    closeDownloads: () -> Unit,
+    moreDestination: MoreDestination?,
+    openMore: (MoreDestination) -> Unit,
+    closeMore: () -> Unit,
 ) {
     Row(modifier = Modifier.fillMaxSize()) {
         AnilibNavigationRail(section, openSection)
@@ -203,6 +208,7 @@ private fun ExpandedShell(
                 discovery,
                 reader,
                 downloads,
+                backup,
                 destination,
                 section,
                 componentCount,
@@ -212,9 +218,9 @@ private fun ExpandedShell(
                 readerError,
                 enqueueDownload,
                 downloadError,
-                downloadsOpen,
-                openDownloads,
-                closeDownloads,
+                moreDestination,
+                openMore,
+                closeMore,
             )
         }
     }
@@ -226,6 +232,7 @@ private fun CompactShell(
     discovery: DiscoveryPresentation,
     reader: ReaderPresentation,
     downloads: DownloadPresentation,
+    backup: BackupPresentation,
     destination: LibraryNavigationState,
     section: AppSection,
     componentCount: Int,
@@ -235,9 +242,9 @@ private fun CompactShell(
     readerError: String?,
     enqueueDownload: (LibraryItemId) -> Unit,
     downloadError: String?,
-    downloadsOpen: Boolean,
-    openDownloads: () -> Unit,
-    closeDownloads: () -> Unit,
+    moreDestination: MoreDestination?,
+    openMore: (MoreDestination) -> Unit,
+    closeMore: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
@@ -246,6 +253,7 @@ private fun CompactShell(
                 discovery,
                 reader,
                 downloads,
+                backup,
                 destination,
                 section,
                 componentCount,
@@ -255,9 +263,9 @@ private fun CompactShell(
                 readerError,
                 enqueueDownload,
                 downloadError,
-                downloadsOpen,
-                openDownloads,
-                closeDownloads,
+                moreDestination,
+                openMore,
+                closeMore,
             )
         }
         HorizontalDivider()
@@ -312,6 +320,7 @@ private fun AppDestination(
     discovery: DiscoveryPresentation,
     reader: ReaderPresentation,
     downloads: DownloadPresentation,
+    backup: BackupPresentation,
     destination: LibraryNavigationState,
     section: AppSection,
     componentCount: Int,
@@ -321,9 +330,9 @@ private fun AppDestination(
     readerError: String?,
     enqueueDownload: (LibraryItemId) -> Unit,
     downloadError: String?,
-    downloadsOpen: Boolean,
-    openDownloads: () -> Unit,
-    closeDownloads: () -> Unit,
+    moreDestination: MoreDestination?,
+    openMore: (MoreDestination) -> Unit,
+    closeMore: () -> Unit,
 ) {
     when (section) {
         AppSection.LIBRARY -> when (destination.page()) {
@@ -346,10 +355,14 @@ private fun AppDestination(
             openSection(AppSection.LIBRARY)
         }
         AppSection.BROWSE -> DiscoveryScreen(discovery, presentation)
-        AppSection.MORE -> if (downloadsOpen) {
-            DownloadsScreen(downloads, closeDownloads)
-        } else {
-            MorePage(componentCount, openDownloads)
+        AppSection.MORE -> when (moreDestination) {
+            MoreDestination.DOWNLOADS -> DownloadsScreen(downloads, closeMore)
+            MoreDestination.BACKUP -> BackupScreen(backup, closeMore)
+            null -> MorePage(
+                componentCount,
+                { openMore(MoreDestination.DOWNLOADS) },
+                { openMore(MoreDestination.BACKUP) },
+            )
         }
     }
 }
@@ -610,10 +623,15 @@ private fun PlaceholderPage(title: String, message: String) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MorePage(componentCount: Int, openDownloads: () -> Unit) {
+private fun MorePage(
+    componentCount: Int,
+    openDownloads: () -> Unit,
+    openBackup: () -> Unit,
+) {
     Scaffold(topBar = { TopAppBar(title = { Text("More") }) }) { padding ->
         LazyColumn(modifier = Modifier.fillMaxSize().padding(padding)) {
             item { MoreRow("Download queue", "Manage current and completed downloads", openDownloads) }
+            item { MoreRow("Backup and restore", "Create or restore a local backup", openBackup) }
             item { MoreRow("Categories", "Organize anime and manga in your library") }
             item { MoreRow("Statistics", "Library and reading activity") }
             item { MoreRow("Settings", "Appearance, library, reader, player, and tracking") }
@@ -679,6 +697,11 @@ private enum class AppSection(val label: String) {
     HISTORY("History"),
     BROWSE("Browse"),
     MORE("More"),
+}
+
+private enum class MoreDestination {
+    DOWNLOADS,
+    BACKUP,
 }
 
 private fun AppSection.icon(): ImageVector = when (this) {
