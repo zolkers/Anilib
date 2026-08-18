@@ -205,7 +205,7 @@ platform-specific.
 
 ### 3. Reader
 
-- [ ] add complete gesture and tap-zone customization
+- [x] add complete gesture and tap-zone customization
 - [ ] add scaling, fit policy, crop borders, split pages, rotation, dual-page,
   and webtoon spacing controls
 - [ ] add color filters, brightness, transitions, orientation policy, and

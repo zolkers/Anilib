@@ -29,7 +29,7 @@ explicit so an architectural seam cannot be mistaken for a finished workflow.
 | Settings home | [x] | Partial | Search and dedicated General, Appearance, Privacy, Library, Reader, Player, Downloads, Services, Data/storage, and About routes are live; add exact Aniyomi icons and summary density |
 | Appearance settings | [x] | Partial | Live system/light/dark selection and a persistent Library/Updates/History/Browse/More start screen are available; add language packs, theme families, colors, typography, and navigation style |
 | Library and update settings | [x] | Partial | Wi-Fi policies and the complete update schedule/skip controls are live; add category defaults, exceptions, and automatic-download depth |
-| Reader settings and reader | [x] | Partial | Immersive pages, resume, tap zones, slider, LTR/RTL/vertical/webtoon, prefetch, and retry are live; add scaling, crop/split, rotation, color filters, transitions, and per-title overrides |
+| Reader settings and reader | [x] | Partial | Immersive pages, resume, slider, LTR/RTL/vertical/webtoon, prefetch, retry, and persisted customization for tap zones, swipes, double taps, and long presses are live; add scaling, crop/split, rotation, color filters, transitions, and per-title overrides |
 | Player settings and player | [x] | Partial | Searchable/unwatched episode list, qualities, subtitles, resume, protected media relay, and native Android/desktop playback are live; add complete controls, gestures, decoder/audio policy, PiP, and custom buttons |
 | Data, storage, and advanced settings | [x] | Partial | A dedicated page owns confirmed cookie/cache/WebView/database cleanup plus backup and About routes; add storage inspection, user agent, proxy/DoH, diagnostics, and crash logs |
 | WebView | [x] | Partial | Navigation, reload, progress, source headers/User-Agent, cookie transfer, challenge completion, and platform cleanup are live; add automatic challenge retry, file chooser, pop-ups, downloads, and browser settings |
@@ -53,6 +53,7 @@ explicit so an architectural seam cannot be mistaken for a finished workflow.
 - [x] Persisted each source catalogue's grid/list choice and added item action menus.
 - [x] Completed batch migration with seasonal matching, source comparison, preview, progress, cancellation, and partial-failure retry.
 - [x] Added synthetic offline compatibility fixtures for the public Yuzono and Keiyoushi repository JSON shapes.
+- [x] Added persisted Reader interaction mappings for tap zones, swipes, double taps, and long presses.
 - [x] Added episode search/unwatched filtering, download status filtering, and reader page retry.
 - [x] Verified backup inspection/rollback/import, tracking edit flows, and browser cookie/challenge handling.
 - [x] Added settings search and connected Sources, Tracking, Backup, and About to their working screens.

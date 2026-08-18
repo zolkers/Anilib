@@ -1,8 +1,10 @@
 package fr.vriege.anilib.platform.compose
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,10 +15,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Slider
@@ -32,11 +38,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import fr.vriege.anilib.feature.reader.ReadingDirection
+import fr.vriege.anilib.feature.reader.ReaderInteractionAction
+import fr.vriege.anilib.feature.reader.ReaderInteractionPreferences
 import fr.vriege.anilib.feature.reader.ui.ReaderController
 import kotlin.math.roundToInt
 
@@ -48,6 +59,9 @@ internal fun ReaderScreen(
 ) {
     var revision by remember(controller) { mutableIntStateOf(0) }
     var controlsVisible by remember(controller) { mutableStateOf(true) }
+    var zoomed by remember(controller) { mutableStateOf(false) }
+    var interactionMenu by remember(controller) { mutableStateOf(false) }
+    var interactions by remember(controller) { mutableStateOf(controller.interactions()) }
     val snapshot = remember(controller, revision) { controller.snapshot() }
     val decodedPage = remember(controller, snapshot.currentPageIndex()) {
         runCatching { pageDecoder(controller.currentPage()) }
@@ -58,21 +72,56 @@ internal fun ReaderScreen(
         if (moved) revision++
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+    fun execute(action: ReaderInteractionAction) {
+        when (action) {
+            ReaderInteractionAction.PREVIOUS_PAGE -> move(true)
+            ReaderInteractionAction.NEXT_PAGE -> move(false)
+            ReaderInteractionAction.TOGGLE_CONTROLS -> controlsVisible = !controlsVisible
+            ReaderInteractionAction.TOGGLE_ZOOM -> zoomed = !zoomed
+            ReaderInteractionAction.OPEN_MENU -> interactionMenu = true
+            ReaderInteractionAction.NONE -> Unit
+        }
+    }
+
+    var drag by remember(controller) { mutableStateOf(Offset.Zero) }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .pointerInput(interactions, snapshot.direction()) {
+                detectDragGestures(
+                    onDragStart = { drag = Offset.Zero },
+                    onDrag = { change, amount ->
+                        change.consume()
+                        drag += amount
+                    },
+                    onDragEnd = {
+                        val horizontal = kotlin.math.abs(drag.x) > kotlin.math.abs(drag.y)
+                        val action = if (horizontal && kotlin.math.abs(drag.x) >= 48f) {
+                            if (drag.x < 0f) interactions.swipeLeft() else interactions.swipeRight()
+                        } else if (!horizontal && kotlin.math.abs(drag.y) >= 48f) {
+                            if (drag.y < 0f) interactions.swipeUp() else interactions.swipeDown()
+                        } else {
+                            ReaderInteractionAction.NONE
+                        }
+                        execute(horizontalAction(action, snapshot.direction()))
+                    },
+                )
+            },
+    ) {
         decodedPage.getOrNull()?.let { image ->
             Image(
                 bitmap = image,
                 contentDescription = "Page ${snapshot.currentPageIndex() + 1}",
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().scale(if (zoomed) 2f else 1f),
                 contentScale = ContentScale.Fit,
             )
         } ?: ReaderPageError(decodedPage.exceptionOrNull()?.message) { revision++ }
 
         ReaderTapZones(
             direction = snapshot.direction(),
-            previous = { move(true) },
-            next = { move(false) },
-            toggleControls = { controlsVisible = !controlsVisible },
+            interactions = interactions,
+            execute = ::execute,
         )
 
         if (controlsVisible) {
@@ -80,6 +129,7 @@ internal fun ReaderScreen(
                 title = snapshot.title(),
                 contentUnit = snapshot.contentUnit().title(),
                 closeReader = closeReader,
+                openInteractions = { interactionMenu = true },
             )
             ReaderBottomBar(
                 pageIndex = snapshot.currentPageIndex(),
@@ -96,31 +146,58 @@ internal fun ReaderScreen(
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
         }
+        if (interactionMenu) {
+            ReaderInteractionDialog(
+                preferences = interactions,
+                update = {
+                    controller.setInteractions(it)
+                    interactions = it
+                },
+                close = { interactionMenu = false },
+            )
+        }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ReaderTapZones(
     direction: ReadingDirection,
-    previous: () -> Unit,
-    next: () -> Unit,
-    toggleControls: () -> Unit,
+    interactions: ReaderInteractionPreferences,
+    execute: (ReaderInteractionAction) -> Unit,
 ) {
     if (direction == ReadingDirection.VERTICAL || direction == ReadingDirection.WEBTOON) {
         Column(modifier = Modifier.fillMaxSize()) {
-            Box(modifier = Modifier.weight(0.36f).fillMaxWidth().clickable(onClick = previous))
-            Box(modifier = Modifier.weight(0.28f).fillMaxWidth().clickable(onClick = toggleControls))
-            Box(modifier = Modifier.weight(0.36f).fillMaxWidth().clickable(onClick = next))
+            ReaderTapZone(Modifier.weight(0.36f).fillMaxWidth(), interactions.topTap(), interactions, execute)
+            ReaderTapZone(Modifier.weight(0.28f).fillMaxWidth(), interactions.centerTap(), interactions, execute)
+            ReaderTapZone(Modifier.weight(0.36f).fillMaxWidth(), interactions.bottomTap(), interactions, execute)
         }
     } else {
-        val left = if (direction == ReadingDirection.RIGHT_TO_LEFT) next else previous
-        val right = if (direction == ReadingDirection.RIGHT_TO_LEFT) previous else next
+        val left = horizontalAction(interactions.leftTap(), direction)
+        val right = horizontalAction(interactions.rightTap(), direction)
         Row(modifier = Modifier.fillMaxSize()) {
-            Box(modifier = Modifier.weight(0.36f).fillMaxHeight().clickable(onClick = left))
-            Box(modifier = Modifier.weight(0.28f).fillMaxHeight().clickable(onClick = toggleControls))
-            Box(modifier = Modifier.weight(0.36f).fillMaxHeight().clickable(onClick = right))
+            ReaderTapZone(Modifier.weight(0.36f).fillMaxHeight(), left, interactions, execute)
+            ReaderTapZone(Modifier.weight(0.28f).fillMaxHeight(), interactions.centerTap(), interactions, execute)
+            ReaderTapZone(Modifier.weight(0.36f).fillMaxHeight(), right, interactions, execute)
         }
     }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun ReaderTapZone(
+    modifier: Modifier,
+    action: ReaderInteractionAction,
+    interactions: ReaderInteractionPreferences,
+    execute: (ReaderInteractionAction) -> Unit,
+) {
+    Box(
+        modifier = modifier.combinedClickable(
+            onClick = { execute(action) },
+            onDoubleClick = { execute(interactions.doubleTap()) },
+            onLongClick = { execute(interactions.longPress()) },
+        ),
+    )
 }
 
 @Composable
@@ -128,6 +205,7 @@ private fun ReaderTopBar(
     title: String,
     contentUnit: String,
     closeReader: () -> Unit,
+    openInteractions: () -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -154,6 +232,102 @@ private fun ReaderTopBar(
                 overflow = TextOverflow.Ellipsis,
             )
         }
+        IconButton(onClick = openInteractions) {
+            Icon(Icons.Default.Settings, contentDescription = "Reader interactions", tint = Color.White)
+        }
+    }
+}
+
+private enum class InteractionSlot(val label: String) {
+    LEFT_TAP("Left tap"),
+    CENTER_TAP("Center tap"),
+    RIGHT_TAP("Right tap"),
+    TOP_TAP("Top tap"),
+    BOTTOM_TAP("Bottom tap"),
+    SWIPE_LEFT("Swipe left"),
+    SWIPE_RIGHT("Swipe right"),
+    SWIPE_UP("Swipe up"),
+    SWIPE_DOWN("Swipe down"),
+    DOUBLE_TAP("Double tap"),
+    LONG_PRESS("Long press"),
+}
+
+@Composable
+private fun ReaderInteractionDialog(
+    preferences: ReaderInteractionPreferences,
+    update: (ReaderInteractionPreferences) -> Unit,
+    close: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = close,
+        title = { Text("Reader interactions") },
+        text = {
+            LazyColumn(modifier = Modifier.heightIn(max = 520.dp)) {
+                items(InteractionSlot.entries.size) { index ->
+                    val slot = InteractionSlot.entries[index]
+                    val action = interaction(preferences, slot)
+                    TextButton(onClick = { update(withInteraction(preferences, slot, nextAction(action))) }) {
+                        Text("${slot.label}: ${action.name.replace('_', ' ').lowercase()}")
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = close) { Text("Done") } },
+        dismissButton = {
+            TextButton(onClick = { update(ReaderInteractionPreferences.defaults()) }) { Text("Reset") }
+        },
+    )
+}
+
+private fun interaction(
+    preferences: ReaderInteractionPreferences,
+    slot: InteractionSlot,
+): ReaderInteractionAction = when (slot) {
+    InteractionSlot.LEFT_TAP -> preferences.leftTap()
+    InteractionSlot.CENTER_TAP -> preferences.centerTap()
+    InteractionSlot.RIGHT_TAP -> preferences.rightTap()
+    InteractionSlot.TOP_TAP -> preferences.topTap()
+    InteractionSlot.BOTTOM_TAP -> preferences.bottomTap()
+    InteractionSlot.SWIPE_LEFT -> preferences.swipeLeft()
+    InteractionSlot.SWIPE_RIGHT -> preferences.swipeRight()
+    InteractionSlot.SWIPE_UP -> preferences.swipeUp()
+    InteractionSlot.SWIPE_DOWN -> preferences.swipeDown()
+    InteractionSlot.DOUBLE_TAP -> preferences.doubleTap()
+    InteractionSlot.LONG_PRESS -> preferences.longPress()
+}
+
+private fun withInteraction(
+    current: ReaderInteractionPreferences,
+    slot: InteractionSlot,
+    action: ReaderInteractionAction,
+) = ReaderInteractionPreferences(
+    if (slot == InteractionSlot.LEFT_TAP) action else current.leftTap(),
+    if (slot == InteractionSlot.CENTER_TAP) action else current.centerTap(),
+    if (slot == InteractionSlot.RIGHT_TAP) action else current.rightTap(),
+    if (slot == InteractionSlot.TOP_TAP) action else current.topTap(),
+    if (slot == InteractionSlot.BOTTOM_TAP) action else current.bottomTap(),
+    if (slot == InteractionSlot.SWIPE_LEFT) action else current.swipeLeft(),
+    if (slot == InteractionSlot.SWIPE_RIGHT) action else current.swipeRight(),
+    if (slot == InteractionSlot.SWIPE_UP) action else current.swipeUp(),
+    if (slot == InteractionSlot.SWIPE_DOWN) action else current.swipeDown(),
+    if (slot == InteractionSlot.DOUBLE_TAP) action else current.doubleTap(),
+    if (slot == InteractionSlot.LONG_PRESS) action else current.longPress(),
+)
+
+private fun nextAction(action: ReaderInteractionAction): ReaderInteractionAction {
+    val values = ReaderInteractionAction.entries
+    return values[(action.ordinal + 1) % values.size]
+}
+
+private fun horizontalAction(
+    action: ReaderInteractionAction,
+    direction: ReadingDirection,
+): ReaderInteractionAction {
+    if (direction != ReadingDirection.RIGHT_TO_LEFT) return action
+    return when (action) {
+        ReaderInteractionAction.PREVIOUS_PAGE -> ReaderInteractionAction.NEXT_PAGE
+        ReaderInteractionAction.NEXT_PAGE -> ReaderInteractionAction.PREVIOUS_PAGE
+        else -> action
     }
 }
 

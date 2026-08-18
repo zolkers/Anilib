@@ -8,12 +8,15 @@ import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.library.LibraryOrigin;
 import fr.vriege.anilib.feature.library.MediaKind;
 import fr.vriege.anilib.feature.reader.ReaderCapabilities;
+import fr.vriege.anilib.feature.reader.ReaderInteractionAction;
+import fr.vriege.anilib.feature.reader.ReaderInteractionPreferences;
 import fr.vriege.anilib.feature.reader.ReaderException;
 import fr.vriege.anilib.feature.reader.ReaderPolicy;
 import fr.vriege.anilib.feature.reader.ReaderService;
 import fr.vriege.anilib.feature.reader.ReaderSession;
 import fr.vriege.anilib.feature.reader.ReadingDirection;
 import fr.vriege.anilib.feature.reader.runtime.DefaultReaderService;
+import fr.vriege.anilib.feature.reader.runtime.FileReaderInteractionPreferenceStore;
 import fr.vriege.anilib.feature.source.InstalledSourceExtension;
 import fr.vriege.anilib.feature.source.PagedSource;
 import fr.vriege.anilib.feature.source.Source;
@@ -53,7 +56,39 @@ final class ReaderTest {
         verifiesStandardLocalReader(counter);
         verifiesBoundedPipeline(counter);
         suppressesIncognitoPersistence(counter);
+        persistsInteractionPreferences(counter);
         return counter.value;
+    }
+
+    private static void persistsInteractionPreferences(Counter counter) {
+        Path directory = null;
+        try {
+            directory = Files.createTempDirectory("anilib-reader-interactions");
+            Path file = directory.resolve("reader-interactions.properties");
+            ReaderInteractionPreferences defaults = ReaderInteractionPreferences.defaults();
+            ReaderInteractionPreferences customized = new ReaderInteractionPreferences(
+                    ReaderInteractionAction.NONE,
+                    defaults.centerTap(),
+                    defaults.rightTap(),
+                    defaults.topTap(),
+                    defaults.bottomTap(),
+                    defaults.swipeLeft(),
+                    defaults.swipeRight(),
+                    defaults.swipeUp(),
+                    defaults.swipeDown(),
+                    ReaderInteractionAction.OPEN_MENU,
+                    ReaderInteractionAction.TOGGLE_CONTROLS);
+            new FileReaderInteractionPreferenceStore(file).save(customized);
+            ReaderInteractionPreferences reopened = new FileReaderInteractionPreferenceStore(file).snapshot();
+            counter.check(reopened.equals(customized),
+                    "reader tap zones and gestures must survive Android and desktop restart");
+        } catch (IOException exception) {
+            throw new AssertionError("Unable to test reader interaction preferences", exception);
+        } finally {
+            if (directory != null) {
+                deleteTree(directory);
+            }
+        }
     }
 
     private static void verifiesStandardLocalReader(Counter counter) {

@@ -5,6 +5,7 @@ import fr.vriege.anilib.feature.library.LibraryCatalog;
 import fr.vriege.anilib.feature.reader.ReaderCapabilities;
 import fr.vriege.anilib.feature.reader.ReaderPolicy;
 import fr.vriege.anilib.feature.reader.runtime.DefaultReaderService;
+import fr.vriege.anilib.feature.reader.runtime.FileReaderInteractionPreferenceStore;
 import fr.vriege.anilib.feature.reader.ui.DefaultReaderPresentation;
 import fr.vriege.anilib.feature.reader.ui.ReaderUiCapabilities;
 import fr.vriege.anilib.feature.source.SourceCapabilities;
@@ -17,6 +18,7 @@ import fr.vriege.anilib.kernel.PluginInstallationContext;
 import fr.vriege.anilib.kernel.PluginManifest;
 
 import java.util.Objects;
+import java.nio.file.Path;
 
 public final class ReaderPlugin implements AnilibPlugin {
     private static final PluginManifest MANIFEST = PluginManifest.builder(
@@ -30,12 +32,24 @@ public final class ReaderPlugin implements AnilibPlugin {
             .build();
 
     private final ReaderPolicy policy;
+    private final Path interactionPreferences;
 
     public ReaderPlugin() {
-        this(ReaderPolicy.standard());
+        this(Path.of("reader-interactions.properties"), ReaderPolicy.standard());
     }
 
     public ReaderPlugin(ReaderPolicy policy) {
+        this(Path.of("reader-interactions.properties"), policy);
+    }
+
+    public ReaderPlugin(Path interactionPreferences) {
+        this(interactionPreferences, ReaderPolicy.standard());
+    }
+
+    public ReaderPlugin(Path interactionPreferences, ReaderPolicy policy) {
+        this.interactionPreferences = Objects.requireNonNull(
+                interactionPreferences,
+                "interactionPreferences must not be null");
         this.policy = Objects.requireNonNull(policy, "policy must not be null");
     }
 
@@ -56,6 +70,8 @@ public final class ReaderPlugin implements AnilibPlugin {
                 () -> !settings.snapshot().incognitoMode()));
         context.publish(ReaderCapabilities.SERVICE, service);
         context.publish(ReaderCapabilities.CONTENT_REGISTRAR, service);
-        context.publish(ReaderUiCapabilities.PRESENTATION, new DefaultReaderPresentation(service));
+        context.publish(ReaderUiCapabilities.PRESENTATION, new DefaultReaderPresentation(
+                service,
+                new FileReaderInteractionPreferenceStore(interactionPreferences)));
     }
 }
