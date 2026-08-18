@@ -6,6 +6,9 @@ import fr.vriege.anilib.feature.backup.BackupInspection;
 import fr.vriege.anilib.feature.backup.BackupRestoreResult;
 import fr.vriege.anilib.feature.backup.BackupSectionSnapshot;
 import fr.vriege.anilib.feature.backup.BackupService;
+import fr.vriege.anilib.feature.backup.AniyomiBackupImportResult;
+import fr.vriege.anilib.feature.backup.AniyomiBackupInspection;
+import fr.vriege.anilib.feature.library.LibraryCatalog;
 import fr.vriege.anilib.framework.backup.BackupSectionCodec;
 import fr.vriege.anilib.framework.backup.BackupSectionData;
 import fr.vriege.anilib.framework.backup.BackupSectionDetails;
@@ -37,22 +40,39 @@ public final class DefaultBackupService implements BackupService, AutoCloseable 
     private final Path backupDirectory;
     private final Map<BackupSectionId, BackupSectionCodec> codecs;
     private final Clock clock;
+    private final AniyomiBackupImporter aniyomiImporter;
     private final BackupArchiveStore store = new BackupArchiveStore();
     private final Set<Runnable> listeners = new HashSet<>();
     private boolean closed;
 
     public DefaultBackupService(Path backupDirectory, List<BackupSectionCodec> codecs) {
-        this(backupDirectory, codecs, Clock.systemUTC());
+        this(backupDirectory, codecs, null, Clock.systemUTC());
     }
 
     public DefaultBackupService(
             Path backupDirectory,
             List<BackupSectionCodec> codecs,
             Clock clock) {
+        this(backupDirectory, codecs, null, clock);
+    }
+
+    public DefaultBackupService(
+            Path backupDirectory,
+            List<BackupSectionCodec> codecs,
+            LibraryCatalog library) {
+        this(backupDirectory, codecs, library, Clock.systemUTC());
+    }
+
+    public DefaultBackupService(
+            Path backupDirectory,
+            List<BackupSectionCodec> codecs,
+            LibraryCatalog library,
+            Clock clock) {
         this.backupDirectory = Objects.requireNonNull(
                 backupDirectory,
                 "backupDirectory must not be null").toAbsolutePath().normalize();
         this.clock = Objects.requireNonNull(clock, "clock must not be null");
+        this.aniyomiImporter = library == null ? null : new AniyomiBackupImporter(library, clock);
         Map<BackupSectionId, BackupSectionCodec> indexed = new LinkedHashMap<>();
         Objects.requireNonNull(codecs, "codecs must not be null").stream()
                 .sorted(Comparator.comparing(BackupSectionCodec::sectionId))
@@ -137,6 +157,12 @@ public final class DefaultBackupService implements BackupService, AutoCloseable 
     }
 
     @Override
+    public synchronized AniyomiBackupInspection inspectAniyomi(Path path) {
+        ensureOpen();
+        return requireAniyomiImporter().inspect(path);
+    }
+
+    @Override
     public synchronized BackupRestoreResult restore(Path path) {
         ensureOpen();
         BackupArchiveStore.Archive archive = store.read(path);
@@ -174,6 +200,14 @@ public final class DefaultBackupService implements BackupService, AutoCloseable 
                 }
             }
         }
+    }
+
+    @Override
+    public synchronized AniyomiBackupImportResult importAniyomi(Path path) {
+        ensureOpen();
+        AniyomiBackupImportResult result = requireAniyomiImporter().importBackup(path);
+        notifyListeners();
+        return result;
     }
 
     @Override
@@ -364,6 +398,13 @@ public final class DefaultBackupService implements BackupService, AutoCloseable 
         if (closed) {
             throw new BackupException("Backup service is closed");
         }
+    }
+
+    private AniyomiBackupImporter requireAniyomiImporter() {
+        if (aniyomiImporter == null) {
+            throw new BackupException("Aniyomi import requires the Library capability");
+        }
+        return aniyomiImporter;
     }
 
     @Override

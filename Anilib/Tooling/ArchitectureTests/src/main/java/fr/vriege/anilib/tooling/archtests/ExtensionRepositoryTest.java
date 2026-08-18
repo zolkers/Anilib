@@ -450,7 +450,7 @@ final class ExtensionRepositoryTest {
                         && streams.getFirst().subtitles().size() == 1,
                 "an adapted APK source must retain stream, header, format, and subtitle metadata");
         counter.check(adapted.bundle().manifest().descriptor().id().toString()
-                        .startsWith("extension.apk.eu.kanade.tachiyomi"),
+                        .startsWith("extension.aniyomi."),
                 "an adapted APK source must become one explicit Source Bundle");
         counter.check(adapted.manifest().permissions().equals(Set.of(SourcePermission.TRUSTED_PLATFORM_RUNTIME)),
                 "the APK adapter must declare its audited platform-runtime exception explicitly");

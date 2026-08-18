@@ -61,7 +61,7 @@ platform-specific.
 - [x] reproducible desktop packages for Windows, Linux, and macOS
 - [x] Android APK using only Android SDK/platform APIs beyond shared Anilib code
 - [x] extension signing, compatibility metadata, and update channels
-- [ ] import compatibility for user-owned Aniyomi backups where legally and
+- [x] import compatibility for user-owned Aniyomi backups where legally and
   technically feasible
 
 ## Phase 6 — bring-your-own sources and complete settings

@@ -134,7 +134,7 @@ public final class AniyomiAnimeSourceAdapter {
             this.authorized = authorized;
             this.preferences = preferences;
             long numericId = number(invoke(delegate, "getId")).longValue();
-            SourceId sourceId = SourceId.of(sourceId(packageName, numericId));
+            SourceId sourceId = SourceId.of(sourceId(numericId));
             descriptor = new SourceDescriptor(
                     sourceId,
                     text(invoke(delegate, "getName"), "source name"),
@@ -689,15 +689,8 @@ public final class AniyomiAnimeSourceAdapter {
         return SourceStreamFormat.AUTOMATIC;
     }
 
-    private static String sourceId(String packageName, long numericId) {
-        String normalizedPackage = packageName.toLowerCase(Locale.ROOT)
-                .replaceAll("[^a-z0-9.-]+", "-")
-                .replaceAll("[.-]{2,}", ".")
-                .replaceAll("^[^a-z]+", "");
-        if (normalizedPackage.isBlank()) {
-            throw new IllegalArgumentException("packageName cannot produce a stable source ID");
-        }
-        return "apk." + normalizedPackage + "." + Long.toUnsignedString(numericId);
+    private static String sourceId(long numericId) {
+        return "aniyomi." + Long.toUnsignedString(numericId);
     }
 
     private static String language(Object value) {

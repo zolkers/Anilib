@@ -12,7 +12,11 @@ public interface BackupService {
 
     BackupInspection inspect(Path path);
 
+    AniyomiBackupInspection inspectAniyomi(Path path);
+
     BackupRestoreResult restore(Path path);
+
+    AniyomiBackupImportResult importAniyomi(Path path);
 
     void delete(Path path);
 

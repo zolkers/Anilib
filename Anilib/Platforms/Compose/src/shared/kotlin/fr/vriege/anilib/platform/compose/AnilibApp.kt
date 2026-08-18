@@ -106,6 +106,7 @@ fun AnilibApp(
     player: PlayerPresentation,
     downloads: DownloadPresentation,
     backup: BackupPresentation,
+    backupImportPicker: BackupImportPicker,
     tracking: TrackerPresentation,
     updates: UpdatePresentation,
     pageDecoder: (ByteArray) -> ImageBitmap?,
@@ -207,6 +208,7 @@ fun AnilibApp(
                             player,
                             downloads,
                             backup,
+                            backupImportPicker,
                             tracking,
                             updates,
                             destination,
@@ -241,6 +243,7 @@ fun AnilibApp(
                             player,
                             downloads,
                             backup,
+                            backupImportPicker,
                             tracking,
                             updates,
                             destination,
@@ -282,6 +285,7 @@ private fun ExpandedShell(
     player: PlayerPresentation,
     downloads: DownloadPresentation,
     backup: BackupPresentation,
+    backupImportPicker: BackupImportPicker,
     tracking: TrackerPresentation,
     updates: UpdatePresentation,
     destination: LibraryNavigationState,
@@ -319,6 +323,7 @@ private fun ExpandedShell(
                 player,
                 downloads,
                 backup,
+                backupImportPicker,
                 tracking,
                 updates,
                 destination,
@@ -357,6 +362,7 @@ private fun CompactShell(
     player: PlayerPresentation,
     downloads: DownloadPresentation,
     backup: BackupPresentation,
+    backupImportPicker: BackupImportPicker,
     tracking: TrackerPresentation,
     updates: UpdatePresentation,
     destination: LibraryNavigationState,
@@ -392,6 +398,7 @@ private fun CompactShell(
                 player,
                 downloads,
                 backup,
+                backupImportPicker,
                 tracking,
                 updates,
                 destination,
@@ -473,6 +480,7 @@ private fun AppDestination(
     player: PlayerPresentation,
     downloads: DownloadPresentation,
     backup: BackupPresentation,
+    backupImportPicker: BackupImportPicker,
     tracking: TrackerPresentation,
     updates: UpdatePresentation,
     destination: LibraryNavigationState,
@@ -524,7 +532,7 @@ private fun AppDestination(
         )
         AppSection.MORE -> when (moreDestination) {
             MoreDestination.DOWNLOADS -> DownloadsScreen(downloads, closeMore)
-            MoreDestination.BACKUP -> BackupScreen(backup, closeMore)
+            MoreDestination.BACKUP -> BackupScreen(backup, backupImportPicker, closeMore)
             MoreDestination.TRACKING -> TrackerAccountsScreen(tracking, closeMore)
             MoreDestination.EXTENSION_REPOSITORIES -> ExtensionRepositoriesScreen(
                 extensionRepositories,

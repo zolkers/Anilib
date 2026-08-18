@@ -65,6 +65,7 @@ class MainActivity : ComponentActivity() {
             startupReports = apkActivation.reports,
         )
         val browserDataController = AndroidBrowserDataController(this)
+        val backupImportPicker = AndroidBackupImportPicker(this)
         val componentCount = started.components().size
         setContent {
             AnilibApp(
@@ -81,6 +82,7 @@ class MainActivity : ComponentActivity() {
                 player = player,
                 downloads = downloads,
                 backup = backup,
+                backupImportPicker = backupImportPicker,
                 tracking = tracking,
                 updates = updates,
                 pageDecoder = ::decodePage,

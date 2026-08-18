@@ -82,6 +82,7 @@ fun main() {
                 player = player,
                 downloads = downloads,
                 backup = backup,
+                backupImportPicker = DesktopBackupImportPicker(),
                 tracking = tracking,
                 updates = updates,
                 pageDecoder = ::decodePage,

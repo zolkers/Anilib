@@ -162,6 +162,15 @@ unsupported known sections fail before mutation. One shared screen on Android
 and desktop provides local creation, preview, confirmed restore, and confirmed
 deletion.
 
+The same Backup Bundle can inspect and import a user-selected Aniyomi protobuf
+backup, compressed or uncompressed, without linking its serializer runtime.
+The bounded wire reader maps manga, anime, categories, history, progress, and
+metadata into Library's public model, discloses unsupported tracker, preference,
+and embedded-extension entries before confirmation, and atomically merges by
+the original numeric source identity plus title URL. APK-adapted sources use
+that numeric identity too, so imported titles can reconnect without a package-
+name guess. Android and desktop execute this identical Java path.
+
 Player is a removable vertical over Library and Source. Source API 1.4 owns the
 optional `StreamingSource` extension contract and immutable episode, stream,
 format, request-header, and subtitle models. The Player Bundle resolves only

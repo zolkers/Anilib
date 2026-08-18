@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Restore
+import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -40,6 +41,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import fr.vriege.anilib.feature.backup.BackupFileSnapshot
 import fr.vriege.anilib.feature.backup.BackupInspection
+import fr.vriege.anilib.feature.backup.AniyomiBackupInspection
 import fr.vriege.anilib.feature.backup.ui.BackupPresentation
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -53,15 +55,24 @@ private val backupDateFormatter = DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun BackupScreen(presentation: BackupPresentation, goBack: () -> Unit) {
+internal fun BackupScreen(
+    presentation: BackupPresentation,
+    importPicker: BackupImportPicker,
+    goBack: () -> Unit,
+) {
     var revision by remember(presentation) { mutableIntStateOf(0) }
     var message by remember(presentation) { mutableStateOf<String?>(null) }
     var error by remember(presentation) { mutableStateOf<String?>(null) }
     var pendingRestore by remember(presentation) { mutableStateOf<BackupInspection?>(null) }
+    var pendingAniyomiImport by remember(presentation) { mutableStateOf<AniyomiBackupInspection?>(null) }
     var pendingDelete by remember(presentation) { mutableStateOf<BackupFileSnapshot?>(null) }
     DisposableEffect(presentation) {
         val registration = presentation.observe { revision++ }
         onDispose { runCatching { registration.close() } }
+    }
+    val pendingAniyomiPath = pendingAniyomiImport?.path()
+    DisposableEffect(pendingAniyomiPath) {
+        onDispose { pendingAniyomiPath?.let(importPicker::release) }
     }
     val backups = remember(presentation, revision) { presentation.backups() }
 
@@ -84,6 +95,27 @@ internal fun BackupScreen(presentation: BackupPresentation, goBack: () -> Unit) 
                 error = null
             }
             .onFailure { error = it.message ?: "Backup inspection failed." }
+    }
+    val chooseAniyomiBackup = {
+        importPicker.choose(
+            { path ->
+                runCatching { presentation.inspectAniyomi(path) }
+                    .onSuccess {
+                        pendingAniyomiImport = it
+                        error = null
+                    }
+                    .onFailure {
+                        importPicker.release(path)
+                        error = it.message ?: "Aniyomi backup inspection failed."
+                        message = null
+                    }
+            },
+            { failure ->
+                error = failure
+                message = null
+            },
+        )
+        Unit
     }
 
     Scaffold(
@@ -108,6 +140,14 @@ internal fun BackupScreen(presentation: BackupPresentation, goBack: () -> Unit) 
             Spacer(Modifier.height(12.dp))
             Button(onClick = createBackup, modifier = Modifier.fillMaxWidth()) {
                 Text("Create backup")
+            }
+            Spacer(Modifier.height(12.dp))
+            OutlinedButton(
+                onClick = chooseAniyomiBackup,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Icon(Icons.Default.UploadFile, contentDescription = null)
+                Text("Import Aniyomi backup", modifier = Modifier.padding(start = 6.dp))
             }
             Text(
                 presentation.backupDirectory().toString(),
@@ -150,6 +190,25 @@ internal fun BackupScreen(presentation: BackupPresentation, goBack: () -> Unit) 
                         message = null
                     }
                 pendingRestore = null
+            },
+        )
+    }
+    pendingAniyomiImport?.let { inspection ->
+        AniyomiImportDialog(
+            inspection = inspection,
+            dismiss = { pendingAniyomiImport = null },
+            confirm = {
+                runCatching { presentation.importAniyomi(inspection.path()) }
+                    .onSuccess {
+                        message = "Imported ${it.importedCount()} titles " +
+                            "(${it.createdCount()} new, ${it.updatedCount()} updated)."
+                        error = null
+                    }
+                    .onFailure {
+                        error = it.message ?: "Aniyomi backup import failed."
+                        message = null
+                    }
+                pendingAniyomiImport = null
             },
         )
     }
@@ -236,6 +295,38 @@ private fun RestoreDialog(
             }
         },
         confirmButton = { TextButton(onClick = confirm) { Text("Restore") } },
+        dismissButton = { TextButton(onClick = dismiss) { Text("Cancel") } },
+    )
+}
+
+@Composable
+private fun AniyomiImportDialog(
+    inspection: AniyomiBackupInspection,
+    dismiss: () -> Unit,
+    confirm: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = dismiss,
+        title = { Text("Import Aniyomi backup?") },
+        text = {
+            Column {
+                Text("Existing titles from the same source are merged; other Anilib titles are kept.")
+                Spacer(Modifier.height(10.dp))
+                Text("Manga: ${inspection.mangaCount()}")
+                Text("Anime: ${inspection.animeCount()}")
+                Text("Categories: ${inspection.categoryCount()}")
+                Text("History entries: ${inspection.historyCount()}")
+                Text("Titles with progress: ${inspection.progressCount()}")
+                if (inspection.skippedEntryCount() > 0) {
+                    Text(
+                        "${inspection.skippedEntryCount()} unsupported preference, tracker, or extension " +
+                            "entries will be skipped.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = confirm) { Text("Import") } },
         dismissButton = { TextButton(onClick = dismiss) { Text("Cancel") } },
     )
 }

@@ -51,7 +51,8 @@ public final class BackupPlugin implements AnilibPlugin {
         PluginManifest.Builder builder = PluginManifest.builder(
                         ComponentDescriptor.of("feature.backup", "Backup and restore", "1.0.0"))
                 .provides(BackupCapabilities.SERVICE)
-                .provides(BackupUiCapabilities.PRESENTATION);
+                .provides(BackupUiCapabilities.PRESENTATION)
+                .requires(LibraryCapabilities.CATALOG);
         codecCapabilities.forEach(builder::requires);
         manifest = builder.build();
     }
@@ -68,7 +69,8 @@ public final class BackupPlugin implements AnilibPlugin {
                 .toList();
         DefaultBackupService service = context.own(new DefaultBackupService(
                 backupDirectory,
-                codecs));
+                codecs,
+                context.require(LibraryCapabilities.CATALOG)));
         context.publish(BackupCapabilities.SERVICE, service);
         context.publish(BackupUiCapabilities.PRESENTATION, new DefaultBackupPresentation(service));
     }

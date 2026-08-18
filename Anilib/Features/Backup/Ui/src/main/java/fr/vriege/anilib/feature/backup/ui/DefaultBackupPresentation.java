@@ -4,6 +4,8 @@ import fr.vriege.anilib.feature.backup.BackupFileSnapshot;
 import fr.vriege.anilib.feature.backup.BackupInspection;
 import fr.vriege.anilib.feature.backup.BackupRestoreResult;
 import fr.vriege.anilib.feature.backup.BackupService;
+import fr.vriege.anilib.feature.backup.AniyomiBackupImportResult;
+import fr.vriege.anilib.feature.backup.AniyomiBackupInspection;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -37,8 +39,18 @@ public final class DefaultBackupPresentation implements BackupPresentation {
     }
 
     @Override
+    public AniyomiBackupInspection inspectAniyomi(Path path) {
+        return service.inspectAniyomi(path);
+    }
+
+    @Override
     public BackupRestoreResult restore(Path path) {
         return service.restore(path);
+    }
+
+    @Override
+    public AniyomiBackupImportResult importAniyomi(Path path) {
+        return service.importAniyomi(path);
     }
 
     @Override

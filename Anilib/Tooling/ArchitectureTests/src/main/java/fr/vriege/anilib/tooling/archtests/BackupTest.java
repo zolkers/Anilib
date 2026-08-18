@@ -7,6 +7,8 @@ import fr.vriege.anilib.feature.backup.BackupFileSnapshot;
 import fr.vriege.anilib.feature.backup.BackupInspection;
 import fr.vriege.anilib.feature.backup.BackupRestoreResult;
 import fr.vriege.anilib.feature.backup.BackupService;
+import fr.vriege.anilib.feature.backup.AniyomiBackupImportResult;
+import fr.vriege.anilib.feature.backup.AniyomiBackupInspection;
 import fr.vriege.anilib.feature.backup.runtime.DefaultBackupService;
 import fr.vriege.anilib.feature.backup.ui.BackupUiCapabilities;
 import fr.vriege.anilib.feature.discovery.runtime.DiscoveryBackupCodec;
@@ -33,6 +35,7 @@ import fr.vriege.anilib.framework.backup.PreparedBackupRestore;
 import fr.vriege.anilib.kernel.StartedAnilib;
 
 import java.io.IOException;
+import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -42,6 +45,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.zip.GZIPOutputStream;
 
 final class BackupTest {
     private static final Instant BACKUP_TIME = Instant.parse("2026-08-18T09:30:00Z");
@@ -53,9 +57,69 @@ final class BackupTest {
         Counter counter = new Counter();
         verifiesStandardRoundTrip(counter);
         verifiesFeatureOwnedCodecs(counter);
+        verifiesAniyomiBackupImport(counter);
         verifiesCorruptionIsRejected(counter);
         verifiesFailedRestoreRollsBack(counter);
         return counter.value;
+    }
+
+    private static void verifiesAniyomiBackupImport(Counter counter) {
+        Path directory = temporaryDirectory("anilib-backup-aniyomi");
+        try {
+            FileLibraryCatalog library = new FileLibraryCatalog(directory.resolve("library.anilib"));
+            Path source = directory.resolve("aniyomi.proto.gz");
+            write(source, gzip(aniyomiBackupFixture()));
+            try (DefaultBackupService backups = new DefaultBackupService(
+                    directory.resolve("backups"),
+                    List.of(new LibraryBackupCodec(library)),
+                    library,
+                    Clock.fixed(BACKUP_TIME, ZoneOffset.UTC))) {
+                AniyomiBackupInspection inspection = backups.inspectAniyomi(source);
+                counter.check(inspection.mangaCount() == 1 && inspection.animeCount() == 1,
+                        "Aniyomi preview must count manga and anime independently");
+                counter.check(inspection.categoryCount() == 2,
+                        "Aniyomi preview must expose both category collections");
+                counter.check(inspection.historyCount() == 2 && inspection.progressCount() == 2,
+                        "Aniyomi preview must expose restorable history and progress");
+                counter.check(inspection.skippedEntryCount() == 2,
+                        "Aniyomi preview must disclose unsupported tracker and preference entries");
+
+                AniyomiBackupImportResult imported = backups.importAniyomi(source);
+                counter.check(imported.createdCount() == 2 && imported.updatedCount() == 0,
+                        "first Aniyomi import must create both titles");
+                LibraryItem manga = library.snapshot().stream()
+                        .filter(item -> item.kind() == MediaKind.MANGA)
+                        .findFirst()
+                        .orElseThrow();
+                LibraryItem anime = library.snapshot().stream()
+                        .filter(item -> item.kind() == MediaKind.ANIME)
+                        .findFirst()
+                        .orElseThrow();
+                counter.check(manga.origin().orElseThrow().equals(new LibraryOrigin("aniyomi.42", "/manga/one")),
+                        "Aniyomi manga origin must retain its numeric source identity and URL");
+                counter.check(anime.origin().orElseThrow().equals(new LibraryOrigin("aniyomi.84", "/anime/one")),
+                        "Aniyomi anime origin must retain its numeric source identity and URL");
+                counter.check(manga.categories().equals(Set.of("Manga shelf"))
+                                && anime.categories().equals(Set.of("Anime shelf")),
+                        "Aniyomi category order references must resolve to names");
+                counter.check(manga.progress().orElseThrow().position() == 7
+                                && anime.progress().orElseThrow().extent() == 120,
+                        "Aniyomi chapter pages and episode seconds must become shared progress");
+                counter.check(manga.metadata().authors().equals(List.of("Manga Author"))
+                                && manga.metadata().publicationStatus() == PublicationStatus.ONGOING,
+                        "Aniyomi title metadata must map to the Anilib library model");
+
+                library.save(manga.withCategories(Set.of("Manga shelf", "Local category")));
+                AniyomiBackupImportResult repeated = backups.importAniyomi(source);
+                LibraryItem merged = library.find(manga.id()).orElseThrow();
+                counter.check(repeated.createdCount() == 0 && repeated.updatedCount() == 2,
+                        "repeated Aniyomi import must update matching origins without duplicates");
+                counter.check(merged.categories().contains("Local category") && library.snapshot().size() == 2,
+                        "Aniyomi merge must preserve newer local categories and unrelated titles");
+            }
+        } finally {
+            deleteDirectory(directory);
+        }
     }
 
     private static void verifiesStandardRoundTrip(Counter counter) {
@@ -254,6 +318,117 @@ final class BackupTest {
         } catch (IOException exception) {
             throw new AssertionError("Unable to corrupt test backup", exception);
         }
+    }
+
+    private static byte[] aniyomiBackupFixture() {
+        byte[] mangaCategory = proto(
+                stringField(1, "Manga shelf"),
+                varintField(2, 2));
+        byte[] animeCategory = proto(
+                stringField(1, "Anime shelf"),
+                varintField(2, 4));
+        byte[] chapter = proto(
+                stringField(1, "/chapter/one"),
+                stringField(2, "Chapter 1"),
+                varintField(6, 7),
+                varintField(7, 1_700_000_000_000L),
+                floatField(9, 1.0F));
+        byte[] mangaHistory = proto(
+                stringField(1, "/chapter/one"),
+                varintField(2, 1_700_000_100_000L));
+        byte[] manga = proto(
+                varintField(1, 42),
+                stringField(2, "/manga/one"),
+                stringField(3, "Manga One"),
+                stringField(5, "Manga Author"),
+                stringField(6, "Manga description"),
+                varintField(8, 1),
+                varintField(13, 1_699_000_000_000L),
+                messageField(16, chapter),
+                messageField(17, rawVarint(2)),
+                messageField(18, new byte[0]),
+                varintField(100, 1),
+                messageField(104, mangaHistory));
+        byte[] episode = proto(
+                stringField(1, "/episode/three"),
+                stringField(2, "Episode 3"),
+                varintField(6, 30),
+                varintField(7, 1_700_100_000_000L),
+                floatField(9, 3.0F),
+                varintField(16, 120));
+        byte[] animeHistory = proto(
+                stringField(1, "/episode/three"),
+                varintField(2, 1_700_100_100_000L));
+        byte[] anime = proto(
+                varintField(1, 84),
+                stringField(2, "/anime/one"),
+                stringField(3, "Anime One"),
+                varintField(13, 1_699_100_000_000L),
+                messageField(16, episode),
+                varintField(17, 4),
+                varintField(100, 1),
+                messageField(104, animeHistory));
+        return proto(
+                messageField(1, manga),
+                messageField(2, mangaCategory),
+                messageField(104, new byte[0]),
+                varintField(500, 0),
+                messageField(501, anime),
+                messageField(502, animeCategory));
+    }
+
+    private static byte[] gzip(byte[] payload) {
+        try {
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            try (GZIPOutputStream gzip = new GZIPOutputStream(output)) {
+                gzip.write(payload);
+            }
+            return output.toByteArray();
+        } catch (IOException exception) {
+            throw new AssertionError("Unable to create Aniyomi gzip fixture", exception);
+        }
+    }
+
+    private static byte[] proto(byte[]... fields) {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        for (byte[] field : fields) {
+            output.writeBytes(field);
+        }
+        return output.toByteArray();
+    }
+
+    private static byte[] stringField(int number, String value) {
+        return messageField(number, value.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static byte[] messageField(int number, byte[] value) {
+        return proto(rawVarint(((long) number << 3) | 2), rawVarint(value.length), value);
+    }
+
+    private static byte[] varintField(int number, long value) {
+        return proto(rawVarint((long) number << 3), rawVarint(value));
+    }
+
+    private static byte[] floatField(int number, float value) {
+        int bits = Float.floatToRawIntBits(value);
+        return proto(
+                rawVarint(((long) number << 3) | 5),
+                new byte[] {
+                        (byte) bits,
+                        (byte) (bits >>> 8),
+                        (byte) (bits >>> 16),
+                        (byte) (bits >>> 24)});
+    }
+
+    private static byte[] rawVarint(long value) {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        long remaining = value;
+        do {
+            int next = (int) (remaining & 0x7f);
+            remaining >>>= 7;
+            output.write(remaining == 0 ? next : next | 0x80);
+        } while (remaining != 0);
+        return output.toByteArray();
     }
 
     private static void expectBackupFailure(Runnable action, Counter counter, String message) {
