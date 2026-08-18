@@ -18,7 +18,6 @@ import fr.vriege.anilib.kernel.PluginManifest;
 import java.nio.file.Path;
 import java.util.Objects;
 
-/** Removable composition unit for scheduled refresh, update feed, backup, and notices. */
 public final class UpdatePlugin implements AnilibPlugin {
     private static final PluginManifest MANIFEST = PluginManifest.builder(
                     ComponentDescriptor.of("feature.updates", "Library updates", "0.1.0"))

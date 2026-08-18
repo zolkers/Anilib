@@ -2,7 +2,6 @@ package fr.vriege.anilib.feature.source;
 
 import fr.vriege.anilib.foundation.validation.Preconditions;
 
-/** Stable source-scoped identity for one chapter or other paged content unit. */
 public record SourceContentUnitId(SourceCatalogueItemId itemId, String value)
         implements Comparable<SourceContentUnitId> {
     public SourceContentUnitId {

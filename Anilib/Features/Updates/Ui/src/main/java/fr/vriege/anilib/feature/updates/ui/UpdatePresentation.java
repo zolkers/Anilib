@@ -5,7 +5,6 @@ import fr.vriege.anilib.feature.updates.LibraryUpdateSnapshot;
 
 import java.util.concurrent.CompletableFuture;
 
-/** Platform-neutral entry point for the shared Updates tab and settings. */
 public interface UpdatePresentation {
     LibraryUpdateSnapshot snapshot();
 

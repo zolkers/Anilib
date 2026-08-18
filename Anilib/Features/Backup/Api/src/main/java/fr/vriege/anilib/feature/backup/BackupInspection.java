@@ -6,7 +6,6 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
 
-/** Fully checksum-validated archive preview before any state is mutated. */
 public record BackupInspection(
         Path path,
         Instant createdAt,

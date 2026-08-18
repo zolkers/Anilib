@@ -8,7 +8,6 @@ import fr.vriege.anilib.feature.source.SourceEpisodeId;
 import java.util.List;
 import java.util.Objects;
 
-/** Default presentation adapter over the shared Player service. */
 public final class DefaultPlayerPresentation implements PlayerPresentation {
     private final PlayerService player;
 

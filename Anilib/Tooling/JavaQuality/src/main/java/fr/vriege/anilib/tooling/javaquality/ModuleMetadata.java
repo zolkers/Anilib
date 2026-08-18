@@ -4,7 +4,6 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
 
-/** Parsed architectural intent from one module.properties file. */
 public record ModuleMetadata(
         String id,
         Layer layer,

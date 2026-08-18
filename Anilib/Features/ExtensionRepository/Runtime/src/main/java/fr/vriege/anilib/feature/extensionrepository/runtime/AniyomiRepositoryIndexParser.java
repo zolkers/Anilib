@@ -18,7 +18,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-/** Parses Aniyomi repository indexes plus the optional portable Anilib artifact block. */
 public final class AniyomiRepositoryIndexParser {
     private static final int MAX_INDEX_CHARACTERS = 4 * 1024 * 1024;
     private static final int MAX_PACKAGES = 10_000;

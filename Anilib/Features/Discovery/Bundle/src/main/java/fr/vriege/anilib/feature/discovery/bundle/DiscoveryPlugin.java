@@ -18,7 +18,6 @@ import fr.vriege.anilib.kernel.PluginManifest;
 import java.nio.file.Path;
 import java.util.Objects;
 
-/** Composition unit for browse, search, source preferences, and migration. */
 public final class DiscoveryPlugin implements AnilibPlugin {
     private static final PluginManifest MANIFEST = PluginManifest.builder(
                     ComponentDescriptor.of("feature.discovery", "Browse", "1.0.0"))

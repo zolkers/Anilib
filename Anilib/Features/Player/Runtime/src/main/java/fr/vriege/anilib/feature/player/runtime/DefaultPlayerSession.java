@@ -14,7 +14,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Default in-memory selection session delegating durable progress to its service. */
 final class DefaultPlayerSession implements PlayerSession {
     private final DefaultPlayerService service;
     private final PlayerSessionSnapshot initial;

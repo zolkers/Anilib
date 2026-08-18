@@ -5,7 +5,6 @@ import fr.vriege.anilib.feature.source.SourceVideoStream;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Immutable, platform-neutral request passed to a selected media backend. */
 public record PlayerMedia(
         String title,
         SourceVideoStream stream,

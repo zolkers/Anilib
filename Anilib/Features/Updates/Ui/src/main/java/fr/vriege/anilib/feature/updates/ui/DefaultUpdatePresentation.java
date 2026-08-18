@@ -7,7 +7,6 @@ import fr.vriege.anilib.feature.updates.LibraryUpdateSnapshot;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
-/** Thin presentation adapter retaining scheduling and update behavior in shared Java. */
 public final class DefaultUpdatePresentation implements UpdatePresentation {
     private final LibraryUpdateService service;
 

@@ -12,7 +12,6 @@ import java.net.http.HttpResponse.BodyHandlers;
 import java.util.List;
 import java.util.Map;
 
-/** Desktop transport backed by the Java 21 HTTP client with HTTP/2 support. */
 public final class JdkHttpTransport implements HttpTransport {
     private static final int MAX_RESPONSE_BYTES = 16 * 1024 * 1024;
 

@@ -64,7 +64,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
-/** Behavior checks for user-supplied Aniyomi-compatible extension repositories. */
 final class ExtensionRepositoryTest {
     private static final URI INDEX = URI.create("https://repo.example/extensions/index.min.json");
     private static final URI BUNDLE = URI.create("https://repo.example/extensions/example.jar");

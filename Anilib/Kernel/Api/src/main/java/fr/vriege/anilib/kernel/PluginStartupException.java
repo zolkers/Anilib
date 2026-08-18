@@ -1,6 +1,5 @@
 package fr.vriege.anilib.kernel;
 
-/** Reports graph validation, installation, or rollback failure. */
 public final class PluginStartupException extends RuntimeException {
     private static final long serialVersionUID = 1L;
 

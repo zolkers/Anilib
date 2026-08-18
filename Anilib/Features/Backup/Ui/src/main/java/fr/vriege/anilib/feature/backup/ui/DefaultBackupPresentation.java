@@ -9,7 +9,6 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
 
-/** Thin presentation adapter retaining all backup policy in the Java service. */
 public final class DefaultBackupPresentation implements BackupPresentation {
     private final BackupService service;
 

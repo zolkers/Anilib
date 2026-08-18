@@ -8,7 +8,6 @@ import fr.vriege.anilib.feature.extensionrepository.ui.InstalledApkExtension
 import java.util.Locale
 import java.util.Optional
 
-/** Persists package-specific certificate trust and audits the host ABI without loading extension code. */
 internal class AndroidAniyomiRuntimePreflight(
     context: Context,
 ) {

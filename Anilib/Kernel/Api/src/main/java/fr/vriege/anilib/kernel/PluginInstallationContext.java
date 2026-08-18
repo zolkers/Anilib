@@ -1,6 +1,5 @@
 package fr.vriege.anilib.kernel;
 
-/** Narrow installation surface enforcing a plugin's declared manifest. */
 public interface PluginInstallationContext {
     <T> T require(CapabilityKey<T> key);
 

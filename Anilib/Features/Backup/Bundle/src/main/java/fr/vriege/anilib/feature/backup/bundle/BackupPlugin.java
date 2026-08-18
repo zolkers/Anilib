@@ -20,7 +20,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
-/** Composition unit for local archive management and transactional restore. */
 public final class BackupPlugin implements AnilibPlugin {
     private final Path backupDirectory;
     private final List<CapabilityKey<BackupSectionCodec>> codecCapabilities;

@@ -8,7 +8,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Keeps the three-host desktop packaging and reproducibility contract explicit. */
 public final class DesktopReleaseRule implements AnilibJavaRule {
     private static final Path ROOT_BUILD = Path.of("build.gradle");
     private static final Path DESKTOP_BUILD = Path.of("Anilib", "Platforms", "Desktop", "build.gradle");

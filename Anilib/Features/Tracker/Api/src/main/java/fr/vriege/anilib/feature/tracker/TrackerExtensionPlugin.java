@@ -11,7 +11,6 @@ import fr.vriege.anilib.kernel.PluginManifest;
 import java.util.Objects;
 import java.util.Set;
 
-/** Bundle adapter installing one tracker with only its explicitly granted capabilities. */
 public final class TrackerExtensionPlugin implements AnilibPlugin {
     private final PluginManifest manifest;
     private final TrackerExtensionManifest extensionManifest;

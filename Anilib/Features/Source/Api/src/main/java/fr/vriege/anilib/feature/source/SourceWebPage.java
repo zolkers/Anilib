@@ -9,7 +9,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-/** Immutable source-owned browser request and optional challenge completion policy. */
 public record SourceWebPage(
         URI location,
         Map<String, String> headers,

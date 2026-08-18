@@ -45,7 +45,6 @@ import fr.vriege.anilib.feature.player.ui.PlayerPresentation
 import java.util.Optional
 import kotlin.math.roundToInt
 
-/** Shared Aniyomi-style episode list and pre-playback stream selection surface. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun EpisodeScreen(

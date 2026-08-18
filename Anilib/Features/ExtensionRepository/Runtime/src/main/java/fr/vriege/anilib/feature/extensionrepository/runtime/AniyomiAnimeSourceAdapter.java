@@ -44,13 +44,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.BooleanSupplier;
 
-/**
- * Adapts one trusted Aniyomi anime source object without linking its external ABI
- * into Anilib's shared modules.
- *
- * <p>The Android boundary is responsible for certificate trust, ABI preflight,
- * class loading, and object construction before calling this adapter.</p>
- */
 public final class AniyomiAnimeSourceAdapter {
     private static final SourceApiVersion REQUIRED_API = new SourceApiVersion(1, 4);
     private static final long SUSPEND_TIMEOUT_SECONDS = 60L;

@@ -17,7 +17,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-/** Platform-neutral snapshots and actions for the shared Browse experience. */
 public interface DiscoveryPresentation {
     List<DiscoverySourceSection> sourceSections(SourceContentKind contentKind);
 

@@ -5,7 +5,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-/** Command-line entry point for the dependency-free repository quality gate. */
 public final class AnilibJavaMain {
     private AnilibJavaMain() {
     }

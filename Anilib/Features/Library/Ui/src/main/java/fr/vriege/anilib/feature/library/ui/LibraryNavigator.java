@@ -5,7 +5,6 @@ import fr.vriege.anilib.feature.library.LibraryItemId;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Toolkit-neutral Library navigation state with deterministic details back behavior. */
 public final class LibraryNavigator {
     private LibraryPage page = LibraryPage.LIBRARY;
     private LibraryPage detailsOrigin = LibraryPage.LIBRARY;

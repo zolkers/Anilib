@@ -4,7 +4,6 @@ import fr.vriege.anilib.foundation.validation.Preconditions;
 
 import java.util.Objects;
 
-/** Toolkit-neutral message emitted to the selected platform notification adapter. */
 public record LibraryUpdateNotification(
         LibraryUpdateNotificationType type,
         String title,

@@ -51,7 +51,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/** Single-job background updater with five source lanes, durable baselines, and native notices. */
 public final class DefaultLibraryUpdateService implements LibraryUpdateService, AutoCloseable {
     private static final int SOURCE_LANES = 5;
     private static final int MAXIMUM_VISIBLE_EVENTS = 100_000;

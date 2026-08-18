@@ -3,7 +3,6 @@ package fr.vriege.anilib.feature.covercache;
 import java.util.Arrays;
 import java.util.Objects;
 
-/** Platform-neutral immutable image represented by packed ARGB pixels. */
 public final class DecodedImage {
     private final int width;
     private final int height;

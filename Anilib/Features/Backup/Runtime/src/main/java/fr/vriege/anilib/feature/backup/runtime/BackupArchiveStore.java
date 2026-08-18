@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
-/** Owns the bounded v1 Anilib backup envelope and its archive/section checksums. */
 final class BackupArchiveStore {
     static final String EXTENSION = ".anibak";
     static final long MAXIMUM_ARCHIVE_BYTES = 256L * 1024L * 1024L;

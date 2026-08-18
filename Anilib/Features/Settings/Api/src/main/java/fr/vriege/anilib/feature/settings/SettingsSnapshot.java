@@ -2,7 +2,6 @@ package fr.vriege.anilib.feature.settings;
 
 import java.util.Objects;
 
-/** Immutable user-owned application preferences shared by every platform. */
 public record SettingsSnapshot(
         ThemeMode themeMode,
         boolean showAdultContent,

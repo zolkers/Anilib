@@ -5,7 +5,6 @@ import fr.vriege.anilib.foundation.validation.Preconditions;
 import java.util.HashSet;
 import java.util.List;
 
-/** Immutable filter schema supplied by a configurable catalogue source. */
 public record SourceFilterDefinition(
         String id,
         String label,

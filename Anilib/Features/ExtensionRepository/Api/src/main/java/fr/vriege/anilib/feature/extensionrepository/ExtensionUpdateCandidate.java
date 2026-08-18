@@ -2,7 +2,6 @@ package fr.vriege.anilib.feature.extensionrepository;
 
 import fr.vriege.anilib.foundation.validation.Preconditions;
 
-/** A newer repository package matching one installed portable extension. */
 public record ExtensionUpdateCandidate(
         InstalledExtensionPackage installed,
         ExtensionPackageMetadata available,

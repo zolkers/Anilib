@@ -3,7 +3,6 @@ package fr.vriege.anilib.feature.extensionrepository;
 import java.net.URI;
 import java.util.List;
 
-/** User-owned repository configuration and refresh boundary. */
 public interface ExtensionRepositoryService {
     List<URI> repositories();
 

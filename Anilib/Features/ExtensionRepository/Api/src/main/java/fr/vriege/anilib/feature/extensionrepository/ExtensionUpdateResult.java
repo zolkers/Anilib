@@ -5,7 +5,6 @@ import fr.vriege.anilib.foundation.validation.Preconditions;
 import java.util.List;
 import java.util.Map;
 
-/** Bounded result of one manual or automatic source update pass. */
 public record ExtensionUpdateResult(
         List<InstalledExtensionPackage> updated,
         Map<String, String> failures) {

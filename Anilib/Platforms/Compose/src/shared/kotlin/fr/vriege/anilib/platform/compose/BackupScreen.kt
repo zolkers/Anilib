@@ -51,7 +51,6 @@ private val backupDateFormatter = DateTimeFormatter
     .withLocale(Locale.getDefault())
     .withZone(ZoneId.systemDefault())
 
-/** Shared Aniyomi-style local backup creation and restore management screen. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun BackupScreen(presentation: BackupPresentation, goBack: () -> Unit) {

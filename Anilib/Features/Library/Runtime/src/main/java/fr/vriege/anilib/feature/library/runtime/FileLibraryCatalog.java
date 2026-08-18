@@ -15,7 +15,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Durable catalog whose mutations commit to disk before becoming observable. */
 public final class FileLibraryCatalog implements LibraryCatalog {
     private static final Comparator<LibraryItem> DISPLAY_ORDER =
             Comparator.comparing(LibraryItem::title, String.CASE_INSENSITIVE_ORDER)

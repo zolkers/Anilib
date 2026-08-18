@@ -7,7 +7,6 @@ import android.webkit.WebViewDatabase
 import fr.vriege.anilib.platform.compose.BrowserDataClearResult
 import fr.vriege.anilib.platform.compose.BrowserDataController
 
-/** Clears Android System WebView data while running on the activity's main thread. */
 internal class AndroidBrowserDataController(private val context: Context) : BrowserDataController {
     override fun clearData(): BrowserDataClearResult = runCatching {
         WebStorage.getInstance().deleteAllData()

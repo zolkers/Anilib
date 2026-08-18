@@ -28,7 +28,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
 
-/** Versioned, atomic, file-backed cache for bounded HTTP responses. */
 public final class FileHttpResponseCache implements HttpResponseCache {
     private static final int MAGIC = 0x41484331;
     private static final int MAX_BODY_BYTES = 16 * 1024 * 1024;

@@ -9,7 +9,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
-/** Immutable HTTP response with defensive body and header ownership. */
 public final class HttpResponse {
     private final int statusCode;
     private final Map<String, List<String>> headers;

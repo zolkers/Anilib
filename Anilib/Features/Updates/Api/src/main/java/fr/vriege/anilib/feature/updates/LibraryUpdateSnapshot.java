@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Immutable state consumed by the Updates tab and native notification adapters. */
 public record LibraryUpdateSnapshot(
         LibraryUpdatePolicy policy,
         LibraryUpdateStatus status,

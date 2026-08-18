@@ -20,7 +20,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/** Bounded HTTPS implementation of Aniyomi-compatible bring-your-own repositories. */
 public final class DefaultExtensionRepositoryService implements ExtensionRepositoryService {
     private static final int MAX_REDIRECTS = 5;
     private static final int MAX_INDEX_BYTES = 4 * 1024 * 1024;

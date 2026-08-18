@@ -6,7 +6,6 @@ import fr.vriege.anilib.feature.source.SourcePageResource;
 import java.util.List;
 import java.util.Objects;
 
-/** Complete immutable page set supplied by an alternate Reader content provider. */
 public record ReaderContent(SourceContentUnit contentUnit, List<SourcePageResource> pages) {
     public ReaderContent {
         Objects.requireNonNull(contentUnit, "contentUnit must not be null");

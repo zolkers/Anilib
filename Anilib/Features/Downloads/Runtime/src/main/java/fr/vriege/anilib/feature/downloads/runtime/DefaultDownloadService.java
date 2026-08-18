@@ -40,7 +40,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-/** Durable resumable page queue and Reader provider shared by all products. */
 public final class DefaultDownloadService
         implements DownloadService, ReaderContentProvider, AutoCloseable {
     private static final Comparator<DownloadRecord> DISPLAY_ORDER =

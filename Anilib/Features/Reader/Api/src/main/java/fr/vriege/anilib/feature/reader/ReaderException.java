@@ -1,6 +1,5 @@
 package fr.vriege.anilib.feature.reader;
 
-/** Reports unavailable content, invalid sessions, or page-pipeline failures. */
 public final class ReaderException extends RuntimeException {
     private static final long serialVersionUID = 1L;
 

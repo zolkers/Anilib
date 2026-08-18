@@ -15,7 +15,6 @@ import fr.vriege.anilib.feature.source.SourcePreferenceType
 import java.lang.reflect.InvocationTargetException
 import java.util.function.Consumer
 
-/** Converts AndroidX controls declared by a configurable APK source into shared Anilib preferences. */
 internal class AndroidAniyomiPreferenceBridge(
     context: Context,
 ) {

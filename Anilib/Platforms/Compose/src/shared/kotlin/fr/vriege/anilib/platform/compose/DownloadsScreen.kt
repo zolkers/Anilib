@@ -44,7 +44,6 @@ import fr.vriege.anilib.feature.downloads.DownloadStatus
 import fr.vriege.anilib.feature.downloads.ui.DownloadPresentation
 import java.util.Locale
 
-/** Shared Aniyomi-style download queue, storage summary, and offline toggle. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun DownloadsScreen(presentation: DownloadPresentation, goBack: () -> Unit) {

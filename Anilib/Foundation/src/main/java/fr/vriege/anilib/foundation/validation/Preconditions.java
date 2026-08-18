@@ -2,7 +2,6 @@ package fr.vriege.anilib.foundation.validation;
 
 import java.util.Objects;
 
-/** Shared validation primitives for immutable public models. */
 public final class Preconditions {
     private Preconditions() {
     }

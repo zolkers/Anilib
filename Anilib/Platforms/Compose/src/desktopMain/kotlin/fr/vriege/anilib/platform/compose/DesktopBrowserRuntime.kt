@@ -9,7 +9,6 @@ import java.nio.file.Path
 import java.nio.file.SimpleFileVisitor
 import java.nio.file.attribute.BasicFileAttributes
 
-/** Owns KCEF initialization and disposal at the desktop platform boundary. */
 object DesktopBrowserRuntime {
     fun initialize(dataDirectory: Path): BrowserRuntimeStatus {
         var failure: Throwable? = null

@@ -5,7 +5,6 @@ import fr.vriege.anilib.foundation.validation.Preconditions;
 
 import java.util.Set;
 
-/** Side-effect-free declaration inspected before a plugin is installed. */
 public record PluginManifest(
         ComponentDescriptor descriptor,
         Set<CapabilityKey<?>> requiredCapabilities,

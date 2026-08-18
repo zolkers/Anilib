@@ -7,7 +7,6 @@ import fr.vriege.anilib.feature.library.LibraryItemId;
 
 import java.util.Objects;
 
-/** Default shared presentation adapter over the durable Download service. */
 public final class DefaultDownloadPresentation implements DownloadPresentation {
     private final DownloadService downloads;
 

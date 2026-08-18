@@ -18,7 +18,6 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.TreeMap;
 
-/** Atomic JDK properties store for source-owned preference values. */
 public final class FileSourcePreferenceStore {
     private final Path file;
     private final Properties values = new Properties();

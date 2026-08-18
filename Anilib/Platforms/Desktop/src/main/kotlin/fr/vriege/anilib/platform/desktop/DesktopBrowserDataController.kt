@@ -6,7 +6,6 @@ import java.nio.file.Files
 import java.nio.file.LinkOption
 import java.nio.file.Path
 
-/** Schedules locked KCEF profile data for safe removal before its next initialization. */
 internal class DesktopBrowserDataController(dataDirectory: Path) : BrowserDataController {
     private val browserDirectory = dataDirectory.toAbsolutePath().normalize().resolve("browser")
     private val marker = browserDirectory.resolve("clear-data-on-start")

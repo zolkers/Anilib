@@ -22,7 +22,6 @@ import java.util.Properties;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
-/** Atomic properties-backed settings implementation. */
 public final class FileSettingsService implements SettingsService {
     private static final String THEME = "appearance.theme";
     private static final String ADULT_CONTENT = "content.show-adult";

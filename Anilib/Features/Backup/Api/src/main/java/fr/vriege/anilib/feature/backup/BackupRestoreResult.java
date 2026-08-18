@@ -5,7 +5,6 @@ import fr.vriege.anilib.foundation.validation.Preconditions;
 import java.time.Instant;
 import java.util.List;
 
-/** Successful transaction result listing only sections restored by this product. */
 public record BackupRestoreResult(
         Instant restoredAt,
         List<BackupSectionSnapshot> restoredSections) {

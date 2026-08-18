@@ -5,7 +5,6 @@ import fr.vriege.anilib.foundation.validation.Preconditions;
 import java.util.HashSet;
 import java.util.List;
 
-/** One deterministic catalogue page and its continuation flag. */
 public record SourcePage(List<SourceCatalogueItem> items, boolean hasNextPage) {
     public SourcePage {
         items = List.copyOf(Preconditions.requireNonNull(items, "items"));

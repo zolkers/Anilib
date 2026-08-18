@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/** Player-owned versioned backup codec for durable per-episode resume state. */
 public final class PlayerBackupCodec implements BackupSectionCodec {
     private static final BackupSectionId SECTION_ID = BackupSectionId.of("playback-state");
     private static final int MAGIC = 0x504C4159;

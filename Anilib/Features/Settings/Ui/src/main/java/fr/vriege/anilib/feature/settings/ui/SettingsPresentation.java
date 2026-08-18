@@ -5,7 +5,6 @@ import fr.vriege.anilib.feature.settings.ThemeMode;
 
 import java.util.function.Consumer;
 
-/** Platform-neutral settings state and user actions. */
 public interface SettingsPresentation {
     SettingsSnapshot snapshot();
 

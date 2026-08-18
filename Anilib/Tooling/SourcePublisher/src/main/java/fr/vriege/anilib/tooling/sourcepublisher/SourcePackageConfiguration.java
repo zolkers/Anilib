@@ -14,7 +14,6 @@ import java.util.Locale;
 import java.util.Properties;
 import java.util.regex.Pattern;
 
-/** Validated publisher metadata for one portable source package. */
 record SourcePackageConfiguration(
         Path configurationFile,
         Path bundle,

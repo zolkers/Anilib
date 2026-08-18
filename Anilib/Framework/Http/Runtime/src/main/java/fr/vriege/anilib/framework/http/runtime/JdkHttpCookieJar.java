@@ -12,7 +12,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/** RFC-aware in-memory cookie jar backed by the JDK cookie implementation. */
 public final class JdkHttpCookieJar implements HttpCookieJar {
     private final CookieManager manager = new CookieManager(null, CookiePolicy.ACCEPT_ORIGINAL_SERVER);
 

@@ -23,7 +23,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-/** Opt-in periodic update channel that preserves package and publisher identity. */
 public final class DefaultExtensionUpdateService implements ExtensionUpdateService, AutoCloseable {
     private static final Duration INITIAL_DELAY = Duration.ofMinutes(1);
     private static final Duration CHECK_INTERVAL = Duration.ofHours(6);

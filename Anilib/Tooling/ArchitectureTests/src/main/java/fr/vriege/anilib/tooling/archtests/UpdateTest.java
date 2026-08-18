@@ -43,7 +43,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
-/** Executable contract for scheduled library refresh, notices, durability, and backup. */
 final class UpdateTest {
     private static final SourceId SOURCE_ID = SourceId.of("test.updates");
     private static final SourceCatalogueItemId SOURCE_ITEM_ID =

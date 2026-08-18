@@ -11,7 +11,6 @@ import java.util.List;
 import java.util.Properties;
 import java.util.stream.Stream;
 
-/** Filesystem indexer with deterministic ordering and generated-tree exclusion. */
 public final class RepositoryScanner {
     public RepositoryScanner() {
     }

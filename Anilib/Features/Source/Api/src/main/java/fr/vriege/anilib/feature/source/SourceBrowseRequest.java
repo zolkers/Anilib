@@ -5,7 +5,6 @@ import fr.vriege.anilib.foundation.validation.Preconditions;
 import java.util.List;
 import java.util.Map;
 
-/** Immutable page request carrying explicit filter and preference snapshots. */
 public record SourceBrowseRequest(
         int page,
         int pageSize,

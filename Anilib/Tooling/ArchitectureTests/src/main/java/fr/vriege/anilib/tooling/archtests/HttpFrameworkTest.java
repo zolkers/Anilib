@@ -30,7 +30,6 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
-/** Behavior checks for the dependency-free HTTP framework. */
 final class HttpFrameworkTest {
     private HttpFrameworkTest() {
     }

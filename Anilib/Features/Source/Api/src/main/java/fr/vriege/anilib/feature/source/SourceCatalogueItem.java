@@ -5,7 +5,6 @@ import fr.vriege.anilib.foundation.validation.Preconditions;
 import java.net.URI;
 import java.util.Optional;
 
-/** Source-owned title summary rendered by browse and global search. */
 public record SourceCatalogueItem(
         SourceCatalogueItemId id,
         String title,

@@ -42,7 +42,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
 
-/** Cross-platform browse, search, preferences, admission, and migration checks. */
 final class DiscoveryTest {
     private static final SourceId LOCAL_SOURCE = SourceId.of("anilib.local");
     private static final SourceId REMOTE_SOURCE = SourceId.of("test.remote");

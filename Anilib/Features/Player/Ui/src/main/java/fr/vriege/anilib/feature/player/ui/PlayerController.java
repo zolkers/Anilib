@@ -7,7 +7,6 @@ import fr.vriege.anilib.feature.player.PlayerPlayback;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Thin shared controller for stream, subtitle, and resume-state selection. */
 public final class PlayerController implements AutoCloseable {
     private final PlayerSession session;
 

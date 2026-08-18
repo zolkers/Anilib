@@ -35,7 +35,6 @@ import java.util.OptionalDouble;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/** Executable contract for opt-in tracker bundles and durable Aniyomi-style mutations. */
 final class TrackerTest {
     private TrackerTest() {
     }

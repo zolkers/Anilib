@@ -10,7 +10,6 @@ import fr.vriege.anilib.feature.tracker.TrackerSearchResult;
 
 import java.util.List;
 
-/** Platform-neutral tracking workflow rendered by Android and desktop. */
 public interface TrackerPresentation {
     List<TrackerAccount> accounts();
 

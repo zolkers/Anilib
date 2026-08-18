@@ -20,7 +20,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Stream;
 
-/** Black-box checks for JDK image decoding and durable cover caching. */
 final class CoverCacheTest {
     private static int assertions;
 

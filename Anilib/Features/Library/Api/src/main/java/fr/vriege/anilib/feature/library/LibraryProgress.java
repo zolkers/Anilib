@@ -5,7 +5,6 @@ import fr.vriege.anilib.foundation.validation.Preconditions;
 import java.time.Instant;
 import java.util.OptionalDouble;
 
-/** Latest reader or player position for one chapter, episode, or local unit. */
 public record LibraryProgress(
         String contentId,
         long position,

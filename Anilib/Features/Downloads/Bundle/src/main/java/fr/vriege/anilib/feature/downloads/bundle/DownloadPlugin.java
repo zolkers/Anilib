@@ -19,7 +19,6 @@ import fr.vriege.anilib.kernel.PluginManifest;
 import java.nio.file.Path;
 import java.util.Objects;
 
-/** Composition unit for durable downloads, storage bounds, and offline reading. */
 public final class DownloadPlugin implements AnilibPlugin {
     private static final PluginManifest MANIFEST = PluginManifest.builder(
                     ComponentDescriptor.of("feature.downloads", "Downloads", "0.1.0"))

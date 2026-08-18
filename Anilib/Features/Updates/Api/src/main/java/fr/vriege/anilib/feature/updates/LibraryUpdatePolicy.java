@@ -3,7 +3,6 @@ package fr.vriege.anilib.feature.updates;
 import java.util.Objects;
 import java.util.Set;
 
-/** Durable restrictions controlling which library titles are refreshed. */
 public record LibraryUpdatePolicy(
         UpdateInterval interval,
         boolean favoritesOnly,

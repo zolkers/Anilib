@@ -7,7 +7,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
-/** Immutable tracker capabilities used by the shared settings and title UI. */
 public record TrackerDescriptor(
         TrackerId id,
         String name,

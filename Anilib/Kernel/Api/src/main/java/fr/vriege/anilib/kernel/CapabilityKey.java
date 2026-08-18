@@ -3,7 +3,6 @@ package fr.vriege.anilib.kernel;
 import fr.vriege.anilib.foundation.component.ComponentId;
 import fr.vriege.anilib.foundation.validation.Preconditions;
 
-/** A typed one-provider dependency in the immutable plugin graph. */
 public record CapabilityKey<T>(ComponentId id, Class<T> type) implements Comparable<CapabilityKey<?>> {
     public CapabilityKey {
         Preconditions.requireNonNull(id, "id");

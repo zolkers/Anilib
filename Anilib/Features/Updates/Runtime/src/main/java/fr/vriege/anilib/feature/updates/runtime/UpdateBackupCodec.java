@@ -16,7 +16,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
-/** Updates-owned backup codec for scheduling policy, baselines, and recent discoveries. */
 public final class UpdateBackupCodec implements BackupSectionCodec {
     private static final BackupSectionId SECTION_ID = BackupSectionId.of("library-updates");
     private static final int CURRENT_VERSION = 1;

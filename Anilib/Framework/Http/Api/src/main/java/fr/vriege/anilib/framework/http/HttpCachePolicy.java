@@ -4,7 +4,6 @@ import fr.vriege.anilib.foundation.validation.Preconditions;
 
 import java.time.Duration;
 
-/** Explicit cache behavior attached to one immutable request. */
 public record HttpCachePolicy(Mode mode, Duration timeToLive) {
     private static final HttpCachePolicy BYPASS = new HttpCachePolicy(Mode.BYPASS, Duration.ZERO);
 
@@ -31,12 +30,10 @@ public record HttpCachePolicy(Mode mode, Duration timeToLive) {
         return new HttpCachePolicy(Mode.REFRESH, timeToLive);
     }
 
-    /** Whether the client may read before going to the network. */
     public boolean reads() {
         return mode == Mode.PREFER_CACHE;
     }
 
-    /** Whether a successful network response may be retained. */
     public boolean writes() {
         return mode != Mode.BYPASS;
     }

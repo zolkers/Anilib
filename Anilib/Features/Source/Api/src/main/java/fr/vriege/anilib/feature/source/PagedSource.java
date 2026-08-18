@@ -2,7 +2,6 @@ package fr.vriege.anilib.feature.source;
 
 import java.util.List;
 
-/** Optional source capability exposing ordered chapters and image pages to Reader. */
 public interface PagedSource extends Source {
     List<SourceContentUnit> contentUnits(SourceCatalogueItemId itemId);
 

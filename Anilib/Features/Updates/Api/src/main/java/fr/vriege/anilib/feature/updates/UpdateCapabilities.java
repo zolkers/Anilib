@@ -3,7 +3,6 @@ package fr.vriege.anilib.feature.updates;
 import fr.vriege.anilib.framework.backup.BackupSectionCodec;
 import fr.vriege.anilib.kernel.CapabilityKey;
 
-/** Typed capabilities published by the removable Updates Bundle. */
 public final class UpdateCapabilities {
     public static final CapabilityKey<LibraryUpdateService> SERVICE =
             CapabilityKey.of("feature.updates.service", LibraryUpdateService.class);

@@ -16,7 +16,6 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 
-/** Small functional catalogue used to validate one source on Android and desktop. */
 final class ExampleCatalogueSource implements CatalogueSource {
     private static final SourceId ID = SourceId.of("example.catalogue");
     private static final List<SourceCatalogueItem> ITEMS = List.of(

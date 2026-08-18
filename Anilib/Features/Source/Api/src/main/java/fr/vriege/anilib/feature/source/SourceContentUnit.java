@@ -5,7 +5,6 @@ import fr.vriege.anilib.foundation.validation.Preconditions;
 import java.time.Instant;
 import java.util.Optional;
 
-/** Immutable chapter summary ordered by the owning source. */
 public record SourceContentUnit(
         SourceContentUnitId id,
         String title,

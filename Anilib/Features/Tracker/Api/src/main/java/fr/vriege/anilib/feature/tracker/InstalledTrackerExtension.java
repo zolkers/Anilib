@@ -2,7 +2,6 @@ package fr.vriege.anilib.feature.tracker;
 
 import java.util.Objects;
 
-/** Inspectable tracker registration with declared and runtime metadata. */
 public record InstalledTrackerExtension(
         TrackerExtensionManifest manifest,
         TrackerDescriptor descriptor) {

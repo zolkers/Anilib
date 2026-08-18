@@ -3,7 +3,6 @@ package fr.vriege.anilib.feature.tracker;
 import fr.vriege.anilib.framework.backup.BackupSectionCodec;
 import fr.vriege.anilib.kernel.CapabilityKey;
 
-/** Typed capabilities published by the removable Tracker Bundle. */
 public final class TrackerCapabilities {
     public static final CapabilityKey<TrackerRegistry> REGISTRY =
             CapabilityKey.of("feature.tracker.registry", TrackerRegistry.class);

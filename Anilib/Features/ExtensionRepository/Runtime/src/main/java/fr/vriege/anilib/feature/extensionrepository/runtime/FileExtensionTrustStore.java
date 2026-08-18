@@ -21,7 +21,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-/** Atomic user-owned Ed25519 publisher trust store. */
 public final class FileExtensionTrustStore {
     private static final Pattern KEY_ID = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]{0,79}");
     private static final int MAX_KEYS = 1_000;

@@ -17,7 +17,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-/** Cross-source discovery, preferences, library admission, and migration boundary. */
 public interface DiscoveryService {
     List<SourceDescriptor> sources(SourceContentKind contentKind);
 

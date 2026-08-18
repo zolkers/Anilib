@@ -2,7 +2,6 @@ package fr.vriege.anilib.feature.updates;
 
 import java.time.Duration;
 
-/** Aniyomi-style automatic library update intervals. */
 public enum UpdateInterval {
     MANUAL(Duration.ZERO),
     SIX_HOURS(Duration.ofHours(6)),

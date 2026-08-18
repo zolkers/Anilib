@@ -12,7 +12,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-/** Immutable, platform-neutral request accepted by the Anilib transport. */
 public final class HttpRequest {
     private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(30);
     private static final Pattern HEADER_NAME = Pattern.compile("[!#$%&'*+.^_`|~0-9A-Za-z-]+");
@@ -100,7 +99,6 @@ public final class HttpRequest {
         return Map.copyOf(copy);
     }
 
-    /** Mutable construction scope that validates at the immutable boundary. */
     public static final class Builder {
         private final URI uri;
         private final Map<String, List<String>> headers = new LinkedHashMap<>();

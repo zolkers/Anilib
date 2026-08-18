@@ -12,7 +12,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Deterministic ephemeral catalog for tests and explicitly non-durable products. */
 public final class InMemoryLibraryCatalog implements LibraryCatalog {
     private static final Comparator<LibraryItem> DISPLAY_ORDER =
             Comparator.comparing(LibraryItem::title, String.CASE_INSENSITIVE_ORDER)

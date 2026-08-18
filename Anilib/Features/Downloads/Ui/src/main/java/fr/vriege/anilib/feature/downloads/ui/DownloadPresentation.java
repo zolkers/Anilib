@@ -4,7 +4,6 @@ import fr.vriege.anilib.feature.downloads.DownloadId;
 import fr.vriege.anilib.feature.downloads.DownloadQueueSnapshot;
 import fr.vriege.anilib.feature.library.LibraryItemId;
 
-/** Platform-neutral Download queue presentation and commands. */
 public interface DownloadPresentation {
     DownloadQueueSnapshot queue();
 

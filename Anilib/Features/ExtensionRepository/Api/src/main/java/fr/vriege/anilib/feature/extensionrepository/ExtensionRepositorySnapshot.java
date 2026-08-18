@@ -7,7 +7,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
-/** Last bounded fetch result for one user-owned repository URL. */
 public record ExtensionRepositorySnapshot(
         URI indexUri,
         Instant fetchedAt,

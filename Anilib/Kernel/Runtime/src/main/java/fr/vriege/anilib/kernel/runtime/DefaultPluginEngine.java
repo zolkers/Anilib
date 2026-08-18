@@ -23,7 +23,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 
-/** Default deterministic and transactional implementation of the plugin kernel. */
 public final class DefaultPluginEngine implements PluginEngine {
     public DefaultPluginEngine() {
     }

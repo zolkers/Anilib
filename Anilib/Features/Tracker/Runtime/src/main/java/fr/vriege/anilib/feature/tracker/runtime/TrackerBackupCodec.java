@@ -29,7 +29,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalDouble;
 
-/** Tracker-owned versioned backup codec for remote title bindings and local mirrors. */
 public final class TrackerBackupCodec implements BackupSectionCodec {
     private static final BackupSectionId SECTION_ID = BackupSectionId.of("tracking");
     private static final int MAGIC = 0x5452414B;

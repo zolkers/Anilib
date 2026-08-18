@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Keeps source imports inside the JDK and Anilib namespaces. */
 public final class ImportPolicyRule implements AnilibJavaRule {
     private static final Pattern IMPORT = Pattern.compile("^\\s*import\\s+(?:static\\s+)?([^;]+)\\s*;");
 

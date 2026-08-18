@@ -9,7 +9,6 @@ import fr.vriege.anilib.tooling.javaquality.ExtensionIsolationRule;
 import java.nio.file.Path;
 import java.util.List;
 
-/** Focused checks for the repository-enforced source extension sandbox boundary. */
 final class SourceExtensionIsolationRuleTest {
     private SourceExtensionIsolationRuleTest() {
     }

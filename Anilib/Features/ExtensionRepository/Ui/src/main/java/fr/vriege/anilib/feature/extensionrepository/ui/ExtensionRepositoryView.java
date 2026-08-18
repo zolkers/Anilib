@@ -7,7 +7,6 @@ import fr.vriege.anilib.foundation.validation.Preconditions;
 
 import java.util.List;
 
-/** Immutable repository and package snapshot for Android and desktop Compose. */
 public record ExtensionRepositoryView(
         List<ExtensionRepositoryRow> repositories,
         List<ExtensionPackageMetadata> packages,

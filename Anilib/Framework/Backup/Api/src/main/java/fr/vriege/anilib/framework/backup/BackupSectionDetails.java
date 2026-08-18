@@ -2,7 +2,6 @@ package fr.vriege.anilib.framework.backup;
 
 import fr.vriege.anilib.foundation.validation.Preconditions;
 
-/** Validated feature-owned section metadata suitable for previews and restore reports. */
 public record BackupSectionDetails(
         BackupSectionId id,
         String displayName,

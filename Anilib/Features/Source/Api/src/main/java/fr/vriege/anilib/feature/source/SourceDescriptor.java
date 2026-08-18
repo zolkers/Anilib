@@ -5,7 +5,6 @@ import fr.vriege.anilib.foundation.validation.Preconditions;
 import java.util.Locale;
 import java.util.Set;
 
-/** Immutable metadata used to validate and display one source extension. */
 public record SourceDescriptor(
         SourceId id,
         String displayName,

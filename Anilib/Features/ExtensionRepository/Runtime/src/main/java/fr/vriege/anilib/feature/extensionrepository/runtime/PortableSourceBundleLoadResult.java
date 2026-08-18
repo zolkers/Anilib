@@ -6,7 +6,6 @@ import fr.vriege.anilib.kernel.AnilibPlugin;
 
 import java.util.List;
 
-/** Deterministic selection of startup-ready source Bundles and isolated failures. */
 public record PortableSourceBundleLoadResult(
         List<AnilibPlugin> bundles,
         List<ExtensionBundleLoadFailure> failures) {

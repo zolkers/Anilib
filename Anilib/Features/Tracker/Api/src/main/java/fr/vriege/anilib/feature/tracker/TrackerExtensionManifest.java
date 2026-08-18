@@ -5,7 +5,6 @@ import fr.vriege.anilib.foundation.component.ComponentDescriptor;
 import java.util.Objects;
 import java.util.Set;
 
-/** Host-reviewed identity and permission declaration for one tracker bundle. */
 public record TrackerExtensionManifest(
         ComponentDescriptor component,
         TrackerId trackerId,

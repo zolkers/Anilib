@@ -6,7 +6,6 @@ import java.net.URI;
 import java.util.Map;
 import java.util.Optional;
 
-/** One optional text subtitle track attached to a video stream. */
 public record SourceSubtitleTrack(
         String id,
         String label,

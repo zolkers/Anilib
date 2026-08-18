@@ -4,7 +4,6 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
 
-/** Immutable repository index shared by all AnilibJava rules. */
 public record RepositorySnapshot(
         Path root,
         List<ModuleMetadata> modules,

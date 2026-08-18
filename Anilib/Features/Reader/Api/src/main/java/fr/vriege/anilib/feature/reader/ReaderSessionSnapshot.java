@@ -5,7 +5,6 @@ import fr.vriege.anilib.feature.source.SourceContentUnit;
 
 import java.util.Objects;
 
-/** Immutable observable reader position used by every platform UI. */
 public record ReaderSessionSnapshot(
         LibraryItemId libraryItemId,
         String title,

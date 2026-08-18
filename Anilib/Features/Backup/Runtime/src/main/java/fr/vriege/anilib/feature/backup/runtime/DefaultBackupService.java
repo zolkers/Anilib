@@ -31,7 +31,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
-/** Checksum-verified coordinator for feature-owned codecs and transactional restores. */
 public final class DefaultBackupService implements BackupService, AutoCloseable {
     private static final DateTimeFormatter FILE_TIME =
             DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC);

@@ -2,7 +2,6 @@ package fr.vriege.anilib.feature.extensionrepository;
 
 import fr.vriege.anilib.foundation.validation.Preconditions;
 
-/** Validation for repository package identities, which are intentionally opaque to Anilib. */
 public final class ExtensionPackageIdentifiers {
     private static final int MAX_CHARACTERS = 512;
 

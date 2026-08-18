@@ -30,7 +30,6 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-/** Shared reader engine resolving library origins into validated paged sessions. */
 public final class DefaultReaderService implements ReaderService, ReaderContentRegistrar, AutoCloseable {
     private final SourceRegistry sources;
     private final LibraryCatalog library;

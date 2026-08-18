@@ -2,7 +2,6 @@ package fr.vriege.anilib.feature.source;
 
 import fr.vriege.anilib.foundation.validation.Preconditions;
 
-/** Ordered opaque page descriptor whose bytes remain owned by its source. */
 public record SourcePageResource(
         SourceContentUnitId contentUnitId,
         String value,

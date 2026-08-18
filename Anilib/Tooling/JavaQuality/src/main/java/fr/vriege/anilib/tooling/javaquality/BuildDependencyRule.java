@@ -12,7 +12,6 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Rejects dependencies outside exact platform-UI allowlists. */
 public final class BuildDependencyRule implements AnilibJavaRule {
     private static final Pattern DEPENDENCY = Pattern.compile(
             "^\\s*(?:api|implementation|compileOnly|runtimeOnly|testImplementation|testRuntimeOnly)\\s+(.+)$");

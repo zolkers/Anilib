@@ -7,7 +7,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
-/** One extension package advertised by a user-supplied repository. */
 public record ExtensionPackageMetadata(
         String displayName,
         String packageName,

@@ -7,7 +7,6 @@ import fr.vriege.anilib.feature.backup.BackupRestoreResult;
 import java.nio.file.Path;
 import java.util.List;
 
-/** Platform-neutral backup screen commands shared by Android and desktop. */
 public interface BackupPresentation {
     Path backupDirectory();
 

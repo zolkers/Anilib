@@ -21,7 +21,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Stream;
 
-/** Black-box persistence, atomic replacement, and legacy migration checks. */
 final class LibraryPersistenceTest {
     private static final int MAGIC = 0x414E494C;
     private static final int CURRENT_VERSION = 3;

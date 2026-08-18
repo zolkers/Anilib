@@ -16,7 +16,6 @@ import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
-/** Black-box folder, ZIP/CBZ, ordering, reading, and traversal checks. */
 final class LocalSourceTest {
     private static final byte[] FIRST_IMAGE = {1, 2, 3};
     private static final byte[] SECOND_IMAGE = {4, 5, 6, 7};

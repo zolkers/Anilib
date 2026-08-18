@@ -1,6 +1,5 @@
 package fr.vriege.anilib.feature.reader;
 
-/** Bounded page-loading policy selected by a product Bundle. */
 public record ReaderPolicy(int prefetchDistance, long maximumCacheBytes, long maximumPageBytes) {
     public ReaderPolicy {
         if (prefetchDistance < 0 || prefetchDistance > 10) {

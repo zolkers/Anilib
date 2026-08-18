@@ -23,7 +23,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
-/** Atomic dependency-free queue metadata codec. Page bytes are stored separately. */
 final class FileDownloadQueueStore {
     private static final String HEADER = "ANILIB_DOWNLOADS\t1\t";
     private static final Base64.Encoder ENCODER = Base64.getUrlEncoder().withoutPadding();

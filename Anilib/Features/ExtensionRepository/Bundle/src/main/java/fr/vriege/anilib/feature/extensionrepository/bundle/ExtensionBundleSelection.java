@@ -6,7 +6,6 @@ import fr.vriege.anilib.kernel.AnilibPlugin;
 
 import java.util.List;
 
-/** Enabled source Bundles selected for one product startup plus isolated failures. */
 public record ExtensionBundleSelection(
         List<AnilibPlugin> bundles,
         List<ExtensionBundleLoadFailure> failures) {

@@ -13,13 +13,11 @@ import fr.vriege.anilib.kernel.PluginManifest;
 import java.util.Objects;
 import java.util.Set;
 
-/** Bundle adapter that constructs one source with only its explicitly granted capabilities. */
 public final class SourceExtensionPlugin implements AnilibPlugin {
     private final PluginManifest manifest;
     private final SourceExtensionManifest extensionManifest;
     private final SourceExtensionFactory factory;
 
-    /** Compatibility constructor for an already-created source that receives no host capabilities. */
     public SourceExtensionPlugin(ComponentDescriptor component, Source source) {
         this(legacyManifest(component, source), ignored -> source);
     }

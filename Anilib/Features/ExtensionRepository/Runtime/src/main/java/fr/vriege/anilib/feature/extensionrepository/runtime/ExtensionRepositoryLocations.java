@@ -4,7 +4,6 @@ import java.net.URI;
 import java.util.List;
 import java.util.Locale;
 
-/** Resolves user-facing Git repository locations to bounded JSON index candidates. */
 final class ExtensionRepositoryLocations {
     private static final String GITHUB_HOST = "github.com";
     private static final String RAW_GITHUB_HOST = "raw.githubusercontent.com";

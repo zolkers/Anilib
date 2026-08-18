@@ -16,7 +16,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.TreeMap;
 
-/** Thread-safe Source registry with compatibility and duplicate checks. */
 public final class DefaultSourceRegistry implements SourceRegistry, SourceRegistrar, AutoCloseable {
     private final TreeMap<SourceId, Entry> sources = new TreeMap<>();
     private boolean closed;

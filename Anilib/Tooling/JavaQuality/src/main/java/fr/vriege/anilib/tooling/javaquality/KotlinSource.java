@@ -7,7 +7,6 @@ import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Indexed Kotlin source owned by one declared Anilib module. */
 public record KotlinSource(
         Path path,
         Path absolutePath,

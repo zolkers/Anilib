@@ -2,7 +2,6 @@ package fr.vriege.anilib.feature.source;
 
 import java.util.List;
 
-/** Optional source capability for Aniyomi-style browse, search, filters, and preferences. */
 public interface CatalogueSource extends Source {
     SourcePage popular(SourceBrowseRequest request);
 

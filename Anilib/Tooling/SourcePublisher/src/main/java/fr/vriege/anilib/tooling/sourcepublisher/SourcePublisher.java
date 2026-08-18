@@ -3,7 +3,6 @@ package fr.vriege.anilib.tooling.sourcepublisher;
 import java.nio.file.Path;
 import java.util.List;
 
-/** Programmatic entrypoint used by Gradle automation and integration verification. */
 public final class SourcePublisher {
     private SourcePublisher() {
     }

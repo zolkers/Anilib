@@ -43,7 +43,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
-/** Round-trip, checksum, merge, self-owned codec, and rollback checks for backups. */
 final class BackupTest {
     private static final Instant BACKUP_TIME = Instant.parse("2026-08-18T09:30:00Z");
 

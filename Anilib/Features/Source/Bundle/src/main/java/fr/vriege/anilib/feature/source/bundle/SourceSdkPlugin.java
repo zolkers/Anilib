@@ -7,7 +7,6 @@ import fr.vriege.anilib.kernel.AnilibPlugin;
 import fr.vriege.anilib.kernel.PluginInstallationContext;
 import fr.vriege.anilib.kernel.PluginManifest;
 
-/** Composition unit publishing the Source SDK registry and registrar. */
 public final class SourceSdkPlugin implements AnilibPlugin {
     private static final PluginManifest MANIFEST = PluginManifest.builder(
                     ComponentDescriptor.of("feature.source", "Source SDK", "1.0.0"))

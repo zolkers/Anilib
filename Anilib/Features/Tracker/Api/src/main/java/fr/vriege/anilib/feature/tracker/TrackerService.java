@@ -6,7 +6,6 @@ import fr.vriege.anilib.feature.library.MediaKind;
 import java.util.Collection;
 import java.util.List;
 
-/** Shared tracking workflow used identically by Android and desktop. */
 public interface TrackerService {
     List<TrackerAccount> accounts();
 

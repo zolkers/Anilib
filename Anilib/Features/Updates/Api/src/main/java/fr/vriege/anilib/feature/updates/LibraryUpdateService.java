@@ -2,7 +2,6 @@ package fr.vriege.anilib.feature.updates;
 
 import java.util.concurrent.CompletableFuture;
 
-/** Background-safe library refresh orchestration shared by all platforms. */
 public interface LibraryUpdateService {
     LibraryUpdateSnapshot snapshot();
 

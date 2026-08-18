@@ -1,6 +1,5 @@
 package fr.vriege.anilib.feature.downloads;
 
-/** Product-selected bounds and lifecycle behavior for downloaded pages. */
 public record DownloadStoragePolicy(
         long maximumStorageBytes,
         long maximumPageBytes,

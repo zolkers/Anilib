@@ -19,7 +19,6 @@ import fr.vriege.anilib.kernel.PluginManifest;
 import java.nio.file.Path;
 import java.util.Objects;
 
-/** Composition unit for episodes, stream selection, subtitles, and resume state. */
 public final class PlayerPlugin implements AnilibPlugin {
     private static final PluginManifest MANIFEST = PluginManifest.builder(
                     ComponentDescriptor.of("feature.player", "Player", "0.1.0"))

@@ -1,6 +1,5 @@
 package fr.vriege.anilib.feature.tracker;
 
-/** Semantic compatibility version for independently shipped tracker adapters. */
 public record TrackerApiVersion(int major, int minor) implements Comparable<TrackerApiVersion> {
     public TrackerApiVersion {
         if (major < 1 || minor < 0) {

@@ -35,7 +35,6 @@ import java.util.Optional;
 import java.util.Objects;
 import java.util.Set;
 
-/** Owns the versioned on-disk format and atomic replacement protocol. */
 final class LibraryFileStore {
     static final int MAGIC = 0x414E494C;
     static final int CURRENT_VERSION = 3;

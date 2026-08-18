@@ -4,7 +4,6 @@ import fr.vriege.anilib.foundation.validation.Preconditions;
 
 import java.time.Instant;
 
-/** One durable reader or player visit in a title's chronological history. */
 public record LibraryHistoryEntry(String contentId, Instant openedAt, long position) {
     public LibraryHistoryEntry {
         Preconditions.requireNonBlank(contentId, "contentId");

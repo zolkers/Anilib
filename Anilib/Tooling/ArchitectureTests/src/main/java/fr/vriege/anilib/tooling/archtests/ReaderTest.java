@@ -41,7 +41,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/** End-to-end reader, persistence, prefetch, ownership, and limit checks. */
 final class ReaderTest {
     private static final byte[] FIRST_PAGE = {1, 2, 3};
     private static final byte[] SECOND_PAGE = {4, 5, 6};

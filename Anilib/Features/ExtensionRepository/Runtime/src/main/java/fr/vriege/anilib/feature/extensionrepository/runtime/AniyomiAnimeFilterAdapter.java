@@ -13,7 +13,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-/** Projects Aniyomi filter objects without linking their ABI into the shared runtime. */
 final class AniyomiAnimeFilterAdapter {
     private AniyomiAnimeFilterAdapter() {
     }

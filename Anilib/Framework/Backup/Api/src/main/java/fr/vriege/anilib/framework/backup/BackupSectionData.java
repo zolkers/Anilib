@@ -2,7 +2,6 @@ package fr.vriege.anilib.framework.backup;
 
 import java.util.Objects;
 
-/** Defensive encoded payload and user-facing entry count returned by one codec. */
 public record BackupSectionData(byte[] payload, int entryCount) {
     public BackupSectionData {
         payload = Objects.requireNonNull(payload, "payload must not be null").clone();

@@ -13,7 +13,6 @@ import fr.vriege.anilib.kernel.PluginManifest;
 
 import java.nio.file.Path;
 
-/** Single additive composition unit for the Library feature. */
 public final class LibraryPlugin implements AnilibPlugin {
     private static final PluginManifest MANIFEST = PluginManifest.builder(
                     ComponentDescriptor.of("feature.library", "Library", "0.1.0"))

@@ -3,7 +3,6 @@ package fr.vriege.anilib.feature.downloads;
 import java.util.Objects;
 import java.util.UUID;
 
-/** Stable identity for one durable download job. */
 public record DownloadId(UUID value) implements Comparable<DownloadId> {
     public DownloadId {
         Objects.requireNonNull(value, "value must not be null");

@@ -10,7 +10,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalDouble;
 
-/** Durable local mirror of one title bound to one remote tracking service. */
 public record TrackerEntry(
         LibraryItemId libraryItemId,
         TrackerId trackerId,

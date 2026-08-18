@@ -53,7 +53,6 @@ private val updateDateFormatter = DateTimeFormatter
     .withLocale(Locale.getDefault())
     .withZone(ZoneId.systemDefault())
 
-/** Shared Updates feed, progress, schedule, and Aniyomi-style filtering controls. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun UpdatesScreen(presentation: UpdatePresentation) {

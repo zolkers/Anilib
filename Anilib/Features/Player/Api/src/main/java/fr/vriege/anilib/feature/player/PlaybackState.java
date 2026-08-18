@@ -7,7 +7,6 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.OptionalDouble;
 
-/** Durable resume state for one episode. Positions and durations use milliseconds. */
 public record PlaybackState(
         LibraryItemId libraryItemId,
         SourceEpisodeId episodeId,

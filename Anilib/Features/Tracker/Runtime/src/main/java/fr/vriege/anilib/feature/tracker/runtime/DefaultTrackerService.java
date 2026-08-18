@@ -26,7 +26,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-/** Durable orchestration for authentication, binding, editing, refresh, and progress sync. */
 public final class DefaultTrackerService implements TrackerService {
     private final TrackerRegistry registry;
     private final LibraryCatalog library;

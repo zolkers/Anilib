@@ -11,7 +11,6 @@ import fr.vriege.anilib.feature.updates.LibraryUpdateNotificationType
 import fr.vriege.anilib.feature.updates.LibraryUpdateNotifier
 import java.util.concurrent.atomic.AtomicInteger
 
-/** Android notification-channel adapter; update behavior remains in shared Java. */
 class AndroidLibraryUpdateNotifier(context: Context) : LibraryUpdateNotifier {
     private val applicationContext = context.applicationContext
     private val manager = applicationContext.getSystemService(NotificationManager::class.java)

@@ -7,7 +7,6 @@ import java.net.URI;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Remote title candidate returned by a tracker search. */
 public record TrackerSearchResult(
         TrackerId trackerId,
         String remoteId,

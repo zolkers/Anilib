@@ -17,7 +17,6 @@ import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
-/** Bounded module archive that avoids retaining an operating-system handle to an installed JAR. */
 final class InMemoryModuleArchive {
     private static final int MAX_ENTRY_BYTES = 8 * 1_024 * 1_024;
     private static final int MAX_EXPANDED_BYTES = 32 * 1_024 * 1_024;

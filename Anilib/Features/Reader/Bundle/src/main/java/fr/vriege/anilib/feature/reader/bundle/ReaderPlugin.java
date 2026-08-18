@@ -16,7 +16,6 @@ import fr.vriege.anilib.kernel.PluginManifest;
 
 import java.util.Objects;
 
-/** Composition unit for paged reading, progress, prefetch, and shared presentation. */
 public final class ReaderPlugin implements AnilibPlugin {
     private static final PluginManifest MANIFEST = PluginManifest.builder(
                     ComponentDescriptor.of("feature.reader", "Reader", "0.1.0"))

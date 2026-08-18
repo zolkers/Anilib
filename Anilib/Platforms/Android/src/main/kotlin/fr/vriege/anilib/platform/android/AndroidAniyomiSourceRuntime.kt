@@ -13,16 +13,11 @@ import fr.vriege.anilib.feature.source.SourceId
 import fr.vriege.anilib.kernel.AnilibPlugin
 import java.lang.reflect.InvocationTargetException
 
-/** Immutable APK activation result selected before the Kernel graph starts. */
 internal data class AndroidApkSourceActivation(
     val bundles: List<AnilibPlugin>,
     val reports: Map<String, ApkExtensionRuntimeReport>,
 )
 
-/**
- * Loads only trusted, ABI-ready Aniyomi entrypoints and converts them into
- * ordinary Source Bundles before Standard freezes the product graph.
- */
 internal class AndroidAniyomiSourceRuntime(
     context: Context,
     private val inventory: AndroidAniyomiExtensionInventory = AndroidAniyomiExtensionInventory(context),
@@ -142,7 +137,6 @@ internal class AndroidAniyomiSourceRuntime(
     }
 }
 
-/** Prefers classes bundled by the APK while retaining Android and host-ABI parents. */
 private class AndroidApkClassLoader(
     sourcePath: String,
     parent: ClassLoader,

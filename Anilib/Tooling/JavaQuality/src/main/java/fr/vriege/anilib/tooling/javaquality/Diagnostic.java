@@ -3,7 +3,6 @@ package fr.vriege.anilib.tooling.javaquality;
 import java.nio.file.Path;
 import java.util.Objects;
 
-/** One deterministic repository-relative quality finding. */
 public record Diagnostic(String rule, Path path, int line, String message) implements Comparable<Diagnostic> {
     public Diagnostic {
         Objects.requireNonNull(rule, "rule must not be null");

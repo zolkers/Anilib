@@ -10,7 +10,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
-/** Complete platform-neutral selection and resume state for one episode. */
 public record PlayerSessionSnapshot(
         LibraryItemId libraryItemId,
         String title,

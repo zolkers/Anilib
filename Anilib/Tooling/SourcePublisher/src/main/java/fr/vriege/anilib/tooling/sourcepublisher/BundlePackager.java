@@ -10,7 +10,6 @@ import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
-/** Reproducibly packages compiled extension classes with the required descriptor. */
 final class BundlePackager {
     private static final String DESCRIPTOR = "META-INF/anilib-extension.properties";
 

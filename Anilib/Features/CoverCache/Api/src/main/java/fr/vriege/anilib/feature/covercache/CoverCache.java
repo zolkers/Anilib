@@ -2,7 +2,6 @@ package fr.vriege.anilib.feature.covercache;
 
 import java.util.Optional;
 
-/** Durable decoded-cover cache contract. */
 public interface CoverCache {
     DecodedImage load(CoverKey key, CoverLoader loader);
 

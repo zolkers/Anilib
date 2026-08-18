@@ -8,7 +8,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 
-/** Small atomic-file boundary shared by publisher commands. */
 final class PublisherFiles {
     private PublisherFiles() {
     }

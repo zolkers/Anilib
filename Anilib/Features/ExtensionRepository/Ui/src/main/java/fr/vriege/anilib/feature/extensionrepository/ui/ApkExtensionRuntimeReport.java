@@ -7,7 +7,6 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
-/** Trust and host-ABI preflight for one Android-visible extension APK. */
 public record ApkExtensionRuntimeReport(
         String packageName,
         ApkExtensionRuntimeState state,

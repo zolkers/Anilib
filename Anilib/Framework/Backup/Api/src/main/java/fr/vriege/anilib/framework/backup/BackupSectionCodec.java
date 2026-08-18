@@ -1,6 +1,5 @@
 package fr.vriege.anilib.framework.backup;
 
-/** Feature-owned, independently versioned codec used by the Backup coordinator. */
 public interface BackupSectionCodec {
     BackupSectionId sectionId();
 

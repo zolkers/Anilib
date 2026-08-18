@@ -13,7 +13,6 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
 import java.util.function.Function;
 
-/** Per-session bounded LRU cache and asynchronous neighboring-page loader. */
 final class ReaderPagePipeline implements AutoCloseable {
     private final Function<SourcePageResource, byte[]> pageReader;
     private final List<SourcePageResource> pages;

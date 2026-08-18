@@ -5,7 +5,6 @@ import fr.vriege.anilib.foundation.validation.Preconditions;
 import java.time.Instant;
 import java.util.Optional;
 
-/** Immutable episode summary supplied by one streaming source. */
 public record SourceEpisode(
         SourceEpisodeId id,
         String title,

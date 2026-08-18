@@ -2,7 +2,6 @@ package fr.vriege.anilib.feature.source;
 
 import fr.vriege.anilib.foundation.validation.Preconditions;
 
-/** Stable source-scoped identity for one anime episode. */
 public record SourceEpisodeId(SourceCatalogueItemId itemId, String value)
         implements Comparable<SourceEpisodeId> {
     public SourceEpisodeId {

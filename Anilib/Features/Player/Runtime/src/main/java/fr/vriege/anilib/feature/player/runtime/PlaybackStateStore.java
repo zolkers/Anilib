@@ -24,7 +24,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Atomic dependency-free persistence for per-episode resume state. */
 final class PlaybackStateStore {
     private static final String HEADER = "ANILIB_PLAYBACK\t1";
     private static final long MAXIMUM_FILE_BYTES = 64L * 1024L * 1024L;

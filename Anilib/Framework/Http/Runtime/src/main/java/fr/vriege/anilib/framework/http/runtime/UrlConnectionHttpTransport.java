@@ -12,7 +12,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Android-compatible transport using only the shared URL connection API. */
 public final class UrlConnectionHttpTransport implements HttpTransport {
     private static final int MAX_RESPONSE_BYTES = 16 * 1024 * 1024;
 

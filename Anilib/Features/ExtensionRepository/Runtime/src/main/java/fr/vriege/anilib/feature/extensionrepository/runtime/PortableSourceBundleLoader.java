@@ -30,7 +30,6 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Set;
 
-/** Loads enabled, verified source Bundles into one child module layer per artifact. */
 public final class PortableSourceBundleLoader {
     private static final long MAX_ARTIFACT_BYTES = 16L * 1_024L * 1_024L;
     private static final Set<String> ALLOWED_REQUIRED_MODULES = Set.of(

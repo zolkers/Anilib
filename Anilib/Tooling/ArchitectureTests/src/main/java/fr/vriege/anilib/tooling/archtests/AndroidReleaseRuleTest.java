@@ -9,7 +9,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
-/** Focused regression checks for the Android APK release contract. */
 final class AndroidReleaseRuleTest {
     private AndroidReleaseRuleTest() {
     }

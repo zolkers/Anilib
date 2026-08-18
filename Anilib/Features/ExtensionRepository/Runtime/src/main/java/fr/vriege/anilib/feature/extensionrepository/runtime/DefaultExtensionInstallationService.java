@@ -39,7 +39,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Verified portable-Bundle lifecycle using only JDK cryptography and storage. */
 public final class DefaultExtensionInstallationService implements ExtensionInstallationService {
     private static final int MAX_ARTIFACT_BYTES = 16 * 1024 * 1024;
     private static final int MAX_REDIRECTS = 5;

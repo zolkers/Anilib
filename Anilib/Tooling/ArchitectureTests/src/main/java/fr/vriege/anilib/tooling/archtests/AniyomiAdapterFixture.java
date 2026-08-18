@@ -3,7 +3,6 @@ package fr.vriege.anilib.tooling.archtests;
 import java.util.List;
 import java.util.Map;
 
-/** Public reflection fixture for the dependency-free Aniyomi source adapter checks. */
 public final class AniyomiAdapterFixture {
     private AniyomiAdapterFixture() {
     }

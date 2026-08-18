@@ -13,7 +13,6 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Atomic line-oriented storage for user-supplied repository URLs. */
 public final class FileExtensionRepositoryStore {
     private final Path file;
 

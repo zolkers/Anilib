@@ -2,7 +2,6 @@ package fr.vriege.anilib.feature.localsource;
 
 import fr.vriege.anilib.foundation.validation.Preconditions;
 
-/** Ordered image entry addressable through its owning local source. */
 public record LocalPage(
         LocalPublicationId publicationId,
         String entryName,

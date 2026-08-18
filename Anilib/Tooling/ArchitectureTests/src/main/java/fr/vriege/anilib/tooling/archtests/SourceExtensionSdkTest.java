@@ -34,7 +34,6 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-/** Contract checks for explicit, versioned, deterministic source extensions. */
 final class SourceExtensionSdkTest {
     private SourceExtensionSdkTest() {
     }

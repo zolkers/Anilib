@@ -4,7 +4,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Enforces the root package and package-to-directory correspondence. */
 public final class PackageLayoutRule implements AnilibJavaRule {
     private static final String ROOT_PACKAGE = "fr.vriege.anilib";
 

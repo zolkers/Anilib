@@ -5,7 +5,6 @@ import fr.vriege.anilib.foundation.validation.Preconditions;
 
 import java.util.Set;
 
-/** Side-effect-free identity and permission request for one explicitly selected source Bundle. */
 public record SourceExtensionManifest(
         ComponentDescriptor component,
         SourceId sourceId,
@@ -50,7 +49,6 @@ public record SourceExtensionManifest(
         return new SourceExtensionManifest(component, sourceId, permissions, values);
     }
 
-    /** Reserved for a platform-owned, explicitly trusted compatibility adapter. */
     public static SourceExtensionManifest trustedPlatform(
             ComponentDescriptor component,
             SourceId sourceId) {

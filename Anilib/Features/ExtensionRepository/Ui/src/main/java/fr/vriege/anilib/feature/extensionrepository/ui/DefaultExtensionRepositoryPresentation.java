@@ -16,7 +16,6 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-/** Shared non-blocking presentation over the synchronous repository service. */
 public final class DefaultExtensionRepositoryPresentation
         implements ExtensionRepositoryPresentation, AutoCloseable {
     private final ExtensionRepositoryService service;

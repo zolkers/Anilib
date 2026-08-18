@@ -2,7 +2,6 @@ package fr.vriege.anilib.framework.backup;
 
 import fr.vriege.anilib.foundation.validation.Preconditions;
 
-/** Stable identifier for one independently versioned feature-owned backup section. */
 public record BackupSectionId(String value) implements Comparable<BackupSectionId> {
     public BackupSectionId {
         value = Preconditions.requireNonBlank(value, "value");

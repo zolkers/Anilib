@@ -16,7 +16,6 @@ import fr.vriege.anilib.kernel.PluginManifest;
 import java.nio.file.Path;
 import java.util.Objects;
 
-/** Removable composition unit for tracker registration, durable mirrors, backup, and UI. */
 public final class TrackerPlugin implements AnilibPlugin {
     private static final PluginManifest MANIFEST = PluginManifest.builder(
                     ComponentDescriptor.of("feature.tracker", "Tracking", "0.1.0"))

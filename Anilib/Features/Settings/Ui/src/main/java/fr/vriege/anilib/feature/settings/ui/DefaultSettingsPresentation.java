@@ -7,7 +7,6 @@ import fr.vriege.anilib.feature.settings.ThemeMode;
 import java.util.Objects;
 import java.util.function.Consumer;
 
-/** Presentation adapter that keeps persistence outside platform code. */
 public final class DefaultSettingsPresentation implements SettingsPresentation {
     private final SettingsService service;
 

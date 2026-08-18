@@ -49,7 +49,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 
-/** End-to-end offline reading, durable resume, cleanup, and storage-policy checks. */
 final class DownloadTest {
     private static final byte[] FIRST_PAGE = {11, 12, 13};
     private static final byte[] SECOND_PAGE = {21, 22, 23, 24};

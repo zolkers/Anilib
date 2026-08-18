@@ -9,7 +9,6 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Enforces ownership, dependency boundaries, imports, and format for Kotlin UI adapters. */
 public final class KotlinSourceRule implements AnilibJavaRule {
     private static final int MAX_LINE_LENGTH = 120;
     private static final String ROOT_PACKAGE = "fr.vriege.anilib";
@@ -97,6 +96,9 @@ public final class KotlinSourceRule implements AnilibJavaRule {
             if (line.length() > MAX_LINE_LENGTH) {
                 diagnostics.add(diagnostic(source, lineNumber,
                         "Line exceeds " + MAX_LINE_LENGTH + " characters"));
+            }
+            if (line.contains("/" + "**")) {
+                diagnostics.add(diagnostic(source, lineNumber, "KDoc blocks are forbidden"));
             }
             validateImport(source, packageOwners, lineNumber, line, diagnostics);
         }

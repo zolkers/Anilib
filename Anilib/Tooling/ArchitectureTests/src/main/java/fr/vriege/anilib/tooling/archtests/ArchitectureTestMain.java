@@ -44,7 +44,6 @@ import java.nio.file.Path;
 import java.nio.file.Files;
 import java.io.IOException;
 
-/** Dependency-free executable architecture contract suite. */
 public final class ArchitectureTestMain {
     private static int assertions;
 

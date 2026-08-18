@@ -3,7 +3,6 @@ package fr.vriege.anilib.tooling.sourcepublisher;
 import java.nio.file.Path;
 import java.util.Arrays;
 
-/** Dependency-free CLI for portable source keys, Bundles, and repository indexes. */
 public final class SourcePublisherMain {
     private SourcePublisherMain() {
     }

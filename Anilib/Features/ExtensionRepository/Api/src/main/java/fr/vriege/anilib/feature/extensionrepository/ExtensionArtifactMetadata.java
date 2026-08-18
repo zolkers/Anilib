@@ -7,7 +7,6 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
-/** One downloadable artifact and its optional portable trust metadata. */
 public record ExtensionArtifactMetadata(
         ExtensionArtifactFormat format,
         URI uri,

@@ -5,7 +5,6 @@ import fr.vriege.anilib.foundation.validation.Preconditions;
 
 import java.util.List;
 
-/** Language header and rows matching Aniyomi's source list grouping. */
 public record DiscoverySourceSection(String languageTag, List<SourceDescriptor> sources) {
     public DiscoverySourceSection {
         languageTag = Preconditions.requireNonBlank(languageTag, "languageTag");

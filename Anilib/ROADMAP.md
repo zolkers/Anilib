@@ -24,6 +24,7 @@ platform-specific.
 - [x] first Library vertical slice
 - [x] desktop shell and Android host seam
 - [x] repository-specific AnilibJava quality checker
+- [x] repository-wide no-Javadoc/KDoc convention enforced by AnilibJava
 - [x] architecture smoke suite
 
 ## Phase 1 — local library

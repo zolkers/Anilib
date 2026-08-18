@@ -6,7 +6,6 @@ import fr.vriege.anilib.framework.http.HttpRateLimiter;
 import fr.vriege.anilib.framework.http.HttpResponseCache;
 import fr.vriege.anilib.kernel.CapabilityKey;
 
-/** Stable network capabilities published by the explicitly selected Network Bundle. */
 public final class NetworkCapabilities {
     public static final CapabilityKey<AnilibHttpClient> HTTP_CLIENT =
             CapabilityKey.of("feature.network.http-client", AnilibHttpClient.class);

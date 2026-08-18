@@ -39,7 +39,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Default cross-source discovery behavior shared by every platform. */
 public final class DefaultDiscoveryService implements DiscoveryService {
     private final SourceRegistry registry;
     private final LibraryCatalog library;

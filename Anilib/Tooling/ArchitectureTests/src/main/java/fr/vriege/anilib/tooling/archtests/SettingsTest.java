@@ -12,7 +12,6 @@ import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/** Durable settings and observation contract checks. */
 final class SettingsTest {
     private SettingsTest() {
     }

@@ -29,7 +29,6 @@ import java.util.Iterator;
 import java.util.Objects;
 import java.util.Optional;
 
-/** File-backed encoded cover cache decoded through the standard JDK image readers. */
 public final class JdkFileCoverCache implements CoverCache {
     private static final int MAX_ENCODED_BYTES = 16 * 1024 * 1024;
     private static final long MAX_PIXELS = 16L * 1024L * 1024L;

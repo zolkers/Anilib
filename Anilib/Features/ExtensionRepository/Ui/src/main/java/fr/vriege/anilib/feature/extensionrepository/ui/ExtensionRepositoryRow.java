@@ -6,7 +6,6 @@ import java.net.URI;
 import java.time.Instant;
 import java.util.Optional;
 
-/** One configured repository row rendered by the shared settings surface. */
 public record ExtensionRepositoryRow(
         URI indexUri,
         Optional<Instant> fetchedAt,

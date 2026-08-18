@@ -23,7 +23,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
-/** Shared HTTP policy engine layered over one platform-owned network transport. */
 public final class DefaultAnilibHttpClient implements AnilibHttpClient {
     private static final HexFormat HEX = HexFormat.of();
 

@@ -6,7 +6,6 @@ import fr.vriege.anilib.feature.source.SourceEpisodeId;
 
 import java.util.List;
 
-/** Platform-neutral entry point consumed by Android and desktop anime screens. */
 public interface PlayerPresentation {
     boolean canOpen(LibraryItemId libraryItemId);
 

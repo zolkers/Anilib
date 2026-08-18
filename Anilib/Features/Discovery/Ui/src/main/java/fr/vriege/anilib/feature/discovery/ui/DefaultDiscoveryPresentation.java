@@ -21,7 +21,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Deterministic presentation adapter over the Discovery service. */
 public final class DefaultDiscoveryPresentation implements DiscoveryPresentation {
     private final DiscoveryService service;
 

@@ -28,7 +28,6 @@ import java.util.Optional;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
 
-/** End-to-end checks for restart-isolated, explicitly selected portable source Bundles. */
 final class PortableBundleLoadingTest {
     private static final String PACKAGE = "eu.example.extension";
     private static final String MODULE = "eu.example.extension";

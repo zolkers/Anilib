@@ -2,11 +2,9 @@ package fr.vriege.anilib.feature.extensionrepository;
 
 import java.util.List;
 
-/** Explicit trust and lifecycle boundary for user-supplied extension artifacts. */
 public interface ExtensionInstallationService {
     List<InstalledExtensionPackage> installed();
 
-    /** Failures observed while selecting enabled Bundles during the current startup. */
     List<ExtensionBundleLoadFailure> loadFailures();
 
     List<String> trustedKeyIds();

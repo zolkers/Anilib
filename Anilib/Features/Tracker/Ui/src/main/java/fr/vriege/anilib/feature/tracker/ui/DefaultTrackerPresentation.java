@@ -12,7 +12,6 @@ import fr.vriege.anilib.feature.tracker.TrackerService;
 import java.util.List;
 import java.util.Objects;
 
-/** Thin presentation adapter retaining all tracking behavior in the Java service. */
 public final class DefaultTrackerPresentation implements TrackerPresentation {
     private final TrackerService service;
 

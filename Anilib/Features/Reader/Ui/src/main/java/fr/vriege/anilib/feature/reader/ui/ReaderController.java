@@ -6,7 +6,6 @@ import fr.vriege.anilib.feature.reader.ReadingDirection;
 
 import java.util.Objects;
 
-/** Thin UI controller preserving one shared navigation behavior across platforms. */
 public final class ReaderController implements AutoCloseable {
     private final ReaderSession session;
 

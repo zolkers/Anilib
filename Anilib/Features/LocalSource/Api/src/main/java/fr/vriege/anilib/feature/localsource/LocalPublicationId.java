@@ -2,7 +2,6 @@ package fr.vriege.anilib.feature.localsource;
 
 import fr.vriege.anilib.foundation.validation.Preconditions;
 
-/** Root-relative, traversal-safe identity of a local publication. */
 public record LocalPublicationId(LocalPublicationType type, String relativePath) {
     public LocalPublicationId {
         Preconditions.requireNonNull(type, "type");

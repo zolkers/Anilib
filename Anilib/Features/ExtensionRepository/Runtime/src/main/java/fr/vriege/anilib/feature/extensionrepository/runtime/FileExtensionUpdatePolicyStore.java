@@ -10,7 +10,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 
-/** Atomic preference for the opt-in automatic portable-source update channel. */
 public final class FileExtensionUpdatePolicyStore {
     private final Path file;
 

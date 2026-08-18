@@ -4,7 +4,6 @@ import fr.vriege.anilib.feature.library.LibraryItemId;
 
 import java.util.Optional;
 
-/** Platform-neutral presentation snapshots for the Library feature. */
 public interface LibraryPresentation {
     LibraryOverview library();
 

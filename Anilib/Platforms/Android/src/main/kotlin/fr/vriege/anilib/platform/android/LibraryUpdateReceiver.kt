@@ -13,7 +13,6 @@ import fr.vriege.anilib.framework.http.runtime.UrlConnectionHttpTransport
 import java.time.Instant
 import java.util.concurrent.CompletableFuture
 
-/** Process-independent Android wake-up adapter for the shared durable update policy. */
 class LibraryUpdateReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         schedule(context)

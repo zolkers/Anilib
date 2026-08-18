@@ -5,7 +5,6 @@ import fr.vriege.anilib.foundation.validation.Preconditions;
 import java.nio.file.Path;
 import java.time.Instant;
 
-/** Lightweight local backup row for the shared management screen. */
 public record BackupFileSnapshot(
         Path path,
         Instant createdAt,

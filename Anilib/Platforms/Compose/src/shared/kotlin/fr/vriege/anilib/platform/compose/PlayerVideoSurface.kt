@@ -40,7 +40,6 @@ import io.github.kdroidfilter.composemediaplayer.rememberVideoPlayerState
 
 private const val PROGRESS_INTERVAL_MILLIS = 2_000L
 
-/** Aniyomi-style player chrome over the shared native video surface. */
 @Composable
 internal fun PlayerVideoSurface(
     controller: PlayerController,

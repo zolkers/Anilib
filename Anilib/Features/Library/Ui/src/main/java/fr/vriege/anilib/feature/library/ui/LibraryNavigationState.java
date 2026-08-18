@@ -5,7 +5,6 @@ import fr.vriege.anilib.feature.library.LibraryItemId;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Immutable current destination for a Library platform renderer. */
 public record LibraryNavigationState(LibraryPage page, Optional<LibraryItemId> selectedTitle) {
     public LibraryNavigationState {
         Objects.requireNonNull(page, "page must not be null");

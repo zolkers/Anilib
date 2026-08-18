@@ -50,7 +50,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/** Episode, stream, subtitle, persistence, backup, and validation checks. */
 final class PlayerTest {
     private static final SourceId SOURCE_ID = SourceId.of("test.streaming");
     private static final SourceCatalogueItemId SOURCE_ITEM_ID =

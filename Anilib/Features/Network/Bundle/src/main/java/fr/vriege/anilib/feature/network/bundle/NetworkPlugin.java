@@ -18,7 +18,6 @@ import fr.vriege.anilib.kernel.PluginManifest;
 import java.nio.file.Path;
 import java.util.Objects;
 
-/** Product composition unit for the dependency-free JDK network stack. */
 public final class NetworkPlugin implements AnilibPlugin {
     private static final PluginManifest MANIFEST = PluginManifest.builder(
                     ComponentDescriptor.of("feature.network", "Network", "1.0.0"))

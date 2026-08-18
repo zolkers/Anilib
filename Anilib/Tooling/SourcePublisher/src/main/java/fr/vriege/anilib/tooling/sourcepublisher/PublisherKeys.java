@@ -8,7 +8,6 @@ import java.security.PrivateKey;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.Base64;
 
-/** Ed25519 key generation and private-key loading. */
 final class PublisherKeys {
     private PublisherKeys() {
     }

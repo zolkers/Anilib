@@ -3,7 +3,6 @@ package fr.vriege.anilib.kernel;
 import fr.vriege.anilib.foundation.component.ComponentId;
 import fr.vriege.anilib.foundation.validation.Preconditions;
 
-/** A typed, ordered, zero-to-many extension point. */
 public record ContributionPoint<T>(ComponentId id, Class<T> type) implements Comparable<ContributionPoint<?>> {
     public ContributionPoint {
         Preconditions.requireNonNull(id, "id");

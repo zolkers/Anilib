@@ -1,6 +1,5 @@
 package fr.vriege.anilib.feature.updates;
 
-/** Built-in headless notifier used by tests and non-graphical hosts. */
 public final class LibraryUpdateNotifiers {
     private static final LibraryUpdateNotifier SILENT = new LibraryUpdateNotifier() {
         @Override

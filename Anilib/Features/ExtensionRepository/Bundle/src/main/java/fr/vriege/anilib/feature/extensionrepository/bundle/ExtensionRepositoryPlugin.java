@@ -20,7 +20,6 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
 
-/** Composition unit for user-managed Aniyomi-compatible extension repositories. */
 public final class ExtensionRepositoryPlugin implements AnilibPlugin {
     private static final PluginManifest MANIFEST = PluginManifest.builder(
                     ComponentDescriptor.of(

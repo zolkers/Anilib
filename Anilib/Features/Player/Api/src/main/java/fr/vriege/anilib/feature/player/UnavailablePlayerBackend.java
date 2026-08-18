@@ -3,7 +3,6 @@ package fr.vriege.anilib.feature.player;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Headless backend retaining selection behavior without claiming media support. */
 final class UnavailablePlayerBackend implements PlayerBackend {
     @Override
     public String id() {

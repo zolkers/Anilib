@@ -7,7 +7,6 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
-/** Durable, platform-neutral status of one verified extension artifact. */
 public record InstalledExtensionPackage(
         String packageName,
         String displayName,

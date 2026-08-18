@@ -4,7 +4,6 @@ import fr.vriege.anilib.feature.extensionrepository.ExtensionPackageMetadata;
 
 import java.util.concurrent.CompletableFuture;
 
-/** Dependency-free APK defaults for platforms without Android package support. */
 public final class ApkExtensionPlatforms {
     private static final ApkExtensionPlatform UNAVAILABLE = new ApkExtensionPlatform() {
         @Override

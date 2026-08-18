@@ -6,7 +6,6 @@ import java.net.URI;
 import java.util.Locale;
 import java.util.Optional;
 
-/** Source identity copied from one Aniyomi-compatible repository entry. */
 public record ExtensionSourceMetadata(
         String displayName,
         String languageTag,

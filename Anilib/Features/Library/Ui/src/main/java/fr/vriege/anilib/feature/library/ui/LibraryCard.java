@@ -8,7 +8,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-/** One title summary rendered by a platform library page. */
 public record LibraryCard(
         LibraryItemId id,
         String title,

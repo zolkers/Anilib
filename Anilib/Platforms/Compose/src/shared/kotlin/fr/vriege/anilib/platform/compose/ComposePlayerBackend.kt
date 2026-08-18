@@ -14,7 +14,6 @@ import io.github.kdroidfilter.composemediaplayer.VideoPlayerState
 import java.util.Optional
 import kotlin.math.roundToLong
 
-/** Media3/native backend shared by the Android and desktop Compose adapters. */
 class ComposePlayerBackend : PlayerBackend {
     override fun id(): String = "compose-native"
 

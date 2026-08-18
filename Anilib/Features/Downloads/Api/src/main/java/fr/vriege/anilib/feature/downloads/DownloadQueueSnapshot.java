@@ -2,7 +2,6 @@ package fr.vriege.anilib.feature.downloads;
 
 import java.util.List;
 
-/** Immutable queue and storage summary consumed by every platform UI. */
 public record DownloadQueueSnapshot(
         List<DownloadJobSnapshot> jobs,
         boolean offlineMode,

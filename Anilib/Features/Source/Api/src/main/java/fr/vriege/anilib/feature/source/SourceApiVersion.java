@@ -1,6 +1,5 @@
 package fr.vriege.anilib.feature.source;
 
-/** Major/minor compatibility level required by a source extension. */
 public record SourceApiVersion(int major, int minor) implements Comparable<SourceApiVersion> {
     public SourceApiVersion {
         if (major < 1) {

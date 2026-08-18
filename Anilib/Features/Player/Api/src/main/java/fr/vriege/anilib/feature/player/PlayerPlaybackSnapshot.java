@@ -3,7 +3,6 @@ package fr.vriege.anilib.feature.player;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Current UI-neutral state reported by a platform media engine. */
 public record PlayerPlaybackSnapshot(
         PlayerPlaybackStatus status,
         long positionMillis,

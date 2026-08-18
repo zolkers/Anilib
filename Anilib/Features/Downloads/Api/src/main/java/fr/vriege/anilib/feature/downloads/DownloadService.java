@@ -2,7 +2,6 @@ package fr.vriege.anilib.feature.downloads;
 
 import fr.vriege.anilib.feature.library.LibraryItemId;
 
-/** Durable queue commands and observable state shared by Android and desktop. */
 public interface DownloadService {
     DownloadQueueSnapshot snapshot();
 

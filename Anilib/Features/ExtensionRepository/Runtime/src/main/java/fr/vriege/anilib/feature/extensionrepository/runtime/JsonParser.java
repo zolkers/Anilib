@@ -7,7 +7,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Small strict JSON parser kept feature-local to avoid a runtime dependency. */
 final class JsonParser {
     private static final int MAX_DEPTH = 64;
 

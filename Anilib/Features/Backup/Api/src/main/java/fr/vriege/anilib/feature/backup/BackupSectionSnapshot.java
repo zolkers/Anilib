@@ -3,7 +3,6 @@ package fr.vriege.anilib.feature.backup;
 import fr.vriege.anilib.foundation.validation.Preconditions;
 import fr.vriege.anilib.framework.backup.BackupSectionId;
 
-/** One inspected archive section, including whether this product can restore it. */
 public record BackupSectionSnapshot(
         BackupSectionId id,
         String displayName,

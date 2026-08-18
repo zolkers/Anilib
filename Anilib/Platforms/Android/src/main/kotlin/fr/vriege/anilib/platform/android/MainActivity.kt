@@ -27,7 +27,6 @@ import fr.vriege.anilib.platform.compose.AnilibApp
 import fr.vriege.anilib.platform.compose.ComposePlayerBackend
 import fr.vriege.anilib.platform.compose.BrowserRuntimeStatus
 
-/** Android launcher for the shared Anilib product and adaptive Compose shell. */
 class MainActivity : ComponentActivity() {
     private var product: AutoCloseable? = null
 

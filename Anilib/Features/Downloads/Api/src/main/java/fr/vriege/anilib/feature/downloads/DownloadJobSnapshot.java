@@ -8,7 +8,6 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Immutable observable state for one queued or stored content unit. */
 public record DownloadJobSnapshot(
         DownloadId id,
         LibraryItemId libraryItemId,

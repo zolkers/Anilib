@@ -4,7 +4,6 @@ import fr.vriege.anilib.foundation.validation.Preconditions;
 
 import java.util.UUID;
 
-/** Stable identity independent of a source extension's mutable metadata. */
 public record LibraryItemId(String value) implements Comparable<LibraryItemId> {
     public LibraryItemId {
         Preconditions.requireNonBlank(value, "value");

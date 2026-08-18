@@ -7,7 +7,6 @@ import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Indexed Java source with its owning module and parsed package. */
 public record JavaSource(Path path, Path absolutePath, ModuleMetadata module, List<String> lines) {
     private static final Pattern PACKAGE = Pattern.compile("^\\s*package\\s+([a-zA-Z0-9_.]+)\\s*;");
 

@@ -8,7 +8,6 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
 
-/** One newly discovered chapter or episode shown in the Updates feed. */
 public record LibraryUpdateEvent(
         LibraryItemId libraryItemId,
         String libraryTitle,

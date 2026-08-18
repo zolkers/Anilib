@@ -3,7 +3,6 @@ package fr.vriege.anilib.feature.source;
 import fr.vriege.anilib.foundation.component.ComponentId;
 import fr.vriege.anilib.foundation.validation.Preconditions;
 
-/** Stable source identity that survives display-name and implementation changes. */
 public record SourceId(ComponentId value) implements Comparable<SourceId> {
     public SourceId {
         Preconditions.requireNonNull(value, "value");

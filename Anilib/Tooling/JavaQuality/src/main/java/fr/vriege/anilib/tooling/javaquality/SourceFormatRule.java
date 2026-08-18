@@ -3,7 +3,6 @@ package fr.vriege.anilib.tooling.javaquality;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Small formatting baseline kept intentionally implementable with the JDK. */
 public final class SourceFormatRule implements AnilibJavaRule {
     private static final int MAX_LINE_LENGTH = 120;
 
@@ -32,6 +31,10 @@ public final class SourceFormatRule implements AnilibJavaRule {
                 if (line.length() > MAX_LINE_LENGTH) {
                     diagnostics.add(new Diagnostic(name(), source.path(), index + 1,
                             "Line exceeds " + MAX_LINE_LENGTH + " characters"));
+                }
+                if (line.contains("/" + "**")) {
+                    diagnostics.add(new Diagnostic(name(), source.path(), index + 1,
+                            "Javadoc blocks are forbidden"));
                 }
             }
         }

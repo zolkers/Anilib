@@ -42,7 +42,6 @@ import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
-/** JDK-only local content source for folders and ZIP-compatible archives. */
 public final class FileSystemLocalContentSource implements LocalContentSource, CatalogueSource, PagedSource {
     private static final SourceDescriptor DESCRIPTOR = new SourceDescriptor(
             SourceId.of("anilib.local"),

@@ -5,7 +5,6 @@ import fr.vriege.anilib.foundation.validation.Preconditions;
 import java.net.URI;
 import java.util.Locale;
 
-/** Exact HTTP origin granted to one source Bundle. Wildcards are deliberately unsupported. */
 public record SourceNetworkOrigin(String scheme, String host, int port) implements Comparable<SourceNetworkOrigin> {
     private static final int HTTP_PORT = 80;
     private static final int HTTPS_PORT = 443;

@@ -34,7 +34,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 
-/** Canonical product selection shared by supported platform applications. */
 public final class StandardAnilib {
     private StandardAnilib() {
     }

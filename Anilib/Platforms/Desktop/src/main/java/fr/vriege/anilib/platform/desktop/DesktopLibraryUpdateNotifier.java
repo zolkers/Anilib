@@ -12,7 +12,6 @@ import java.awt.SystemTray;
 import java.awt.TrayIcon;
 import java.awt.image.BufferedImage;
 
-/** Native desktop tray adapter for the shared library update job. */
 public final class DesktopLibraryUpdateNotifier implements LibraryUpdateNotifier {
     private final TrayIcon icon;
 

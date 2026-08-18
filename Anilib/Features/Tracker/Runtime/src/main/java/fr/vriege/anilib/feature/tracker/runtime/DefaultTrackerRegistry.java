@@ -16,7 +16,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.TreeMap;
 
-/** Thread-safe registry enforcing tracker API compatibility and stable identities. */
 public final class DefaultTrackerRegistry implements TrackerRegistry, TrackerRegistrar, AutoCloseable {
     private final TreeMap<TrackerId, Entry> trackers = new TreeMap<>();
     private boolean closed;

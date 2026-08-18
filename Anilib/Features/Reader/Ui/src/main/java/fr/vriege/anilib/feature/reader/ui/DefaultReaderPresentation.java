@@ -5,7 +5,6 @@ import fr.vriege.anilib.feature.reader.ReaderService;
 
 import java.util.Objects;
 
-/** Default presentation adapter over the shared reader service. */
 public final class DefaultReaderPresentation implements ReaderPresentation {
     private final ReaderService reader;
 

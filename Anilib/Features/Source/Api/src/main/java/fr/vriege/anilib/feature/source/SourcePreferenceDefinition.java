@@ -5,7 +5,6 @@ import fr.vriege.anilib.foundation.validation.Preconditions;
 import java.util.HashSet;
 import java.util.List;
 
-/** Source preference schema rendered identically by Android and desktop. */
 public record SourcePreferenceDefinition(
         String id,
         String title,

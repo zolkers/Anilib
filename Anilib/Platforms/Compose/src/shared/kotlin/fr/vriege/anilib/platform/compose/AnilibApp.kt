@@ -91,7 +91,6 @@ private val dateTimeFormatter = DateTimeFormatter
     .withLocale(Locale.getDefault())
     .withZone(ZoneId.systemDefault())
 
-/** Shared adaptive Compose shell rendered by desktop and Android launchers. */
 @Composable
 fun AnilibApp(
     presentation: LibraryPresentation,

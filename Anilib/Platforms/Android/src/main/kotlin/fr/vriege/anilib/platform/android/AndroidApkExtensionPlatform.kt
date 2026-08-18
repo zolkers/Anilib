@@ -23,7 +23,6 @@ import java.net.URI
 import java.time.Duration
 import java.util.concurrent.CompletableFuture
 
-/** Android integration for current APK extension discovery, trust, and installation. */
 internal class AndroidApkExtensionPlatform(
     private val activity: ComponentActivity,
     private val client: AnilibHttpClient,
@@ -143,7 +142,6 @@ internal class AndroidApkExtensionPlatform(
     }
 }
 
-/** Receives PackageInstaller status and launches Android's mandatory confirmation surface. */
 class AnilibApkInstallReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)

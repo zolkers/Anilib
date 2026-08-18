@@ -21,7 +21,6 @@ import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
-/** Signs portable Bundles and writes deterministic full and minified repository indexes. */
 final class RepositoryPublisher {
     private static final String DESCRIPTOR = "META-INF/anilib-extension.properties";
 

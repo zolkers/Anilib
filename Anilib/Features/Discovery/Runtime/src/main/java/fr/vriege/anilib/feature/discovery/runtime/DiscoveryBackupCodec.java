@@ -18,7 +18,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
 
-/** Discovery-owned codec for source preferences, including currently missing extensions. */
 public final class DiscoveryBackupCodec implements BackupSectionCodec {
     private static final BackupSectionId SECTION_ID = BackupSectionId.of("source-preferences");
     private static final int MAGIC = 0x44535046;

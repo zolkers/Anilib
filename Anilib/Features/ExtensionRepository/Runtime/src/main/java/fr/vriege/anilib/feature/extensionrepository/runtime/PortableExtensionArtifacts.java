@@ -8,7 +8,6 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 
-/** Canonical paths for artifacts owned by the extension installation directory. */
 final class PortableExtensionArtifacts {
     private PortableExtensionArtifacts() {
     }

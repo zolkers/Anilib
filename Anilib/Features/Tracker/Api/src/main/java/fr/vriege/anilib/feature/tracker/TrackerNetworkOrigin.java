@@ -4,7 +4,6 @@ import java.net.URI;
 import java.util.Locale;
 import java.util.Objects;
 
-/** Exact scheme, host, and optional port granted to a network tracker. */
 public record TrackerNetworkOrigin(String scheme, String host, int port) {
     public static final int DEFAULT_PORT = -1;
 

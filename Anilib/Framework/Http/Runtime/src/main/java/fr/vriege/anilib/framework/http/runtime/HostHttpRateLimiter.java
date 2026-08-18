@@ -11,7 +11,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
-/** Thread-safe fixed-interval limiter that reserves independent slots per origin. */
 public final class HostHttpRateLimiter implements HttpRateLimiter {
     private final Map<String, Long> nextSlots = new HashMap<>();
 

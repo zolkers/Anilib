@@ -26,7 +26,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalDouble;
 
-/** Atomic dependency-free persistence for local mirrors of remote tracker entries. */
 final class TrackerEntryStore {
     private static final String HEADER = "ANILIB_TRACKING\t1";
     private static final long MAXIMUM_FILE_BYTES = 64L * 1024L * 1024L;

@@ -11,7 +11,6 @@ import fr.vriege.anilib.feature.extensionrepository.ui.InstalledApkExtension
 import java.security.MessageDigest
 import java.util.Optional
 
-/** Best-effort metadata discovery for Android-visible, separately installed Aniyomi APKs. */
 internal class AndroidAniyomiExtensionInventory(
     context: Context,
 ) {

@@ -16,7 +16,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/** Library-owned backup codec retaining compatibility with every library storage version. */
 public final class LibraryBackupCodec implements BackupSectionCodec {
     private static final BackupSectionId SECTION_ID = BackupSectionId.of("library");
     private final LibraryCatalog catalog;

@@ -5,7 +5,6 @@ import fr.vriege.anilib.foundation.validation.Preconditions;
 import java.util.HashSet;
 import java.util.List;
 
-/** Editable source-neutral metadata attached to one library title. */
 public record LibraryTitleMetadata(
         String description,
         List<String> authors,

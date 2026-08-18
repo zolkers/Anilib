@@ -4,7 +4,6 @@ import fr.vriege.anilib.foundation.validation.Preconditions;
 
 import java.util.regex.Pattern;
 
-/** Stable, human-readable identity used by modules, plugins, and capabilities. */
 public record ComponentId(String value) implements Comparable<ComponentId> {
     private static final Pattern VALID_ID = Pattern.compile("[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*");
 

@@ -3,7 +3,6 @@ package fr.vriege.anilib.platform.desktop;
 import java.nio.file.Path;
 import java.util.Locale;
 
-/** Resolves the platform-owned default data directory without leaking it inward. */
 final class DesktopDataDirectory {
     private DesktopDataDirectory() {
     }

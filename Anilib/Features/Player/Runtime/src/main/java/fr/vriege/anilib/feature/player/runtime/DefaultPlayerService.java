@@ -32,7 +32,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
-/** Shared episode resolver, stream selector, and durable playback state engine. */
 public final class DefaultPlayerService implements PlayerService, AutoCloseable {
     private static final int MAXIMUM_EPISODES = 100_000;
     private static final int MAXIMUM_STREAMS = 512;

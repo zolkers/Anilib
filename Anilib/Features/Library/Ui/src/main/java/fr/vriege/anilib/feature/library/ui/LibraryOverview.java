@@ -2,7 +2,6 @@ package fr.vriege.anilib.feature.library.ui;
 
 import java.util.List;
 
-/** Complete snapshot for the desktop or Android library page. */
 public record LibraryOverview(
         List<LibraryCard> titles,
         List<String> categories,

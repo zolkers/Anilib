@@ -10,7 +10,6 @@ import fr.vriege.anilib.kernel.PluginManifest;
 import java.nio.file.Path;
 import java.util.Objects;
 
-/** Desktop composition unit for durable JDK-decoded covers. */
 public final class CoverCachePlugin implements AnilibPlugin {
     private static final PluginManifest MANIFEST = PluginManifest.builder(
                     ComponentDescriptor.of("feature.cover-cache", "Cover cache", "0.1.0"))

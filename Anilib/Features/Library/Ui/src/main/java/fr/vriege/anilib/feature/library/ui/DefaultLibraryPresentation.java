@@ -11,7 +11,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Deterministic presentation mapping shared by every platform renderer. */
 public final class DefaultLibraryPresentation implements LibraryPresentation {
     private static final Comparator<String> TEXT_ORDER =
             String.CASE_INSENSITIVE_ORDER.thenComparing(Comparator.naturalOrder());

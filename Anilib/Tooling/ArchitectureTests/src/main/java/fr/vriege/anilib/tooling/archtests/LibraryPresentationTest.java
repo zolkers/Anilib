@@ -20,7 +20,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 
-/** Black-box checks for shared Library presentation and navigation behavior. */
 final class LibraryPresentationTest {
     private LibraryPresentationTest() {
     }

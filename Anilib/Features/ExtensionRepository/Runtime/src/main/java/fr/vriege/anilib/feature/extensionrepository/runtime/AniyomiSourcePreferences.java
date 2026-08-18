@@ -7,7 +7,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
-/** Portable projection of an Aniyomi preference screen and its Android value sink. */
 public record AniyomiSourcePreferences(
         List<SourcePreferenceDefinition> definitions,
         Consumer<Map<String, String>> valueSink) {

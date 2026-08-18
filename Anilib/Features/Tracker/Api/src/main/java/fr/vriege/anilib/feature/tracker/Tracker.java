@@ -5,7 +5,6 @@ import fr.vriege.anilib.feature.library.MediaKind;
 
 import java.util.List;
 
-/** Provider adapter implemented by an explicitly selected tracker bundle. */
 public interface Tracker {
     TrackerDescriptor descriptor();
 

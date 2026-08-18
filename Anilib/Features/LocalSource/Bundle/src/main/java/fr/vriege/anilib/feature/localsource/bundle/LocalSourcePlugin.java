@@ -11,7 +11,6 @@ import fr.vriege.anilib.kernel.PluginManifest;
 
 import java.nio.file.Path;
 
-/** Single additive composition unit for local folder and archive content. */
 public final class LocalSourcePlugin implements AnilibPlugin {
     private static final PluginManifest MANIFEST = PluginManifest.builder(
                     ComponentDescriptor.of("feature.local-source", "Local source", "0.1.0"))

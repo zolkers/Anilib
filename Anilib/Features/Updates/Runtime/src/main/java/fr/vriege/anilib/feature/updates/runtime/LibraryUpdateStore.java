@@ -30,7 +30,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
-/** Atomic bounded persistence for update policy, source baselines, and the Updates feed. */
 final class LibraryUpdateStore {
     private static final int MAGIC = 0x55504454;
     private static final int VERSION = 1;

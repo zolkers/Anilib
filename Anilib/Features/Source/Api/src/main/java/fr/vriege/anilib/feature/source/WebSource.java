@@ -5,7 +5,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-/** Optional source contract for opening its website and catalogue titles in an embedded browser. */
 public interface WebSource extends Source {
     URI homePage();
 

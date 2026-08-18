@@ -2,7 +2,6 @@ package fr.vriege.anilib.feature.player;
 
 import java.util.Optional;
 
-/** Narrow commands and observable state shared by every platform media engine. */
 public interface PlayerPlayback extends AutoCloseable {
     PlayerMedia media();
 

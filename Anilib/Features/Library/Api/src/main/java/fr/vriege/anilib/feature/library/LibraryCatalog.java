@@ -4,7 +4,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
-/** Thread-safe source of the user's shared anime and manga library. */
 public interface LibraryCatalog {
     List<LibraryItem> snapshot();
 

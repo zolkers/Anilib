@@ -12,7 +12,6 @@ import fr.vriege.anilib.kernel.PluginManifest;
 import java.nio.file.Path;
 import java.util.Objects;
 
-/** Composition unit for durable shared application preferences. */
 public final class SettingsPlugin implements AnilibPlugin {
     private static final PluginManifest MANIFEST = PluginManifest.builder(
                     ComponentDescriptor.of("feature.settings", "Settings", "1.0.0"))

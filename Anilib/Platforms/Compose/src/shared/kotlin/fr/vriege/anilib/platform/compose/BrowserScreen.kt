@@ -39,7 +39,6 @@ import fr.vriege.anilib.feature.source.SourceWebPage
 import java.net.URI
 import kotlinx.coroutines.launch
 
-/** Shared source browser backed by Android WebView or desktop KCEF. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun BrowserScreen(

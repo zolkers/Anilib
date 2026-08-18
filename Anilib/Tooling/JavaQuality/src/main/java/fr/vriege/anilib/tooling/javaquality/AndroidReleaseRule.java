@@ -8,7 +8,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Keeps Android packaging, signing, and platform confinement explicit. */
 public final class AndroidReleaseRule implements AnilibJavaRule {
     private static final Path ANDROID_BUILD = Path.of("Anilib", "Platforms", "Android", "build.gradle");
     private static final Path ANDROID_MODULE = Path.of("Anilib", "Platforms", "Android", "module.properties");

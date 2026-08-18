@@ -4,7 +4,6 @@ import fr.vriege.anilib.foundation.validation.Preconditions;
 
 import java.util.Objects;
 
-/** Ephemeral credentials passed directly to an opted-in tracker adapter. */
 public record TrackerCredentials(TrackerAuthentication authentication, String identity, String secret) {
     public TrackerCredentials {
         Objects.requireNonNull(authentication, "authentication must not be null");

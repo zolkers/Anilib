@@ -5,7 +5,6 @@ import fr.vriege.anilib.foundation.validation.Preconditions;
 import java.util.List;
 import java.util.Optional;
 
-/** Safe metadata projection of one Android-visible extension APK. */
 public record InstalledApkExtension(
         String packageName,
         String displayName,

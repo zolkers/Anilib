@@ -3,7 +3,6 @@ package fr.vriege.anilib.tooling.sourcepublisher;
 import java.net.URI;
 import java.util.List;
 
-/** Deterministic JSON encoding for the supported repository index shape. */
 final class RepositoryJson {
     private RepositoryJson() {
     }

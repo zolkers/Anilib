@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-/** Prevents source and tracker extensions from bypassing their capability-limited factory context. */
 public final class ExtensionIsolationRule implements AnilibJavaRule {
     private static final String SOURCE_SDK = "feature.source.api";
     private static final String TRACKER_SDK = "feature.tracker.api";

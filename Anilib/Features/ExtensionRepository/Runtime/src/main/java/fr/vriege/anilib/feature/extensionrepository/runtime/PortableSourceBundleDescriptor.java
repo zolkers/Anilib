@@ -18,7 +18,6 @@ import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
-/** Strict, signed entrypoint descriptor for one portable source Bundle. */
 record PortableSourceBundleDescriptor(
         String packageName,
         long versionCode,

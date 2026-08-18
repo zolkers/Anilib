@@ -9,7 +9,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
-/** Focused regression checks for the cross-host desktop release contract. */
 final class DesktopReleaseRuleTest {
     private DesktopReleaseRuleTest() {
     }

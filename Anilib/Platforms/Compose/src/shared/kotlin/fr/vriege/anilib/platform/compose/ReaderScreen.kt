@@ -40,7 +40,6 @@ import fr.vriege.anilib.feature.reader.ReadingDirection
 import fr.vriege.anilib.feature.reader.ui.ReaderController
 import kotlin.math.roundToInt
 
-/** Immersive Aniyomi-like page reader shared verbatim by Android and desktop. */
 @Composable
 internal fun ReaderScreen(
     controller: ReaderController,
