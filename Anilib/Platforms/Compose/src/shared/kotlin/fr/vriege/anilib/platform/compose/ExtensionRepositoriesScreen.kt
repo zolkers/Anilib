@@ -1,5 +1,6 @@
 package fr.vriege.anilib.platform.compose
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -36,6 +37,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,8 +56,11 @@ import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionPlatform
 import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionRuntimeReport
 import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionRuntimeState
 import fr.vriege.anilib.feature.extensionrepository.ui.InstalledApkExtension
-import java.util.concurrent.CompletableFuture
 import java.util.Locale
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,7 +74,11 @@ internal fun ExtensionRepositoriesScreen(
     var trusting by remember { mutableStateOf(false) }
     var filteringLanguages by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(false) }
+    var operationLabel by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
+    var retry by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var selectedExtension by remember { mutableStateOf<ExtensionPackageMetadata?>(null) }
+    val scope = rememberCoroutineScope()
     var pendingApkTrust by remember { mutableStateOf<InstalledApkExtension?>(null) }
     var installedApkExtensions by remember(apkExtensionPlatform) {
         mutableStateOf(runCatching(apkExtensionPlatform::discoverInstalled).getOrDefault(emptyList()))
@@ -82,16 +91,27 @@ internal fun ExtensionRepositoriesScreen(
         onDispose { observation.close() }
     }
 
-    fun complete(operation: CompletableFuture<ExtensionRepositoryView>) {
+    fun complete(label: String, operation: () -> java.util.concurrent.CompletableFuture<ExtensionRepositoryView>) {
         loading = true
+        operationLabel = label
         error = null
-        operation.whenComplete { refreshed, failure ->
-            if (failure == null) {
+        retry = null
+        scope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) { operation().get() }
+            }.onSuccess { refreshed ->
                 view = refreshed
-            } else {
-                error = failure.cause?.message ?: failure.message ?: "Extension operation failed."
+            }.onFailure { failure ->
+                error = buildString {
+                    append(failure.cause?.message ?: failure.message ?: "Extension operation failed.")
+                    append("\n")
+                    append("Diagnostic: ")
+                    append((failure.cause ?: failure)::class.simpleName ?: "unknown failure")
+                }
+                retry = { complete(label, operation) }
             }
             loading = false
+            operationLabel = null
         }
     }
 
@@ -102,7 +122,47 @@ internal fun ExtensionRepositoriesScreen(
                 apkRuntimeReports = inspectApkRuntimes(apkExtensionPlatform, it)
             }
             .onFailure { error = it.message ?: "Installed APK discovery failed." }
-        complete(presentation.refreshAll())
+        complete("Refreshing repositories") { presentation.refreshAll() }
+    }
+
+    selectedExtension?.let { extension ->
+        val installed = view.installed().firstOrNull { it.packageName() == extension.packageName() }
+        ExtensionDetailScreen(
+            extension = extension,
+            installed = installed,
+            trustedKeyIds = view.trustedKeyIds().toSet(),
+            pinned = extension.packageName() in view.pinnedPackages(),
+            loading = loading,
+            operationLabel = operationLabel,
+            error = error,
+            retry = retry,
+            goBack = { selectedExtension = null },
+            togglePinned = { pinned ->
+                runCatching { presentation.setPinned(extension.packageName(), pinned) }
+                    .onFailure { error = it.message ?: "Extension pinning failed." }
+            },
+            install = { complete("Installing ${extension.displayName()}") { presentation.install(extension) } },
+            update = { complete("Updating ${extension.displayName()}") { presentation.update(extension) } },
+            toggle = { enabled ->
+                runCatching { presentation.setEnabled(extension.packageName(), enabled) }
+                    .onFailure { error = it.message ?: "Extension state change failed." }
+            },
+            remove = {
+                runCatching { presentation.removeInstalled(extension.packageName()) }
+                    .onFailure { error = it.message ?: "Extension removal failed." }
+            },
+            installApk = if (apkExtensionPlatform.available()) {
+                { installApkExtension(apkExtensionPlatform, extension, scope, { state ->
+                    loading = state
+                    operationLabel = if (state) "Handing APK to Android" else null
+                }) { message, failure ->
+                    error = failure
+                } }
+            } else {
+                null
+            },
+        )
+        return
     }
 
     Scaffold(
@@ -163,15 +223,21 @@ internal fun ExtensionRepositoriesScreen(
             }
             if (loading) {
                 item {
-                    Row(
+                    Column(
                         modifier = Modifier.fillMaxWidth().padding(12.dp),
-                        horizontalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         CircularProgressIndicator()
+                        operationLabel?.let {
+                            Spacer(Modifier.height(8.dp))
+                            Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
                 }
             }
-            error?.let { message -> item { Text(message, color = MaterialTheme.colorScheme.error) } }
+            error?.let { message ->
+                item { ExtensionFailure(message, retry) }
+            }
             if (view.updates().isNotEmpty()) {
                 item {
                     Row(
@@ -179,7 +245,11 @@ internal fun ExtensionRepositoriesScreen(
                         horizontalArrangement = Arrangement.End,
                     ) {
                         Button(
-                            onClick = { complete(presentation.updateAllAvailable()) },
+                            onClick = {
+                                complete("Updating all extensions") {
+                                    presentation.updateAllAvailable()
+                                }
+                            },
                             enabled = !loading,
                         ) {
                             Text("Update all (${view.updates().size})")
@@ -235,12 +305,21 @@ internal fun ExtensionRepositoriesScreen(
                         installed = installed,
                         pinned = extension.packageName() in view.pinnedPackages(),
                         busy = loading,
+                        openDetails = { selectedExtension = extension },
                         togglePinned = { pinned ->
                             runCatching { presentation.setPinned(extension.packageName(), pinned) }
                                 .onFailure { error = it.message ?: "Extension pinning failed." }
                         },
-                        install = { complete(presentation.install(extension)) },
-                        update = { complete(presentation.update(extension)) },
+                        install = {
+                            complete("Installing ${extension.displayName()}") {
+                                presentation.install(extension)
+                            }
+                        },
+                        update = {
+                            complete("Updating ${extension.displayName()}") {
+                                presentation.update(extension)
+                            }
+                        },
                         toggle = { enabled ->
                             runCatching { presentation.setEnabled(extension.packageName(), enabled) }
                                 .onFailure { error = it.message ?: "Extension state change failed." }
@@ -421,6 +500,238 @@ private fun apkCompatibility(compatibility: ApkExtensionCompatibility): String =
     ApkExtensionCompatibility.UNSIGNED -> "unsigned package"
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ExtensionDetailScreen(
+    extension: ExtensionPackageMetadata,
+    installed: InstalledExtensionPackage?,
+    trustedKeyIds: Set<String>,
+    pinned: Boolean,
+    loading: Boolean,
+    operationLabel: String?,
+    error: String?,
+    retry: (() -> Unit)?,
+    goBack: () -> Unit,
+    togglePinned: (Boolean) -> Unit,
+    install: () -> Unit,
+    update: () -> Unit,
+    toggle: (Boolean) -> Unit,
+    remove: () -> Unit,
+    installApk: (() -> Unit)?,
+) {
+    val portable = extension.artifacts().any {
+        it.format() == ExtensionArtifactFormat.ANILIB_BUNDLE
+    }
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(extension.displayName()) },
+                navigationIcon = {
+                    IconButton(onClick = goBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { togglePinned(!pinned) }) {
+                        Icon(
+                            Icons.Default.PushPin,
+                            contentDescription = if (pinned) "Unpin extension" else "Pin extension",
+                            tint = if (pinned) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                        )
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            item {
+                Text(
+                    "${extension.packageName()} · ${extension.languageTag()} · " +
+                        extension.contentKind().name.lowercase(),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (loading) {
+                item {
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            CircularProgressIndicator()
+                            Text(operationLabel ?: "Extension operation in progress…")
+                        }
+                    }
+                }
+            }
+            error?.let { message -> item { ExtensionFailure(message, retry) } }
+            item { SectionTitle("Versions") }
+            item {
+                ExtensionDetailCard {
+                    Text(
+                        "Available: ${extension.versionName()} (${extension.versionCode()})",
+                        fontWeight = FontWeight.Medium,
+                    )
+                    Text(
+                        installed?.let {
+                            "Installed: ${it.versionName()} (${it.versionCode()}) · " +
+                                it.state().name.lowercase()
+                        } ?: "Not installed",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            item { SectionTitle("Permissions and sources") }
+            items(extension.sources(), key = { it.sourceId() }) { source ->
+                ExtensionDetailCard {
+                    Text(source.displayName(), fontWeight = FontWeight.Medium)
+                    Text(
+                        "Source ${source.sourceId()} · ${source.languageTag()}",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        source.baseUri().map { "Network access: ${it.scheme}://${it.host}" }
+                            .orElse("No repository-declared network origin"),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            item { SectionTitle("Trust and artifacts") }
+            items(extension.artifacts(), key = { it.format().name }) { artifact ->
+                val keyId = artifact.signingKeyId().orElse(null)
+                ExtensionDetailCard {
+                    Text(artifact.format().name.replace('_', ' '), fontWeight = FontWeight.Medium)
+                    Text(artifact.uri().toString(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        keyId?.let {
+                            "Publisher $it · ${if (it in trustedKeyIds) "trusted" else "trust required"}"
+                        } ?: "No publisher signature declared",
+                        color = if (keyId != null && keyId !in trustedKeyIds) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                    )
+                    Text(
+                        artifact.sha256().map { "SHA-256 ${it.take(16)}…" }
+                            .orElse("No checksum declared"),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    artifact.requiredApiVersion().orElse(null)?.let {
+                        Text("Required Source API $it", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+            installed?.signingKeyId()?.orElse(null)?.let { keyId ->
+                item {
+                    Text(
+                        "Installed publisher identity: $keyId",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            item { SectionTitle("Changelog") }
+            item {
+                ExtensionDetailCard {
+                    Text(extension.changelog().orElse("No changelog supplied by this repository."))
+                }
+            }
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    when {
+                        installed == null && portable -> Button(
+                            onClick = install,
+                            enabled = !loading,
+                        ) { Text("Install") }
+                        installed != null -> {
+                            TextButton(
+                                onClick = {
+                                    toggle(installed.state() == ExtensionInstallationState.DISABLED)
+                                },
+                                enabled = !loading,
+                            ) {
+                                Text(if (installed.state() == ExtensionInstallationState.ENABLED) {
+                                    "Disable"
+                                } else {
+                                    "Enable"
+                                })
+                            }
+                            if (extension.versionCode() > installed.versionCode() && portable) {
+                                Button(onClick = update, enabled = !loading) { Text("Update") }
+                            }
+                            TextButton(onClick = remove, enabled = !loading) { Text("Remove") }
+                        }
+                    }
+                    if (extension.artifacts().any {
+                            it.format() == ExtensionArtifactFormat.ANIYOMI_APK
+                        } && installApk != null
+                    ) {
+                        TextButton(onClick = installApk, enabled = !loading) { Text("Install APK") }
+                    }
+                }
+            }
+            item { Spacer(Modifier.height(20.dp)) }
+        }
+    }
+}
+
+@Composable
+private fun ExtensionDetailCard(content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(5.dp),
+            content = content,
+        )
+    }
+}
+
+@Composable
+private fun ExtensionFailure(message: String, retry: (() -> Unit)?) {
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
+        Column(modifier = Modifier.fillMaxWidth().padding(14.dp)) {
+            Text(message, color = MaterialTheme.colorScheme.onErrorContainer)
+            retry?.let { action ->
+                TextButton(onClick = action) { Text("Retry") }
+            }
+        }
+    }
+}
+
+private fun installApkExtension(
+    platform: ApkExtensionPlatform,
+    extension: ExtensionPackageMetadata,
+    scope: CoroutineScope,
+    setLoading: (Boolean) -> Unit,
+    complete: (String?, String?) -> Unit,
+) {
+    setLoading(true)
+    scope.launch {
+        runCatching {
+            withContext(Dispatchers.IO) { platform.install(extension).get() }
+        }.onSuccess { message ->
+            complete(message, null)
+        }.onFailure { failure ->
+            complete(null, failure.cause?.message ?: failure.message ?: "APK hand-off failed.")
+        }
+        setLoading(false)
+    }
+}
+
 @Composable
 private fun ApkCertificateTrustDialog(
     extension: InstalledApkExtension,
@@ -514,6 +825,7 @@ private fun ExtensionPackageCard(
     installed: InstalledExtensionPackage?,
     pinned: Boolean,
     busy: Boolean,
+    openDetails: () -> Unit,
     togglePinned: (Boolean) -> Unit,
     install: () -> Unit,
     update: () -> Unit,
@@ -521,7 +833,7 @@ private fun ExtensionPackageCard(
     remove: () -> Unit,
     installApk: (() -> Unit)?,
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(modifier = Modifier.fillMaxWidth().clickable(onClick = openDetails)) {
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(extension.displayName(), fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))

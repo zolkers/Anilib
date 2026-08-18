@@ -5,6 +5,7 @@ import fr.vriege.anilib.foundation.validation.Preconditions;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
 
 public record ExtensionPackageMetadata(
@@ -16,7 +17,8 @@ public record ExtensionPackageMetadata(
         boolean adult,
         ExtensionContentKind contentKind,
         List<ExtensionSourceMetadata> sources,
-        List<ExtensionArtifactMetadata> artifacts) {
+        List<ExtensionArtifactMetadata> artifacts,
+        Optional<String> changelog) {
     public ExtensionPackageMetadata {
         displayName = Preconditions.requireNonBlank(displayName, "displayName");
         packageName = ExtensionPackageIdentifiers.requireValid(packageName);
@@ -31,12 +33,40 @@ public record ExtensionPackageMetadata(
         if (sources.isEmpty() || artifacts.isEmpty()) {
             throw new IllegalArgumentException("extension package must declare sources and artifacts");
         }
+        changelog = Preconditions.requireNonNull(changelog, "changelog")
+                .map(value -> Preconditions.requireNonBlank(value, "changelog"));
+        if (changelog.map(String::length).orElse(0) > 20_000) {
+            throw new IllegalArgumentException("changelog must not exceed 20000 characters");
+        }
         Set<ExtensionArtifactFormat> formats = new HashSet<>();
         for (ExtensionArtifactMetadata artifact : artifacts) {
             if (!formats.add(artifact.format())) {
                 throw new IllegalArgumentException("extension package cannot duplicate an artifact format");
             }
         }
+    }
+
+    public ExtensionPackageMetadata(
+            String displayName,
+            String packageName,
+            String languageTag,
+            long versionCode,
+            String versionName,
+            boolean adult,
+            ExtensionContentKind contentKind,
+            List<ExtensionSourceMetadata> sources,
+            List<ExtensionArtifactMetadata> artifacts) {
+        this(
+                displayName,
+                packageName,
+                languageTag,
+                versionCode,
+                versionName,
+                adult,
+                contentKind,
+                sources,
+                artifacts,
+                Optional.empty());
     }
 
     private static String normalizeLanguage(String value) {

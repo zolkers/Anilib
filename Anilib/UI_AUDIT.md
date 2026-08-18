@@ -19,7 +19,7 @@ explicit so an architectural seam cannot be mistaken for a finished workflow.
 | Browse landing and sources | [x] | Complete | Anime/manga source, extension, and migration tabs expose update-count badges, fixed-density rows, source/extension overflow actions, global search, languages, pinning, latest, WebView, and repository navigation |
 | Source catalogue, search, and filters | [x] | Partial | Popular/latest, paging, search, filters, source preferences, list/grid, web entry, and library admission are live; add item menus and persisted display choice |
 | Migration | [x] | Partial | Source/title selection and migration are live; add batch options, seasonal anime handling, comparison detail, and progress states |
-| Extensions and repositories | [x] | Partial | Repository catalogue, language/pin ordering, trust, install/update/enable/remove, APK hand-off, source navigation, Browse update badges, in-place update progress, and errors are live; add a dedicated extension detail route |
+| Extensions and repositories | [x] | Partial | Repository catalogue, language/pin ordering, dedicated permission/trust/version/changelog details, install/update progress with retryable diagnostics, enable/remove, APK hand-off, source navigation, and Browse update badges are live; add full per-source management parity |
 | More hub | [x] | Partial | Core ordering and actions are live; add storage and help destinations plus richer download state |
 | Categories | [x] | Partial | The shared screen shows real counts plus create, rename, reorder, delete, display, and update policies |
 | Statistics | [x] | Complete | The shared screen reports real totals plus status, source, language, tracker-score bands, watched/known duration, average progress, and 7/30/365-day activity |
@@ -48,6 +48,7 @@ explicit so an architectural seam cannot be mistaken for a finished workflow.
 - [x] Added searchable history plus anime/manga/unread update filters.
 - [x] Added conventional back navigation to title details.
 - [x] Connected Browse extension tabs directly to repository management.
+- [x] Added dedicated extension details with permissions, trust identity, versions, changelog, progress, retry, and failure diagnostics.
 - [x] Verified catalogue paging, global/per-source search, filters, preferences, WebView entry, and migration routes.
 - [x] Added episode search/unwatched filtering, download status filtering, and reader page retry.
 - [x] Verified backup inspection/rollback/import, tracking edit flows, and browser cookie/challenge handling.

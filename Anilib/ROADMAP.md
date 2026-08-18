@@ -195,7 +195,7 @@ platform-specific.
 
 - [x] add source and extension update badges, richer overflow actions, and exact
   Aniyomi density and loading/error states
-- [ ] add a dedicated extension detail route with permissions, trust identity,
+- [x] add a dedicated extension detail route with permissions, trust identity,
   versions, changelog, install progress, retry, and failure diagnostics
 - [ ] persist catalogue grid/list choice and add catalogue item menus
 - [ ] add batch migration, seasonal-anime handling, source comparison, options,

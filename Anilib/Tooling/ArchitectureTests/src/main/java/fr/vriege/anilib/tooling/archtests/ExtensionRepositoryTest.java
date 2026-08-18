@@ -106,6 +106,7 @@ final class ExtensionRepositoryTest {
                   "lang":"en",
                   "code":2,
                   "version":"14.2",
+                  "changelog":"Improved source compatibility.",
                   "nsfw":0,
                   "anilib":{
                     "bundle":"example-v1.2.jar",
@@ -135,6 +136,8 @@ final class ExtensionRepositoryTest {
                 "portable Bundle metadata must retain its checksum");
         counter.check(extension.sources().getFirst().baseUri().isEmpty(),
                 "Aniyomi indexes may advertise a source with an empty baseUrl");
+        counter.check(extension.changelog().orElseThrow().equals("Improved source compatibility."),
+                "repository entries must retain optional release changelogs");
     }
 
     private static void rejectsUnsafeMetadata(Counter counter) {

@@ -68,7 +68,8 @@ public final class AniyomiRepositoryIndexParser {
                 adult(entry.get("nsfw")),
                 contentKind(packageName, entry.get("anilib")),
                 sources,
-                artifacts);
+                artifacts,
+                optionalStringAllowBlank(entry, "changelog").filter(value -> !value.isBlank()));
     }
 
     private List<ExtensionArtifactMetadata> artifacts(URI repository, Map<String, Object> entry) {
