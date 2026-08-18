@@ -66,6 +66,8 @@ platform-specific.
 ## Phase 6 — bring-your-own sources and complete settings
 
 - [x] user-managed extension repository URLs using the Aniyomi index shape
+- [x] resolve GitHub repository URLs dynamically through default-branch
+  `index.min.json` and `index.json` candidates on Android and desktop
 - [x] signed portable Anilib artifacts with trust, install, update, disable, and remove
 - [x] load enabled portable Bundles into the Source registry through an explicit
   restart-isolated module boundary

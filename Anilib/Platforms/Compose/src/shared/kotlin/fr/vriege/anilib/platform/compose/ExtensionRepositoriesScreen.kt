@@ -534,12 +534,12 @@ private fun AddRepositoryDialog(dismiss: () -> Unit, add: (String) -> Unit) {
         title = { Text("Add repository") },
         text = {
             Column {
-                Text("Paste an HTTPS Aniyomi-compatible index URL from a repository you trust.")
+                Text("Paste a trusted GitHub repository URL or a direct HTTPS JSON index URL.")
                 Spacer(Modifier.height(12.dp))
                 OutlinedTextField(
                     value = url,
                     onValueChange = { url = it },
-                    label = { Text("Repository index URL") },
+                    label = { Text("GitHub repository or index URL") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )

@@ -76,6 +76,7 @@ final class ExtensionRepositoryTest {
         parsesAniyomiAndPortableArtifacts(counter);
         rejectsUnsafeMetadata(counter);
         persistsAndRefreshesUserRepositories(counter);
+        resolvesGitHubRepositoriesDynamically(counter);
         installsOnlyTrustedPortableBundles(counter);
         modelsInstalledApkDiscovery(counter);
         adaptsAbiReadyAnimeSource(counter);
@@ -175,6 +176,37 @@ final class ExtensionRepositoryTest {
                     "user repository URLs must survive product restart");
             counter.check(reopened.remove(INDEX) && reopened.repositories().isEmpty(),
                     "users must be able to remove their own repository URL");
+        } finally {
+            deleteDirectory(directory);
+        }
+    }
+
+    private static void resolvesGitHubRepositoriesDynamically(Counter counter) {
+        Path directory = temporaryDirectory();
+        try {
+            URI github = URI.create("https://github.com/example/anilib-sources");
+            String index = """
+                    [{"name":"Portable","pkg":"fr.example.sources","lang":"all",
+                    "code":1,"version":"1.0","nsfw":false,
+                    "anilib":{"bundle":"portable.jar","api":"1.4","sha256":"%s",
+                    "signature":"c2ln","keyId":"publisher","kind":"manga"},
+                    "sources":[{"name":"Portable","lang":"all","id":"portable"}]}]
+                    """.formatted(SHA_256);
+            GitHubIndexClient client = new GitHubIndexClient(index);
+            DefaultExtensionRepositoryService service = new DefaultExtensionRepositoryService(
+                    new FileExtensionRepositoryStore(directory.resolve("repositories.txt")),
+                    client);
+            service.add(github);
+            ExtensionRepositorySnapshot snapshot = service.refresh(github);
+            counter.check(snapshot.successful() && snapshot.packages().size() == 1,
+                    "a GitHub repository URL must resolve to its dynamic JSON index");
+            counter.check(client.requests.equals(List.of(
+                            URI.create("https://raw.githubusercontent.com/example/anilib-sources/HEAD/index.min.json"),
+                            URI.create("https://raw.githubusercontent.com/example/anilib-sources/HEAD/index.json"))),
+                    "GitHub resolution must prefer index.min.json and fall back to index.json");
+            counter.check(snapshot.packages().getFirst().artifacts().getFirst().uri().equals(
+                            URI.create("https://raw.githubusercontent.com/example/anilib-sources/HEAD/portable.jar")),
+                    "relative Bundle URLs must resolve beside the fetched GitHub index");
         } finally {
             deleteDirectory(directory);
         }
@@ -520,6 +552,24 @@ final class ExtensionRepositoryTest {
         public HttpResponse execute(HttpRequest request) {
             lastRequest = request;
             return new HttpResponse(200, Map.of("content-type", List.of("application/json")), body, false);
+        }
+    }
+
+    private static final class GitHubIndexClient implements AnilibHttpClient {
+        private final byte[] index;
+        private final List<URI> requests = new java.util.ArrayList<>();
+
+        private GitHubIndexClient(String index) {
+            this.index = index.getBytes(StandardCharsets.UTF_8);
+        }
+
+        @Override
+        public HttpResponse execute(HttpRequest request) {
+            requests.add(request.uri());
+            if (request.uri().getPath().endsWith("index.min.json")) {
+                return new HttpResponse(404, Map.of(), new byte[0], false);
+            }
+            return new HttpResponse(200, Map.of("content-type", List.of("application/json")), index, false);
         }
     }
 

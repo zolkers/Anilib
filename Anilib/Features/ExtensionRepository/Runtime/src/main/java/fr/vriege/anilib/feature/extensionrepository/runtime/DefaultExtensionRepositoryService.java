@@ -91,7 +91,7 @@ public final class DefaultExtensionRepositoryService implements ExtensionReposit
         Instant fetchedAt = clock.instant();
         ExtensionRepositorySnapshot snapshot;
         try {
-            FetchResult fetched = fetch(repository);
+            FetchResult fetched = fetchRepository(repository);
             HttpResponse response = fetched.response();
             if (response.body().length > MAX_INDEX_BYTES) {
                 throw new IllegalArgumentException("Repository response exceeds 4 MiB");
@@ -158,6 +158,21 @@ public final class DefaultExtensionRepositoryService implements ExtensionReposit
             current = AniyomiRepositoryIndexParser.requireRepositoryUri(current.resolve(location));
         }
         throw new IllegalStateException("Unreachable repository redirect state");
+    }
+
+    private FetchResult fetchRepository(URI configuredLocation) {
+        RuntimeException lastFailure = null;
+        for (URI candidate : ExtensionRepositoryLocations.indexCandidates(configuredLocation)) {
+            try {
+                return fetch(candidate);
+            } catch (RuntimeException exception) {
+                if (lastFailure != null) {
+                    exception.addSuppressed(lastFailure);
+                }
+                lastFailure = exception;
+            }
+        }
+        throw Objects.requireNonNull(lastFailure, "repository candidates");
     }
 
     private boolean redirect(int statusCode) {
