@@ -14,6 +14,7 @@ public final class AnilibJavaRuleRegistry {
                 new BuildDependencyRule(),
                 new DesktopReleaseRule(),
                 new AndroidReleaseRule(),
+                new ApplicationReleaseRule(),
                 new ExtensionIsolationRule(),
                 new KotlinSourceRule(),
                 new SourceFormatRule());

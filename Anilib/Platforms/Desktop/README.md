@@ -10,8 +10,9 @@ Multiplatform `jpackage` integration:
 Cross-compilation is deliberately not attempted because the native packaging
 toolchain requires its target operating system. The
 `.github/workflows/desktop-release.yml` matrix uses fixed Windows, Ubuntu, and
-macOS runner generations with Microsoft OpenJDK 21.0.10. A manual version or a
-numeric `vMAJOR.MINOR.PATCH` tag drives the same Gradle invocation on each host.
+macOS runner generations with Microsoft OpenJDK 21.0.10. A manual version drives
+the reusable packaging workflow; a numeric `vMAJOR.MINOR.PATCH` tag invokes it
+through `application-release.yml` with production signing required.
 
 Run the current-host pipeline locally with:
 
@@ -28,6 +29,20 @@ module set. Every host emits `build/release/SHA256SUMS` beside its installer.
 AnilibJava verifies that the three target formats, pinned runner matrix,
 toolchain, integrity manifest, and stable identifiers remain present.
 
-Unsigned development packages are suitable for local testing. Public macOS
-distribution still requires Apple signing and notarization credentials; those
-secrets are intentionally not stored in this repository.
+Unsigned development packages are suitable for local testing. Production uses
+these GitHub secrets:
+
+- `ANILIB_WINDOWS_CERTIFICATE_BASE64` and
+  `ANILIB_WINDOWS_CERTIFICATE_PASSWORD` for the Authenticode PFX;
+- `ANILIB_MACOS_CERTIFICATE_BASE64`,
+  `ANILIB_MACOS_CERTIFICATE_PASSWORD`, and
+  `ANILIB_MACOS_SIGNING_IDENTITY` for the Developer ID P12;
+- `ANILIB_MACOS_NOTARIZATION_APPLE_ID`,
+  `ANILIB_MACOS_NOTARIZATION_PASSWORD`, and
+  `ANILIB_MACOS_NOTARIZATION_TEAM_ID` for Apple notarization.
+
+The Windows runner signs, timestamps, and verifies the MSI. The macOS runner
+signs the application, notarizes the DMG, staples the ticket, and verifies the
+result. Temporary certificates and keychains are removed even after failure.
+The final publication job verifies all platform checksums and adds a signed
+GitHub/Sigstore provenance attestation before creating one GitHub Release.

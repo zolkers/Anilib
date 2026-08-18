@@ -1,15 +1,26 @@
 name: Desktop release packages
 
 on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+      require-signing:
+        required: false
+        type: boolean
+        default: false
   workflow_dispatch:
     inputs:
       version:
         description: Numeric package version (MAJOR.MINOR.PATCH)
         required: true
         default: 0.1.0
-  push:
-    tags:
-      - "v[0-9]+.[0-9]+.[0-9]+"
+      require-signing:
+        description: Require production Windows signing and macOS signing/notarization
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -28,6 +39,15 @@ jobs:
           - runner: macos-15
             artifact: anilib-macos
     runs-on: ${{ matrix.runner }}
+    env:
+      WINDOWS_CERTIFICATE_BASE64: ${{ secrets.ANILIB_WINDOWS_CERTIFICATE_BASE64 }}
+      WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.ANILIB_WINDOWS_CERTIFICATE_PASSWORD }}
+      MACOS_CERTIFICATE_BASE64: ${{ secrets.ANILIB_MACOS_CERTIFICATE_BASE64 }}
+      MACOS_CERTIFICATE_PASSWORD: ${{ secrets.ANILIB_MACOS_CERTIFICATE_PASSWORD }}
+      MACOS_SIGNING_IDENTITY: ${{ secrets.ANILIB_MACOS_SIGNING_IDENTITY }}
+      MACOS_NOTARIZATION_APPLE_ID: ${{ secrets.ANILIB_MACOS_NOTARIZATION_APPLE_ID }}
+      MACOS_NOTARIZATION_PASSWORD: ${{ secrets.ANILIB_MACOS_NOTARIZATION_PASSWORD }}
+      MACOS_NOTARIZATION_TEAM_ID: ${{ secrets.ANILIB_MACOS_NOTARIZATION_TEAM_ID }}
     steps:
       - name: Check out source
         uses: actions/checkout@v6.0.2
@@ -37,16 +57,107 @@ jobs:
           distribution: microsoft
           java-version: 21.0.10
           cache: gradle
+      - name: Validate production signing secrets
+        if: inputs['require-signing']
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            test -n "$WINDOWS_CERTIFICATE_BASE64"
+            test -n "$WINDOWS_CERTIFICATE_PASSWORD"
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            test -n "$MACOS_CERTIFICATE_BASE64"
+            test -n "$MACOS_CERTIFICATE_PASSWORD"
+            test -n "$MACOS_SIGNING_IDENTITY"
+            test -n "$MACOS_NOTARIZATION_APPLE_ID"
+            test -n "$MACOS_NOTARIZATION_PASSWORD"
+            test -n "$MACOS_NOTARIZATION_TEAM_ID"
+          fi
+      - name: Restore macOS signing identity
+        if: runner.os == 'macOS' && inputs['require-signing']
+        shell: bash
+        env:
+          KEYCHAIN_PASSWORD: anilib-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          CERTIFICATE="$RUNNER_TEMP/anilib-signing.p12"
+          KEYCHAIN="$RUNNER_TEMP/anilib-signing.keychain-db"
+          printf '%s' "$MACOS_CERTIFICATE_BASE64" | base64 --decode > "$CERTIFICATE"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$CERTIFICATE" -k "$KEYCHAIN" \
+            -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s \
+            -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
       - name: Validate and package
         shell: bash
         env:
-          REQUESTED_VERSION: ${{ inputs.version || github.ref_name }}
+          REQUESTED_VERSION: ${{ inputs.version }}
         run: |
           VERSION="${REQUESTED_VERSION#v}"
-          ./gradlew --no-daemon --console=plain check \
-            :Anilib:Platforms:Desktop:writeDesktopReleaseChecksums \
-            -PanilibVersion="$VERSION" \
-            -PanilibPackageVersion="$VERSION"
+          if [[ "$RUNNER_OS" == "macOS" && "${{ inputs['require-signing'] }}" == "true" ]]; then
+            ./gradlew --no-daemon --console=plain check \
+              :Anilib:Platforms:Desktop:notarizeDmg \
+              -PanilibVersion="$VERSION" \
+              -PanilibPackageVersion="$VERSION" \
+              -Pcompose.desktop.mac.sign=true \
+              -Pcompose.desktop.mac.signing.identity="$MACOS_SIGNING_IDENTITY" \
+              -Pcompose.desktop.mac.signing.keychain="$RUNNER_TEMP/anilib-signing.keychain-db" \
+              -Pcompose.desktop.mac.notarization.appleID="$MACOS_NOTARIZATION_APPLE_ID" \
+              -Pcompose.desktop.mac.notarization.password="$MACOS_NOTARIZATION_PASSWORD" \
+              -Pcompose.desktop.mac.notarization.teamID="$MACOS_NOTARIZATION_TEAM_ID"
+          else
+            ./gradlew --no-daemon --console=plain check \
+              :Anilib:Platforms:Desktop:writeDesktopReleaseChecksums \
+              -PanilibVersion="$VERSION" \
+              -PanilibPackageVersion="$VERSION"
+          fi
+      - name: Sign and verify Windows installer
+        if: runner.os == 'Windows' && inputs['require-signing']
+        shell: pwsh
+        run: |
+          $certificate = Join-Path $env:RUNNER_TEMP 'anilib-signing.pfx'
+          [IO.File]::WriteAllBytes(
+            $certificate,
+            [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE_BASE64)
+          )
+          $signTool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" `
+            -Filter signtool.exe -Recurse |
+            Where-Object FullName -Match '\\x64\\signtool\.exe$' |
+            Sort-Object FullName -Descending |
+            Select-Object -First 1 -ExpandProperty FullName
+          if (-not $signTool) { throw 'signtool.exe was not found' }
+          $installer = Get-ChildItem 'Anilib/Platforms/Desktop/build/compose/binaries/main' `
+            -Filter '*.msi' -Recurse | Select-Object -First 1
+          if (-not $installer) { throw 'Windows MSI was not produced' }
+          & $signTool sign /f $certificate /p $env:WINDOWS_CERTIFICATE_PASSWORD `
+            /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $installer.FullName
+          if ($LASTEXITCODE -ne 0) { throw 'Authenticode signing failed' }
+          & $signTool verify /pa /all $installer.FullName
+          if ($LASTEXITCODE -ne 0) { throw 'Authenticode verification failed' }
+          $digest = (Get-FileHash -Algorithm SHA256 $installer.FullName).Hash.ToLowerInvariant()
+          New-Item 'Anilib/Platforms/Desktop/build/release' -ItemType Directory -Force | Out-Null
+          "$digest  $($installer.Name)" | Set-Content `
+            'Anilib/Platforms/Desktop/build/release/SHA256SUMS' -Encoding utf8NoBOM
+      - name: Verify notarization and write macOS checksum
+        if: runner.os == 'macOS' && inputs['require-signing']
+        shell: bash
+        run: |
+          DMG="$(find Anilib/Platforms/Desktop/build/compose/binaries/main -name '*.dmg' -type f -print -quit)"
+          test -n "$DMG"
+          xcrun stapler staple "$DMG"
+          xcrun stapler validate "$DMG"
+          spctl --assess --verbose --type install "$DMG"
+          mkdir -p Anilib/Platforms/Desktop/build/release
+          (cd "$(dirname "$DMG")" && shasum -a 256 "$(basename "$DMG")") \
+            > Anilib/Platforms/Desktop/build/release/SHA256SUMS
+      - name: Remove temporary signing material
+        if: always()
+        shell: bash
+        run: |
+          rm -f "$RUNNER_TEMP/anilib-signing.pfx" "$RUNNER_TEMP/anilib-signing.p12"
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            security delete-keychain "$RUNNER_TEMP/anilib-signing.keychain-db" 2>/dev/null || true
+          fi
       - name: Upload native package and checksums
         uses: actions/upload-artifact@v7.0.1
         with:

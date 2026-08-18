@@ -68,6 +68,7 @@ public final class ArchitectureTestMain {
         assertions += SourceExtensionIsolationRuleTest.run();
         assertions += DesktopReleaseRuleTest.run();
         assertions += AndroidReleaseRuleTest.run();
+        assertions += ApplicationReleaseRuleTest.run();
         assertions += ExtensionRepositoryTest.run();
         assertions += SourcePublisherTest.run();
         assertions += PortableBundleLoadingTest.run();

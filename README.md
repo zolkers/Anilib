@@ -125,7 +125,8 @@ See [ARCHITECTURE.md](Anilib/ARCHITECTURE.md) and
 [ROADMAP.md](Anilib/ROADMAP.md) for the dependency contract and parity plan.
 Desktop packaging and the three-host release matrix are documented in
 [Desktop release](Anilib/Platforms/Desktop/README.md).
-Android APK packaging, optional signing, and release secrets are documented in
+Android APK packaging, local optional signing, and required production release
+secrets are documented in
 [Android release](Anilib/Platforms/Android/README.md).
 
 ## Legal

@@ -38,13 +38,15 @@ ends in `-unsigned.apk`. It is suitable for verification and later signing, but
 cannot be installed or distributed as a trusted Anilib release until it is
 signed.
 
-The `android-release.yml` workflow accepts a numeric semantic version and a
-positive Android version code. Tag builds derive the semantic version from a
-`vMAJOR.MINOR.PATCH` tag and use the monotonic GitHub run number as their version
-code. CI optionally restores the base64-encoded key from
-`ANILIB_ANDROID_KEYSTORE_BASE64`; the other secret names match the environment
-variables above. The workflow always runs the complete repository gate and
-uploads the APK together with `SHA256SUMS`.
+The reusable `android-release.yml` workflow accepts a numeric semantic version
+and a positive Android version code. Manual runs may deliberately produce an
+unsigned verification artifact. A `vMAJOR.MINOR.PATCH` tag instead invokes it
+through `application-release.yml`, uses the monotonic GitHub run number as the
+version code, and requires all signing secrets. CI restores the base64-encoded
+key from `ANILIB_ANDROID_KEYSTORE_BASE64`; the other secret names match the
+environment variables above. Production rejects `-unsigned.apk`, verifies the
+APK certificate with `apksigner`, and removes the temporary key store before
+publication. The final release also carries a signed provenance attestation.
 
 ## User-supplied Aniyomi APKs
 

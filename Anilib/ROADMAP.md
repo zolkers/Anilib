@@ -62,6 +62,8 @@ platform-specific.
 - [x] Android APK using only Android SDK/platform APIs beyond shared Anilib code
 - [x] extension signing, compatibility metadata, and update channels
 - [x] shared stable application update checks and release-page hand-off
+- [x] atomic GitHub application publication with required Android, Windows, and
+  macOS signing plus signed provenance for every platform artifact
 - [x] import compatibility for user-owned Aniyomi backups where legally and
   technically feasible
 

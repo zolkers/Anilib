@@ -1,6 +1,18 @@
 name: Android release APK
 
 on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+      version-code:
+        required: true
+        type: string
+      require-signing:
+        required: false
+        type: boolean
+        default: false
   workflow_dispatch:
     inputs:
       version:
@@ -11,9 +23,11 @@ on:
         description: Positive Android version code
         required: true
         default: "1"
-  push:
-    tags:
-      - "v[0-9]+.[0-9]+.[0-9]+"
+      require-signing:
+        description: Require a production-signed APK
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -38,7 +52,15 @@ jobs:
           cache: gradle
       - name: Install pinned Android platform
         run: sdkmanager --install "platforms;android-37"
-      - name: Restore optional release key
+      - name: Validate production signing secrets
+        if: inputs['require-signing']
+        shell: bash
+        run: |
+          test -n "$ANDROID_KEYSTORE_BASE64"
+          test -n "$ANILIB_ANDROID_KEYSTORE_PASSWORD"
+          test -n "$ANILIB_ANDROID_KEY_ALIAS"
+          test -n "$ANILIB_ANDROID_KEY_PASSWORD"
+      - name: Restore release key
         if: env.ANDROID_KEYSTORE_BASE64 != ''
         shell: bash
         run: |
@@ -47,8 +69,8 @@ jobs:
       - name: Validate and package
         shell: bash
         env:
-          REQUESTED_VERSION: ${{ inputs.version || github.ref_name }}
-          REQUESTED_VERSION_CODE: ${{ inputs['version-code'] || github.run_number }}
+          REQUESTED_VERSION: ${{ inputs.version }}
+          REQUESTED_VERSION_CODE: ${{ inputs.version-code }}
         run: |
           VERSION="${REQUESTED_VERSION#v}"
           ./gradlew --no-daemon --console=plain check \
@@ -56,6 +78,20 @@ jobs:
             -PanilibVersion="$VERSION" \
             -PanilibAndroidVersionName="$VERSION" \
             -PanilibAndroidVersionCode="$REQUESTED_VERSION_CODE"
+      - name: Verify production APK signature
+        if: inputs['require-signing']
+        shell: bash
+        run: |
+          APK="$(find Anilib/Platforms/Android/build/outputs/apk/release -name '*.apk' -type f -print -quit)"
+          test -n "$APK"
+          [[ "$APK" != *-unsigned.apk ]]
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)"
+          test -n "$APKSIGNER"
+          "$APKSIGNER" verify --verbose --print-certs "$APK"
+      - name: Remove temporary signing material
+        if: always()
+        shell: bash
+        run: rm -f "$ANILIB_ANDROID_KEYSTORE"
       - name: Upload APK and checksums
         uses: actions/upload-artifact@v7.0.1
         with:
