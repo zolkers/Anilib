@@ -1,6 +1,7 @@
 package fr.vriege.anilib.feature.extensionrepository.bundle;
 
 import fr.vriege.anilib.feature.extensionrepository.ExtensionRepositoryCapabilities;
+import fr.vriege.anilib.feature.extensionrepository.runtime.DefaultExtensionInstallationService;
 import fr.vriege.anilib.feature.extensionrepository.runtime.DefaultExtensionRepositoryService;
 import fr.vriege.anilib.feature.extensionrepository.runtime.FileExtensionRepositoryStore;
 import fr.vriege.anilib.feature.extensionrepository.ui.DefaultExtensionRepositoryPresentation;
@@ -24,6 +25,7 @@ public final class ExtensionRepositoryPlugin implements AnilibPlugin {
                             "1.0.0"))
             .requires(NetworkCapabilities.HTTP_CLIENT)
             .provides(ExtensionRepositoryCapabilities.SERVICE)
+            .provides(ExtensionRepositoryCapabilities.INSTALLATION)
             .provides(ExtensionRepositoryUiCapabilities.PRESENTATION)
             .build();
 
@@ -46,9 +48,13 @@ public final class ExtensionRepositoryPlugin implements AnilibPlugin {
         DefaultExtensionRepositoryService service = new DefaultExtensionRepositoryService(
                 new FileExtensionRepositoryStore(repositoryFile),
                 client);
+        DefaultExtensionInstallationService installation = new DefaultExtensionInstallationService(
+                repositoryFile.resolveSibling("extensions"),
+                client);
         DefaultExtensionRepositoryPresentation presentation = new DefaultExtensionRepositoryPresentation(service);
         context.own(presentation);
         context.publish(ExtensionRepositoryCapabilities.SERVICE, service);
+        context.publish(ExtensionRepositoryCapabilities.INSTALLATION, installation);
         context.publish(ExtensionRepositoryUiCapabilities.PRESENTATION, presentation);
     }
 }

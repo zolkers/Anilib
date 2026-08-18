@@ -1,29 +1,49 @@
 package fr.vriege.anilib.tooling.archtests;
 
 import fr.vriege.anilib.feature.extensionrepository.ExtensionArtifactFormat;
+import fr.vriege.anilib.feature.extensionrepository.ExtensionArtifactMetadata;
+import fr.vriege.anilib.feature.extensionrepository.ExtensionContentKind;
+import fr.vriege.anilib.feature.extensionrepository.ExtensionInstallationState;
 import fr.vriege.anilib.feature.extensionrepository.ExtensionPackageMetadata;
 import fr.vriege.anilib.feature.extensionrepository.ExtensionRepositorySnapshot;
+import fr.vriege.anilib.feature.extensionrepository.ExtensionSourceMetadata;
+import fr.vriege.anilib.feature.extensionrepository.InstalledExtensionPackage;
 import fr.vriege.anilib.feature.extensionrepository.runtime.AniyomiRepositoryIndexParser;
+import fr.vriege.anilib.feature.extensionrepository.runtime.DefaultExtensionInstallationService;
 import fr.vriege.anilib.feature.extensionrepository.runtime.DefaultExtensionRepositoryService;
+import fr.vriege.anilib.feature.extensionrepository.runtime.FileExtensionTrustStore;
 import fr.vriege.anilib.feature.extensionrepository.runtime.FileExtensionRepositoryStore;
+import fr.vriege.anilib.feature.extensionrepository.runtime.FileInstalledExtensionStore;
 import fr.vriege.anilib.framework.http.AnilibHttpClient;
 import fr.vriege.anilib.framework.http.HttpRequest;
 import fr.vriege.anilib.framework.http.HttpResponse;
 
 import java.io.IOException;
+import java.io.ByteArrayOutputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.GeneralSecurityException;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.MessageDigest;
+import java.security.Signature;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Base64;
+import java.util.HexFormat;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 /** Behavior checks for user-supplied Aniyomi-compatible extension repositories. */
 final class ExtensionRepositoryTest {
     private static final URI INDEX = URI.create("https://repo.example/extensions/index.min.json");
+    private static final URI BUNDLE = URI.create("https://repo.example/extensions/example.jar");
     private static final String SHA_256 = "0123456789abcdef0123456789abcdef"
             + "0123456789abcdef0123456789abcdef";
 
@@ -35,6 +55,7 @@ final class ExtensionRepositoryTest {
         parsesAniyomiAndPortableArtifacts(counter);
         rejectsUnsafeMetadata(counter);
         persistsAndRefreshesUserRepositories(counter);
+        installsOnlyTrustedPortableBundles(counter);
         return counter.value;
     }
 
@@ -134,6 +155,125 @@ final class ExtensionRepositoryTest {
         }
     }
 
+    private static void installsOnlyTrustedPortableBundles(Counter counter) {
+        Path directory = temporaryDirectory();
+        try {
+            KeyPair keyPair = keyPair();
+            byte[] versionOne = bundle("eu.example.extension", 1, "1.4");
+            ExtensionPackageMetadata first = portablePackage(versionOne, keyPair, 1);
+            DefaultExtensionInstallationService service = installationService(
+                    directory,
+                    new RecordingClient(versionOne));
+            service.trust("example-publisher", Base64.getEncoder().encodeToString(keyPair.getPublic().getEncoded()));
+            InstalledExtensionPackage installed = service.install(first);
+            counter.check(installed.state() == ExtensionInstallationState.ENABLED
+                            && service.installed().equals(List.of(installed)),
+                    "a checksum-matched Bundle signed by a trusted publisher must install enabled");
+            service.setEnabled(first.packageName(), false);
+            counter.check(service.installed().getFirst().state() == ExtensionInstallationState.DISABLED,
+                    "installed portable Bundles must support durable disable state");
+
+            byte[] versionTwo = bundle("eu.example.extension", 2, "1.4");
+            DefaultExtensionInstallationService reopened = installationService(
+                    directory,
+                    new RecordingClient(versionTwo));
+            InstalledExtensionPackage updated = reopened.update(portablePackage(versionTwo, keyPair, 2));
+            counter.check(updated.versionCode() == 2
+                            && updated.state() == ExtensionInstallationState.DISABLED,
+                    "a verified newer Bundle must update without silently enabling a disabled extension");
+            counter.check(reopened.remove(first.packageName()) && reopened.installed().isEmpty(),
+                    "users must be able to remove installed portable Bundles");
+
+            Path untrustedDirectory = directory.resolve("untrusted");
+            DefaultExtensionInstallationService untrusted = installationService(
+                    untrustedDirectory,
+                    new RecordingClient(versionOne));
+            counter.expectSecurity(
+                    () -> untrusted.install(first),
+                    "portable Bundles from untrusted signing keys must not install");
+            counter.check(new DefaultExtensionInstallationService(
+                            directory,
+                            new RecordingClient(versionTwo)).installed().isEmpty(),
+                    "installed-extension removal must survive product restart");
+        } finally {
+            deleteDirectory(directory);
+        }
+    }
+
+    private static DefaultExtensionInstallationService installationService(
+            Path directory,
+            RecordingClient client) {
+        return new DefaultExtensionInstallationService(
+                directory,
+                client,
+                Clock.fixed(Instant.parse("2026-08-18T12:00:00Z"), ZoneOffset.UTC),
+                new FileInstalledExtensionStore(directory.resolve("installed.tsv")),
+                new FileExtensionTrustStore(directory.resolve("trusted-keys.txt")));
+    }
+
+    private static ExtensionPackageMetadata portablePackage(byte[] bundle, KeyPair keyPair, long versionCode) {
+        String checksum = sha256(bundle);
+        String signature = signature(bundle, keyPair);
+        return new ExtensionPackageMetadata(
+                "Example",
+                "eu.example.extension",
+                "en",
+                versionCode,
+                "1." + versionCode,
+                false,
+                ExtensionContentKind.MIXED,
+                List.of(new ExtensionSourceMetadata("Example", "en", "42", Optional.of(BUNDLE))),
+                List.of(new ExtensionArtifactMetadata(
+                        ExtensionArtifactFormat.ANILIB_BUNDLE,
+                        BUNDLE,
+                        Optional.of(checksum),
+                        Optional.of(signature),
+                        Optional.of("example-publisher"),
+                        Optional.of("1.4"))));
+    }
+
+    private static byte[] bundle(String packageName, long versionCode, String api) {
+        try {
+            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+            try (ZipOutputStream archive = new ZipOutputStream(bytes)) {
+                archive.putNextEntry(new ZipEntry("META-INF/anilib-extension.properties"));
+                archive.write(("package=" + packageName + "\nversionCode=" + versionCode + "\napi=" + api + "\n")
+                        .getBytes(StandardCharsets.UTF_8));
+                archive.closeEntry();
+            }
+            return bytes.toByteArray();
+        } catch (IOException exception) {
+            throw new AssertionError("Unable to create portable Bundle fixture", exception);
+        }
+    }
+
+    private static KeyPair keyPair() {
+        try {
+            return KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
+        } catch (GeneralSecurityException exception) {
+            throw new AssertionError("JDK must provide Ed25519", exception);
+        }
+    }
+
+    private static String signature(byte[] bytes, KeyPair keyPair) {
+        try {
+            Signature signature = Signature.getInstance("Ed25519");
+            signature.initSign(keyPair.getPrivate());
+            signature.update(bytes);
+            return Base64.getEncoder().encodeToString(signature.sign());
+        } catch (GeneralSecurityException exception) {
+            throw new AssertionError("Unable to sign portable Bundle fixture", exception);
+        }
+    }
+
+    private static String sha256(byte[] bytes) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+        } catch (GeneralSecurityException exception) {
+            throw new AssertionError("JDK must provide SHA-256", exception);
+        }
+    }
+
     private static Path temporaryDirectory() {
         try {
             return Files.createTempDirectory("anilib-extension-repository-test");
@@ -163,6 +303,10 @@ final class ExtensionRepositoryTest {
             this.body = body.getBytes(StandardCharsets.UTF_8);
         }
 
+        private RecordingClient(byte[] body) {
+            this.body = body.clone();
+        }
+
         @Override
         public HttpResponse execute(HttpRequest request) {
             lastRequest = request;
@@ -185,6 +329,15 @@ final class ExtensionRepositoryTest {
                 action.run();
                 throw new AssertionError(message);
             } catch (IllegalArgumentException expected) {
+                value++;
+            }
+        }
+
+        private void expectSecurity(Runnable action, String message) {
+            try {
+                action.run();
+                throw new AssertionError(message);
+            } catch (SecurityException expected) {
                 value++;
             }
         }

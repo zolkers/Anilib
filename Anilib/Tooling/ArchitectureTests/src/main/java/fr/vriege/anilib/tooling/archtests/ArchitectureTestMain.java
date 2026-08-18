@@ -92,6 +92,8 @@ public final class ArchitectureTestMain {
             check(application.components().size() == 12, "standard product must install twelve bootstrap bundles");
             check(application.capability(ExtensionRepositoryCapabilities.SERVICE).repositories().isEmpty(),
                     "standard product must ship without a third-party extension repository");
+            check(application.capability(ExtensionRepositoryCapabilities.INSTALLATION).installed().isEmpty(),
+                    "standard product must start without installed third-party extensions");
             check(application.capability(ExtensionRepositoryUiCapabilities.PRESENTATION) != null,
                     "extension repository Bundle must publish its shared presentation");
             check(application.capability(LocalSourceCapabilities.CONTENT).publications().isEmpty(),
