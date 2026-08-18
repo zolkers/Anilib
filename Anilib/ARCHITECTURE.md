@@ -262,8 +262,16 @@ stored per package and ceases to match when its current signer changes. Only
 then does a non-initializing preflight check the Aniyomi, RxJava, HTTP, parser,
 injection, coroutine, serialization, preference, and optional torrent host ABI.
 AnilibJava keeps that certificate binding and `Class.forName(..., false, ...)`
-contract present. The classes still expect Aniyomi's external runtime dependency
-graph, so portable Anilib Bundles remain the executable cross-platform format.
+contract present. At Android startup, ABI-ready entrypoints are constructed with
+an APK class loader and reflected into ordinary Source Bundles before the Kernel
+graph freezes. The adapter translates catalogue pages, episodes, streams,
+headers, and subtitles while retaining activation failures per package. Its
+`TRUSTED_PLATFORM_RUNTIME` permission is reserved to this audited platform path
+and forbidden to portable extension modules. Every bridged operation rechecks
+the installed signer against current trust before invoking APK code. The app
+still needs a complete, compatible host ABI before a real installed APK can
+reach that path, so portable Anilib Bundles remain the executable cross-platform
+format.
 
 ## External dependency policy
 

@@ -69,12 +69,15 @@ android {
 }
 
 dependencies {
+    implementation project(':Anilib:Kernel:Api')
     implementation project(':Anilib:Framework:Http:Runtime')
     implementation project(':Anilib:Framework:Http:Api')
     implementation project(':Anilib:Configurations:Standard')
     implementation project(':Anilib:Features:Discovery:Ui')
     implementation project(':Anilib:Features:ExtensionRepository:Ui')
     implementation project(':Anilib:Features:ExtensionRepository:Api')
+    implementation project(':Anilib:Features:ExtensionRepository:Runtime')
+    implementation project(':Anilib:Features:Source:Api')
     implementation project(':Anilib:Features:Network:Api')
     implementation project(':Anilib:Features:Settings:Ui')
     implementation project(':Anilib:Features:Library:Ui')

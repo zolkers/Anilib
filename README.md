@@ -70,8 +70,11 @@ the OS already exposes, including their source entrypoints, Aniyomi library
 generation,
 content flags, and signing-certificate fingerprints. This metadata-only bridge
 does not load APK extension bytecode or request unrestricted package visibility;
-executing those APKs still requires an isolated implementation of Aniyomi's
-host ABI. Portable Anilib Bundles are the executable cross-platform format.
+ABI-ready anime APKs now enter a pre-start adapter that turns catalogue pages,
+episodes, streams, headers, and subtitles into ordinary Anilib Source Bundles;
+activation failures stay isolated to their package. Supplying the complete
+Aniyomi host ABI is still required before current installed APKs can execute.
+Portable Anilib Bundles remain the executable cross-platform format.
 Before that future bridge may activate anything, Android requires explicit
 package-certificate trust and performs a non-initializing audit of the required
 host-ABI groups. A signing-certificate change invalidates the stored decision.

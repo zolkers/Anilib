@@ -1,4 +1,6 @@
 module fr.vriege.anilib.tooling.archtests {
+    opens fr.vriege.anilib.tooling.archtests to fr.vriege.anilib.feature.extensionrepository.runtime;
+
     requires fr.vriege.anilib.tooling.javaquality;
     requires java.desktop;
     requires java.compiler;

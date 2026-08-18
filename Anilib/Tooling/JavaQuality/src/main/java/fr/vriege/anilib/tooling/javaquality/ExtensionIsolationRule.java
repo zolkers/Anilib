@@ -18,6 +18,7 @@ public final class ExtensionIsolationRule implements AnilibJavaRule {
                     + "|java\\.nio\\.file\\."
                     + "|java\\.lang\\.reflect\\."
                     + "|java\\.io\\.File"
+                    + "|TRUSTED_PLATFORM_RUNTIME"
                     + "|fr\\.vriege\\.anilib\\.feature\\.network\\."
                     + "|fr\\.vriege\\.anilib\\.kernel\\.)");
 

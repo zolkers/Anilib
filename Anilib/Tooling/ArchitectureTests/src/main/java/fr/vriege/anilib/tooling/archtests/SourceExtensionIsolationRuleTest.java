@@ -60,7 +60,14 @@ final class SourceExtensionIsolationRuleTest {
                 "an extension bypass must report role, dependency, and direct network access");
         check(diagnostics.stream().anyMatch(diagnostic -> diagnostic.message().contains("granted")),
                 "extension bypass diagnostics must direct authors to the granted context");
-        return 4;
+        JavaSource privilegedSource = source(
+                safeModule,
+                "PrivilegedSource.java",
+                List.of("SourcePermission.TRUSTED_PLATFORM_RUNTIME"));
+        check(rule.analyze(snapshot(root, safeModule, privilegedSource)).stream()
+                        .anyMatch(diagnostic -> diagnostic.message().contains("granted")),
+                "portable extensions must not claim the trusted platform runtime permission");
+        return 5;
     }
 
     private static ModuleMetadata module(

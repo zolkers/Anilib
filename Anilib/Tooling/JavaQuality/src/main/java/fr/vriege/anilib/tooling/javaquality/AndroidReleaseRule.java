@@ -17,6 +17,12 @@ public final class AndroidReleaseRule implements AnilibJavaRule {
     private static final Path APK_RUNTIME_PREFLIGHT = Path.of(
             "Anilib", "Platforms", "Android", "src", "main", "kotlin", "fr", "vriege", "anilib",
             "platform", "android", "AndroidAniyomiRuntimePreflight.kt");
+    private static final Path APK_SOURCE_RUNTIME = Path.of(
+            "Anilib", "Platforms", "Android", "src", "main", "kotlin", "fr", "vriege", "anilib",
+            "platform", "android", "AndroidAniyomiSourceRuntime.kt");
+    private static final Path ANDROID_MAIN = Path.of(
+            "Anilib", "Platforms", "Android", "src", "main", "kotlin", "fr", "vriege", "anilib",
+            "platform", "android", "MainActivity.kt");
     private static final Path WORKFLOW = Path.of(".github", "workflows", "android-release.yml");
 
     public AndroidReleaseRule() {
@@ -70,6 +76,23 @@ public final class AndroidReleaseRule implements AnilibJavaRule {
                 "extension.signingCertificateSha256()::contains",
                 "Class.forName(className, false, applicationContext.classLoader)",
                 "ApkExtensionRuntimeState.HOST_ABI_MISSING");
+        requireTokens(
+                repository,
+                APK_SOURCE_RUNTIME,
+                diagnostics,
+                "PathClassLoader",
+                "preflight.report(extension)",
+                "ApkExtensionRuntimeState.HOST_ABI_AVAILABLE",
+                "AniyomiAnimeSourceAdapter.adapt",
+                "inventory.discover(extension.packageName())",
+                "ApkExtensionRuntimeReport.activationFailed");
+        requireTokens(
+                repository,
+                ANDROID_MAIN,
+                diagnostics,
+                "AndroidAniyomiSourceRuntime(this).prepare()",
+                "apkActivation.bundles",
+                "startupReports = apkActivation.reports");
         requireTokens(
                 repository,
                 WORKFLOW,

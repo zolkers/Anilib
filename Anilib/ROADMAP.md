@@ -76,6 +76,8 @@ platform-specific.
   without loading APK extension classes
 - [x] Anilib-owned extension contracts with APK compatibility isolated to
   Android and portable Bundles shared by Android and desktop
+- [x] pre-start Android adapter from ABI-ready anime APK catalogues, episodes, streams,
+  headers, and subtitles into explicit Anilib Source Bundles
 - [ ] execute discovered Aniyomi sources through a compatibility runtime without
   importing Aniyomi's external host dependency graph into shared Anilib modules
 - [x] shared Settings Bundle with durable appearance and feature-policy preferences

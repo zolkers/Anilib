@@ -311,7 +311,8 @@ private fun ApkExtensionCard(
             Text(
                 apkRuntimeStatus(runtime),
                 color = when (runtime.state()) {
-                    ApkExtensionRuntimeState.HOST_ABI_AVAILABLE -> MaterialTheme.colorScheme.primary
+                    ApkExtensionRuntimeState.ACTIVE -> MaterialTheme.colorScheme.primary
+                    ApkExtensionRuntimeState.HOST_ABI_AVAILABLE -> MaterialTheme.colorScheme.tertiary
                     ApkExtensionRuntimeState.HOST_ABI_MISSING -> MaterialTheme.colorScheme.tertiary
                     ApkExtensionRuntimeState.UNSUPPORTED_PLATFORM -> MaterialTheme.colorScheme.onSurfaceVariant
                     else -> MaterialTheme.colorScheme.error
@@ -345,7 +346,10 @@ private fun apkRuntimeStatus(runtime: ApkExtensionRuntimeReport): String = when 
     ApkExtensionRuntimeState.HOST_ABI_MISSING ->
         "Trusted; ${runtime.missingHostClasses().size} required host ABI classes are missing"
     ApkExtensionRuntimeState.HOST_ABI_AVAILABLE ->
-        "Trusted; host ABI available for the future activation bridge"
+        "Trusted; host ABI available, restart Anilib to activate"
+    ApkExtensionRuntimeState.ACTIVATION_FAILED ->
+        "Activation failed: ${runtime.activationFailure().orElse("unknown APK runtime error")}"
+    ApkExtensionRuntimeState.ACTIVE -> "Active through the Anilib Source registry"
 }
 
 private fun apkCompatibility(compatibility: ApkExtensionCompatibility): String = when (compatibility) {

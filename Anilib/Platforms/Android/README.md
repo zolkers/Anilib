@@ -54,6 +54,9 @@ rate-limit stack with a 16 MiB bound, then writes the bytes into an Android
 `PackageInstaller` session. Android's unknown-source permission and final user
 confirmation remain mandatory.
 
-This hand-off installs the user-selected package; it does not claim binary API
-compatibility or make the same APK executable on desktop. Discovery and the
-best-effort Aniyomi API adapter remain a separate roadmap item.
+This hand-off installs the user-selected package; it does not make the same APK
+executable on desktop. On the next Android startup, certificate-trusted packages
+pass a non-initializing host-ABI check. ABI-ready entrypoints are loaded before
+the immutable product graph starts and adapted into Anilib anime catalogue and
+streaming Sources; failures remain attached to one package. Current APKs stay
+blocked until Anilib supplies their complete external host ABI.

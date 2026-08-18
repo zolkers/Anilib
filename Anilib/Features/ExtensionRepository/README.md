@@ -63,11 +63,17 @@ missing Aniyomi, RxJava, OkHttp, jsoup, Injekt, NanoHTTPD, coroutine,
 serialization, preference, and torrent classes remain visible as a blocked
 runtime state. Forgetting trust is immediate.
 
-This is metadata compatibility only. Existing Aniyomi APKs compile against the
+Discovery alone is metadata compatibility only. Existing Aniyomi APKs compile against the
 Aniyomi source API and host-provided external libraries, so they are not executed
-until a separately isolated Android compatibility runtime can satisfy that ABI.
+until the Android compatibility runtime can satisfy that ABI. When preflight is
+green, Android now constructs the declared source or source factory before
+Standard startup and adapts catalogue pages, episodes, streams, request headers,
+and subtitles into explicit Anilib Source Bundles. One package failure does not
+select a partial Bundle and is displayed in the shared repository screen. Each
+bridged operation rechecks the currently installed signer, so forgetting trust
+or replacing the APK immediately blocks subsequent calls.
 Signed portable Anilib Bundles remain the only source artifact executed on both
-Android and desktop.
+Android and desktop without that compatibility ABI.
 
 Portable artifacts are accepted only when `sha256`, `signature`, `keyId`, and
 `api` are present, the user has explicitly imported the publisher's X.509

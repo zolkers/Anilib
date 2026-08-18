@@ -14,6 +14,7 @@ import fr.vriege.anilib.feature.extensionrepository.ExtensionArtifactFormat
 import fr.vriege.anilib.feature.extensionrepository.ExtensionPackageMetadata
 import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionPlatform
 import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionRuntimeReport
+import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionRuntimeState
 import fr.vriege.anilib.feature.extensionrepository.ui.InstalledApkExtension
 import fr.vriege.anilib.framework.http.AnilibHttpClient
 import fr.vriege.anilib.framework.http.HttpCachePolicy
@@ -28,13 +29,26 @@ internal class AndroidApkExtensionPlatform(
     private val client: AnilibHttpClient,
     private val inventory: AndroidAniyomiExtensionInventory = AndroidAniyomiExtensionInventory(activity),
     private val runtimePreflight: AndroidAniyomiRuntimePreflight = AndroidAniyomiRuntimePreflight(activity),
+    private val startupReports: Map<String, ApkExtensionRuntimeReport> = emptyMap(),
 ) : ApkExtensionPlatform {
     override fun available(): Boolean = true
 
     override fun discoverInstalled(): List<InstalledApkExtension> = inventory.discover()
 
-    override fun runtimeReport(extensionPackage: InstalledApkExtension): ApkExtensionRuntimeReport =
-        runtimePreflight.report(extensionPackage)
+    override fun runtimeReport(extensionPackage: InstalledApkExtension): ApkExtensionRuntimeReport {
+        val current = runtimePreflight.report(extensionPackage)
+        val startup = startupReports[extensionPackage.packageName()]?.takeIf {
+            it.state() == ApkExtensionRuntimeState.ACTIVE ||
+                it.state() == ApkExtensionRuntimeState.ACTIVATION_FAILED
+        }
+        return if (current.state() == ApkExtensionRuntimeState.HOST_ABI_AVAILABLE &&
+            startup != null
+        ) {
+            startup
+        } else {
+            current
+        }
+    }
 
     override fun trustCertificate(
         extensionPackage: InstalledApkExtension,

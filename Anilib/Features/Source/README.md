@@ -60,6 +60,10 @@ Network feature are rejected. This is an architectural capability boundary for
 explicitly selected code, not a promise to execute arbitrary untrusted bytecode;
 signing and update trust remain release-phase work.
 
+`TRUSTED_PLATFORM_RUNTIME` is an explicit exception for audited compatibility
+code owned by a platform adapter. Portable extension modules cannot request it;
+AnilibJava rejects the token in every `layer=EXTENSION` source.
+
 ## Catalogue shape
 
 A catalogue source implements `CatalogueSource`. It receives immutable

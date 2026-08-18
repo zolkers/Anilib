@@ -30,6 +30,7 @@ internal class AndroidAniyomiRuntimePreflight(
                 ApkExtensionRuntimeState.HOST_ABI_MISSING,
                 missingClasses,
                 Optional.of(trustedCertificate),
+                Optional.empty(),
             )
         }
         return ApkExtensionRuntimeReport(
@@ -37,6 +38,7 @@ internal class AndroidAniyomiRuntimePreflight(
             ApkExtensionRuntimeState.HOST_ABI_AVAILABLE,
             emptyList(),
             Optional.of(trustedCertificate),
+            Optional.empty(),
         )
     }
 
@@ -71,6 +73,7 @@ internal class AndroidAniyomiRuntimePreflight(
         extension.packageName(),
         state,
         emptyList(),
+        Optional.empty(),
         Optional.empty(),
     )
 

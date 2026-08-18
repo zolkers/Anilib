@@ -9,6 +9,7 @@ import fr.vriege.anilib.feature.extensionrepository.ExtensionRepositorySnapshot;
 import fr.vriege.anilib.feature.extensionrepository.ExtensionSourceMetadata;
 import fr.vriege.anilib.feature.extensionrepository.InstalledExtensionPackage;
 import fr.vriege.anilib.feature.extensionrepository.runtime.AniyomiRepositoryIndexParser;
+import fr.vriege.anilib.feature.extensionrepository.runtime.AniyomiAnimeSourceAdapter;
 import fr.vriege.anilib.feature.extensionrepository.runtime.DefaultExtensionInstallationService;
 import fr.vriege.anilib.feature.extensionrepository.runtime.DefaultExtensionRepositoryService;
 import fr.vriege.anilib.feature.extensionrepository.runtime.FileExtensionTrustStore;
@@ -22,6 +23,12 @@ import fr.vriege.anilib.feature.extensionrepository.ui.InstalledApkExtension;
 import fr.vriege.anilib.framework.http.AnilibHttpClient;
 import fr.vriege.anilib.framework.http.HttpRequest;
 import fr.vriege.anilib.framework.http.HttpResponse;
+import fr.vriege.anilib.feature.source.CatalogueSource;
+import fr.vriege.anilib.feature.source.SourceBrowseRequest;
+import fr.vriege.anilib.feature.source.SourceEpisode;
+import fr.vriege.anilib.feature.source.SourcePage;
+import fr.vriege.anilib.feature.source.SourcePermission;
+import fr.vriege.anilib.feature.source.StreamingSource;
 
 import java.io.IOException;
 import java.io.ByteArrayOutputStream;
@@ -40,8 +47,10 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.Base64;
 import java.util.HexFormat;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -62,6 +71,7 @@ final class ExtensionRepositoryTest {
         persistsAndRefreshesUserRepositories(counter);
         installsOnlyTrustedPortableBundles(counter);
         modelsInstalledApkDiscovery(counter);
+        adaptsAbiReadyAnimeSource(counter);
         return counter.value;
     }
 
@@ -243,7 +253,8 @@ final class ExtensionRepositoryTest {
                 extension.packageName(),
                 ApkExtensionRuntimeState.HOST_ABI_MISSING,
                 List.of("rx.Observable", "eu.kanade.tachiyomi.animesource.AnimeSource"),
-                Optional.of(SHA_256));
+                Optional.of(SHA_256),
+                Optional.empty());
         counter.check(preflight.missingHostClasses().getFirst()
                         .equals("eu.kanade.tachiyomi.animesource.AnimeSource")
                         && preflight.trustedCertificateSha256().orElseThrow().equals(SHA_256),
@@ -251,12 +262,20 @@ final class ExtensionRepositoryTest {
         counter.check(ApkExtensionPlatforms.unavailable().runtimeReport(extension).state()
                         == ApkExtensionRuntimeState.UNSUPPORTED_PLATFORM,
                 "platforms without an APK runtime must report it explicitly");
+        ApkExtensionRuntimeReport failed = ApkExtensionRuntimeReport.activationFailed(
+                extension.packageName(),
+                SHA_256,
+                "LinkageError: missing ABI method");
+        counter.check(failed.state() == ApkExtensionRuntimeState.ACTIVATION_FAILED
+                        && failed.activationFailure().orElseThrow().contains("missing ABI"),
+                "APK activation failures must remain visible without hiding certificate trust");
         counter.expectIllegalArgument(
                 () -> new ApkExtensionRuntimeReport(
                         extension.packageName(),
                         ApkExtensionRuntimeState.HOST_ABI_MISSING,
                         List.of(),
-                        Optional.of(SHA_256)),
+                        Optional.of(SHA_256),
+                        Optional.empty()),
                 "missing-host-ABI reports must identify at least one absent class");
         counter.expectIllegalArgument(
                 () -> new InstalledApkExtension(
@@ -274,6 +293,40 @@ final class ExtensionRepositoryTest {
                         List.of(),
                         ApkExtensionCompatibility.MISSING_ENTRYPOINT),
                 "APK extension metadata must reject blank package identities");
+    }
+
+    private static void adaptsAbiReadyAnimeSource(Counter counter) {
+        AtomicBoolean authorized = new AtomicBoolean(true);
+        AniyomiAnimeSourceAdapter.AdaptedSource adapted = AniyomiAnimeSourceAdapter.adapt(
+                "eu.kanade.tachiyomi.animeextension.en.example",
+                "16.7",
+                new AniyomiAdapterFixture.Source(),
+                authorized::get);
+        CatalogueSource catalogue = (CatalogueSource) adapted.source();
+        SourcePage page = catalogue.popular(new SourceBrowseRequest(1, 20, List.of(), Map.of()));
+        counter.check(page.items().size() == 1
+                        && page.hasNextPage()
+                        && page.items().getFirst().title().equals("Example Anime"),
+                "an ABI-ready APK source must adapt its catalogue page into Anilib models");
+        StreamingSource streaming = (StreamingSource) adapted.source();
+        List<SourceEpisode> episodes = streaming.episodes(page.items().getFirst().id());
+        counter.check(episodes.size() == 1 && episodes.getFirst().episodeNumber() == 1.0d,
+                "an adapted APK source must retain episode identity and ordering");
+        var streams = streaming.streams(episodes.getFirst().id());
+        counter.check(streams.size() == 1
+                        && streams.getFirst().format().name().equals("HLS")
+                        && streams.getFirst().headers().get("Referer").equals("https://example.test/")
+                        && streams.getFirst().subtitles().size() == 1,
+                "an adapted APK source must retain stream, header, format, and subtitle metadata");
+        counter.check(adapted.bundle().manifest().descriptor().id().toString()
+                        .startsWith("extension.apk.eu.kanade.tachiyomi"),
+                "an adapted APK source must become one explicit Source Bundle");
+        counter.check(adapted.manifest().permissions().equals(Set.of(SourcePermission.TRUSTED_PLATFORM_RUNTIME)),
+                "the APK adapter must declare its audited platform-runtime exception explicitly");
+        authorized.set(false);
+        counter.expectSecurity(
+                () -> catalogue.popular(new SourceBrowseRequest(1, 20, List.of(), Map.of())),
+                "revoking APK certificate trust must block subsequent adapted source calls");
     }
 
     private static ExtensionPackageMetadata portablePackage(byte[] bundle, KeyPair keyPair, long versionCode) {

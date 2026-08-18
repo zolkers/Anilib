@@ -49,4 +49,15 @@ public record SourceExtensionManifest(
                 : Set.of(SourcePermission.NETWORK);
         return new SourceExtensionManifest(component, sourceId, permissions, values);
     }
+
+    /** Reserved for a platform-owned, explicitly trusted compatibility adapter. */
+    public static SourceExtensionManifest trustedPlatform(
+            ComponentDescriptor component,
+            SourceId sourceId) {
+        return new SourceExtensionManifest(
+                component,
+                sourceId,
+                Set.of(SourcePermission.TRUSTED_PLATFORM_RUNTIME),
+                Set.of());
+    }
 }

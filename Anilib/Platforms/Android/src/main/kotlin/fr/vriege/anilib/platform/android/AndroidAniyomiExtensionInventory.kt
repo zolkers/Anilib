@@ -34,22 +34,46 @@ internal class AndroidAniyomiExtensionInventory(
             .toList()
     }
 
+    fun discover(packageName: String): InstalledApkExtension? {
+        val packageManager = applicationContext.packageManager
+        return try {
+            val packageInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                packageManager.getPackageInfo(
+                    packageName,
+                    PackageManager.PackageInfoFlags.of(packageFlags().toLong()),
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                packageManager.getPackageInfo(packageName, packageFlags())
+            }
+            packageInfo.takeIf(::isAniyomiExtension)
+                ?.let { extensionMetadata(packageManager, it) }
+        } catch (_: PackageManager.NameNotFoundException) {
+            null
+        } catch (_: RuntimeException) {
+            null
+        }
+    }
+
     @Suppress("DEPRECATION")
     private fun installedPackages(packageManager: PackageManager): List<PackageInfo> {
-        val flags = PackageManager.GET_CONFIGURATIONS or
-            PackageManager.GET_META_DATA or
-            PackageManager.GET_SIGNATURES or
-            (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                PackageManager.GET_SIGNING_CERTIFICATES
-            } else {
-                0
-            })
+        val flags = packageFlags()
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             packageManager.getInstalledPackages(PackageManager.PackageInfoFlags.of(flags.toLong()))
         } else {
             packageManager.getInstalledPackages(flags)
         }
     }
+
+    @Suppress("DEPRECATION")
+    private fun packageFlags(): Int = PackageManager.GET_CONFIGURATIONS or
+        PackageManager.GET_META_DATA or
+        PackageManager.GET_SIGNATURES or
+        (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            PackageManager.GET_SIGNING_CERTIFICATES
+        } else {
+            0
+        })
 
     private fun isAniyomiExtension(packageInfo: PackageInfo): Boolean =
         packageInfo.reqFeatures.orEmpty().any { it.name == EXTENSION_FEATURE }

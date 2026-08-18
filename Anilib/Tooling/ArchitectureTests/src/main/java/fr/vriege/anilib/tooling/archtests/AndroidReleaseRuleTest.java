@@ -42,6 +42,23 @@ final class AndroidReleaseRuleTest {
                     Class.forName(className, false, applicationContext.classLoader)
                     ApkExtensionRuntimeState.HOST_ABI_MISSING
                     """);
+            Path sourceRuntime = repository.resolve(
+                    "Anilib/Platforms/Android/src/main/kotlin/fr/vriege/anilib/platform/android/"
+                            + "AndroidAniyomiSourceRuntime.kt");
+            write(sourceRuntime, """
+                    PathClassLoader preflight.report(extension)
+                    ApkExtensionRuntimeState.HOST_ABI_AVAILABLE
+                    AniyomiAnimeSourceAdapter.adapt
+                    inventory.discover(extension.packageName())
+                    ApkExtensionRuntimeReport.activationFailed
+                    """);
+            Path main = repository.resolve(
+                    "Anilib/Platforms/Android/src/main/kotlin/fr/vriege/anilib/platform/android/MainActivity.kt");
+            write(main, """
+                    AndroidAniyomiSourceRuntime(this).prepare()
+                    apkActivation.bundles
+                    startupReports = apkActivation.reports
+                    """);
             Path workflow = repository.resolve(".github/workflows/android-release.yml");
             write(workflow, """
                     ubuntu-24.04 actions/checkout@v6.0.2 actions/setup-java@v5.6.0
@@ -80,7 +97,16 @@ final class AndroidReleaseRuleTest {
                             .anyMatch(diagnostic -> diagnostic.message().contains(
                                     "extension.signingCertificateSha256()::contains")),
                     "APK runtime preflight must retain certificate binding before activation");
-            return 5;
+            write(preflight, """
+                    extension.signingCertificateSha256()::contains
+                    Class.forName(className, false, applicationContext.classLoader)
+                    ApkExtensionRuntimeState.HOST_ABI_MISSING
+                    """);
+            write(sourceRuntime, "PathClassLoader preflight.report(extension)");
+            check(rule.analyze(snapshot).stream()
+                            .anyMatch(diagnostic -> diagnostic.message().contains("AniyomiAnimeSourceAdapter.adapt")),
+                    "APK activation must retain its explicit Source adapter boundary");
+            return 6;
         } catch (IOException exception) {
             throw new AssertionError("Unable to run Android release rule test", exception);
         } finally {

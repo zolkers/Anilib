@@ -41,12 +41,13 @@ class MainActivity : ComponentActivity() {
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), NOTIFICATION_PERMISSION_REQUEST)
         }
 
+        val apkActivation = AndroidAniyomiSourceRuntime(this).prepare()
         val started = StandardAnilib.start(
             filesDir.toPath(),
             UrlConnectionHttpTransport(),
             ComposePlayerBackend(),
             AndroidLibraryUpdateNotifier(this),
-            emptyList(),
+            apkActivation.bundles,
         )
         product = started
         val presentation = started.capability(LibraryUiCapabilities.PRESENTATION)
@@ -61,6 +62,7 @@ class MainActivity : ComponentActivity() {
         val apkExtensionPlatform = AndroidApkExtensionPlatform(
             this,
             started.capability(NetworkCapabilities.HTTP_CLIENT),
+            startupReports = apkActivation.reports,
         )
         val browserDataController = AndroidBrowserDataController(this)
         val componentCount = started.components().size
