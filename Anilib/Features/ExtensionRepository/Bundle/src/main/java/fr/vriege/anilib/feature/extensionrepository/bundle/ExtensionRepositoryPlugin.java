@@ -3,6 +3,8 @@ package fr.vriege.anilib.feature.extensionrepository.bundle;
 import fr.vriege.anilib.feature.extensionrepository.ExtensionRepositoryCapabilities;
 import fr.vriege.anilib.feature.extensionrepository.runtime.DefaultExtensionRepositoryService;
 import fr.vriege.anilib.feature.extensionrepository.runtime.FileExtensionRepositoryStore;
+import fr.vriege.anilib.feature.extensionrepository.ui.DefaultExtensionRepositoryPresentation;
+import fr.vriege.anilib.feature.extensionrepository.ui.ExtensionRepositoryUiCapabilities;
 import fr.vriege.anilib.feature.network.NetworkCapabilities;
 import fr.vriege.anilib.framework.http.AnilibHttpClient;
 import fr.vriege.anilib.foundation.component.ComponentDescriptor;
@@ -22,6 +24,7 @@ public final class ExtensionRepositoryPlugin implements AnilibPlugin {
                             "1.0.0"))
             .requires(NetworkCapabilities.HTTP_CLIENT)
             .provides(ExtensionRepositoryCapabilities.SERVICE)
+            .provides(ExtensionRepositoryUiCapabilities.PRESENTATION)
             .build();
 
     private final Path repositoryFile;
@@ -40,10 +43,12 @@ public final class ExtensionRepositoryPlugin implements AnilibPlugin {
     @Override
     public void install(PluginInstallationContext context) {
         AnilibHttpClient client = context.require(NetworkCapabilities.HTTP_CLIENT);
-        context.publish(
-                ExtensionRepositoryCapabilities.SERVICE,
-                new DefaultExtensionRepositoryService(
-                        new FileExtensionRepositoryStore(repositoryFile),
-                        client));
+        DefaultExtensionRepositoryService service = new DefaultExtensionRepositoryService(
+                new FileExtensionRepositoryStore(repositoryFile),
+                client);
+        DefaultExtensionRepositoryPresentation presentation = new DefaultExtensionRepositoryPresentation(service);
+        context.own(presentation);
+        context.publish(ExtensionRepositoryCapabilities.SERVICE, service);
+        context.publish(ExtensionRepositoryUiCapabilities.PRESENTATION, presentation);
     }
 }

@@ -16,6 +16,7 @@ dependencies {
     implementation project(':Anilib:Configurations:Standard')
     implementation project(':Anilib:Features:CoverCache:Bundle')
     implementation project(':Anilib:Features:Discovery:Ui')
+    implementation project(':Anilib:Features:ExtensionRepository:Ui')
     implementation project(':Anilib:Features:Library:Ui')
     implementation project(':Anilib:Features:Reader:Ui')
     implementation project(':Anilib:Features:Player:Ui')

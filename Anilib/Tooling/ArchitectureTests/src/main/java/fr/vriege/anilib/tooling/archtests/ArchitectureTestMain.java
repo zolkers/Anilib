@@ -19,6 +19,7 @@ import fr.vriege.anilib.feature.updates.ui.UpdateUiCapabilities;
 import fr.vriege.anilib.feature.downloads.DownloadCapabilities;
 import fr.vriege.anilib.feature.downloads.ui.DownloadUiCapabilities;
 import fr.vriege.anilib.feature.extensionrepository.ExtensionRepositoryCapabilities;
+import fr.vriege.anilib.feature.extensionrepository.ui.ExtensionRepositoryUiCapabilities;
 import fr.vriege.anilib.feature.backup.BackupCapabilities;
 import fr.vriege.anilib.feature.backup.ui.BackupUiCapabilities;
 import fr.vriege.anilib.feature.library.ui.LibraryUiCapabilities;
@@ -91,6 +92,8 @@ public final class ArchitectureTestMain {
             check(application.components().size() == 12, "standard product must install twelve bootstrap bundles");
             check(application.capability(ExtensionRepositoryCapabilities.SERVICE).repositories().isEmpty(),
                     "standard product must ship without a third-party extension repository");
+            check(application.capability(ExtensionRepositoryUiCapabilities.PRESENTATION) != null,
+                    "extension repository Bundle must publish its shared presentation");
             check(application.capability(LocalSourceCapabilities.CONTENT).publications().isEmpty(),
                     "standard product must expose the local source capability");
             SourceRegistry sourceRegistry = application.capability(SourceCapabilities.REGISTRY);

@@ -5,4 +5,5 @@ dependencies {
     implementation project(':Anilib:Features:Network:Api')
     api project(':Anilib:Features:ExtensionRepository:Api')
     implementation project(':Anilib:Features:ExtensionRepository:Runtime')
+    implementation project(':Anilib:Features:ExtensionRepository:Ui')
 }

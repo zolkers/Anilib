@@ -55,6 +55,10 @@ Desktop delivers native tray notices; Android uses dedicated notification
 channels and an SDK alarm that resumes due work after process death. Both
 platforms render the same Aniyomi-style progress, schedule, filter, failure, and
 new-content screen.
+The removable Extension Repository Bundle accepts only user-entered HTTPS index
+URLs, parses the Aniyomi repository shape with strict resource limits, and
+shows the resulting APK and portable Anilib artifacts in the shared Browse
+experience. Anilib ships with no third-party source catalogue.
 The repository also contains the dependency-free
 `AnilibJava` quality checker. Kotlin and audited UI dependencies are confined
 to outer platform renderers; shared contracts and behavior remain Java 21.

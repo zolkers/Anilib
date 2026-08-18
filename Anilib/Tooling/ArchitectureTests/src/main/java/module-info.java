@@ -15,6 +15,7 @@ module fr.vriege.anilib.tooling.archtests {
     requires fr.vriege.anilib.feature.discovery.runtime;
     requires fr.vriege.anilib.feature.extensionrepository.api;
     requires fr.vriege.anilib.feature.extensionrepository.runtime;
+    requires fr.vriege.anilib.feature.extensionrepository.ui;
     requires fr.vriege.anilib.feature.covercache.api;
     requires fr.vriege.anilib.feature.covercache.runtime;
     requires fr.vriege.anilib.feature.covercache.bundle;

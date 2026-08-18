@@ -12,6 +12,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import fr.vriege.anilib.configuration.standard.StandardAnilib
 import fr.vriege.anilib.feature.discovery.ui.DiscoveryUiCapabilities
+import fr.vriege.anilib.feature.extensionrepository.ui.ExtensionRepositoryUiCapabilities
 import fr.vriege.anilib.feature.library.ui.LibraryUiCapabilities
 import fr.vriege.anilib.feature.reader.ui.ReaderUiCapabilities
 import fr.vriege.anilib.feature.player.ui.PlayerUiCapabilities
@@ -47,6 +48,7 @@ class MainActivity : ComponentActivity() {
         product = started
         val presentation = started.capability(LibraryUiCapabilities.PRESENTATION)
         val discovery = started.capability(DiscoveryUiCapabilities.PRESENTATION)
+        val extensionRepositories = started.capability(ExtensionRepositoryUiCapabilities.PRESENTATION)
         val reader = started.capability(ReaderUiCapabilities.PRESENTATION)
         val player = started.capability(PlayerUiCapabilities.PRESENTATION)
         val downloads = started.capability(DownloadUiCapabilities.PRESENTATION)
@@ -58,6 +60,7 @@ class MainActivity : ComponentActivity() {
             AnilibApp(
                 presentation = presentation,
                 discovery = discovery,
+                extensionRepositories = extensionRepositories,
                 reader = reader,
                 player = player,
                 downloads = downloads,

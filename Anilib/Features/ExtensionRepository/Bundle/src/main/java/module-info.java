@@ -5,6 +5,7 @@ module fr.vriege.anilib.feature.extensionrepository.bundle {
     requires fr.vriege.anilib.feature.network.api;
     requires transitive fr.vriege.anilib.feature.extensionrepository.api;
     requires fr.vriege.anilib.feature.extensionrepository.runtime;
+    requires fr.vriege.anilib.feature.extensionrepository.ui;
 
     exports fr.vriege.anilib.feature.extensionrepository.bundle;
 }

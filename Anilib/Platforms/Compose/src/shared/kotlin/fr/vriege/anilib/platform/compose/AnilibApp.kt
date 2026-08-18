@@ -60,6 +60,7 @@ import fr.vriege.anilib.feature.library.LibraryItemId
 import fr.vriege.anilib.feature.backup.ui.BackupPresentation
 import fr.vriege.anilib.feature.discovery.ui.DiscoveryPresentation
 import fr.vriege.anilib.feature.downloads.ui.DownloadPresentation
+import fr.vriege.anilib.feature.extensionrepository.ui.ExtensionRepositoryPresentation
 import fr.vriege.anilib.feature.library.ui.LibraryCard
 import fr.vriege.anilib.feature.library.ui.LibraryDetails
 import fr.vriege.anilib.feature.library.ui.LibraryHistoryRow
@@ -89,6 +90,7 @@ private val dateTimeFormatter = DateTimeFormatter
 fun AnilibApp(
     presentation: LibraryPresentation,
     discovery: DiscoveryPresentation,
+    extensionRepositories: ExtensionRepositoryPresentation,
     reader: ReaderPresentation,
     player: PlayerPresentation,
     downloads: DownloadPresentation,
@@ -172,6 +174,7 @@ fun AnilibApp(
                         ExpandedShell(
                             presentation,
                             discovery,
+                            extensionRepositories,
                             reader,
                             player,
                             downloads,
@@ -198,6 +201,7 @@ fun AnilibApp(
                         CompactShell(
                             presentation,
                             discovery,
+                            extensionRepositories,
                             reader,
                             player,
                             downloads,
@@ -231,6 +235,7 @@ fun AnilibApp(
 private fun ExpandedShell(
     presentation: LibraryPresentation,
     discovery: DiscoveryPresentation,
+    extensionRepositories: ExtensionRepositoryPresentation,
     reader: ReaderPresentation,
     player: PlayerPresentation,
     downloads: DownloadPresentation,
@@ -260,6 +265,7 @@ private fun ExpandedShell(
             AppDestination(
                 presentation,
                 discovery,
+                extensionRepositories,
                 reader,
                 player,
                 downloads,
@@ -290,6 +296,7 @@ private fun ExpandedShell(
 private fun CompactShell(
     presentation: LibraryPresentation,
     discovery: DiscoveryPresentation,
+    extensionRepositories: ExtensionRepositoryPresentation,
     reader: ReaderPresentation,
     player: PlayerPresentation,
     downloads: DownloadPresentation,
@@ -317,6 +324,7 @@ private fun CompactShell(
             AppDestination(
                 presentation,
                 discovery,
+                extensionRepositories,
                 reader,
                 player,
                 downloads,
@@ -390,6 +398,7 @@ private fun AnilibNavigationBar(
 private fun AppDestination(
     presentation: LibraryPresentation,
     discovery: DiscoveryPresentation,
+    extensionRepositories: ExtensionRepositoryPresentation,
     reader: ReaderPresentation,
     player: PlayerPresentation,
     downloads: DownloadPresentation,
@@ -442,11 +451,16 @@ private fun AppDestination(
             MoreDestination.DOWNLOADS -> DownloadsScreen(downloads, closeMore)
             MoreDestination.BACKUP -> BackupScreen(backup, closeMore)
             MoreDestination.TRACKING -> TrackerAccountsScreen(tracking, closeMore)
+            MoreDestination.EXTENSION_REPOSITORIES -> ExtensionRepositoriesScreen(
+                extensionRepositories,
+                closeMore,
+            )
             null -> MorePage(
                 componentCount,
                 { openMore(MoreDestination.DOWNLOADS) },
                 { openMore(MoreDestination.BACKUP) },
                 { openMore(MoreDestination.TRACKING) },
+                { openMore(MoreDestination.EXTENSION_REPOSITORIES) },
             )
         }
     }
@@ -737,12 +751,20 @@ private fun MorePage(
     openDownloads: () -> Unit,
     openBackup: () -> Unit,
     openTracking: () -> Unit,
+    openExtensionRepositories: () -> Unit,
 ) {
     Scaffold(topBar = { TopAppBar(title = { Text("More") }) }) { padding ->
         LazyColumn(modifier = Modifier.fillMaxSize().padding(padding)) {
             item { MoreRow("Download queue", "Manage current and completed downloads", openDownloads) }
             item { MoreRow("Backup and restore", "Create or restore a local backup", openBackup) }
             item { MoreRow("Tracking", "Manage external tracking accounts", openTracking) }
+            item {
+                MoreRow(
+                    "Extension repositories",
+                    "Bring your own Aniyomi-compatible repository URLs",
+                    openExtensionRepositories,
+                )
+            }
             item { MoreRow("Categories", "Organize anime and manga in your library") }
             item { MoreRow("Statistics", "Library and reading activity") }
             item { MoreRow("Settings", "Appearance, library, reader, player, and tracking") }
@@ -814,6 +836,7 @@ private enum class MoreDestination {
     DOWNLOADS,
     BACKUP,
     TRACKING,
+    EXTENSION_REPOSITORIES,
 }
 
 private fun AppSection.icon(): ImageVector = when (this) {
