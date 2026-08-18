@@ -143,7 +143,12 @@ exposing a UI-toolkit or media-SDK type. Standard injects either an explicit
 headless backend or the outer Compose adapter. That adapter uses Media3 on
 Android and native desktop engines through one allowlisted ComposeMediaPlayer
 surface, while progress, watched state, stream replacement, and subtitle policy
-remain owned by the removable Player vertical.
+remain owned by the removable Player vertical. Header-bearing media and subtitle
+URLs pass through a per-playback, tokenized loopback relay. The relay reapplies
+source headers and response cookies, preserves byte ranges and redirects, and
+rewrites HLS segment, key, map, and nested-playlist locations. It binds only to
+`127.0.0.1`, closes with the playback handle, and never exposes an unrestricted
+forward proxy.
 
 HTTP is split at the platform boundary. Framework contracts own immutable
 requests and responses plus cookie, cache, rate-limit, and low-level transport

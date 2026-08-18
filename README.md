@@ -40,7 +40,10 @@ exposes episodes, qualities, formats, request metadata, and subtitles, and
 persists per-episode resume and watched state across Android and desktop. Its
 narrow Java backend capability drives an Aniyomi-style shared video surface,
 using Media3 on Android and native media engines on desktop without leaking
-either implementation into the shared product core.
+either implementation into the shared product core. Protected streams retain
+their source-provided `Referer`, cookies, user agent, byte ranges, redirects,
+subtitle headers, and HLS headers across playlists, segments, and encryption
+keys.
 The repository also contains the dependency-free
 `AnilibJava` quality checker. Kotlin and audited UI dependencies are confined
 to outer platform renderers; shared contracts and behavior remain Java 21.

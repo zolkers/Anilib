@@ -84,4 +84,8 @@ retain the source-scoped catalogue identity and streams expose absolute media
 locations, transport format, request headers, quality labels, and immutable
 subtitle tracks. The Player validates ownership and duplicate identities before
 publishing any selection to a platform adapter. Sources still own discovery and
-resolution; inward Player code never imports a platform media SDK.
+resolution; inward Player code never imports a platform media SDK. The selected
+platform backend must preserve stream and subtitle headers. Anilib's standard
+Android/Desktop adapter does so through a playback-scoped loopback relay that
+also propagates response cookies, byte ranges, redirects, and rewritten HLS
+resource locations.
