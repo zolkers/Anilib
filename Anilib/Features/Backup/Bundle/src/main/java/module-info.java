@@ -1,6 +1,6 @@
 module fr.vriege.anilib.feature.backup.bundle {
     requires fr.vriege.anilib.foundation;
-    requires fr.vriege.anilib.framework.backup.api;
+    requires transitive fr.vriege.anilib.framework.backup.api;
     requires transitive fr.vriege.anilib.kernel.api;
     requires fr.vriege.anilib.feature.library.api;
     requires fr.vriege.anilib.feature.discovery.api;

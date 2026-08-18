@@ -6,6 +6,8 @@ import fr.vriege.anilib.feature.localsource.bundle.LocalSourcePlugin;
 import fr.vriege.anilib.feature.network.bundle.NetworkPlugin;
 import fr.vriege.anilib.feature.reader.bundle.ReaderPlugin;
 import fr.vriege.anilib.feature.downloads.bundle.DownloadPlugin;
+import fr.vriege.anilib.feature.player.PlayerCapabilities;
+import fr.vriege.anilib.feature.player.bundle.PlayerPlugin;
 import fr.vriege.anilib.feature.backup.bundle.BackupPlugin;
 import fr.vriege.anilib.feature.source.bundle.SourceSdkPlugin;
 import fr.vriege.anilib.framework.http.HttpTransport;
@@ -47,6 +49,7 @@ public final class StandardAnilib {
         Path httpCache = dataDirectory.toAbsolutePath().normalize().resolve("http-cache");
         Path sourcePreferences = dataDirectory.toAbsolutePath().normalize().resolve("source-preferences.properties");
         Path downloads = dataDirectory.toAbsolutePath().normalize().resolve("downloads");
+        Path playbackState = dataDirectory.toAbsolutePath().normalize().resolve("playback-state.anilib");
         Path backups = dataDirectory.toAbsolutePath().normalize().resolve("backups");
         List<AnilibPlugin> plugins = new ArrayList<>();
         plugins.add(new LibraryPlugin(libraryFile));
@@ -56,7 +59,8 @@ public final class StandardAnilib {
         plugins.add(new DiscoveryPlugin(sourcePreferences));
         plugins.add(new ReaderPlugin());
         plugins.add(new DownloadPlugin(downloads));
-        plugins.add(new BackupPlugin(backups));
+        plugins.add(new PlayerPlugin(playbackState));
+        plugins.add(new BackupPlugin(backups, List.of(PlayerCapabilities.BACKUP_CODEC)));
         plugins.addAll(additionalPlugins);
         return new DefaultPluginEngine().start(List.copyOf(plugins));
     }

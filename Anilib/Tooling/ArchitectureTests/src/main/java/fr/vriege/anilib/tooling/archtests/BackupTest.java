@@ -72,7 +72,7 @@ final class BackupTest {
                 BackupFileSnapshot created = backups.createBackup();
                 backupPath = created.path();
                 counter.check(Files.isRegularFile(backupPath), "backup creation must write a local archive");
-                counter.check(created.sectionCount() == 2, "standard backup must contain two owned sections");
+                counter.check(created.sectionCount() == 3, "standard backup must contain three owned sections");
                 counter.check(created.entryCount() == 1, "backup entry count must include the library title");
                 BackupInspection inspection = backups.inspect(backupPath);
                 counter.check(inspection.sections().stream().allMatch(section -> section.restorable()),
@@ -80,7 +80,7 @@ final class BackupTest {
                 counter.check(inspection.sections().stream()
                                 .map(section -> section.id().value())
                                 .toList()
-                                .equals(List.of("library", "source-preferences")),
+                                .equals(List.of("library", "playback-state", "source-preferences")),
                         "section order must be deterministic");
                 counter.check(application.capability(BackupUiCapabilities.PRESENTATION)
                                 .backups().size() == 1,
@@ -89,7 +89,7 @@ final class BackupTest {
                 library.save(rename(original, "Changed after backup"));
                 library.save(extra);
                 BackupRestoreResult restored = backups.restore(backupPath);
-                counter.check(restored.restoredSections().size() == 2,
+                counter.check(restored.restoredSections().size() == 3,
                         "restore must commit each installed feature section");
                 counter.check(library.find(original.id()).orElseThrow().equals(original),
                         "restore must recover every library field");

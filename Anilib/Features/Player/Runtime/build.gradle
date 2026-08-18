@@ -1,0 +1,6 @@
+dependencies {
+    implementation project(':Anilib:Framework:Backup:Api')
+    implementation project(':Anilib:Features:Library:Api')
+    implementation project(':Anilib:Features:Source:Api')
+    implementation project(':Anilib:Features:Player:Api')
+}

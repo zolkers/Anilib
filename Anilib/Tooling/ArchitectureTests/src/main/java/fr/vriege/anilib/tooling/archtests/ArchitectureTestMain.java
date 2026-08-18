@@ -10,6 +10,8 @@ import fr.vriege.anilib.feature.localsource.LocalSourceCapabilities;
 import fr.vriege.anilib.feature.network.NetworkCapabilities;
 import fr.vriege.anilib.feature.reader.ReaderCapabilities;
 import fr.vriege.anilib.feature.reader.ui.ReaderUiCapabilities;
+import fr.vriege.anilib.feature.player.PlayerCapabilities;
+import fr.vriege.anilib.feature.player.ui.PlayerUiCapabilities;
 import fr.vriege.anilib.feature.downloads.DownloadCapabilities;
 import fr.vriege.anilib.feature.downloads.ui.DownloadUiCapabilities;
 import fr.vriege.anilib.feature.backup.BackupCapabilities;
@@ -58,6 +60,7 @@ public final class ArchitectureTestMain {
         assertions += DiscoveryTest.run();
         assertions += HttpFrameworkTest.run();
         assertions += ReaderTest.run();
+        assertions += PlayerTest.run();
         assertions += DownloadTest.run();
         assertions += BackupTest.run();
         System.out.println("Architecture tests: " + assertions + " assertions passed.");
@@ -75,7 +78,7 @@ public final class ArchitectureTestMain {
             LibraryItem item = LibraryItem.create("A test title", MediaKind.MANGA);
             catalog.save(item);
             check(catalog.find(item.id()).orElseThrow().equals(item), "library must return saved item");
-            check(application.components().size() == 8, "standard product must install eight bootstrap bundles");
+            check(application.components().size() == 9, "standard product must install nine bootstrap bundles");
             check(application.capability(LocalSourceCapabilities.CONTENT).publications().isEmpty(),
                     "standard product must expose the local source capability");
             SourceRegistry sourceRegistry = application.capability(SourceCapabilities.REGISTRY);
@@ -95,6 +98,12 @@ public final class ArchitectureTestMain {
                     "Reader Bundle must publish its reader capability");
             check(application.capability(ReaderUiCapabilities.PRESENTATION) != null,
                     "Reader Bundle must publish its shared presentation capability");
+            check(application.capability(PlayerCapabilities.SERVICE) != null,
+                    "Player Bundle must publish its episode capability");
+            check(application.capability(PlayerCapabilities.BACKUP_CODEC) != null,
+                    "Player Bundle must publish its self-owned backup codec");
+            check(application.capability(PlayerUiCapabilities.PRESENTATION) != null,
+                    "Player Bundle must publish its shared presentation capability");
             check(application.capability(DownloadCapabilities.SERVICE) != null,
                     "Downloads Bundle must publish its queue capability");
             check(application.capability(DownloadUiCapabilities.PRESENTATION) != null,

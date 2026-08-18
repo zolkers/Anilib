@@ -1,0 +1,52 @@
+package fr.vriege.anilib.feature.player.bundle;
+
+import fr.vriege.anilib.feature.library.LibraryCapabilities;
+import fr.vriege.anilib.feature.library.LibraryCatalog;
+import fr.vriege.anilib.feature.player.PlayerCapabilities;
+import fr.vriege.anilib.feature.player.runtime.DefaultPlayerService;
+import fr.vriege.anilib.feature.player.runtime.PlayerBackupCodec;
+import fr.vriege.anilib.feature.player.ui.DefaultPlayerPresentation;
+import fr.vriege.anilib.feature.player.ui.PlayerUiCapabilities;
+import fr.vriege.anilib.feature.source.SourceCapabilities;
+import fr.vriege.anilib.feature.source.SourceRegistry;
+import fr.vriege.anilib.foundation.component.ComponentDescriptor;
+import fr.vriege.anilib.kernel.AnilibPlugin;
+import fr.vriege.anilib.kernel.PluginInstallationContext;
+import fr.vriege.anilib.kernel.PluginManifest;
+
+import java.nio.file.Path;
+import java.util.Objects;
+
+/** Composition unit for episodes, stream selection, subtitles, and resume state. */
+public final class PlayerPlugin implements AnilibPlugin {
+    private static final PluginManifest MANIFEST = PluginManifest.builder(
+                    ComponentDescriptor.of("feature.player", "Player", "0.1.0"))
+            .requires(SourceCapabilities.REGISTRY)
+            .requires(LibraryCapabilities.CATALOG)
+            .provides(PlayerCapabilities.SERVICE)
+            .provides(PlayerCapabilities.BACKUP_CODEC)
+            .provides(PlayerUiCapabilities.PRESENTATION)
+            .build();
+    private final Path stateFile;
+
+    public PlayerPlugin(Path stateFile) {
+        this.stateFile = Objects.requireNonNull(
+                stateFile,
+                "stateFile must not be null").toAbsolutePath().normalize();
+    }
+
+    @Override
+    public PluginManifest manifest() {
+        return MANIFEST;
+    }
+
+    @Override
+    public void install(PluginInstallationContext context) {
+        SourceRegistry sources = context.require(SourceCapabilities.REGISTRY);
+        LibraryCatalog library = context.require(LibraryCapabilities.CATALOG);
+        DefaultPlayerService service = context.own(new DefaultPlayerService(sources, library, stateFile));
+        context.publish(PlayerCapabilities.SERVICE, service);
+        context.publish(PlayerCapabilities.BACKUP_CODEC, new PlayerBackupCodec(service));
+        context.publish(PlayerUiCapabilities.PRESENTATION, new DefaultPlayerPresentation(service));
+    }
+}
