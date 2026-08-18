@@ -1,3 +1,5 @@
+import java.security.MessageDigest
+
 plugins {
     id 'org.jetbrains.kotlin.jvm'
     id 'org.jetbrains.kotlin.plugin.compose'
@@ -31,16 +33,72 @@ kotlin {
     jvmToolchain(21)
 }
 
+def packageVersionValue = providers.gradleProperty('anilibPackageVersion').orElse('0.1.0').get()
+if (!(packageVersionValue ==~ /[0-9]+\.[0-9]+\.[0-9]+/)) {
+    throw new GradleException('anilibPackageVersion must use MAJOR.MINOR.PATCH numeric form')
+}
+
 compose.desktop {
     application {
         mainClass = 'fr.vriege.anilib.platform.desktop.ComposeDesktopMainKt'
         nativeDistributions {
             packageName = 'Anilib'
-            packageVersion = '0.1.0'
+            packageVersion = packageVersionValue
+            description = 'Cross-platform anime and manga library, reader, and player'
+            copyright = 'Copyright 2026 Victor Riegert'
+            vendor = 'Anilib'
+            licenseFile.set(rootProject.file('LICENSE'))
+            includeAllModules = true
             targetFormats(
                     org.jetbrains.compose.desktop.application.dsl.TargetFormat.Dmg,
                     org.jetbrains.compose.desktop.application.dsl.TargetFormat.Msi,
                     org.jetbrains.compose.desktop.application.dsl.TargetFormat.Deb)
+            windows {
+                menuGroup = 'Anilib'
+                perUserInstall = true
+                upgradeUuid = '9f7e13a2-70b2-4d51-a105-d99bac900f78'
+            }
+            linux {
+                packageName = 'anilib'
+                appCategory = 'utils'
+                appRelease = '1'
+            }
+            macOS {
+                bundleID = 'fr.vriege.anilib'
+                appCategory = 'public.app-category.entertainment'
+            }
         }
+    }
+}
+
+tasks.register('writeDesktopReleaseChecksums') {
+    group = 'distribution'
+    description = 'Builds the native package for this host and writes deterministic SHA-256 sums.'
+    dependsOn tasks.named('packageDistributionForCurrentOS')
+    def packageDirectory = layout.buildDirectory.dir('compose/binaries/main')
+    def checksumFile = layout.buildDirectory.file('release/SHA256SUMS')
+    inputs.files(fileTree(packageDirectory) {
+        include '**/*.msi', '**/*.deb', '**/*.dmg'
+    })
+    outputs.file(checksumFile)
+    doLast { task ->
+        List<File> packages = task.inputs.files.files.sort { first, second -> first.name <=> second.name }
+        if (packages.isEmpty()) {
+            throw new GradleException('No desktop package was produced for the current operating system')
+        }
+        File output = task.outputs.files.singleFile
+        output.parentFile.mkdirs()
+        output.setText(packages.collect { artifact ->
+            MessageDigest digest = MessageDigest.getInstance('SHA-256')
+            artifact.withInputStream { input ->
+                byte[] buffer = new byte[8192]
+                int count
+                while ((count = input.read(buffer)) >= 0) {
+                    digest.update(buffer, 0, count)
+                }
+            }
+            String hash = digest.digest().collect { value -> String.format('%02x', value & 0xff) }.join()
+            return "${hash}  ${artifact.name}"
+        }.join('\n') + '\n', 'UTF-8')
     }
 }

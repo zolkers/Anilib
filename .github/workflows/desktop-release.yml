@@ -1,0 +1,59 @@
+name: Desktop release packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Numeric package version (MAJOR.MINOR.PATCH)
+        required: true
+        default: 0.1.0
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: ${{ matrix.artifact }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-2025
+            artifact: anilib-windows
+          - runner: ubuntu-24.04
+            artifact: anilib-linux
+          - runner: macos-15
+            artifact: anilib-macos
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6.0.2
+      - name: Install pinned Java
+        uses: actions/setup-java@v5.6.0
+        with:
+          distribution: microsoft
+          java-version: 21.0.10
+          cache: gradle
+      - name: Validate and package
+        shell: bash
+        env:
+          REQUESTED_VERSION: ${{ inputs.version || github.ref_name }}
+        run: |
+          VERSION="${REQUESTED_VERSION#v}"
+          ./gradlew --no-daemon --console=plain check \
+            :Anilib:Platforms:Desktop:writeDesktopReleaseChecksums \
+            -PanilibVersion="$VERSION" \
+            -PanilibPackageVersion="$VERSION"
+      - name: Upload native package and checksums
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: ${{ matrix.artifact }}
+          if-no-files-found: error
+          path: |
+            Anilib/Platforms/Desktop/build/compose/binaries/main/**/*.msi
+            Anilib/Platforms/Desktop/build/compose/binaries/main/**/*.deb
+            Anilib/Platforms/Desktop/build/compose/binaries/main/**/*.dmg
+            Anilib/Platforms/Desktop/build/release/SHA256SUMS

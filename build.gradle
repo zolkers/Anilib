@@ -49,6 +49,16 @@ subprojects {
         options.encoding = 'UTF-8'
         options.addBooleanOption('Xdoclint:all,-missing', true)
     }
+
+    tasks.withType(AbstractArchiveTask).configureEach {
+        preserveFileTimestamps = false
+        reproducibleFileOrder = true
+    }
+
+    configurations.configureEach {
+        resolutionStrategy.failOnDynamicVersions()
+        resolutionStrategy.failOnChangingVersions()
+    }
 }
 
 tasks.register('javaQuality') {
