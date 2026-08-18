@@ -124,7 +124,8 @@ platform-specific.
   - [x] audit and align the Library, details, Updates, and History baseline
   - [x] audit and align the Browse, source catalogue, migration, and extension baseline
   - [x] audit and align the Reader, Player, Downloads, Backup, Tracking, and WebView baseline
-  - [ ] audit and align every Settings destination, About, Help, and app updates
+  - [x] audit the Settings hierarchy and connect every already implemented destination
+  - [ ] finish dedicated Settings destinations, About, Help, and application updates
 
 Each checkbox should land through a Bundle that can be removed from the
 Standard configuration without changing unrelated features.

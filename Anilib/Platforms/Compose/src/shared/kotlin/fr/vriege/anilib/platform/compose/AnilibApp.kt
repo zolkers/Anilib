@@ -558,6 +558,10 @@ private fun AppDestination(
                 settings,
                 networkMaintenance,
                 browserDataController,
+                { openMore(MoreDestination.EXTENSION_REPOSITORIES) },
+                { openMore(MoreDestination.TRACKING) },
+                { openMore(MoreDestination.BACKUP) },
+                { openMore(MoreDestination.ABOUT) },
                 closeMore,
             )
             MoreDestination.ABOUT -> AboutScreen(componentCount, closeMore)

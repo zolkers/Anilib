@@ -16,6 +16,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -44,10 +45,15 @@ internal fun SettingsScreen(
     settings: SettingsSnapshot,
     maintenance: NetworkMaintenance,
     browserDataController: BrowserDataController,
+    openExtensionRepositories: () -> Unit,
+    openTracking: () -> Unit,
+    openBackup: () -> Unit,
+    openAbout: () -> Unit,
     goBack: () -> Unit,
 ) {
     var confirmation by remember { mutableStateOf<MaintenanceAction?>(null) }
     var result by remember { mutableStateOf<String?>(null) }
+    var query by remember { mutableStateOf("") }
     val browserCookies = remember { WebViewCookieManager() }
     val scope = rememberCoroutineScope()
     Scaffold(
@@ -63,15 +69,26 @@ internal fun SettingsScreen(
         },
     ) { padding ->
         LazyColumn(modifier = Modifier.fillMaxSize().padding(padding)) {
-            item { SettingsSection("Appearance") }
             item {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    label = { Text("Search settings") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 10.dp),
+                )
+            }
+            item { SettingsSection("Appearance") }
+            if (settingMatches(query, "Theme", "System light dark appearance")) item {
                 SettingsRow("Theme", themeLabel(settings)) {
                     presentation.setThemeMode(settings.themeMode().next())
                 }
             }
-            item { SettingsRow("Language and start screen", "System language and Library") }
+            if (settingMatches(query, "Language and start screen", "System language Library")) item {
+                SettingsRow("Language and start screen", "System language and Library")
+            }
             item { SettingsSection("Content and privacy") }
-            item {
+            if (settingMatches(query, "Show adult content", "sources titles mature")) item {
                 SettingsSwitchRow(
                     "Show adult content",
                     "Allow sources and titles marked as adult",
@@ -79,7 +96,7 @@ internal fun SettingsScreen(
                     presentation::setShowAdultContent,
                 )
             }
-            item {
+            if (settingMatches(query, "Incognito mode", "history privacy")) item {
                 SettingsSwitchRow(
                     "Incognito mode",
                     "Do not add newly opened titles to history",
@@ -88,10 +105,23 @@ internal fun SettingsScreen(
                 )
             }
             item { SettingsSection("Features") }
-            item { SettingsRow("Library", "Categories, display, update, and duplicate policy") }
-            item { SettingsRow("Reader", "Reading mode, controls, display, and navigation") }
-            item { SettingsRow("Player", "Playback, decoder, audio, subtitles, and gestures") }
-            item {
+            if (settingMatches(query, "Sources and repositories", "extensions Git repositories")) item {
+                SettingsRow(
+                    "Sources and repositories",
+                    "Languages, installed sources, trust, and repository URLs",
+                    openExtensionRepositories,
+                )
+            }
+            if (settingMatches(query, "Library", "Categories display update duplicate")) item {
+                SettingsRow("Library", "Categories, display, update, and duplicate policy")
+            }
+            if (settingMatches(query, "Reader", "Reading mode controls display navigation")) item {
+                SettingsRow("Reader", "Reading mode, controls, display, and navigation")
+            }
+            if (settingMatches(query, "Player", "Playback decoder audio subtitles gestures")) item {
+                SettingsRow("Player", "Playback, decoder, audio, subtitles, and gestures")
+            }
+            if (settingMatches(query, "Wi-Fi only downloads", "network metered")) item {
                 SettingsSwitchRow(
                     "Wi-Fi only downloads",
                     "Keep automatic and queued downloads off metered connections",
@@ -99,7 +129,7 @@ internal fun SettingsScreen(
                     presentation::setDownloadOnlyOnWifi,
                 )
             }
-            item {
+            if (settingMatches(query, "Wi-Fi only updates", "library network")) item {
                 SettingsSwitchRow(
                     "Wi-Fi only updates",
                     "Refresh the library automatically only on Wi-Fi",
@@ -107,25 +137,29 @@ internal fun SettingsScreen(
                     presentation::setUpdateOnlyOnWifi,
                 )
             }
-            item { SettingsRow("Tracking", "Accounts, sync, score, and privacy") }
-            item { SettingsRow("Backup", "Automatic backups, restore, and storage") }
+            if (settingMatches(query, "Tracking", "Accounts sync score privacy")) item {
+                SettingsRow("Tracking", "Accounts, sync, score, and privacy", openTracking)
+            }
+            if (settingMatches(query, "Backup", "Automatic restore storage import")) item {
+                SettingsRow("Backup", "Backups, restore, imports, and storage", openBackup)
+            }
             item { SettingsSection("Advanced") }
-            item {
+            if (settingMatches(query, "Clear cookies", "browser source sessions")) item {
                 SettingsRow("Clear cookies", "Sign out browser sessions for every source") {
                     confirmation = MaintenanceAction.COOKIES
                 }
             }
-            item {
+            if (settingMatches(query, "Clear network cache", "HTTP responses")) item {
                 SettingsRow("Clear network cache", "Remove cached HTTP responses") {
                     confirmation = MaintenanceAction.CACHE
                 }
             }
-            item {
+            if (settingMatches(query, "Clear WebView data", "browser cache site storage")) item {
                 SettingsRow("Clear WebView data", "Remove browser cookies, cache, and site storage") {
                     confirmation = MaintenanceAction.BROWSER_DATA
                 }
             }
-            item {
+            if (settingMatches(query, "Clean database", "unused orphaned feature data")) item {
                 SettingsRow("Clean database", "Remove feature data for titles no longer in the library") {
                     confirmation = MaintenanceAction.UNUSED_DATA
                 }
@@ -139,7 +173,9 @@ internal fun SettingsScreen(
                     )
                 }
             }
-            item { SettingsRow("About", "Version, licences, diagnostics, and update channel") }
+            if (settingMatches(query, "About", "Version licences diagnostics update channel")) item {
+                SettingsRow("About", "Version, runtime, formats, and platforms", openAbout)
+            }
         }
     }
     confirmation?.let { action ->
@@ -251,6 +287,9 @@ private fun themeLabel(settings: SettingsSnapshot): String = when (settings.them
     fr.vriege.anilib.feature.settings.ThemeMode.LIGHT -> "Light"
     fr.vriege.anilib.feature.settings.ThemeMode.DARK -> "Dark"
 }
+
+private fun settingMatches(query: String, title: String, keywords: String): Boolean =
+    query.isBlank() || title.contains(query, ignoreCase = true) || keywords.contains(query, ignoreCase = true)
 
 private enum class MaintenanceAction(val title: String, val warning: String, val result: String) {
     COOKIES(
