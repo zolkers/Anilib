@@ -28,7 +28,9 @@ same Discovery behavior and adaptive Compose screen run on Android and desktop.
 It also includes a removable Reader Bundle with local folder/CBZ pages,
 persistent resume and history, bounded asynchronous prefetch, LTR, RTL,
 vertical, and webtoon navigation, plus one immersive shared reader screen with
-persisted tap-zone, swipe, double-tap, and long-press action mappings.
+persisted tap-zone, swipe, double-tap, and long-press action mappings. Its
+display controls persist scale and fit policy, border crop, split or dual-page
+layout, rotation, and webtoon spacing across Android and desktop restarts.
 The shared Library screen persists grid/list density, sorting, and its landing
 category. Its category manager creates, renames, reorders, and deletes durable
 categories while retaining per-category display and update policy.

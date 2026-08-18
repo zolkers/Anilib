@@ -38,16 +38,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import fr.vriege.anilib.feature.reader.ReadingDirection
+import fr.vriege.anilib.feature.reader.ReaderDisplayPreferences
 import fr.vriege.anilib.feature.reader.ReaderInteractionAction
 import fr.vriege.anilib.feature.reader.ReaderInteractionPreferences
+import fr.vriege.anilib.feature.reader.ReaderRotation
+import fr.vriege.anilib.feature.reader.ReaderScaleMode
 import fr.vriege.anilib.feature.reader.ui.ReaderController
 import kotlin.math.roundToInt
 
@@ -60,15 +65,48 @@ internal fun ReaderScreen(
     var revision by remember(controller) { mutableIntStateOf(0) }
     var controlsVisible by remember(controller) { mutableStateOf(true) }
     var zoomed by remember(controller) { mutableStateOf(false) }
-    var interactionMenu by remember(controller) { mutableStateOf(false) }
+    var settingsMenu by remember(controller) { mutableStateOf(false) }
+    var splitSecondHalf by remember(controller) { mutableStateOf(false) }
     var interactions by remember(controller) { mutableStateOf(controller.interactions()) }
+    var display by remember(controller) { mutableStateOf(controller.display()) }
     val snapshot = remember(controller, revision) { controller.snapshot() }
     val decodedPage = remember(controller, snapshot.currentPageIndex()) {
         runCatching { pageDecoder(controller.currentPage()) }
     }
+    val decodedAdjacentPage = remember(controller, snapshot.currentPageIndex(), display.dualPage()) {
+        if (display.dualPage() && snapshot.currentPageIndex() + 1 < snapshot.pageCount()) {
+            runCatching { pageDecoder(controller.page(snapshot.currentPageIndex() + 1)) }
+        } else {
+            null
+        }
+    }
 
     fun move(previous: Boolean) {
-        val moved = if (previous) controller.previousPage() else controller.nextPage()
+        if (display.splitPages()) {
+            if (previous && splitSecondHalf) {
+                splitSecondHalf = false
+                return
+            }
+            if (!previous && !splitSecondHalf) {
+                splitSecondHalf = true
+                return
+            }
+        }
+        val moved = if (display.dualPage()) {
+            val delta = if (previous) -2 else 2
+            val target = snapshot.currentPageIndex() + delta
+            if (target in 0 until snapshot.pageCount()) {
+                controller.goToPage(target)
+                true
+            } else {
+                false
+            }
+        } else if (previous) {
+            controller.previousPage()
+        } else {
+            controller.nextPage()
+        }
+        if (moved) splitSecondHalf = previous && display.splitPages()
         if (moved) revision++
     }
 
@@ -78,7 +116,7 @@ internal fun ReaderScreen(
             ReaderInteractionAction.NEXT_PAGE -> move(false)
             ReaderInteractionAction.TOGGLE_CONTROLS -> controlsVisible = !controlsVisible
             ReaderInteractionAction.TOGGLE_ZOOM -> zoomed = !zoomed
-            ReaderInteractionAction.OPEN_MENU -> interactionMenu = true
+            ReaderInteractionAction.OPEN_MENU -> settingsMenu = true
             ReaderInteractionAction.NONE -> Unit
         }
     }
@@ -110,11 +148,14 @@ internal fun ReaderScreen(
             },
     ) {
         decodedPage.getOrNull()?.let { image ->
-            Image(
-                bitmap = image,
-                contentDescription = "Page ${snapshot.currentPageIndex() + 1}",
-                modifier = Modifier.fillMaxSize().scale(if (zoomed) 2f else 1f),
-                contentScale = ContentScale.Fit,
+            ReaderPages(
+                primary = image,
+                adjacent = decodedAdjacentPage?.getOrNull(),
+                pageIndex = snapshot.currentPageIndex(),
+                direction = snapshot.direction(),
+                display = display,
+                zoomed = zoomed,
+                splitSecondHalf = splitSecondHalf,
             )
         } ?: ReaderPageError(decodedPage.exceptionOrNull()?.message) { revision++ }
 
@@ -129,7 +170,7 @@ internal fun ReaderScreen(
                 title = snapshot.title(),
                 contentUnit = snapshot.contentUnit().title(),
                 closeReader = closeReader,
-                openInteractions = { interactionMenu = true },
+                openSettings = { settingsMenu = true },
             )
             ReaderBottomBar(
                 pageIndex = snapshot.currentPageIndex(),
@@ -137,26 +178,124 @@ internal fun ReaderScreen(
                 direction = snapshot.direction(),
                 goToPage = { index ->
                     controller.goToPage(index)
+                    splitSecondHalf = false
                     revision++
                 },
                 changeDirection = { direction ->
                     controller.setDirection(direction)
                     revision++
                 },
+                splitSecondHalf = splitSecondHalf,
+                dualPage = display.dualPage(),
+                splitPages = display.splitPages(),
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
         }
-        if (interactionMenu) {
-            ReaderInteractionDialog(
-                preferences = interactions,
-                update = {
+        if (settingsMenu) {
+            ReaderSettingsDialog(
+                interactions = interactions,
+                display = display,
+                updateInteractions = {
                     controller.setInteractions(it)
                     interactions = it
                 },
-                close = { interactionMenu = false },
+                updateDisplay = {
+                    controller.setDisplay(it)
+                    display = it
+                    splitSecondHalf = false
+                },
+                close = { settingsMenu = false },
             )
         }
     }
+}
+
+@Composable
+private fun ReaderPages(
+    primary: ImageBitmap,
+    adjacent: ImageBitmap?,
+    pageIndex: Int,
+    direction: ReadingDirection,
+    display: ReaderDisplayPreferences,
+    zoomed: Boolean,
+    splitSecondHalf: Boolean,
+) {
+    val spacing = if (direction == ReadingDirection.WEBTOON) display.webtoonSpacingDp().dp else 0.dp
+    val modifier = Modifier.fillMaxSize().padding(vertical = spacing / 2)
+    if (display.dualPage() && adjacent != null) {
+        val pages = if (direction == ReadingDirection.RIGHT_TO_LEFT) {
+            listOf(adjacent to pageIndex + 1, primary to pageIndex)
+        } else {
+            listOf(primary to pageIndex, adjacent to pageIndex + 1)
+        }
+        Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(spacing)) {
+            pages.forEach { (image, index) ->
+                ReaderPageImage(
+                    image = image,
+                    pageIndex = index,
+                    display = display,
+                    zoomed = zoomed,
+                    splitSecondHalf = false,
+                    direction = direction,
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                )
+            }
+        }
+    } else {
+        ReaderPageImage(
+            image = primary,
+            pageIndex = pageIndex,
+            display = display,
+            zoomed = zoomed,
+            splitSecondHalf = splitSecondHalf,
+            direction = direction,
+            modifier = modifier,
+        )
+    }
+}
+
+@Composable
+private fun ReaderPageImage(
+    image: ImageBitmap,
+    pageIndex: Int,
+    display: ReaderDisplayPreferences,
+    zoomed: Boolean,
+    splitSecondHalf: Boolean,
+    direction: ReadingDirection,
+    modifier: Modifier,
+) {
+    val splitScale = if (display.splitPages()) 2f else 1f
+    val cropScale = if (display.cropBorders()) 1.06f else 1f
+    val zoomScale = if (zoomed) 2f else 1f
+    val secondVisualHalf = splitSecondHalf.xor(direction == ReadingDirection.RIGHT_TO_LEFT)
+    val origin = when {
+        !display.splitPages() -> TransformOrigin.Center
+        secondVisualHalf -> TransformOrigin(1f, 0.5f)
+        else -> TransformOrigin(0f, 0.5f)
+    }
+    Box(modifier = modifier.clipToBounds()) {
+        Image(
+            bitmap = image,
+            contentDescription = "Page ${pageIndex + 1}",
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer(
+                    scaleX = splitScale * cropScale * zoomScale,
+                    scaleY = splitScale * cropScale * zoomScale,
+                    rotationZ = display.rotation().degrees().toFloat(),
+                    transformOrigin = origin,
+                ),
+            contentScale = contentScale(display.scaleMode()),
+        )
+    }
+}
+
+private fun contentScale(mode: ReaderScaleMode): ContentScale = when (mode) {
+    ReaderScaleMode.FIT -> ContentScale.Fit
+    ReaderScaleMode.FILL -> ContentScale.Crop
+    ReaderScaleMode.FIT_WIDTH -> ContentScale.FillWidth
+    ReaderScaleMode.FIT_HEIGHT -> ContentScale.FillHeight
+    ReaderScaleMode.ORIGINAL -> ContentScale.None
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -205,7 +344,7 @@ private fun ReaderTopBar(
     title: String,
     contentUnit: String,
     closeReader: () -> Unit,
-    openInteractions: () -> Unit,
+    openSettings: () -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -232,8 +371,8 @@ private fun ReaderTopBar(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        IconButton(onClick = openInteractions) {
-            Icon(Icons.Default.Settings, contentDescription = "Reader interactions", tint = Color.White)
+        IconButton(onClick = openSettings) {
+            Icon(Icons.Default.Settings, contentDescription = "Reader settings", tint = Color.White)
         }
     }
 }
@@ -253,20 +392,60 @@ private enum class InteractionSlot(val label: String) {
 }
 
 @Composable
-private fun ReaderInteractionDialog(
-    preferences: ReaderInteractionPreferences,
-    update: (ReaderInteractionPreferences) -> Unit,
+private fun ReaderSettingsDialog(
+    interactions: ReaderInteractionPreferences,
+    display: ReaderDisplayPreferences,
+    updateInteractions: (ReaderInteractionPreferences) -> Unit,
+    updateDisplay: (ReaderDisplayPreferences) -> Unit,
     close: () -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = close,
-        title = { Text("Reader interactions") },
+        title = { Text("Reader settings") },
         text = {
             LazyColumn(modifier = Modifier.heightIn(max = 520.dp)) {
+                item { Text("Display", fontWeight = FontWeight.SemiBold) }
+                item {
+                    TextButton(onClick = {
+                        updateDisplay(withScaleMode(display, nextScaleMode(display.scaleMode())))
+                    }) {
+                        Text("Scale: ${display.scaleMode().name.replace('_', ' ').lowercase()}")
+                    }
+                }
+                item {
+                    TextButton(onClick = { updateDisplay(withCropBorders(display, !display.cropBorders())) }) {
+                        Text("Crop borders: ${enabledLabel(display.cropBorders())}")
+                    }
+                }
+                item {
+                    TextButton(onClick = { updateDisplay(withSplitPages(display, !display.splitPages())) }) {
+                        Text("Split pages: ${enabledLabel(display.splitPages())}")
+                    }
+                }
+                item {
+                    TextButton(onClick = { updateDisplay(withRotation(display, nextRotation(display.rotation()))) }) {
+                        Text("Rotation: ${display.rotation().degrees()}°")
+                    }
+                }
+                item {
+                    TextButton(onClick = { updateDisplay(withDualPage(display, !display.dualPage())) }) {
+                        Text("Dual page: ${enabledLabel(display.dualPage())}")
+                    }
+                }
+                item {
+                    TextButton(onClick = {
+                        updateDisplay(withWebtoonSpacing(display, nextSpacing(display.webtoonSpacingDp())))
+                    }) {
+                        Text("Webtoon spacing: ${display.webtoonSpacingDp()} dp")
+                    }
+                }
+                item { Text("Interactions", fontWeight = FontWeight.SemiBold) }
                 items(InteractionSlot.entries.size) { index ->
                     val slot = InteractionSlot.entries[index]
-                    val action = interaction(preferences, slot)
-                    TextButton(onClick = { update(withInteraction(preferences, slot, nextAction(action))) }) {
+                    val action = interaction(interactions, slot)
+                    TextButton(onClick = {
+                        updateInteractions(withInteraction(interactions, slot, nextAction(action)))
+                    }) {
                         Text("${slot.label}: ${action.name.replace('_', ' ').lowercase()}")
                     }
                 }
@@ -274,10 +453,85 @@ private fun ReaderInteractionDialog(
         },
         confirmButton = { TextButton(onClick = close) { Text("Done") } },
         dismissButton = {
-            TextButton(onClick = { update(ReaderInteractionPreferences.defaults()) }) { Text("Reset") }
+            TextButton(onClick = {
+                updateDisplay(ReaderDisplayPreferences.defaults())
+                updateInteractions(ReaderInteractionPreferences.defaults())
+            }) { Text("Reset") }
         },
     )
 }
+
+private fun withScaleMode(current: ReaderDisplayPreferences, value: ReaderScaleMode) = ReaderDisplayPreferences(
+    value,
+    current.cropBorders(),
+    current.splitPages(),
+    current.rotation(),
+    current.dualPage(),
+    current.webtoonSpacingDp(),
+)
+
+private fun withCropBorders(current: ReaderDisplayPreferences, value: Boolean) = ReaderDisplayPreferences(
+    current.scaleMode(),
+    value,
+    current.splitPages(),
+    current.rotation(),
+    current.dualPage(),
+    current.webtoonSpacingDp(),
+)
+
+private fun withSplitPages(current: ReaderDisplayPreferences, value: Boolean) = ReaderDisplayPreferences(
+    current.scaleMode(),
+    current.cropBorders(),
+    value,
+    current.rotation(),
+    if (value) false else current.dualPage(),
+    current.webtoonSpacingDp(),
+)
+
+private fun withRotation(current: ReaderDisplayPreferences, value: ReaderRotation) = ReaderDisplayPreferences(
+    current.scaleMode(),
+    current.cropBorders(),
+    current.splitPages(),
+    value,
+    current.dualPage(),
+    current.webtoonSpacingDp(),
+)
+
+private fun withDualPage(current: ReaderDisplayPreferences, value: Boolean) = ReaderDisplayPreferences(
+    current.scaleMode(),
+    current.cropBorders(),
+    if (value) false else current.splitPages(),
+    current.rotation(),
+    value,
+    current.webtoonSpacingDp(),
+)
+
+private fun withWebtoonSpacing(current: ReaderDisplayPreferences, value: Int) = ReaderDisplayPreferences(
+    current.scaleMode(),
+    current.cropBorders(),
+    current.splitPages(),
+    current.rotation(),
+    current.dualPage(),
+    value,
+)
+
+private fun nextScaleMode(value: ReaderScaleMode): ReaderScaleMode {
+    val values = ReaderScaleMode.entries
+    return values[(value.ordinal + 1) % values.size]
+}
+
+private fun nextRotation(value: ReaderRotation): ReaderRotation {
+    val values = ReaderRotation.entries
+    return values[(value.ordinal + 1) % values.size]
+}
+
+private fun nextSpacing(value: Int): Int {
+    val values = intArrayOf(0, 4, 8, 16, 24, 32, 48, 64, 96)
+    val index = values.indexOf(value)
+    return values[(index + 1) % values.size]
+}
+
+private fun enabledLabel(value: Boolean) = if (value) "on" else "off"
 
 private fun interaction(
     preferences: ReaderInteractionPreferences,
@@ -338,6 +592,9 @@ private fun ReaderBottomBar(
     direction: ReadingDirection,
     goToPage: (Int) -> Unit,
     changeDirection: (ReadingDirection) -> Unit,
+    splitSecondHalf: Boolean,
+    dualPage: Boolean,
+    splitPages: Boolean,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -359,7 +616,7 @@ private fun ReaderBottomBar(
             Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.White)
         }
         Text(
-            text = "${pageIndex + 1} / $pageCount",
+            text = readerPageLabel(pageIndex, pageCount, splitSecondHalf, dualPage, splitPages),
             color = Color.White,
             modifier = Modifier.align(Alignment.CenterHorizontally),
         )
@@ -374,6 +631,18 @@ private fun ReaderBottomBar(
             DirectionButton("Webtoon", ReadingDirection.WEBTOON, direction, changeDirection)
         }
     }
+}
+
+private fun readerPageLabel(
+    pageIndex: Int,
+    pageCount: Int,
+    splitSecondHalf: Boolean,
+    dualPage: Boolean,
+    splitPages: Boolean,
+): String = when {
+    splitPages -> "${pageIndex + 1}${if (splitSecondHalf) "b" else "a"} / $pageCount"
+    dualPage && pageIndex + 1 < pageCount -> "${pageIndex + 1}-${pageIndex + 2} / $pageCount"
+    else -> "${pageIndex + 1} / $pageCount"
 }
 
 @Composable

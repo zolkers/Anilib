@@ -8,14 +8,18 @@ import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.library.LibraryOrigin;
 import fr.vriege.anilib.feature.library.MediaKind;
 import fr.vriege.anilib.feature.reader.ReaderCapabilities;
+import fr.vriege.anilib.feature.reader.ReaderDisplayPreferences;
 import fr.vriege.anilib.feature.reader.ReaderInteractionAction;
 import fr.vriege.anilib.feature.reader.ReaderInteractionPreferences;
 import fr.vriege.anilib.feature.reader.ReaderException;
 import fr.vriege.anilib.feature.reader.ReaderPolicy;
 import fr.vriege.anilib.feature.reader.ReaderService;
 import fr.vriege.anilib.feature.reader.ReaderSession;
+import fr.vriege.anilib.feature.reader.ReaderRotation;
+import fr.vriege.anilib.feature.reader.ReaderScaleMode;
 import fr.vriege.anilib.feature.reader.ReadingDirection;
 import fr.vriege.anilib.feature.reader.runtime.DefaultReaderService;
+import fr.vriege.anilib.feature.reader.runtime.FileReaderDisplayPreferenceStore;
 import fr.vriege.anilib.feature.reader.runtime.FileReaderInteractionPreferenceStore;
 import fr.vriege.anilib.feature.source.InstalledSourceExtension;
 import fr.vriege.anilib.feature.source.PagedSource;
@@ -57,7 +61,33 @@ final class ReaderTest {
         verifiesBoundedPipeline(counter);
         suppressesIncognitoPersistence(counter);
         persistsInteractionPreferences(counter);
+        persistsDisplayPreferences(counter);
         return counter.value;
+    }
+
+    private static void persistsDisplayPreferences(Counter counter) {
+        Path directory = null;
+        try {
+            directory = Files.createTempDirectory("anilib-reader-display");
+            Path file = directory.resolve("reader-display.properties");
+            ReaderDisplayPreferences customized = new ReaderDisplayPreferences(
+                    ReaderScaleMode.FIT_WIDTH,
+                    true,
+                    false,
+                    ReaderRotation.CLOCKWISE_90,
+                    true,
+                    24);
+            new FileReaderDisplayPreferenceStore(file).save(customized);
+            ReaderDisplayPreferences reopened = new FileReaderDisplayPreferenceStore(file).snapshot();
+            counter.check(reopened.equals(customized),
+                    "reader display preferences must survive Android and desktop restart");
+        } catch (IOException exception) {
+            throw new AssertionError("Unable to test reader display preferences", exception);
+        } finally {
+            if (directory != null) {
+                deleteTree(directory);
+            }
+        }
     }
 
     private static void persistsInteractionPreferences(Counter counter) {

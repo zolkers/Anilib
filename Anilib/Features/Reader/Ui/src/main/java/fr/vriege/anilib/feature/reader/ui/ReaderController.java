@@ -1,5 +1,7 @@
 package fr.vriege.anilib.feature.reader.ui;
 
+import fr.vriege.anilib.feature.reader.ReaderDisplayPreferenceStore;
+import fr.vriege.anilib.feature.reader.ReaderDisplayPreferences;
 import fr.vriege.anilib.feature.reader.ReaderSession;
 import fr.vriege.anilib.feature.reader.ReaderSessionSnapshot;
 import fr.vriege.anilib.feature.reader.ReaderInteractionPreferenceStore;
@@ -11,10 +13,15 @@ import java.util.Objects;
 public final class ReaderController implements AutoCloseable {
     private final ReaderSession session;
     private final ReaderInteractionPreferenceStore interactions;
+    private final ReaderDisplayPreferenceStore display;
 
-    ReaderController(ReaderSession session, ReaderInteractionPreferenceStore interactions) {
+    ReaderController(
+            ReaderSession session,
+            ReaderInteractionPreferenceStore interactions,
+            ReaderDisplayPreferenceStore display) {
         this.session = Objects.requireNonNull(session, "session must not be null");
         this.interactions = Objects.requireNonNull(interactions, "interactions must not be null");
+        this.display = Objects.requireNonNull(display, "display must not be null");
     }
 
     public ReaderSessionSnapshot snapshot() {
@@ -51,6 +58,14 @@ public final class ReaderController implements AutoCloseable {
 
     public void setInteractions(ReaderInteractionPreferences preferences) {
         interactions.save(preferences);
+    }
+
+    public ReaderDisplayPreferences display() {
+        return display.snapshot();
+    }
+
+    public void setDisplay(ReaderDisplayPreferences preferences) {
+        display.save(preferences);
     }
 
     @Override

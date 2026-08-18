@@ -5,6 +5,7 @@ import fr.vriege.anilib.feature.library.LibraryCatalog;
 import fr.vriege.anilib.feature.reader.ReaderCapabilities;
 import fr.vriege.anilib.feature.reader.ReaderPolicy;
 import fr.vriege.anilib.feature.reader.runtime.DefaultReaderService;
+import fr.vriege.anilib.feature.reader.runtime.FileReaderDisplayPreferenceStore;
 import fr.vriege.anilib.feature.reader.runtime.FileReaderInteractionPreferenceStore;
 import fr.vriege.anilib.feature.reader.ui.DefaultReaderPresentation;
 import fr.vriege.anilib.feature.reader.ui.ReaderUiCapabilities;
@@ -33,23 +34,31 @@ public final class ReaderPlugin implements AnilibPlugin {
 
     private final ReaderPolicy policy;
     private final Path interactionPreferences;
+    private final Path displayPreferences;
 
     public ReaderPlugin() {
-        this(Path.of("reader-interactions.properties"), ReaderPolicy.standard());
+        this(
+                Path.of("reader-interactions.properties"),
+                Path.of("reader-display.properties"),
+                ReaderPolicy.standard());
     }
 
     public ReaderPlugin(ReaderPolicy policy) {
-        this(Path.of("reader-interactions.properties"), policy);
+        this(Path.of("reader-interactions.properties"), Path.of("reader-display.properties"), policy);
     }
 
-    public ReaderPlugin(Path interactionPreferences) {
-        this(interactionPreferences, ReaderPolicy.standard());
+    public ReaderPlugin(Path interactionPreferences, Path displayPreferences) {
+        this(interactionPreferences, displayPreferences, ReaderPolicy.standard());
     }
 
-    public ReaderPlugin(Path interactionPreferences, ReaderPolicy policy) {
+    public ReaderPlugin(
+            Path interactionPreferences,
+            Path displayPreferences,
+            ReaderPolicy policy) {
         this.interactionPreferences = Objects.requireNonNull(
                 interactionPreferences,
                 "interactionPreferences must not be null");
+        this.displayPreferences = Objects.requireNonNull(displayPreferences, "displayPreferences must not be null");
         this.policy = Objects.requireNonNull(policy, "policy must not be null");
     }
 
@@ -72,6 +81,7 @@ public final class ReaderPlugin implements AnilibPlugin {
         context.publish(ReaderCapabilities.CONTENT_REGISTRAR, service);
         context.publish(ReaderUiCapabilities.PRESENTATION, new DefaultReaderPresentation(
                 service,
-                new FileReaderInteractionPreferenceStore(interactionPreferences)));
+                new FileReaderInteractionPreferenceStore(interactionPreferences),
+                new FileReaderDisplayPreferenceStore(displayPreferences)));
     }
 }
