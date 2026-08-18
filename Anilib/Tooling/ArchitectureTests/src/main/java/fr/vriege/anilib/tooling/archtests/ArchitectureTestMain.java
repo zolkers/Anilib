@@ -61,6 +61,7 @@ public final class ArchitectureTestMain {
         assertions += LibraryPresentationTest.run();
         assertions += SourceExtensionSdkTest.run();
         assertions += SourceExtensionIsolationRuleTest.run();
+        assertions += DesktopReleaseRuleTest.run();
         assertions += DiscoveryTest.run();
         assertions += HttpFrameworkTest.run();
         assertions += ReaderTest.run();
