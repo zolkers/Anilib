@@ -14,4 +14,10 @@ public interface LibraryCatalog {
     void replaceAll(Collection<LibraryItem> items);
 
     boolean remove(LibraryItemId id);
+
+    default AutoCloseable observe(Runnable listener) {
+        java.util.Objects.requireNonNull(listener, "listener must not be null");
+        return () -> {
+        };
+    }
 }

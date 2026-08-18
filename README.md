@@ -57,7 +57,8 @@ Statistics combine library status/source/language/progress and activity with
 tracker scores and persisted player duration without failing on unavailable sources.
 Tracking providers are explicit product choices: optional first-party AniList
 and Kitsu Bundles implement authentication, remote search, binding, editing,
-refresh, and removal while keeping secrets out of durable Tracker state.
+refresh, removal, branded identities, automatic/manual synchronization, and
+explicit conflict resolution while keeping secrets out of durable Tracker state.
 Downloads use a durable grouped priority queue with manual ordering, confirmed
 delete-all, measured speed/ETA, and resume-or-restart recovery for partial jobs.
 Their validated storage location can be migrated safely, repaired from the

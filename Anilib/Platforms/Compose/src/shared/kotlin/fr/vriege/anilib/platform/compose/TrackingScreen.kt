@@ -1,7 +1,9 @@
 package fr.vriege.anilib.platform.compose
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -9,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
@@ -31,17 +34,27 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.shape.CircleShape
 import fr.vriege.anilib.feature.library.LibraryItemId
 import fr.vriege.anilib.feature.library.MediaKind
 import fr.vriege.anilib.feature.tracker.TrackerAccount
 import fr.vriege.anilib.feature.tracker.TrackerAuthentication
 import fr.vriege.anilib.feature.tracker.TrackerCredentials
+import fr.vriege.anilib.feature.tracker.TrackerConflictPolicy
+import fr.vriege.anilib.feature.tracker.TrackerConflictResolution
 import fr.vriege.anilib.feature.tracker.TrackerEntry
 import fr.vriege.anilib.feature.tracker.TrackerId
 import fr.vriege.anilib.feature.tracker.TrackerSearchResult
 import fr.vriege.anilib.feature.tracker.TrackerStatus
+import fr.vriege.anilib.feature.tracker.TrackerSyncConflict
+import fr.vriege.anilib.feature.tracker.TrackerSyncDirection
+import fr.vriege.anilib.feature.tracker.TrackerSyncPreferences
+import fr.vriege.anilib.feature.tracker.TrackerSyncReport
 import fr.vriege.anilib.feature.tracker.ui.TrackerPresentation
 import java.time.LocalDate
 import java.util.Optional
@@ -58,6 +71,9 @@ internal fun TrackerAccountsScreen(
     var error by remember { mutableStateOf<String?>(null) }
     ObserveTracking(presentation) { revision++ }
     val accounts = remember(revision) { presentation.accounts() }
+    val preferences = remember(revision) { presentation.syncPreferences() }
+    val conflicts = remember(revision) { presentation.conflicts() }
+    var syncSummary by remember { mutableStateOf<String?>(null) }
 
     login?.let { account ->
         TrackerLoginDialog(
@@ -94,6 +110,65 @@ internal fun TrackerAccountsScreen(
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
                 )
+            }
+            item {
+                TrackerSyncSettings(
+                    preferences = preferences,
+                    synchronize = {
+                        runCatching { presentation.synchronizeAll() }
+                            .onSuccess {
+                                syncSummary = syncSummary(it)
+                                error = null
+                                revision++
+                            }
+                            .onFailure { error = it.message ?: "Synchronization failed." }
+                    },
+                    save = {
+                        runCatching { presentation.saveSyncPreferences(it) }
+                            .onSuccess {
+                                error = null
+                                revision++
+                            }
+                            .onFailure { failure ->
+                                error = failure.message ?: "Unable to save synchronization preferences."
+                            }
+                    },
+                )
+            }
+            syncSummary?.let { summary ->
+                item {
+                    Text(
+                        summary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 24.dp),
+                    )
+                }
+            }
+            if (conflicts.isNotEmpty()) {
+                item {
+                    Text(
+                        "Synchronization conflicts",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                    )
+                }
+                items(conflicts, key = { conflictKey(it) }) { conflict ->
+                    TrackerConflictCard(
+                        conflict = conflict,
+                        resolve = { resolution ->
+                            runCatching {
+                                presentation.resolveConflict(
+                                    conflict.localEntry().libraryItemId(),
+                                    conflict.localEntry().trackerId(),
+                                    resolution,
+                                )
+                            }.onSuccess {
+                                error = null
+                                revision++
+                            }.onFailure { error = it.message ?: "Unable to resolve synchronization conflict." }
+                        },
+                    )
+                }
             }
             if (accounts.isEmpty()) {
                 item {
@@ -147,6 +222,8 @@ private fun TrackerAccountRow(account: TrackerAccount, activate: () -> Unit) {
         modifier = Modifier.fillMaxWidth().clickable(onClick = activate).padding(24.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        TrackerProviderIcon(account)
+        Spacer(Modifier.size(16.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(account.descriptor().name(), fontWeight = FontWeight.Medium)
             Spacer(Modifier.height(4.dp))
@@ -154,6 +231,110 @@ private fun TrackerAccountRow(account: TrackerAccount, activate: () -> Unit) {
         }
         if (account.authenticated() && authentication != TrackerAuthentication.NONE) {
             Text("Sign out", color = MaterialTheme.colorScheme.error)
+        }
+    }
+}
+
+@Composable
+private fun TrackerProviderIcon(account: TrackerAccount) {
+    val icon = account.descriptor().icon()
+    Box(
+        modifier = Modifier
+            .size(44.dp)
+            .clip(CircleShape)
+            .background(Color(0xFF000000 or icon.colorRgb().toLong())),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(icon.monogram(), color = Color.White, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun TrackerSyncSettings(
+    preferences: TrackerSyncPreferences,
+    synchronize: () -> Unit,
+    save: (TrackerSyncPreferences) -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Automatic synchronization", fontWeight = FontWeight.Medium)
+                    Text(
+                        "Refresh bound titles after library activity and account sign-in.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = preferences.automatic(),
+                    onCheckedChange = { save(preferences.withAutomatic(it)) },
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            Text("Direction", style = MaterialTheme.typography.labelLarge)
+            EnumChoiceRow(
+                values = TrackerSyncDirection.entries,
+                selected = preferences.direction(),
+                label = ::readableEnum,
+                choose = { save(preferences.withDirection(it)) },
+            )
+            Spacer(Modifier.height(8.dp))
+            Text("When both sides changed", style = MaterialTheme.typography.labelLarge)
+            EnumChoiceRow(
+                values = TrackerConflictPolicy.entries,
+                selected = preferences.conflictPolicy(),
+                label = ::readableEnum,
+                choose = { save(preferences.withConflictPolicy(it)) },
+            )
+            TextButton(onClick = synchronize) { Text("Synchronize now") }
+        }
+    }
+}
+
+@Composable
+private fun <T> EnumChoiceRow(
+    values: List<T>,
+    selected: T,
+    label: (T) -> String,
+    choose: (T) -> Unit,
+) {
+    Column {
+        values.chunked(2).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                row.forEach { value ->
+                    TextButton(onClick = { choose(value) }) {
+                        Text(if (value == selected) "• ${label(value)}" else label(value))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TrackerConflictCard(
+    conflict: TrackerSyncConflict,
+    resolve: (TrackerConflictResolution) -> Unit,
+) {
+    Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(conflict.localEntry().title(), fontWeight = FontWeight.SemiBold)
+            Text(
+                "Local ${trackerProgress(conflict.localEntry())} · " +
+                    "Remote ${trackerProgress(conflict.remoteEntry())}",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = { resolve(TrackerConflictResolution.KEEP_LOCAL) }) {
+                    Text("Keep local")
+                }
+                TextButton(onClick = { resolve(TrackerConflictResolution.KEEP_REMOTE) }) {
+                    Text("Keep remote")
+                }
+            }
         }
     }
 }
@@ -186,6 +367,7 @@ private fun TrackerLoginDialog(
                     onValueChange = { secret = it },
                     label = { Text(secretLabel(authentication)) },
                     singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
                 )
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }
@@ -260,7 +442,15 @@ internal fun TitleTrackingScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
-                Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(top = 8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                    TextButton(onClick = { action { presentation.synchronize(itemId) } }) {
+                        Text("Sync")
+                    }
+                }
             }
             if (accounts.isEmpty()) {
                 item { EmptyPage("Sign in to an installed tracking service from More > Tracking.") }
@@ -304,6 +494,8 @@ private fun UnboundTrackerCard(account: TrackerAccount, search: () -> Unit) {
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            TrackerProviderIcon(account)
+            Spacer(Modifier.size(12.dp))
             Text(account.descriptor().name(), fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
             TextButton(onClick = search) { Text("Add tracking") }
         }
@@ -319,13 +511,55 @@ private fun TrackerEntryCard(
     remove: () -> Unit,
 ) {
     val descriptor = account.descriptor()
+    var editing by remember(entry) { mutableStateOf(false) }
+    var confirmingRemove by remember(entry) { mutableStateOf(false) }
+    var editError by remember(entry) { mutableStateOf<String?>(null) }
+    if (editing) {
+        TrackerEditDialog(
+            account = account,
+            entry = entry,
+            error = editError,
+            dismiss = {
+                editing = false
+                editError = null
+            },
+            submit = { replacement ->
+                runCatching { update(replacement) }
+                    .onSuccess {
+                        editing = false
+                        editError = null
+                    }
+                    .onFailure { editError = it.message ?: "Unable to update tracking." }
+            },
+        )
+    }
+    if (confirmingRemove) {
+        AlertDialog(
+            onDismissRequest = { confirmingRemove = false },
+            title = { Text("Remove ${descriptor.name()} tracking?") },
+            text = { Text("The remote list entry will be deleted before the local binding is removed.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmingRemove = false
+                    remove()
+                }) { Text("Remove") }
+            },
+            dismissButton = { TextButton(onClick = { confirmingRemove = false }) { Text("Cancel") } },
+        )
+    }
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-            Text(descriptor.name(), color = MaterialTheme.colorScheme.primary)
-            Text(entry.title(), fontWeight = FontWeight.SemiBold)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                TrackerProviderIcon(account)
+                Spacer(Modifier.size(12.dp))
+                Column {
+                    Text(descriptor.name(), color = MaterialTheme.colorScheme.primary)
+                    Text(entry.title(), fontWeight = FontWeight.SemiBold)
+                }
+            }
             Spacer(Modifier.height(12.dp))
             Text("Status: ${readable(entry.status())}")
             Text("Progress: ${trackerProgress(entry)}")
@@ -335,48 +569,116 @@ private fun TrackerEntryCard(
                 Text("Finished: ${entry.finishDate().map(LocalDate::toString).orElse("Not set")}")
             }
             Spacer(Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                TextButton(onClick = { update(entry.withStatus(nextStatus(entry, descriptor.statuses()))) }) {
-                    Text("Status")
-                }
-                TextButton(onClick = { update(entry.withProgress(nextProgress(entry))) }) {
-                    Text("+ Progress")
-                }
-                if (descriptor.scores().isNotEmpty()) {
-                    TextButton(onClick = { update(entry.withScore(nextScore(entry, descriptor.scores()))) }) {
-                        Text("Score")
-                    }
-                }
-            }
-            if (descriptor.supportsDates()) {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    TextButton(
-                        onClick = { update(entry.withDates(Optional.of(LocalDate.now()), entry.finishDate())) },
-                    ) {
-                        Text("Start today")
-                    }
-                    TextButton(
-                        onClick = { update(entry.withDates(entry.startDate(), Optional.of(LocalDate.now()))) },
-                    ) {
-                        Text("Finish today")
-                    }
-                }
-            }
-            if (descriptor.supportsPrivateEntries()) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Private", modifier = Modifier.weight(1f))
-                    Switch(
-                        checked = entry.privateEntry(),
-                        onCheckedChange = { update(entry.withPrivateEntry(it)) },
-                    )
-                }
-            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = { editing = true }) { Text("Edit") }
                 TextButton(onClick = refresh) { Text("Refresh") }
-                TextButton(onClick = remove) { Text("Remove") }
+                TextButton(onClick = { confirmingRemove = true }) { Text("Remove") }
             }
         }
     }
+}
+
+@Composable
+private fun TrackerEditDialog(
+    account: TrackerAccount,
+    entry: TrackerEntry,
+    error: String?,
+    dismiss: () -> Unit,
+    submit: (TrackerEntry) -> Unit,
+) {
+    val descriptor = account.descriptor()
+    var status by remember(entry) { mutableStateOf(entry.status()) }
+    var progress by remember(entry) { mutableStateOf(entry.progress().toString()) }
+    var score by remember(entry) {
+        mutableStateOf(if (entry.score().isPresent) entry.score().orElse(0.0).toString() else "")
+    }
+    var startDate by remember(entry) { mutableStateOf(entry.startDate().map(LocalDate::toString).orElse("")) }
+    var finishDate by remember(entry) { mutableStateOf(entry.finishDate().map(LocalDate::toString).orElse("")) }
+    var privateEntry by remember(entry) { mutableStateOf(entry.privateEntry()) }
+    var validationError by remember(entry) { mutableStateOf<String?>(null) }
+    AlertDialog(
+        onDismissRequest = dismiss,
+        title = { Text("Edit ${descriptor.name()} tracking") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(entry.title(), fontWeight = FontWeight.SemiBold)
+                Text("Status", style = MaterialTheme.typography.labelLarge)
+                EnumChoiceRow(
+                    values = descriptor.statuses(),
+                    selected = status,
+                    label = ::readable,
+                    choose = { status = it },
+                )
+                OutlinedTextField(
+                    value = progress,
+                    onValueChange = { progress = it },
+                    label = {
+                        Text(if (entry.totalUnits() >= 0) "Progress / ${entry.totalUnits()}" else "Progress")
+                    },
+                    singleLine = true,
+                )
+                if (descriptor.scores().isNotEmpty()) {
+                    OutlinedTextField(
+                        value = score,
+                        onValueChange = { score = it },
+                        label = { Text("Score (blank or ${scoreRange(descriptor.scores())})") },
+                        singleLine = true,
+                    )
+                }
+                if (descriptor.supportsDates()) {
+                    OutlinedTextField(
+                        value = startDate,
+                        onValueChange = { startDate = it },
+                        label = { Text("Start date (YYYY-MM-DD, optional)") },
+                        singleLine = true,
+                    )
+                    OutlinedTextField(
+                        value = finishDate,
+                        onValueChange = { finishDate = it },
+                        label = { Text("Finish date (YYYY-MM-DD, optional)") },
+                        singleLine = true,
+                    )
+                }
+                if (descriptor.supportsPrivateEntries()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Private entry", modifier = Modifier.weight(1f))
+                        Switch(checked = privateEntry, onCheckedChange = { privateEntry = it })
+                    }
+                }
+                (validationError ?: error)?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                runCatching {
+                    val progressValue = progress.toDouble()
+                    require(progressValue >= 0.0 && progressValue.isFinite()) { "Progress must be non-negative." }
+                    require(entry.totalUnits() < 0 || progressValue <= entry.totalUnits()) {
+                        "Progress must not exceed ${entry.totalUnits()}."
+                    }
+                    val scoreValue = if (score.isBlank()) {
+                        OptionalDouble.empty()
+                    } else {
+                        OptionalDouble.of(score.toDouble())
+                    }
+                    require(!scoreValue.isPresent || descriptor.scores().contains(scoreValue.orElse(0.0))) {
+                        "Choose a score supported by ${descriptor.name()}."
+                    }
+                    entry.withProgress(progressValue)
+                        .withStatus(status)
+                        .withScore(scoreValue)
+                        .withDates(optionalDate(startDate), optionalDate(finishDate))
+                        .withPrivateEntry(privateEntry)
+                }.onSuccess {
+                    validationError = null
+                    submit(it)
+                }.onFailure {
+                    validationError = it.message ?: "Invalid tracking values."
+                }
+            }) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = dismiss) { Text("Cancel") } },
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -392,7 +694,33 @@ private fun TrackerSearchScreen(
 ) {
     var query by remember { mutableStateOf(title) }
     var results by remember { mutableStateOf<List<TrackerSearchResult>>(emptyList()) }
+    var selected by remember { mutableStateOf<TrackerSearchResult?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
+    selected?.let { result ->
+        AlertDialog(
+            onDismissRequest = { selected = null },
+            title = { Text("Track ${result.title()}?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Provider: ${account.descriptor().name()}")
+                    Text("Media: ${readableEnum(result.kind())}")
+                    Text(
+                        if (result.totalUnits() >= 0) "Length: ${result.totalUnits()} units"
+                        else "Length: unknown",
+                    )
+                    result.remoteUri().orElse(null)?.let { Text("Remote page: $it") }
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    runCatching { presentation.bind(itemId, result) }
+                        .onSuccess { bound() }
+                        .onFailure { error = it.message ?: "Unable to add tracking." }
+                }) { Text("Add tracking") }
+            },
+            dismissButton = { TextButton(onClick = { selected = null }) { Text("Cancel") } },
+        )
+    }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -427,11 +755,7 @@ private fun TrackerSearchScreen(
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(results, key = TrackerSearchResult::remoteId) { result ->
                     Card(
-                        modifier = Modifier.fillMaxWidth().clickable {
-                            runCatching { presentation.bind(itemId, result) }
-                                .onSuccess { bound() }
-                                .onFailure { error = it.message ?: "Unable to add tracking." }
-                        },
+                        modifier = Modifier.fillMaxWidth().clickable { selected = result },
                     ) {
                         Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
                             Text(result.title(), fontWeight = FontWeight.Medium)
@@ -473,24 +797,6 @@ private fun secretLabel(authentication: TrackerAuthentication): String = when (a
     TrackerAuthentication.NONE -> "Credential"
 }
 
-private fun nextStatus(entry: TrackerEntry, statuses: List<TrackerStatus>): TrackerStatus {
-    val index = statuses.indexOf(entry.status())
-    return statuses[(index + 1).mod(statuses.size)]
-}
-
-private fun nextProgress(entry: TrackerEntry): Double {
-    val next = entry.progress() + 1.0
-    return if (entry.totalUnits() >= 0) next.coerceAtMost(entry.totalUnits().toDouble()) else next
-}
-
-private fun nextScore(entry: TrackerEntry, scores: List<Double>): OptionalDouble {
-    if (!entry.score().isPresent) {
-        return OptionalDouble.of(scores.first())
-    }
-    val index = scores.indexOf(entry.score().orElse(0.0))
-    return OptionalDouble.of(scores[(index + 1).mod(scores.size)])
-}
-
 private fun trackerProgress(entry: TrackerEntry): String =
     if (entry.totalUnits() >= 0) "${entry.progress()} / ${entry.totalUnits()}" else entry.progress().toString()
 
@@ -498,3 +804,23 @@ private fun readable(value: TrackerStatus): String = value.name
     .replace('_', ' ')
     .lowercase()
     .replaceFirstChar(Char::uppercase)
+
+private fun readableEnum(value: Enum<*>): String = value.name
+    .replace('_', ' ')
+    .lowercase()
+    .replaceFirstChar(Char::uppercase)
+
+private fun optionalDate(value: String): Optional<LocalDate> =
+    if (value.isBlank()) Optional.empty() else Optional.of(LocalDate.parse(value.trim()))
+
+private fun scoreRange(values: List<Double>): String = "${values.min()}–${values.max()}"
+
+private fun conflictKey(conflict: TrackerSyncConflict): String =
+    "${conflict.localEntry().libraryItemId().value()}:${conflict.localEntry().trackerId().value()}"
+
+private fun syncSummary(report: TrackerSyncReport): String = buildString {
+    append("Synchronization: ${report.pushed()} pushed, ${report.pulled()} pulled")
+    if (report.conflicts().isNotEmpty()) append(", ${report.conflicts().size} conflict(s)")
+    if (report.failures().isNotEmpty()) append(", ${report.failures().size} failure(s)")
+    append('.')
+}

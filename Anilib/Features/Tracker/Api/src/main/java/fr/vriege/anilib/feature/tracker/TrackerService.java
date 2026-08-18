@@ -27,6 +27,21 @@ public interface TrackerService {
 
     void synchronizeProgress(LibraryItemId libraryItemId, double progress, long totalUnits);
 
+    TrackerSyncPreferences syncPreferences();
+
+    void saveSyncPreferences(TrackerSyncPreferences preferences);
+
+    TrackerSyncReport synchronizeAll();
+
+    TrackerSyncReport synchronize(LibraryItemId libraryItemId);
+
+    List<TrackerSyncConflict> conflicts();
+
+    TrackerEntry resolveConflict(
+            LibraryItemId libraryItemId,
+            TrackerId trackerId,
+            TrackerConflictResolution resolution);
+
     List<TrackerEntry> snapshot();
 
     void replaceAll(Collection<TrackerEntry> entries);

@@ -16,6 +16,11 @@ then provides:
 - status, fractional progress, score, start date, finish date, and privacy;
 - remote refresh and confirmed adapter-owned removal;
 - automatic completion semantics when synchronized progress reaches the total;
+- branded provider identities and confirmed, validated search/edit/remove flows;
+- manual or activity-triggered automatic synchronization with push-only,
+  pull-only, and bidirectional direction policies;
+- durable conflict preferences with ask, local, remote, and newest-wins
+  resolution plus explicit conflict review;
 - durable local mirrors and a feature-owned `tracking` backup section.
 
 Credentials are never persisted by Tracker Core. An opted-in adapter owns its
@@ -36,6 +41,11 @@ Both providers keep credentials and access tokens in memory only. Their Bundle
 manifests restrict HTTP access to the single exact provider origin, and fixture
 tests exercise their full authentication and entry lifecycle without requiring
 live accounts.
+
+Synchronization preferences and pending local changes are written atomically
+beside the tracking mirror. Remote refresh timestamps let the newest-wins policy
+compare provider and local state, while ask mode retains both snapshots until
+the user explicitly keeps the local or remote version.
 
 ## Extension boundary
 

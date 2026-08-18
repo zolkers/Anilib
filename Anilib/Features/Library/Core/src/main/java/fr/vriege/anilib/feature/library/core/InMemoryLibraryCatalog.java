@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 public final class InMemoryLibraryCatalog implements LibraryCatalog {
     private static final Comparator<LibraryItem> DISPLAY_ORDER =
@@ -18,6 +19,7 @@ public final class InMemoryLibraryCatalog implements LibraryCatalog {
                     .thenComparing(LibraryItem::id);
 
     private final Map<LibraryItemId, LibraryItem> items = new LinkedHashMap<>();
+    private final CopyOnWriteArrayList<Runnable> listeners = new CopyOnWriteArrayList<>();
 
     public InMemoryLibraryCatalog() {
     }
@@ -36,6 +38,7 @@ public final class InMemoryLibraryCatalog implements LibraryCatalog {
     public synchronized void save(LibraryItem item) {
         Objects.requireNonNull(item, "item must not be null");
         items.put(item.id(), item);
+        notifyListeners();
     }
 
     @Override
@@ -50,10 +53,26 @@ public final class InMemoryLibraryCatalog implements LibraryCatalog {
         }
         items.clear();
         items.putAll(next);
+        notifyListeners();
     }
 
     @Override
     public synchronized boolean remove(LibraryItemId id) {
-        return items.remove(Objects.requireNonNull(id, "id must not be null")) != null;
+        boolean removed = items.remove(Objects.requireNonNull(id, "id must not be null")) != null;
+        if (removed) {
+            notifyListeners();
+        }
+        return removed;
+    }
+
+    @Override
+    public AutoCloseable observe(Runnable listener) {
+        Runnable value = Objects.requireNonNull(listener, "listener must not be null");
+        listeners.add(value);
+        return () -> listeners.remove(value);
+    }
+
+    private void notifyListeners() {
+        listeners.forEach(Runnable::run);
     }
 }

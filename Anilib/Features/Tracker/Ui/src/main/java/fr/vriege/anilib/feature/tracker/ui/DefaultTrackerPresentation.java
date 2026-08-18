@@ -4,10 +4,14 @@ import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.library.MediaKind;
 import fr.vriege.anilib.feature.tracker.TrackerAccount;
 import fr.vriege.anilib.feature.tracker.TrackerCredentials;
+import fr.vriege.anilib.feature.tracker.TrackerConflictResolution;
 import fr.vriege.anilib.feature.tracker.TrackerEntry;
 import fr.vriege.anilib.feature.tracker.TrackerId;
 import fr.vriege.anilib.feature.tracker.TrackerSearchResult;
 import fr.vriege.anilib.feature.tracker.TrackerService;
+import fr.vriege.anilib.feature.tracker.TrackerSyncConflict;
+import fr.vriege.anilib.feature.tracker.TrackerSyncPreferences;
+import fr.vriege.anilib.feature.tracker.TrackerSyncReport;
 
 import java.util.List;
 import java.util.Objects;
@@ -62,6 +66,39 @@ public final class DefaultTrackerPresentation implements TrackerPresentation {
     @Override
     public boolean remove(LibraryItemId itemId, TrackerId trackerId) {
         return service.remove(itemId, trackerId);
+    }
+
+    @Override
+    public TrackerSyncPreferences syncPreferences() {
+        return service.syncPreferences();
+    }
+
+    @Override
+    public void saveSyncPreferences(TrackerSyncPreferences preferences) {
+        service.saveSyncPreferences(preferences);
+    }
+
+    @Override
+    public TrackerSyncReport synchronizeAll() {
+        return service.synchronizeAll();
+    }
+
+    @Override
+    public TrackerSyncReport synchronize(LibraryItemId itemId) {
+        return service.synchronize(itemId);
+    }
+
+    @Override
+    public List<TrackerSyncConflict> conflicts() {
+        return service.conflicts();
+    }
+
+    @Override
+    public TrackerEntry resolveConflict(
+            LibraryItemId itemId,
+            TrackerId trackerId,
+            TrackerConflictResolution resolution) {
+        return service.resolveConflict(itemId, trackerId, resolution);
     }
 
     @Override

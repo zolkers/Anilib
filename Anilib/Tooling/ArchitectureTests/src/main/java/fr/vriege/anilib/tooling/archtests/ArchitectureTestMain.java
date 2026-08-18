@@ -78,6 +78,7 @@ public final class ArchitectureTestMain {
         assertions += PlayerTest.run();
         assertions += TrackerTest.run();
         assertions += FirstPartyTrackerTest.run();
+        assertions += TrackerSynchronizationTest.run();
         assertions += UpdateTest.run();
         assertions += ApplicationUpdateTest.run();
         assertions += DownloadTest.run();

@@ -47,7 +47,7 @@ public final class TrackerPlugin implements AnilibPlugin {
         LibraryCatalog library = context.require(LibraryCapabilities.CATALOG);
         UnusedDataRegistrar cleanup = context.require(SettingsCapabilities.UNUSED_DATA_REGISTRAR);
         DefaultTrackerRegistry registry = context.own(new DefaultTrackerRegistry());
-        DefaultTrackerService service = new DefaultTrackerService(registry, library, stateFile);
+        DefaultTrackerService service = context.own(new DefaultTrackerService(registry, library, stateFile));
         context.own(cleanup.register("tracking", service::cleanUnusedData));
         context.publish(TrackerCapabilities.REGISTRY, registry);
         context.publish(TrackerCapabilities.REGISTRAR, registry);

@@ -238,7 +238,7 @@ platform-specific.
 
 - [x] ship opt-in first-party tracker Bundles with complete authentication flows
   for the selected services
-- [ ] add provider icons, richer search/edit dialogs, automatic synchronization,
+- [x] add provider icons, richer search/edit dialogs, automatic synchronization,
   conflict handling, and sync preferences
 - [ ] add automatic backup schedules, retention, content selection, configurable
   destinations, SAF/native folder integration, and sharing/export

@@ -138,7 +138,7 @@ final class FirstPartyTrackerTest {
 
     private static String aniListEntry(String status, int progress, int score) {
         return "{\"id\":99,\"status\":\"" + status + "\",\"progress\":" + progress
-                + ",\"repeat\":0,\"score\":" + score + ",\"private\":false,"
+                + ",\"repeat\":0,\"score\":" + score + ",\"private\":false,\"updatedAt\":1787000000,"
                 + "\"startedAt\":{\"year\":2026,\"month\":8,\"day\":18},"
                 + "\"completedAt\":{\"year\":null,\"month\":null,\"day\":null},"
                 + "\"media\":" + aniListMedia() + "}";
@@ -153,7 +153,8 @@ final class FirstPartyTrackerTest {
         return "{\"type\":\"libraryEntries\",\"id\":\"81\",\"attributes\":{"
                 + "\"status\":\"" + status + "\",\"reconsuming\":" + reconsuming
                 + ",\"progress\":" + progress + ",\"ratingTwenty\":" + rating
-                + ",\"startedAt\":null,\"finishedAt\":null,\"private\":false}}";
+                + ",\"startedAt\":null,\"finishedAt\":null,\"private\":false,"
+                + "\"updatedAt\":\"2026-08-18T12:00:00Z\"}}";
     }
 
     private static HttpResponse json(String value) {

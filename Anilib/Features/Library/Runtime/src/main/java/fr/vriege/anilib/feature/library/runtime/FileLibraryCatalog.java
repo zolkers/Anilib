@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 public final class FileLibraryCatalog implements LibraryCatalog {
     private static final Comparator<LibraryItem> DISPLAY_ORDER =
@@ -22,6 +23,7 @@ public final class FileLibraryCatalog implements LibraryCatalog {
 
     private final LibraryFileStore store;
     private final Map<LibraryItemId, LibraryItem> items = new LinkedHashMap<>();
+    private final CopyOnWriteArrayList<Runnable> listeners = new CopyOnWriteArrayList<>();
 
     public FileLibraryCatalog(Path storageFile) {
         store = new LibraryFileStore(Objects.requireNonNull(storageFile, "storageFile must not be null"));
@@ -52,6 +54,7 @@ public final class FileLibraryCatalog implements LibraryCatalog {
         Map<LibraryItemId, LibraryItem> next = new LinkedHashMap<>(items);
         next.put(item.id(), item);
         persistAndReplace(next.values());
+        notifyListeners();
     }
 
     @Override
@@ -65,6 +68,7 @@ public final class FileLibraryCatalog implements LibraryCatalog {
             }
         }
         persistAndReplace(next.values());
+        notifyListeners();
     }
 
     @Override
@@ -76,7 +80,15 @@ public final class FileLibraryCatalog implements LibraryCatalog {
         Map<LibraryItemId, LibraryItem> next = new LinkedHashMap<>(items);
         next.remove(id);
         persistAndReplace(next.values());
+        notifyListeners();
         return true;
+    }
+
+    @Override
+    public AutoCloseable observe(Runnable listener) {
+        Runnable value = Objects.requireNonNull(listener, "listener must not be null");
+        listeners.add(value);
+        return () -> listeners.remove(value);
     }
 
     private void persistAndReplace(Collection<LibraryItem> next) {
@@ -91,5 +103,9 @@ public final class FileLibraryCatalog implements LibraryCatalog {
 
     private static LibraryStorageException failure(String operation, IOException cause) {
         return new LibraryStorageException("Unable to " + operation + " the Anilib library", cause);
+    }
+
+    private void notifyListeners() {
+        listeners.forEach(Runnable::run);
     }
 }

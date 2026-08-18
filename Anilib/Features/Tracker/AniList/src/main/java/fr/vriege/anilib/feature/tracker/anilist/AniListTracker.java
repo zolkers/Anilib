@@ -9,6 +9,7 @@ import fr.vriege.anilib.feature.tracker.TrackerDescriptor;
 import fr.vriege.anilib.feature.tracker.TrackerEntry;
 import fr.vriege.anilib.feature.tracker.TrackerException;
 import fr.vriege.anilib.feature.tracker.TrackerId;
+import fr.vriege.anilib.feature.tracker.TrackerIcon;
 import fr.vriege.anilib.feature.tracker.TrackerSearchResult;
 import fr.vriege.anilib.feature.tracker.TrackerSdk;
 import fr.vriege.anilib.feature.tracker.TrackerStatus;
@@ -37,6 +38,7 @@ public final class AniListTracker implements Tracker {
     private static final TrackerDescriptor DESCRIPTOR = new TrackerDescriptor(
             ID,
             "AniList",
+            new TrackerIcon("A", 0x02A9FF),
             TrackerSdk.API_VERSION,
             Set.of(MediaKind.ANIME, MediaKind.MANGA),
             TrackerAuthentication.TOKEN,
@@ -52,7 +54,7 @@ public final class AniListTracker implements Tracker {
             scores(),
             true,
             true);
-    private static final String ENTRY_FIELDS = "id status progress repeat score private "
+    private static final String ENTRY_FIELDS = "id status progress repeat score private updatedAt "
             + "startedAt { year month day } completedAt { year month day } "
             + "media { id type episodes chapters siteUrl title { userPreferred } }";
     private final AnilibHttpClient client;
@@ -241,7 +243,7 @@ public final class AniListTracker implements Tracker {
                 fuzzyDate(value.get("completedAt")),
                 TrackerJson.booleanValue(value.get("private"), false),
                 uri(media.get("siteUrl")),
-                Instant.now());
+                instant(value.get("updatedAt")));
     }
 
     private static String mediaType(MediaKind kind) {
@@ -313,6 +315,10 @@ public final class AniListTracker implements Tracker {
 
     private static Optional<URI> uri(Object value) {
         return TrackerJson.optionalString(value).map(URI::create);
+    }
+
+    private static Instant instant(Object value) {
+        return value instanceof Number number ? Instant.ofEpochSecond(number.longValue()) : Instant.now();
     }
 
     private static int integerId(String value) {

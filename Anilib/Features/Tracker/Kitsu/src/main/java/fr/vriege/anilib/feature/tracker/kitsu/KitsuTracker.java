@@ -10,6 +10,7 @@ import fr.vriege.anilib.feature.tracker.TrackerDescriptor;
 import fr.vriege.anilib.feature.tracker.TrackerEntry;
 import fr.vriege.anilib.feature.tracker.TrackerException;
 import fr.vriege.anilib.feature.tracker.TrackerId;
+import fr.vriege.anilib.feature.tracker.TrackerIcon;
 import fr.vriege.anilib.feature.tracker.TrackerSdk;
 import fr.vriege.anilib.feature.tracker.TrackerSearchResult;
 import fr.vriege.anilib.feature.tracker.TrackerStatus;
@@ -41,6 +42,7 @@ public final class KitsuTracker implements Tracker {
     private static final TrackerDescriptor DESCRIPTOR = new TrackerDescriptor(
             ID,
             "Kitsu",
+            new TrackerIcon("K", 0xFD755C),
             TrackerSdk.API_VERSION,
             Set.of(MediaKind.ANIME, MediaKind.MANGA),
             TrackerAuthentication.USERNAME_PASSWORD,
@@ -276,7 +278,7 @@ public final class KitsuTracker implements Tracker {
                 date(attributes.get("finishedAt")),
                 TrackerJson.booleanValue(attributes.get("private"), false),
                 remoteUri,
-                Instant.now());
+                instant(attributes.get("updatedAt")));
     }
 
     private static Map<String, Object> relationship(String type, String id) {
@@ -339,6 +341,10 @@ public final class KitsuTracker implements Tracker {
 
     private static Optional<LocalDate> date(Object value) {
         return TrackerJson.optionalString(value).map(LocalDate::parse);
+    }
+
+    private static Instant instant(Object value) {
+        return TrackerJson.optionalString(value).map(Instant::parse).orElseGet(Instant::now);
     }
 
     private static double optionalDouble(Object value, double fallback) {

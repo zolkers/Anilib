@@ -8,6 +8,8 @@ import fr.vriege.anilib.feature.tracker.Tracker;
 import fr.vriege.anilib.feature.tracker.TrackerAccount;
 import fr.vriege.anilib.feature.tracker.TrackerAuthentication;
 import fr.vriege.anilib.feature.tracker.TrackerCredentials;
+import fr.vriege.anilib.feature.tracker.TrackerConflictPolicy;
+import fr.vriege.anilib.feature.tracker.TrackerConflictResolution;
 import fr.vriege.anilib.feature.tracker.TrackerEntry;
 import fr.vriege.anilib.feature.tracker.TrackerException;
 import fr.vriege.anilib.feature.tracker.TrackerId;
@@ -15,27 +17,54 @@ import fr.vriege.anilib.feature.tracker.TrackerRegistry;
 import fr.vriege.anilib.feature.tracker.TrackerSearchResult;
 import fr.vriege.anilib.feature.tracker.TrackerService;
 import fr.vriege.anilib.feature.tracker.TrackerStatus;
+import fr.vriege.anilib.feature.tracker.TrackerSyncConflict;
+import fr.vriege.anilib.feature.tracker.TrackerSyncDirection;
+import fr.vriege.anilib.feature.tracker.TrackerSyncPreferences;
+import fr.vriege.anilib.feature.tracker.TrackerSyncReport;
 
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-public final class DefaultTrackerService implements TrackerService {
+public final class DefaultTrackerService implements TrackerService, AutoCloseable {
     private final TrackerRegistry registry;
     private final LibraryCatalog library;
     private final TrackerEntryStore entries;
+    private final TrackerSyncPreferenceStore preferences;
+    private final TrackerPendingSyncStore pendingSynchronizations;
     private final CopyOnWriteArrayList<Runnable> listeners = new CopyOnWriteArrayList<>();
+    private final Map<BindingKey, TrackerSyncConflict> conflicts = new LinkedHashMap<>();
+    private final Set<BindingKey> dirtyEntries = new HashSet<>();
+    private final ExecutorService synchronizer = Executors.newSingleThreadExecutor(
+            Thread.ofVirtual().name("anilib-tracker-sync").factory());
+    private final AtomicBoolean synchronizationQueued = new AtomicBoolean();
+    private final AutoCloseable libraryObservation;
+    private volatile boolean closed;
 
     public DefaultTrackerService(TrackerRegistry registry, LibraryCatalog library, Path stateFile) {
         this.registry = Objects.requireNonNull(registry, "registry must not be null");
         this.library = Objects.requireNonNull(library, "library must not be null");
-        entries = new TrackerEntryStore(stateFile);
+        Path file = Objects.requireNonNull(stateFile, "stateFile must not be null").toAbsolutePath().normalize();
+        entries = new TrackerEntryStore(file);
+        preferences = new TrackerSyncPreferenceStore(file.resolveSibling("tracking-sync.properties"));
+        pendingSynchronizations = new TrackerPendingSyncStore(
+                file.resolveSibling("tracking-sync-pending.anilib"));
+        pendingSynchronizations.load().forEach(value -> dirtyEntries.add(
+                new BindingKey(value.libraryItemId(), value.trackerId())));
+        libraryObservation = library.observe(this::libraryChanged);
     }
 
     @Override
@@ -61,6 +90,7 @@ public final class DefaultTrackerService implements TrackerService {
             throw new TrackerException("Tracker did not establish an authenticated session");
         }
         notifyListeners();
+        queueAutomaticSynchronization();
     }
 
     @Override
@@ -130,6 +160,7 @@ public final class DefaultTrackerService implements TrackerService {
                 tracker.update(normalized),
                 requested.libraryItemId());
         entries.save(updated);
+        clearPending(BindingKey.of(updated));
         notifyListeners();
         return updated;
     }
@@ -141,6 +172,7 @@ public final class DefaultTrackerService implements TrackerService {
                 () -> new TrackerException("Tracker entry is not bound"));
         TrackerEntry refreshed = validate(tracker, tracker.refresh(current), libraryItemId);
         entries.save(refreshed);
+        clearPending(BindingKey.of(refreshed));
         notifyListeners();
         return refreshed;
     }
@@ -153,6 +185,7 @@ public final class DefaultTrackerService implements TrackerService {
         }
         readyTracker(trackerId).remove(current.orElseThrow());
         boolean removed = entries.remove(libraryItemId, trackerId);
+        clearPending(new BindingKey(libraryItemId, trackerId));
         notifyListeners();
         return removed;
     }
@@ -175,7 +208,16 @@ public final class DefaultTrackerService implements TrackerService {
                         status == TrackerStatus.COMPLETED && current.finishDate().isEmpty()
                                 ? Optional.of(LocalDate.now()) : current.finishDate(),
                         current.privateEntry(), current.remoteUri(), Instant.now());
-                update(replacement);
+                if (syncPreferences().automatic()) {
+                    update(replacement);
+                } else {
+                    entries.save(replacement);
+                    synchronized (this) {
+                        dirtyEntries.add(BindingKey.of(replacement));
+                        persistPending();
+                    }
+                    notifyListeners();
+                }
             } catch (RuntimeException exception) {
                 failures.add(exception);
             }
@@ -185,6 +227,68 @@ public final class DefaultTrackerService implements TrackerService {
             failures.forEach(failure::addSuppressed);
             throw failure;
         }
+        queueAutomaticSynchronization();
+    }
+
+    @Override
+    public TrackerSyncPreferences syncPreferences() {
+        return preferences.load();
+    }
+
+    @Override
+    public void saveSyncPreferences(TrackerSyncPreferences value) {
+        preferences.save(Objects.requireNonNull(value, "preferences must not be null"));
+        notifyListeners();
+        queueAutomaticSynchronization();
+    }
+
+    @Override
+    public synchronized TrackerSyncReport synchronizeAll() {
+        SyncCounts counts = new SyncCounts();
+        for (TrackerEntry entry : entries.snapshot()) {
+            synchronizeEntry(entry, counts);
+        }
+        if (counts.changed()) {
+            notifyListeners();
+        }
+        return counts.report();
+    }
+
+    @Override
+    public synchronized TrackerSyncReport synchronize(LibraryItemId libraryItemId) {
+        LibraryItemId itemId = Objects.requireNonNull(libraryItemId, "libraryItemId must not be null");
+        SyncCounts counts = new SyncCounts();
+        for (TrackerEntry entry : entries.forItem(itemId)) {
+            synchronizeEntry(entry, counts);
+        }
+        if (counts.changed()) {
+            notifyListeners();
+        }
+        return counts.report();
+    }
+
+    @Override
+    public synchronized List<TrackerSyncConflict> conflicts() {
+        return List.copyOf(conflicts.values());
+    }
+
+    @Override
+    public synchronized TrackerEntry resolveConflict(
+            LibraryItemId libraryItemId,
+            TrackerId trackerId,
+            TrackerConflictResolution resolution) {
+        BindingKey key = new BindingKey(
+                Objects.requireNonNull(libraryItemId, "libraryItemId must not be null"),
+                Objects.requireNonNull(trackerId, "trackerId must not be null"));
+        TrackerSyncConflict conflict = Optional.ofNullable(conflicts.get(key)).orElseThrow(
+                () -> new TrackerException("Tracker synchronization conflict no longer exists"));
+        TrackerEntry result = switch (Objects.requireNonNull(resolution, "resolution must not be null")) {
+            case KEEP_LOCAL -> push(tracker(trackerId), conflict.localEntry());
+            case KEEP_REMOTE -> pull(conflict.remoteEntry());
+        };
+        clearPending(key);
+        notifyListeners();
+        return result;
     }
 
     @Override
@@ -195,6 +299,12 @@ public final class DefaultTrackerService implements TrackerService {
     @Override
     public void replaceAll(Collection<TrackerEntry> replacement) {
         entries.replaceAll(replacement);
+        synchronized (this) {
+            dirtyEntries.clear();
+            replacement.forEach(entry -> dirtyEntries.add(BindingKey.of(entry)));
+            conflicts.clear();
+            persistPending();
+        }
         notifyListeners();
     }
 
@@ -206,6 +316,13 @@ public final class DefaultTrackerService implements TrackerService {
         int removed = current.size() - retained.size();
         if (removed > 0) {
             entries.replaceAll(retained);
+            synchronized (this) {
+                Set<BindingKey> retainedKeys = retained.stream().map(BindingKey::of).collect(
+                        java.util.stream.Collectors.toSet());
+                dirtyEntries.retainAll(retainedKeys);
+                conflicts.keySet().retainAll(retainedKeys);
+                persistPending();
+            }
             notifyListeners();
         }
         return removed;
@@ -216,6 +333,150 @@ public final class DefaultTrackerService implements TrackerService {
         Runnable value = Objects.requireNonNull(listener, "listener must not be null");
         listeners.add(value);
         return () -> listeners.remove(value);
+    }
+
+    @Override
+    public void close() {
+        closed = true;
+        try {
+            libraryObservation.close();
+        } catch (Exception exception) {
+            throw new IllegalStateException("Unable to close tracker library observation", exception);
+        } finally {
+            synchronizer.shutdownNow();
+        }
+    }
+
+    private void synchronizeEntry(TrackerEntry current, SyncCounts counts) {
+        Tracker tracker;
+        try {
+            tracker = readyTracker(current.trackerId());
+            TrackerEntry remote = validate(tracker, tracker.refresh(current), current.libraryItemId());
+            BindingKey key = BindingKey.of(current);
+            if (sameEditableState(current, remote)) {
+                entries.save(remote);
+                clearPending(key);
+                counts.pulled++;
+                return;
+            }
+            boolean dirty = dirtyEntries.contains(key);
+            TrackerSyncPreferences policy = syncPreferences();
+            if (!dirty) {
+                if (policy.direction() != TrackerSyncDirection.PUSH_ONLY) {
+                    pull(remote);
+                    counts.pulled++;
+                }
+                return;
+            }
+            if (policy.direction() == TrackerSyncDirection.PUSH_ONLY) {
+                push(tracker, current);
+                clearPending(key);
+                counts.pushed++;
+                return;
+            }
+            if (policy.direction() == TrackerSyncDirection.PULL_ONLY) {
+                pull(remote);
+                clearPending(key);
+                counts.pulled++;
+                return;
+            }
+            resolvePolicy(tracker, current, remote, policy.conflictPolicy(), counts);
+        } catch (RuntimeException exception) {
+            String message = exception.getMessage();
+            counts.failures.add(current.trackerId().value() + ": "
+                    + (message == null || message.isBlank() ? exception.getClass().getSimpleName() : message));
+        }
+    }
+
+    private void resolvePolicy(
+            Tracker tracker,
+            TrackerEntry local,
+            TrackerEntry remote,
+            TrackerConflictPolicy policy,
+            SyncCounts counts) {
+        BindingKey key = BindingKey.of(local);
+        switch (policy) {
+            case KEEP_LOCAL -> {
+                push(tracker, local);
+                clearPending(key);
+                counts.pushed++;
+            }
+            case KEEP_REMOTE -> {
+                pull(remote);
+                clearPending(key);
+                counts.pulled++;
+            }
+            case NEWEST_WINS -> {
+                if (local.updatedAt().isAfter(remote.updatedAt())) {
+                    push(tracker, local);
+                    counts.pushed++;
+                } else {
+                    pull(remote);
+                    counts.pulled++;
+                }
+                clearPending(key);
+            }
+            case ASK -> {
+                TrackerSyncConflict conflict = new TrackerSyncConflict(local, remote, Instant.now());
+                conflicts.put(key, conflict);
+                counts.conflicts.add(conflict);
+            }
+        }
+    }
+
+    private TrackerEntry push(Tracker tracker, TrackerEntry local) {
+        validateEditable(tracker, local);
+        TrackerEntry pushed = validate(tracker, tracker.update(local), local.libraryItemId());
+        entries.save(pushed);
+        return pushed;
+    }
+
+    private TrackerEntry pull(TrackerEntry remote) {
+        entries.save(remote);
+        return remote;
+    }
+
+    private synchronized void clearPending(BindingKey key) {
+        boolean changed = dirtyEntries.remove(key);
+        conflicts.remove(key);
+        if (changed) {
+            persistPending();
+        }
+    }
+
+    private synchronized void persistPending() {
+        pendingSynchronizations.save(dirtyEntries.stream()
+                .map(key -> new TrackerPendingSyncStore.PendingSync(key.libraryItemId(), key.trackerId()))
+                .toList());
+    }
+
+    private void libraryChanged() {
+        queueAutomaticSynchronization();
+    }
+
+    private void queueAutomaticSynchronization() {
+        if (closed || !syncPreferences().automatic() || !synchronizationQueued.compareAndSet(false, true)) {
+            return;
+        }
+        synchronizer.execute(() -> {
+            try {
+                synchronizeAll();
+            } finally {
+                synchronizationQueued.set(false);
+            }
+        });
+    }
+
+    private static boolean sameEditableState(TrackerEntry first, TrackerEntry second) {
+        return first.progress() == second.progress()
+                && first.totalUnits() == second.totalUnits()
+                && first.status() == second.status()
+                && first.score().equals(second.score())
+                && first.startDate().equals(second.startDate())
+                && first.finishDate().equals(second.finishDate())
+                && first.privateEntry() == second.privateEntry()
+                && first.title().equals(second.title())
+                && first.remoteUri().equals(second.remoteUri());
     }
 
     private Tracker tracker(TrackerId id) {
@@ -295,5 +556,31 @@ public final class DefaultTrackerService implements TrackerService {
 
     private void notifyListeners() {
         listeners.forEach(Runnable::run);
+    }
+
+    private record BindingKey(LibraryItemId libraryItemId, TrackerId trackerId) {
+        private BindingKey {
+            Objects.requireNonNull(libraryItemId, "libraryItemId must not be null");
+            Objects.requireNonNull(trackerId, "trackerId must not be null");
+        }
+
+        private static BindingKey of(TrackerEntry entry) {
+            return new BindingKey(entry.libraryItemId(), entry.trackerId());
+        }
+    }
+
+    private static final class SyncCounts {
+        private int pushed;
+        private int pulled;
+        private final List<TrackerSyncConflict> conflicts = new ArrayList<>();
+        private final List<String> failures = new ArrayList<>();
+
+        private boolean changed() {
+            return pushed > 0 || pulled > 0 || !conflicts.isEmpty();
+        }
+
+        private TrackerSyncReport report() {
+            return new TrackerSyncReport(pushed, pulled, conflicts, failures);
+        }
     }
 }

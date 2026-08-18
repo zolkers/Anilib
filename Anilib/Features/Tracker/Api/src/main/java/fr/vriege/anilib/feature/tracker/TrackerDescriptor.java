@@ -10,6 +10,7 @@ import java.util.Set;
 public record TrackerDescriptor(
         TrackerId id,
         String name,
+        TrackerIcon icon,
         TrackerApiVersion requiredApiVersion,
         Set<MediaKind> supportedKinds,
         TrackerAuthentication authentication,
@@ -20,6 +21,7 @@ public record TrackerDescriptor(
     public TrackerDescriptor {
         Objects.requireNonNull(id, "id must not be null");
         Preconditions.requireNonBlank(name, "name");
+        Objects.requireNonNull(icon, "icon must not be null");
         Objects.requireNonNull(requiredApiVersion, "requiredApiVersion must not be null");
         supportedKinds = Set.copyOf(supportedKinds);
         if (supportedKinds.isEmpty()) {
@@ -35,5 +37,28 @@ public record TrackerDescriptor(
                 || scores.size() != Set.copyOf(scores).size()) {
             throw new IllegalArgumentException("scores must be unique values between 0 and 10");
         }
+    }
+
+    public TrackerDescriptor(
+            TrackerId id,
+            String name,
+            TrackerApiVersion requiredApiVersion,
+            Set<MediaKind> supportedKinds,
+            TrackerAuthentication authentication,
+            List<TrackerStatus> statuses,
+            List<Double> scores,
+            boolean supportsDates,
+            boolean supportsPrivateEntries) {
+        this(
+                id,
+                name,
+                TrackerIcon.generic(name),
+                requiredApiVersion,
+                supportedKinds,
+                authentication,
+                statuses,
+                scores,
+                supportsDates,
+                supportsPrivateEntries);
     }
 }

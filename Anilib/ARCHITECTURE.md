@@ -211,6 +211,12 @@ Optional first-party AniList and Kitsu Bundles use this same boundary: AniList
 performs token-authenticated GraphQL operations only at `graphql.anilist.co`,
 while Kitsu performs its password OAuth and JSON:API lifecycle only at
 `kitsu.io`. Neither Bundle is selected by Standard or persists its session.
+Tracker Core atomically stores synchronization direction, automatic mode,
+conflict policy, and pending-local markers beside its mirror. Library activity
+triggers a serialized refresh only when automatic synchronization is enabled.
+Remote-only changes replace the mirror, local pending changes can be pushed,
+and divergent bidirectional changes are resolved by the durable policy or kept
+as two explicit snapshots for user choice.
 
 Updates is a removable vertical over Library and Source. Its single shared job
 filters eligible titles, groups them by source, runs at most five source groups
