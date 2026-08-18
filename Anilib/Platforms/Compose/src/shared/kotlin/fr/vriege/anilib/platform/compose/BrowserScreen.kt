@@ -1,6 +1,7 @@
 package fr.vriege.anilib.platform.compose
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -8,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -15,18 +17,25 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import com.multiplatform.webview.cookie.Cookie
 import com.multiplatform.webview.web.LoadingState
 import com.multiplatform.webview.web.WebView
 import com.multiplatform.webview.web.rememberWebViewNavigator
 import com.multiplatform.webview.web.rememberWebViewState
 import fr.vriege.anilib.framework.http.HttpCookieJar
+import fr.vriege.anilib.feature.source.SourceWebPage
 import java.net.URI
 import kotlinx.coroutines.launch
 
@@ -34,7 +43,7 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun BrowserScreen(
-    uri: URI,
+    page: SourceWebPage,
     cookieJar: HttpCookieJar,
     runtimeStatus: BrowserRuntimeStatus,
     close: () -> Unit,
@@ -43,20 +52,43 @@ internal fun BrowserScreen(
         BrowserUnavailable(runtimeStatus.message, close)
         return
     }
-    val initialHeaders = remember(uri, cookieJar) { browserHeaders(cookieJar, uri) }
-    val state = rememberWebViewState(uri.toString(), initialHeaders)
+    val uri = page.location()
+    val initialHeaders = remember(page, cookieJar) { browserHeaders(cookieJar, page) }
+    val state = rememberWebViewState(uri.toString(), initialHeaders) {
+        customUserAgentString = page.userAgent().orElse(null)
+        androidWebSettings.domStorageEnabled = true
+    }
     val navigator = rememberWebViewNavigator()
     val scope = rememberCoroutineScope()
+    var challengeSolved by remember(page) { mutableStateOf(page.completionCookies().isEmpty()) }
+    var challengeChecked by remember(page) { mutableStateOf(false) }
     LaunchedEffect(uri, state.cookieManager) {
         seedCookies(uri, initialHeaders, state.cookieManager)
     }
     val closeBrowser: () -> Unit = {
         scope.launch {
-            val loadedUri = runCatching {
-                URI.create(state.lastLoadedUrl ?: uri.toString())
-            }.getOrDefault(uri)
-            syncCookies(loadedUri, state.cookieManager, cookieJar)
-            close()
+            val loadedUri = currentWebUri(state.lastLoadedUrl, uri)
+            try {
+                runCatching { syncCookies(uri, state.cookieManager, cookieJar) }
+                if (loadedUri != uri) {
+                    runCatching { syncCookies(loadedUri, state.cookieManager, cookieJar) }
+                }
+            } finally {
+                close()
+            }
+        }
+    }
+    val checkChallenge: () -> Unit = {
+        scope.launch {
+            val loadedUri = currentWebUri(state.lastLoadedUrl, uri)
+            challengeSolved = runCatching {
+                challengeCookiesPresent(
+                    listOf(uri, loadedUri),
+                    state.cookieManager,
+                    page.completionCookies(),
+                )
+            }.getOrDefault(false)
+            challengeChecked = true
         }
     }
     Scaffold(
@@ -80,6 +112,11 @@ internal fun BrowserScreen(
                     IconButton(onClick = navigator::reload) {
                         Icon(Icons.Default.Refresh, contentDescription = "Reload")
                     }
+                    if (page.completionCookies().isNotEmpty()) {
+                        IconButton(onClick = checkChallenge) {
+                            Icon(Icons.Default.CheckCircle, contentDescription = "Check web challenge")
+                        }
+                    }
                 },
             )
         },
@@ -91,6 +128,24 @@ internal fun BrowserScreen(
                     progress = { loading.progress },
                     modifier = Modifier.fillMaxWidth(),
                 )
+            }
+            if (page.completionCookies().isNotEmpty()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = when {
+                            challengeSolved -> "Challenge complete. Close to retry the source."
+                            challengeChecked -> "Challenge cookie not found yet."
+                            else -> "Complete the website challenge, then check it."
+                        },
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(onClick = checkChallenge) {
+                        Text("Check")
+                    }
+                }
             }
             WebView(
                 state = state,
@@ -126,8 +181,35 @@ private fun BrowserUnavailable(message: String, close: () -> Unit) {
     }
 }
 
-private fun browserHeaders(cookieJar: HttpCookieJar, uri: URI): Map<String, String> =
-    cookieJar.requestHeaders(uri).mapValues { (_, values) -> values.joinToString("; ") }
+private fun browserHeaders(cookieJar: HttpCookieJar, page: SourceWebPage): Map<String, String> = buildMap {
+    putAll(page.headers())
+    cookieJar.requestHeaders(page.location()).forEach { (name, values) ->
+        put(name, values.joinToString("; "))
+    }
+}
+
+private fun currentWebUri(value: String?, fallback: URI): URI {
+    val uri = runCatching { URI.create(value ?: fallback.toString()) }.getOrDefault(fallback)
+    return if (uri.scheme.equals("http", ignoreCase = true)
+        || uri.scheme.equals("https", ignoreCase = true)
+    ) {
+        uri
+    } else {
+        fallback
+    }
+}
+
+private suspend fun challengeCookiesPresent(
+    locations: List<URI>,
+    manager: com.multiplatform.webview.cookie.CookieManager,
+    expectedNames: Set<String>,
+): Boolean {
+    val cookieNames = locations.distinct()
+        .flatMap { manager.getCookies(it.toString()) }
+        .map { it.name.lowercase() }
+        .toSet()
+    return expectedNames.all { it.lowercase() in cookieNames }
+}
 
 private suspend fun seedCookies(
     uri: URI,

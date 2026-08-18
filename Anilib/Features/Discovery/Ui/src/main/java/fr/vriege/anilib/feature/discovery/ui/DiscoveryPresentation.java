@@ -11,10 +11,10 @@ import fr.vriege.anilib.feature.source.SourceFilterValue;
 import fr.vriege.anilib.feature.source.SourceId;
 import fr.vriege.anilib.feature.source.SourceListing;
 import fr.vriege.anilib.feature.source.SourcePage;
+import fr.vriege.anilib.feature.source.SourceWebPage;
 
 import java.util.List;
 import java.util.Map;
-import java.net.URI;
 import java.util.Optional;
 
 /** Platform-neutral snapshots and actions for the shared Browse experience. */
@@ -25,9 +25,9 @@ public interface DiscoveryPresentation {
 
     boolean supportsLatest(SourceId sourceId);
 
-    Optional<URI> sourceWebPage(SourceId sourceId);
+    Optional<SourceWebPage> sourceWebPage(SourceId sourceId);
 
-    Optional<URI> titleWebPage(SourceCatalogueItemId itemId);
+    Optional<SourceWebPage> titleWebPage(SourceCatalogueItemId itemId);
 
     SourcePage browse(
             SourceId sourceId,

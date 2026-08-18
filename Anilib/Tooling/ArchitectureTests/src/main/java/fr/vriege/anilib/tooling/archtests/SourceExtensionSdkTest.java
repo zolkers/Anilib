@@ -13,6 +13,7 @@ import fr.vriege.anilib.feature.source.SourcePermission;
 import fr.vriege.anilib.feature.source.SourcePermissionException;
 import fr.vriege.anilib.feature.source.SourceRegistry;
 import fr.vriege.anilib.feature.source.SourceSdk;
+import fr.vriege.anilib.feature.source.SourceWebPage;
 import fr.vriege.anilib.feature.source.bundle.SourceSdkPlugin;
 import fr.vriege.anilib.feature.network.NetworkCapabilities;
 import fr.vriege.anilib.framework.http.AnilibHttpClient;
@@ -28,6 +29,7 @@ import fr.vriege.anilib.kernel.runtime.DefaultPluginEngine;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -43,6 +45,7 @@ final class SourceExtensionSdkTest {
         rejectsDuplicateSourceIds(counter);
         rejectsIncompatibleApi(counter);
         validatesDescriptors(counter);
+        validatesBrowserPages(counter);
         enforcesExplicitPermissions(counter);
         rejectsInvalidExtensionDeclarations(counter);
         return counter.value;
@@ -100,8 +103,35 @@ final class SourceExtensionSdkTest {
                 "current Source API must support its streaming-content contract");
         counter.check(SourceSdk.API_VERSION.supports(new SourceApiVersion(1, 5)),
                 "current Source API must support its browser entry-point contract");
-        counter.check(!SourceSdk.API_VERSION.supports(new SourceApiVersion(1, 6)),
+        counter.check(SourceSdk.API_VERSION.supports(new SourceApiVersion(1, 6)),
+                "current Source API must support its browser-policy contract");
+        counter.check(!SourceSdk.API_VERSION.supports(new SourceApiVersion(1, 7)),
                 "current Source API must reject a newer minor contract");
+    }
+
+    private static void validatesBrowserPages(Counter counter) {
+        SourceWebPage page = new SourceWebPage(
+                URI.create("https://catalogue.example.test/challenge"),
+                Map.of("Referer", "https://catalogue.example.test/"),
+                Optional.of("Test Browser/1.0"),
+                Set.of("cf_clearance"));
+        counter.check(page.location().getHost().equals("catalogue.example.test")
+                        && page.completionCookies().equals(Set.of("cf_clearance")),
+                "browser pages must retain immutable source request and challenge policy");
+        counter.expectIllegalArgument(() -> SourceWebPage.of(URI.create("file:///tmp/source.html")),
+                "browser pages must reject non-web schemes");
+        counter.expectIllegalArgument(() -> new SourceWebPage(
+                        URI.create("https://catalogue.example.test/"),
+                        Map.of("Cookie", "session=secret"),
+                        Optional.empty(),
+                        Set.of()),
+                "browser pages must keep cookies under the shared cookie jar");
+        counter.expectIllegalArgument(() -> new SourceWebPage(
+                        URI.create("https://catalogue.example.test/"),
+                        Map.of(),
+                        Optional.empty(),
+                        Set.of("invalid cookie")),
+                "challenge completion cookies must use valid names");
     }
 
     private static void validatesDescriptors(Counter counter) {

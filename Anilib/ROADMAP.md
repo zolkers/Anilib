@@ -78,6 +78,7 @@ platform-specific.
 - [x] user-confirmed clear actions for shared HTTP cache, HTTP cookies, and WebView cookies
 - [ ] clear remaining WebView cache/storage and unused database entries
 - [x] source and title WebView with shared browser-session cookies
+- [x] source-declared WebView headers, User-Agent, and challenge-cookie completion
 - [ ] per-screen parity audit against the current Aniyomi information architecture
 
 Each checkbox should land through a Bundle that can be removed from the

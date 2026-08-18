@@ -24,6 +24,7 @@ import fr.vriege.anilib.feature.source.SourceListing;
 import fr.vriege.anilib.feature.source.SourcePage;
 import fr.vriege.anilib.feature.source.SourceSdk;
 import fr.vriege.anilib.feature.source.SourceSearchRequest;
+import fr.vriege.anilib.feature.source.SourceWebPage;
 import fr.vriege.anilib.feature.source.WebSource;
 import fr.vriege.anilib.foundation.component.ComponentDescriptor;
 import fr.vriege.anilib.kernel.StartedAnilib;
@@ -36,6 +37,7 @@ import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -95,11 +97,17 @@ final class DiscoveryTest {
                     "the shared presentation must expose selected extension Bundles but not built-ins");
             counter.check(discovery.supportsLatest(LOCAL_SOURCE),
                     "local catalogue must expose its latest listing");
-            counter.check(presentation.sourceWebPage(REMOTE_SOURCE)
-                            .orElseThrow().equals(URI.create("https://catalogue.example.test/")),
+            SourceWebPage sourcePage = presentation.sourceWebPage(REMOTE_SOURCE).orElseThrow();
+            counter.check(sourcePage.location().equals(URI.create("https://catalogue.example.test/"))
+                            && sourcePage.headers().equals(Map.of("Accept-Language", "en-US"))
+                            && sourcePage.userAgent().orElseThrow().equals("Anilib-Test/1.0")
+                            && sourcePage.completionCookies().equals(Set.of("cf_clearance")),
                     "the shared presentation must expose optional source browser entry points");
-            counter.check(presentation.titleWebPage(REMOTE_ITEM.id()).orElseThrow().equals(
-                            URI.create("https://catalogue.example.test/title/alpha-hero-reborn")),
+            SourceWebPage titlePage = presentation.titleWebPage(REMOTE_ITEM.id()).orElseThrow();
+            counter.check(titlePage.location().equals(
+                            URI.create("https://catalogue.example.test/title/alpha-hero-reborn"))
+                            && titlePage.userAgent().equals(sourcePage.userAgent())
+                            && titlePage.completionCookies().equals(sourcePage.completionCookies()),
                     "the shared presentation must expose optional title browser entry points");
             counter.check(presentation.sourceWebPage(LOCAL_SOURCE).isEmpty(),
                     "sources without a web contract must not expose a browser action");
@@ -246,6 +254,21 @@ final class DiscoveryTest {
         @Override
         public Optional<URI> titlePage(SourceCatalogueItemId itemId) {
             return Optional.of(URI.create("https://catalogue.example.test/title/" + itemId.value()));
+        }
+
+        @Override
+        public Map<String, String> browserHeaders(URI location) {
+            return Map.of("Accept-Language", "en-US");
+        }
+
+        @Override
+        public Optional<String> browserUserAgent(URI location) {
+            return Optional.of("Anilib-Test/1.0");
+        }
+
+        @Override
+        public Set<String> browserCompletionCookies(URI location) {
+            return Set.of("cf_clearance");
         }
     }
 

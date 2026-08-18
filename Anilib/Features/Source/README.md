@@ -11,7 +11,10 @@ the Reader for ordered content units, opaque page resources, and source-owned
 page bytes. API version `1.4` adds the optional `StreamingSource` contract for
 ordered episodes, stream candidates, request headers, formats, and subtitle
 tracks. API version `1.5` adds the optional `WebSource` contract for source and
-title browser entry points without exposing a platform WebView type.
+title browser entry points without exposing a platform WebView type. API
+version `1.6` adds immutable per-page headers, an optional User-Agent, and
+source-declared challenge completion cookies so the shared browser can return a
+verified session to the HTTP client.
 
 ## Extension shape
 

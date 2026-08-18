@@ -78,8 +78,8 @@ import fr.vriege.anilib.feature.source.SourcePage
 import fr.vriege.anilib.feature.source.SourcePermission
 import fr.vriege.anilib.feature.source.SourcePreferenceType
 import fr.vriege.anilib.feature.source.SourceId
+import fr.vriege.anilib.feature.source.SourceWebPage
 import fr.vriege.anilib.framework.http.HttpCookieJar
-import java.net.URI
 import java.util.Locale
 
 private enum class BrowseSection(val label: String, val kind: SourceContentKind?) {
@@ -105,7 +105,7 @@ internal fun DiscoveryScreen(
     var globalSearch by remember { mutableStateOf(false) }
     var globalQuery by remember { mutableStateOf("") }
     var pinnedSources by remember { mutableStateOf<Set<SourceId>>(emptySet()) }
-    var browserPage by remember { mutableStateOf<URI?>(null) }
+    var browserPage by remember { mutableStateOf<SourceWebPage?>(null) }
 
     browserPage?.let { page ->
         BrowserScreen(page, browserCookies, browserRuntimeStatus) { browserPage = null }
@@ -309,7 +309,7 @@ private fun SourceCatalogueScreen(
     source: SourceDescriptor,
     listing: SourceListing,
     presentation: DiscoveryPresentation,
-    openWebPage: (URI) -> Unit,
+    openWebPage: (SourceWebPage) -> Unit,
     navigateUp: () -> Unit,
 ) {
     var query by remember(source.id()) { mutableStateOf("") }
@@ -452,8 +452,8 @@ private fun ColumnScope.CatalogueContent(
     page: SourcePage,
     grid: Boolean,
     add: (SourceCatalogueItem) -> Unit,
-    webPage: (SourceCatalogueItem) -> URI?,
-    openWebPage: (URI) -> Unit,
+    webPage: (SourceCatalogueItem) -> SourceWebPage?,
+    openWebPage: (SourceWebPage) -> Unit,
 ) {
     if (page.items().isEmpty()) {
         EmptyDiscovery("No results found")
@@ -484,8 +484,8 @@ private fun ColumnScope.CatalogueContent(
 private fun CatalogueCard(
     item: SourceCatalogueItem,
     add: (SourceCatalogueItem) -> Unit,
-    webPage: URI?,
-    openWebPage: (URI) -> Unit,
+    webPage: SourceWebPage?,
+    openWebPage: (SourceWebPage) -> Unit,
 ) {
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
         Column(modifier = Modifier.fillMaxWidth().padding(14.dp)) {
@@ -518,8 +518,8 @@ private fun CatalogueCard(
 private fun CatalogueRow(
     item: SourceCatalogueItem,
     add: (SourceCatalogueItem) -> Unit,
-    webPage: URI?,
-    openWebPage: (URI) -> Unit,
+    webPage: SourceWebPage?,
+    openWebPage: (SourceWebPage) -> Unit,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),

@@ -26,9 +26,9 @@ import fr.vriege.anilib.feature.source.SourcePreferenceDefinition;
 import fr.vriege.anilib.feature.source.SourcePreferenceType;
 import fr.vriege.anilib.feature.source.SourceRegistry;
 import fr.vriege.anilib.feature.source.SourceSearchRequest;
+import fr.vriege.anilib.feature.source.SourceWebPage;
 import fr.vriege.anilib.feature.source.WebSource;
 
-import java.net.URI;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -91,16 +91,17 @@ public final class DefaultDiscoveryService implements DiscoveryService {
     }
 
     @Override
-    public Optional<URI> sourceWebPage(SourceId sourceId) {
-        return webSource(sourceId).map(WebSource::homePage).map(DefaultDiscoveryService::webUri);
+    public Optional<SourceWebPage> sourceWebPage(SourceId sourceId) {
+        return webSource(sourceId).map(source -> Objects.requireNonNull(
+                source.homeBrowserPage(), "source browser page must not be null"));
     }
 
     @Override
-    public Optional<URI> titleWebPage(SourceCatalogueItemId itemId) {
+    public Optional<SourceWebPage> titleWebPage(SourceCatalogueItemId itemId) {
         Objects.requireNonNull(itemId, "itemId must not be null");
         return webSource(itemId.sourceId())
-                .flatMap(source -> source.titlePage(itemId))
-                .map(DefaultDiscoveryService::webUri);
+                .flatMap(source -> Objects.requireNonNull(
+                        source.titleBrowserPage(itemId), "title browser page must not be null"));
     }
 
     @Override
@@ -298,16 +299,6 @@ public final class DefaultDiscoveryService implements DiscoveryService {
         return registry.find(Objects.requireNonNull(sourceId, "sourceId must not be null"))
                 .filter(WebSource.class::isInstance)
                 .map(WebSource.class::cast);
-    }
-
-    private static URI webUri(URI value) {
-        URI uri = Objects.requireNonNull(value, "web URI must not be null").normalize();
-        String scheme = uri.getScheme();
-        if (!uri.isAbsolute() || uri.getHost() == null || uri.getUserInfo() != null
-                || !(scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https"))) {
-            throw new IllegalArgumentException("Source web pages must be absolute HTTP(S) URIs without user info");
-        }
-        return uri;
     }
 
     private static void requireUnique(List<String> values, String label) {

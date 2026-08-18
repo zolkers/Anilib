@@ -94,12 +94,14 @@ favourites. Its platform-neutral presentation is the only surface consumed by
 the shared Compose Browse screen, so Android and desktop cannot drift into two
 different discovery implementations.
 
-Source API 1.5 adds the optional `WebSource` contract for source and title web
+Source API 1.6 owns the optional `WebSource` contract for source and title web
 entry points. Discovery validates absolute HTTP(S) locations before exposing
-them to the UI. The shared Compose browser owns navigation and transfers
-session cookies through the framework `HttpCookieJar`; only platform adapters
-select the engine, using Android System WebView or desktop KCEF. Browser engine
-types and lifecycle therefore remain outside Java feature code.
+them to the UI. Each immutable page can carry source-defined request headers,
+User-Agent, and challenge-completion cookie names. The shared Compose browser
+owns navigation, verifies those cookies, and transfers the resulting session
+through the framework `HttpCookieJar`; only platform adapters select the
+engine, using Android System WebView or desktop KCEF. Browser engine types and
+lifecycle therefore remain outside Java feature code.
 
 Reader is another removable vertical over Library and Source. Its Bundle
 resolves a library origin only through the typed Source registry and accepts
