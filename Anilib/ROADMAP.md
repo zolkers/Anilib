@@ -10,6 +10,12 @@ but it must not simplify or reinterpret an Aniyomi workflow merely because its
 internal implementation is different. The refactor applies to ownership and
 modularity behind the UI; Aniyomi remains the product reference.
 
+This roadmap records architectural delivery milestones. It is not a percentage
+of end-user parity. The auditable screen and behavior comparison lives in
+[`PARITY.md`](PARITY.md); a capability is marked complete there only when it is
+reachable from both supported products or explicitly documented as
+platform-specific.
+
 ## Phase 0 — architecture bootstrap
 
 - [x] Java 21 multi-module core with allowlisted platform UI libraries only
@@ -56,6 +62,16 @@ modularity behind the UI; Aniyomi remains the product reference.
 - [ ] extension signing, compatibility metadata, and update channels
 - [ ] import compatibility for user-owned Aniyomi backups where legally and
   technically feasible
+
+## Phase 6 — bring-your-own sources and complete settings
+
+- [ ] user-managed extension repository URLs using the Aniyomi index shape
+- [ ] signed portable Anilib bundles with install, update, disable, and remove
+- [ ] best-effort Android bridge for user-supplied Aniyomi extension APKs
+- [ ] shared Settings hierarchy with persistent appearance and feature policy
+- [ ] clear HTTP cache, cookies, WebView data, and unused database entries
+- [ ] source and title WebView with shared browser-session cookies
+- [ ] per-screen parity audit against the current Aniyomi information architecture
 
 Each checkbox should land through a Bundle that can be removed from the
 Standard configuration without changing unrelated features.
