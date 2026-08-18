@@ -166,11 +166,13 @@ final class AniyomiAnimeFilterAdapter {
         Class<?> current = filter.getClass();
         while (current != null && !current.equals(Object.class)) {
             String name = current.getName();
-            int marker = name.indexOf("AnimeFilter$");
-            if (marker >= 0) {
-                String nested = name.substring(marker + "AnimeFilter$".length());
-                int next = nested.indexOf('$');
-                return next < 0 ? nested : nested.substring(0, next);
+            for (String marker : List.of("AnimeFilter$", "Filter$")) {
+                int position = name.indexOf(marker);
+                if (position >= 0) {
+                    String nested = name.substring(position + marker.length());
+                    int next = nested.indexOf('$');
+                    return next < 0 ? nested : nested.substring(0, next);
+                }
             }
             current = current.getSuperclass();
         }
@@ -313,10 +315,7 @@ final class AniyomiAnimeFilterAdapter {
                     .findFirst()
                     .orElseThrow(() -> new IllegalArgumentException("Unknown Aniyomi sort option: " + value));
             try {
-                Class<?> type = Class.forName(
-                        "eu.kanade.tachiyomi.animesource.model.AnimeFilter$Sort$Selection",
-                        false,
-                        filter.getClass().getClassLoader());
+                Class<?> type = sortSelectionType(filter.getClass().getClassLoader());
                 Constructor<?> constructor = type.getConstructor(int.class, boolean.class);
                 return constructor.newInstance(selection.index(), selection.ascending());
             } catch (ClassNotFoundException | NoSuchMethodException | InstantiationException
@@ -324,6 +323,20 @@ final class AniyomiAnimeFilterAdapter {
                 throw new IllegalStateException("Aniyomi sort selection ABI is unavailable", exception);
             } catch (InvocationTargetException exception) {
                 throw new IllegalStateException("Unable to create Aniyomi sort selection", exception.getCause());
+            }
+        }
+
+        private static Class<?> sortSelectionType(ClassLoader classLoader) throws ClassNotFoundException {
+            try {
+                return Class.forName(
+                        "eu.kanade.tachiyomi.animesource.model.AnimeFilter$Sort$Selection",
+                        false,
+                        classLoader);
+            } catch (ClassNotFoundException ignored) {
+                return Class.forName(
+                        "eu.kanade.tachiyomi.source.model.Filter$Sort$Selection",
+                        false,
+                        classLoader);
             }
         }
     }

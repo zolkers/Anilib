@@ -96,6 +96,7 @@ public final class AndroidReleaseRule implements AnilibJavaRule {
                 "preflight.report(extension)",
                 "ApkExtensionRuntimeState.HOST_ABI_AVAILABLE",
                 "AniyomiAnimeSourceAdapter.adapt",
+                "AniyomiMangaSourceAdapter.adapt",
                 "preferenceBridge.project(source)",
                 "inventory.discover(extension.packageName())",
                 "ApkExtensionRuntimeReport.activationFailed");

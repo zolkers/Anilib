@@ -5,7 +5,9 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.os.Build
 import dalvik.system.PathClassLoader
+import fr.vriege.anilib.feature.extensionrepository.ExtensionContentKind
 import fr.vriege.anilib.feature.extensionrepository.runtime.AniyomiAnimeSourceAdapter
+import fr.vriege.anilib.feature.extensionrepository.runtime.AniyomiMangaSourceAdapter
 import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionRuntimeReport
 import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionRuntimeState
 import fr.vriege.anilib.feature.extensionrepository.ui.InstalledApkExtension
@@ -16,6 +18,11 @@ import java.lang.reflect.InvocationTargetException
 internal data class AndroidApkSourceActivation(
     val bundles: List<AnilibPlugin>,
     val reports: Map<String, ApkExtensionRuntimeReport>,
+)
+
+private data class AdaptedApkSource(
+    val sourceId: SourceId,
+    val bundle: AnilibPlugin,
 )
 
 internal class AndroidAniyomiSourceRuntime(
@@ -40,7 +47,7 @@ internal class AndroidAniyomiSourceRuntime(
             try {
                 val adapted = load(extension)
                 require(adapted.isNotEmpty()) { "APK extension created no sources" }
-                val sourceIds = adapted.map { it.source().descriptor().id() }
+                val sourceIds = adapted.map(AdaptedApkSource::sourceId)
                 require(sourceIds.toSet().size == sourceIds.size) {
                     "APK extension created duplicate source IDs"
                 }
@@ -48,7 +55,7 @@ internal class AndroidAniyomiSourceRuntime(
                     "APK source ID collides with another selected APK"
                 }
                 selectedSourceIds.addAll(sourceIds)
-                bundles.addAll(adapted.map(AniyomiAnimeSourceAdapter.AdaptedSource::bundle))
+                bundles.addAll(adapted.map(AdaptedApkSource::bundle))
                 reports[extension.packageName()] = ApkExtensionRuntimeReport.active(
                     extension.packageName(),
                     certificate,
@@ -66,7 +73,7 @@ internal class AndroidAniyomiSourceRuntime(
 
     private fun load(
         extension: InstalledApkExtension,
-    ): List<AniyomiAnimeSourceAdapter.AdaptedSource> {
+    ): List<AdaptedApkSource> {
         val applicationInfo = applicationInfo(extension.packageName())
         val sourcePath = requireNotNull(applicationInfo.sourceDir) {
             "APK extension has no source path"
@@ -75,17 +82,31 @@ internal class AndroidAniyomiSourceRuntime(
         return extension.sourceEntrypoints()
             .flatMap { entrypoint -> instantiate(entrypoint, classLoader) }
             .map { source ->
-                AniyomiAnimeSourceAdapter.adapt(
-                    extension.packageName(),
-                    extension.versionName(),
-                    source,
-                    {
-                        inventory.discover(extension.packageName())
-                            ?.let(preflight::report)
-                            ?.state() == ApkExtensionRuntimeState.HOST_ABI_AVAILABLE
-                    },
-                    preferenceBridge.project(source),
-                )
+                val authorized = {
+                    inventory.discover(extension.packageName())
+                        ?.let(preflight::report)
+                        ?.state() == ApkExtensionRuntimeState.HOST_ABI_AVAILABLE
+                }
+                val preferences = preferenceBridge.project(source)
+                when (extension.contentKind()) {
+                    ExtensionContentKind.ANIME -> AniyomiAnimeSourceAdapter.adapt(
+                        extension.packageName(),
+                        extension.versionName(),
+                        source,
+                        authorized,
+                        preferences,
+                    ).let { AdaptedApkSource(it.source().descriptor().id(), it.bundle()) }
+                    ExtensionContentKind.MANGA -> AniyomiMangaSourceAdapter.adapt(
+                        extension.packageName(),
+                        extension.versionName(),
+                        source,
+                        authorized,
+                        preferences,
+                    ).let { AdaptedApkSource(it.source().descriptor().id(), it.bundle()) }
+                    ExtensionContentKind.MIXED,
+                    ExtensionContentKind.UNKNOWN,
+                    -> error("APK extension has no executable media kind")
+                }
             }
     }
 

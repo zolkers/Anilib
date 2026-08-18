@@ -124,6 +124,111 @@ public final class AniyomiAdapterFixture {
         }
     }
 
+    public static final class ModernMangaSource {
+        public long getId() {
+            return 126L;
+        }
+
+        public String getName() {
+            return "Modern Manga Example";
+        }
+
+        public String getLang() {
+            return "en";
+        }
+
+        public boolean getSupportsLatest() {
+            return true;
+        }
+
+        public Object getFilterList() {
+            return List.of();
+        }
+
+        public MangaPage getPopularManga(int page, Object continuation) {
+            return new MangaPage(List.of(new Manga()), true);
+        }
+
+        public MangaPage getLatestUpdates(int page, Object continuation) {
+            return getPopularManga(page, continuation);
+        }
+
+        public MangaPage getSearchManga(int page, String query, Object filters, Object continuation) {
+            return getPopularManga(page, continuation);
+        }
+
+        public MangaUpdate getMangaUpdate(
+                Manga manga,
+                List<Chapter> chapters,
+                boolean fetchDetails,
+                boolean fetchChapters,
+                Object continuation) {
+            return new MangaUpdate(manga, List.of(new Chapter()));
+        }
+
+        public List<MangaImagePage> getPageList(Chapter chapter, Object continuation) {
+            return List.of(new MangaImagePage());
+        }
+    }
+
+    public record MangaPage(List<Manga> mangas, boolean hasNextPage) {
+        public List<Manga> getMangas() {
+            return mangas;
+        }
+
+        public boolean getHasNextPage() {
+            return hasNextPage;
+        }
+    }
+
+    public static final class Manga {
+        public String getUrl() {
+            return "/manga/example";
+        }
+
+        public String getTitle() {
+            return "Example Manga";
+        }
+
+        public String getDescription() {
+            return "Example manga description";
+        }
+
+        public String getThumbnail_url() {
+            return "https://example.test/manga-cover.jpg";
+        }
+    }
+
+    public record MangaUpdate(Manga manga, List<Chapter> chapters) {
+        public List<Chapter> getChapters() {
+            return chapters;
+        }
+    }
+
+    public static final class Chapter {
+        public String getUrl() {
+            return "/chapter/1";
+        }
+
+        public String getName() {
+            return "Chapter 1";
+        }
+
+        public long getDate_upload() {
+            return 1_700_000_000_000L;
+        }
+    }
+
+    public static final class MangaImagePage {
+        public String getUrl() {
+            return "";
+        }
+
+        public String getImageUrl() {
+            return "https://cdn.example.test/page-1.jpg";
+        }
+    }
+
     public static final class Hoster {
         public List<Video> getVideoList() {
             return null;

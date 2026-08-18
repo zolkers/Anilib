@@ -107,7 +107,8 @@ platform-specific.
     models and apply their values before extension requests
   - [x] discover manga extension APK metadata and preflight its host ABI separately
     from the anime contract
-  - [ ] add the equivalent trusted APK bridge for manga extensions
+  - [x] add the equivalent trusted APK bridge for manga catalogue, chapters,
+    reader pages, filters, preferences, and bounded extension-client downloads
 - [x] shared Settings Bundle with durable appearance and feature-policy preferences
 - [x] live Android and desktop theme selection from shared settings
 - [x] enforce Wi-Fi, incognito, and adult-content policies in their owning Bundles

@@ -97,7 +97,10 @@ sources project AndroidX switch, text, and select controls into the same Source
 preference schema used by portable Bundles. Anilib's shared Android/desktop
 screen owns the durable selection; the Android adapter commits its request
 snapshot into the APK source's expected `SharedPreferences` immediately before
-the source call. One package failure does not
+the source call. Metadata-compatible manga APKs use a separate adapter for
+RxJava or suspend catalogue/search calls, combined manga/chapter updates,
+chapter pages, bounded page downloads through the extension HTTP client,
+filters, preferences, and the Anilib Reader contract. One package failure does not
 select a partial Bundle and is displayed in the shared repository screen. Each
 bridged operation rechecks the currently installed signer, so forgetting trust
 or replacing the APK immediately blocks subsequent calls.

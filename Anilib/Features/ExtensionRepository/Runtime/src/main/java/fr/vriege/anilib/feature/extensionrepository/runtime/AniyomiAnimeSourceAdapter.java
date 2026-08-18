@@ -365,12 +365,12 @@ public final class AniyomiAnimeSourceAdapter {
         }
     }
 
-    private static Object await(Object value) {
+    static Object await(Object value) {
         Optional<Object> blocking = invokeOptional(value, "toBlocking");
         return blocking.map(result -> invoke(result, "single")).orElse(value);
     }
 
-    private static Object invokeModernOrRx(
+    static Object invokeModernOrRx(
             Object target,
             String suspendMethod,
             String rxMethod,
@@ -381,7 +381,7 @@ public final class AniyomiAnimeSourceAdapter {
         return await(invoke(target, rxMethod, arguments));
     }
 
-    private static Object invokeSuspend(Object target, String methodName, Object... arguments) {
+    static Object invokeSuspend(Object target, String methodName, Object... arguments) {
         Object value = Preconditions.requireNonNull(target, "reflection target");
         Method method = compatibleSuspendMethod(value.getClass(), methodName, arguments)
                 .orElseThrow(() -> new IllegalStateException(
@@ -474,7 +474,7 @@ public final class AniyomiAnimeSourceAdapter {
         }
     }
 
-    private static boolean hasMethod(Object target, String methodName, int parameterCount) {
+    static boolean hasMethod(Object target, String methodName, int parameterCount) {
         return List.of(target.getClass().getMethods()).stream()
                 .anyMatch(method -> method.getName().equals(methodName)
                         && method.getParameterCount() == parameterCount);
@@ -499,7 +499,7 @@ public final class AniyomiAnimeSourceAdapter {
         return false;
     }
 
-    private static boolean hasCompatibleSuspendMethod(Object target, String methodName, Object... arguments) {
+    static boolean hasCompatibleSuspendMethod(Object target, String methodName, Object... arguments) {
         return compatibleSuspendMethod(target.getClass(), methodName, arguments).isPresent();
     }
 
@@ -595,7 +595,7 @@ public final class AniyomiAnimeSourceAdapter {
         throw new IllegalStateException("Aniyomi boolean property has an invalid type");
     }
 
-    private static String text(Object value, String label) {
+    static String text(Object value, String label) {
         if (value instanceof String text && !text.isBlank()) {
             return text;
         }
@@ -611,7 +611,7 @@ public final class AniyomiAnimeSourceAdapter {
         return text.isEmpty() ? Optional.empty() : Optional.of(text);
     }
 
-    private static String firstText(Object target, String... methods) {
+    static String firstText(Object target, String... methods) {
         for (String method : methods) {
             Optional<Object> value = invokeOptional(target, method);
             if (value.isPresent() && value.get() instanceof String text && !text.isBlank()) {
@@ -621,7 +621,7 @@ public final class AniyomiAnimeSourceAdapter {
         throw new IllegalStateException("Aniyomi text property is missing: " + String.join(" or ", methods));
     }
 
-    private static Optional<URI> absoluteUri(Object value) {
+    static Optional<URI> absoluteUri(Object value) {
         if (!(value instanceof String text) || text.isBlank()) {
             return Optional.empty();
         }
@@ -637,7 +637,7 @@ public final class AniyomiAnimeSourceAdapter {
         }
     }
 
-    private static Optional<Instant> uploadedAt(Object value) {
+    static Optional<Instant> uploadedAt(Object value) {
         if (!(value instanceof Number number) || number.longValue() <= 0) {
             return Optional.empty();
         }
@@ -689,11 +689,11 @@ public final class AniyomiAnimeSourceAdapter {
         return SourceStreamFormat.AUTOMATIC;
     }
 
-    private static String sourceId(long numericId) {
+    static String sourceId(long numericId) {
         return "aniyomi." + Long.toUnsignedString(numericId);
     }
 
-    private static String language(Object value) {
+    static String language(Object value) {
         String language = nullableText(value).strip();
         return language.isEmpty() || language.equalsIgnoreCase("all") ? "und" : language;
     }

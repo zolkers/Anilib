@@ -55,7 +55,7 @@ final class AndroidReleaseRuleTest {
             write(sourceRuntime, """
                     PathClassLoader preflight.report(extension)
                     ApkExtensionRuntimeState.HOST_ABI_AVAILABLE
-                    AniyomiAnimeSourceAdapter.adapt
+                    AniyomiAnimeSourceAdapter.adapt AniyomiMangaSourceAdapter.adapt
                     preferenceBridge.project(source)
                     inventory.discover(extension.packageName())
                     ApkExtensionRuntimeReport.activationFailed
@@ -111,7 +111,7 @@ final class AndroidReleaseRuleTest {
                     ApkExtensionRuntimeState.HOST_ABI_MISSING
                     ANIME_HOST_CLASSES MANGA_HOST_CLASSES
                     """);
-            write(sourceRuntime, "PathClassLoader preflight.report(extension)");
+            write(sourceRuntime, "PathClassLoader preflight.report(extension) AniyomiMangaSourceAdapter.adapt");
             check(rule.analyze(snapshot).stream()
                             .anyMatch(diagnostic -> diagnostic.message().contains("AniyomiAnimeSourceAdapter.adapt")),
                     "APK activation must retain its explicit Source adapter boundary");

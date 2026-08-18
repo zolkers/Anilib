@@ -12,6 +12,7 @@ import fr.vriege.anilib.feature.extensionrepository.ExtensionSourceMetadata;
 import fr.vriege.anilib.feature.extensionrepository.InstalledExtensionPackage;
 import fr.vriege.anilib.feature.extensionrepository.runtime.AniyomiRepositoryIndexParser;
 import fr.vriege.anilib.feature.extensionrepository.runtime.AniyomiAnimeSourceAdapter;
+import fr.vriege.anilib.feature.extensionrepository.runtime.AniyomiMangaSourceAdapter;
 import fr.vriege.anilib.feature.extensionrepository.runtime.AniyomiSourcePreferences;
 import fr.vriege.anilib.feature.extensionrepository.runtime.DefaultExtensionInstallationService;
 import fr.vriege.anilib.feature.extensionrepository.runtime.DefaultExtensionRepositoryService;
@@ -30,12 +31,15 @@ import fr.vriege.anilib.framework.http.AnilibHttpClient;
 import fr.vriege.anilib.framework.http.HttpRequest;
 import fr.vriege.anilib.framework.http.HttpResponse;
 import fr.vriege.anilib.feature.source.CatalogueSource;
+import fr.vriege.anilib.feature.source.PagedSource;
 import fr.vriege.anilib.feature.source.SourceBrowseRequest;
+import fr.vriege.anilib.feature.source.SourceContentKind;
 import fr.vriege.anilib.feature.source.SourceEpisode;
 import fr.vriege.anilib.feature.source.SourceFilterType;
 import fr.vriege.anilib.feature.source.SourceFilterValue;
 import fr.vriege.anilib.feature.source.SourcePage;
 import fr.vriege.anilib.feature.source.SourcePermission;
+import fr.vriege.anilib.feature.source.SourcePageResource;
 import fr.vriege.anilib.feature.source.SourcePreferenceDefinition;
 import fr.vriege.anilib.feature.source.SourcePreferenceType;
 import fr.vriege.anilib.feature.source.SourceSearchRequest;
@@ -88,6 +92,7 @@ final class ExtensionRepositoryTest {
         modelsInstalledApkDiscovery(counter);
         adaptsAbiReadyAnimeSource(counter);
         adaptsModernSuspendAndHosterAnimeSource(counter);
+        adaptsModernMangaSource(counter);
         adaptsConfigurableAnimeSourcePreferences(counter);
         return counter.value;
     }
@@ -557,6 +562,30 @@ final class ExtensionRepositoryTest {
                 "configurable APK sources must expose their preference schema through the shared Source API");
         counter.check(applied.get().equals(selected),
                 "shared Android and desktop preference selections must reach the APK source before requests");
+    }
+
+    private static void adaptsModernMangaSource(Counter counter) {
+        AniyomiMangaSourceAdapter.AdaptedSource adapted = AniyomiMangaSourceAdapter.adapt(
+                "eu.kanade.tachiyomi.extension.en.example",
+                "1.6.1",
+                new AniyomiAdapterFixture.ModernMangaSource());
+        CatalogueSource catalogue = (CatalogueSource) adapted.source();
+        SourcePage page = catalogue.popular(new SourceBrowseRequest(1, 20, List.of(), Map.of()));
+        counter.check(page.items().size() == 1
+                        && page.items().getFirst().title().equals("Example Manga")
+                        && page.items().getFirst().contentKind() == SourceContentKind.MANGA,
+                "an ABI-ready manga APK source must adapt its catalogue into Anilib models");
+        PagedSource paged = (PagedSource) adapted.source();
+        var chapters = paged.contentUnits(page.items().getFirst().id());
+        counter.check(chapters.size() == 1
+                        && chapters.getFirst().title().equals("Chapter 1")
+                        && chapters.getFirst().publishedAt().isPresent(),
+                "the manga APK bridge must project chapter identity and publication time");
+        List<SourcePageResource> pages = paged.pages(chapters.getFirst().id());
+        counter.check(pages.size() == 1
+                        && pages.getFirst().index() == 0
+                        && pages.getFirst().value().contains("page-1.jpg"),
+                "the manga APK bridge must project a validated reader page sequence");
     }
 
     private static ExtensionPackageMetadata portablePackage(
