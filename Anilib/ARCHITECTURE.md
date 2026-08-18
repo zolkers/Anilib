@@ -150,6 +150,18 @@ rewrites HLS segment, key, map, and nested-playlist locations. It binds only to
 `127.0.0.1`, closes with the playback handle, and never exposes an unrestricted
 forward proxy.
 
+Tracker is a removable vertical over Library. Its versioned Java SDK models
+authentication, remote search, title binding, provider-supported statuses and
+score scales, fractional progress, dates, privacy, refresh, removal, and
+progress synchronization. Tracker adapters are explicit `AnilibPlugin` units
+registered through one transactional registrar; Standard installs no hidden
+provider list. A network adapter declares exact origins and receives only a
+restricted HTTP client, while AnilibJava applies the same direct network,
+filesystem, reflection, Network, and Kernel import bans used for source
+extensions. Core stores no credentials. It atomically persists only remote
+title mirrors and owns their versioned `tracking` backup section. Android and
+desktop share the same account settings, search, binding, and editing surfaces.
+
 HTTP is split at the platform boundary. Framework contracts own immutable
 requests and responses plus cookie, cache, rate-limit, and low-level transport
 ports. One shared policy engine applies those contracts. Desktop injects the

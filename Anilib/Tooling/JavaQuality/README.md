@@ -11,6 +11,7 @@ The standard registry currently enforces:
 - explicit manifest dependencies for cross-module Java imports;
 - exact per-platform UI dependency and compiler-plugin allowlists;
 - Kotlin platform source packages, imports, layout, and formatting;
+- capability-context isolation for source and tracker extension bundles;
 - a compact whitespace and line-length baseline.
 
 Run it directly or through the full gate:

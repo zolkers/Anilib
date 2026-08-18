@@ -33,8 +33,8 @@ pause/cancel/resume controls, restart-safe partial downloads, storage quotas,
 and offline reading through the same Reader on Android and desktop.
 The removable Backup Bundle creates checksum-verified local archives from
 feature-owned versioned codecs, previews their contents, and restores Library
-source preferences, and playback state with merge semantics and cross-section
-rollback.
+source preferences, playback state, and tracking bindings with merge semantics
+and cross-section rollback.
 The removable Player Bundle consumes Source API 1.4 streaming extensions,
 exposes episodes, qualities, formats, request metadata, and subtitles, and
 persists per-episode resume and watched state across Android and desktop. Its
@@ -44,6 +44,10 @@ either implementation into the shared product core. Protected streams retain
 their source-provided `Referer`, cookies, user agent, byte ranges, redirects,
 subtitle headers, and HLS headers across playlists, segments, and encryption
 keys.
+The removable Tracker Bundle adds a versioned adapter SDK, explicit opt-in
+registrations, restricted network contexts, account login/logout, remote title
+search and binding, status, progress, score, dates, privacy, refresh, removal,
+restart-safe mirrors, and shared Android/desktop tracking screens.
 The repository also contains the dependency-free
 `AnilibJava` quality checker. Kotlin and audited UI dependencies are confined
 to outer platform renderers; shared contracts and behavior remain Java 21.
