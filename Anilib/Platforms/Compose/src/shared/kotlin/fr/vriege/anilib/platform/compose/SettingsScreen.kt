@@ -38,6 +38,8 @@ import com.multiplatform.webview.cookie.WebViewCookieManager
 import fr.vriege.anilib.feature.network.NetworkMaintenance
 import fr.vriege.anilib.feature.network.NetworkPolicy
 import fr.vriege.anilib.feature.settings.SettingsSnapshot
+import fr.vriege.anilib.feature.settings.DiagnosticResetArea
+import fr.vriege.anilib.feature.settings.DiagnosticResetPlan
 import fr.vriege.anilib.feature.settings.LanguagePack
 import fr.vriege.anilib.feature.settings.ThemeMode
 import fr.vriege.anilib.feature.settings.TypographyScale
@@ -54,6 +56,7 @@ internal fun SettingsScreen(
     settings: SettingsSnapshot,
     maintenance: NetworkMaintenance,
     browserDataController: BrowserDataController,
+    diagnosticExportPicker: BackupImportPicker,
     openExtensionRepositories: () -> Unit,
     openTracking: () -> Unit,
     openBackup: () -> Unit,
@@ -65,6 +68,8 @@ internal fun SettingsScreen(
     var confirmation by remember { mutableStateOf<MaintenanceAction?>(null) }
     var result by remember { mutableStateOf<String?>(null) }
     var networkPolicyDialog by remember { mutableStateOf(false) }
+    var diagnosticsDialog by remember { mutableStateOf(false) }
+    var resetPlan by remember { mutableStateOf<DiagnosticResetPlan?>(null) }
     val browserCookies = remember { WebViewCookieManager() }
     val scope = rememberCoroutineScope()
 
@@ -126,6 +131,7 @@ internal fun SettingsScreen(
             openAbout = openAbout,
             requestMaintenance = { confirmation = it },
             openNetworkPolicy = { networkPolicyDialog = true },
+            openDiagnostics = { diagnosticsDialog = true },
             goBack = { destination = null },
         )
     }
@@ -148,6 +154,34 @@ internal fun SettingsScreen(
     }
     if (networkPolicyDialog) {
         NetworkPolicyDialog(maintenance, close = { networkPolicyDialog = false })
+    }
+    if (diagnosticsDialog) {
+        DiagnosticsDialog(
+            presentation,
+            diagnosticExportPicker,
+            requestReset = { resetPlan = it },
+            close = { diagnosticsDialog = false },
+        )
+    }
+    resetPlan?.let { plan ->
+        AlertDialog(
+            onDismissRequest = { resetPlan = null },
+            title = { Text("Confirm safe reset") },
+            text = {
+                Text(
+                    "Remove ${plan.targets().size} allowlisted targets and reclaim " +
+                        "${formatDiagnosticBytes(plan.reclaimableBytes())}?",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    presentation.executeReset(plan)
+                    resetPlan = null
+                    diagnosticsDialog = false
+                }) { Text("Reset") }
+            },
+            dismissButton = { TextButton(onClick = { resetPlan = null }) { Text("Cancel") } },
+        )
     }
 }
 
@@ -251,6 +285,7 @@ private fun SettingsDetail(
     openAbout: () -> Unit,
     requestMaintenance: (MaintenanceAction) -> Unit,
     openNetworkPolicy: () -> Unit,
+    openDiagnostics: () -> Unit,
     goBack: () -> Unit,
 ) {
     Scaffold(topBar = { SettingsTopBar(destination.title, goBack) }) { padding ->
@@ -382,6 +417,13 @@ private fun SettingsDetail(
                     }
                     item { SettingsSection("Application data") }
                     item {
+                        SettingsRow(
+                            "Storage and diagnostics",
+                            "Inspect storage, logs, crash reports, export, and safe reset",
+                            openDiagnostics,
+                        )
+                    }
+                    item {
                         SettingsRow("Clean database", "Remove records for titles no longer in the library") {
                             requestMaintenance(MaintenanceAction.UNUSED_DATA)
                         }
@@ -393,6 +435,82 @@ private fun SettingsDetail(
             }
         }
     }
+}
+
+@Composable
+private fun DiagnosticsDialog(
+    presentation: SettingsPresentation,
+    exportPicker: BackupImportPicker,
+    requestReset: (DiagnosticResetPlan) -> Unit,
+    close: () -> Unit,
+) {
+    var revision by remember { mutableStateOf(0) }
+    val snapshot = remember(presentation, revision) { presentation.diagnostics() }
+    var feedback by remember { mutableStateOf<String?>(null) }
+    AlertDialog(
+        onDismissRequest = close,
+        title = { Text("Storage and diagnostics") },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text("${formatDiagnosticBytes(snapshot.totalBytes())} in ${snapshot.totalFiles()} files")
+                Text(snapshot.dataDirectory().toString(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                snapshot.storage().forEach { usage ->
+                    SettingsRow(
+                        usage.area(),
+                        "${formatDiagnosticBytes(usage.bytes())} · ${usage.files()} files",
+                    )
+                }
+                SettingsSection("Reports")
+                if (snapshot.reports().isEmpty()) {
+                    SettingsHint("No log or crash report is available.")
+                } else {
+                    snapshot.reports().forEach { report ->
+                        SettingsRow(
+                            report.name(),
+                            "${report.type().name.lowercase()} · ${formatDiagnosticBytes(report.bytes())}",
+                        )
+                    }
+                }
+                TextButton(onClick = {
+                    runCatching { presentation.exportDiagnostics() }
+                        .onSuccess { archive ->
+                            exportPicker.export(
+                                archive,
+                                { feedback = "Diagnostics exported" },
+                                { feedback = it },
+                            )
+                        }
+                        .onFailure { feedback = it.message ?: "Diagnostics export failed" }
+                }) { Text("Export diagnostics") }
+                TextButton(onClick = {
+                    requestReset(
+                        presentation.planReset(
+                            setOf(
+                                DiagnosticResetArea.NETWORK_CACHE,
+                                DiagnosticResetArea.LOGS,
+                                DiagnosticResetArea.CRASH_REPORTS,
+                            ),
+                        ),
+                    )
+                }) { Text("Clear cache and reports") }
+                TextButton(onClick = {
+                    requestReset(presentation.planReset(setOf(DiagnosticResetArea.SETTINGS)))
+                }) { Text("Reset settings") }
+                feedback?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { revision++ }) { Text("Refresh") }
+        },
+        dismissButton = { TextButton(onClick = close) { Text("Close") } },
+    )
+}
+
+private fun formatDiagnosticBytes(bytes: Long): String = when {
+    bytes >= 1024L * 1024L * 1024L -> "%.1f GiB".format(bytes / (1024.0 * 1024.0 * 1024.0))
+    bytes >= 1024L * 1024L -> "%.1f MiB".format(bytes / (1024.0 * 1024.0))
+    bytes >= 1024L -> "%.1f KiB".format(bytes / 1024.0)
+    else -> "$bytes B"
 }
 
 @Composable

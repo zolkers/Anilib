@@ -1,5 +1,9 @@
 package fr.vriege.anilib.feature.settings.ui;
 
+import fr.vriege.anilib.feature.settings.DiagnosticResetArea;
+import fr.vriege.anilib.feature.settings.DiagnosticResetPlan;
+import fr.vriege.anilib.feature.settings.DiagnosticService;
+import fr.vriege.anilib.feature.settings.DiagnosticSnapshot;
 import fr.vriege.anilib.feature.settings.SettingsService;
 import fr.vriege.anilib.feature.settings.SettingsSnapshot;
 import fr.vriege.anilib.feature.settings.AccentColor;
@@ -13,19 +17,22 @@ import fr.vriege.anilib.feature.settings.UnusedDataCleanupResult;
 import fr.vriege.anilib.feature.settings.UnusedDataMaintenance;
 
 import java.util.Objects;
+import java.nio.file.Path;
+import java.util.Set;
 import java.util.function.Consumer;
 
 public final class DefaultSettingsPresentation implements SettingsPresentation {
     private final SettingsService service;
     private final UnusedDataMaintenance maintenance;
+    private final DiagnosticService diagnostics;
 
-    public DefaultSettingsPresentation(SettingsService service) {
-        this(service, UnusedDataCleanupResult::empty);
-    }
-
-    public DefaultSettingsPresentation(SettingsService service, UnusedDataMaintenance maintenance) {
+    public DefaultSettingsPresentation(
+            SettingsService service,
+            UnusedDataMaintenance maintenance,
+            DiagnosticService diagnostics) {
         this.service = Objects.requireNonNull(service, "service must not be null");
         this.maintenance = Objects.requireNonNull(maintenance, "maintenance must not be null");
+        this.diagnostics = Objects.requireNonNull(diagnostics, "diagnostics must not be null");
     }
 
     @Override
@@ -96,5 +103,29 @@ public final class DefaultSettingsPresentation implements SettingsPresentation {
     @Override
     public UnusedDataCleanupResult cleanUnusedData() {
         return maintenance.clean();
+    }
+
+    @Override
+    public DiagnosticSnapshot diagnostics() {
+        return diagnostics.snapshot();
+    }
+
+    @Override
+    public Path exportDiagnostics() {
+        return diagnostics.export();
+    }
+
+    @Override
+    public DiagnosticResetPlan planReset(Set<DiagnosticResetArea> areas) {
+        return diagnostics.planReset(areas);
+    }
+
+    @Override
+    public void executeReset(DiagnosticResetPlan plan) {
+        Objects.requireNonNull(plan, "plan must not be null");
+        diagnostics.executeReset(plan.confirmationToken());
+        if (plan.areas().contains(DiagnosticResetArea.SETTINGS)) {
+            service.replace(SettingsSnapshot.defaults());
+        }
     }
 }

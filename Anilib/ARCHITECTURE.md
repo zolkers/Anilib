@@ -290,6 +290,13 @@ including downloaded files, while every feature performs its own atomic rewrite.
 Unlike Aniyomi, Anilib does not persist titles merely viewed during discovery, so
 there is no non-library catalogue table to purge.
 
+Settings also owns operational diagnostics without reading feature file formats.
+It measures top-level application storage without following links, retains
+bounded application logs and uncaught-crash reports, and exports only a summary
+plus those reports. Reset is a two-phase plan/confirmation protocol whose exact
+targets are allowlisted to settings, HTTP cache, logs, and crash reports; it can
+never select the data root, library, downloads, backup, or extension content.
+
 ## Product lifecycle
 
 1. A configuration selects feature Bundles.

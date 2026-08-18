@@ -249,7 +249,7 @@ platform-specific.
   style, and remaining category defaults and exceptions
 - [x] add configurable user agent, proxy, DNS-over-HTTPS, timeout, cache, and
   per-source network diagnostics
-- [ ] add storage inspection, logs, crash reports, exportable diagnostics, and
+- [x] add storage inspection, logs, crash reports, exportable diagnostics, and
   safe reset flows
 - [ ] add WebView file chooser, pop-ups, downloads, browser settings, and
   automatic challenge retry without provider-specific code in shared modules

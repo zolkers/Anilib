@@ -1,5 +1,8 @@
 package fr.vriege.anilib.feature.settings.ui;
 
+import fr.vriege.anilib.feature.settings.DiagnosticResetArea;
+import fr.vriege.anilib.feature.settings.DiagnosticResetPlan;
+import fr.vriege.anilib.feature.settings.DiagnosticSnapshot;
 import fr.vriege.anilib.feature.settings.SettingsSnapshot;
 import fr.vriege.anilib.feature.settings.AccentColor;
 import fr.vriege.anilib.feature.settings.LanguagePack;
@@ -11,6 +14,8 @@ import fr.vriege.anilib.feature.settings.TypographyScale;
 import fr.vriege.anilib.feature.settings.UnusedDataCleanupResult;
 
 import java.util.function.Consumer;
+import java.nio.file.Path;
+import java.util.Set;
 
 public interface SettingsPresentation {
     SettingsSnapshot snapshot();
@@ -40,4 +45,12 @@ public interface SettingsPresentation {
     void setUpdateOnlyOnWifi(boolean enabled);
 
     UnusedDataCleanupResult cleanUnusedData();
+
+    DiagnosticSnapshot diagnostics();
+
+    Path exportDiagnostics();
+
+    DiagnosticResetPlan planReset(Set<DiagnosticResetArea> areas);
+
+    void executeReset(DiagnosticResetPlan plan);
 }

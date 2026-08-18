@@ -685,6 +685,7 @@ private fun AppDestination(
                 settings,
                 networkMaintenance,
                 browserDataController,
+                backupImportPicker,
                 { openMore(MoreDestination.EXTENSION_REPOSITORIES) },
                 { openMore(MoreDestination.TRACKING) },
                 { openMore(MoreDestination.BACKUP) },

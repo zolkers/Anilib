@@ -7,6 +7,8 @@ public final class SettingsCapabilities {
             CapabilityKey.of("feature.settings.service", SettingsService.class);
     public static final CapabilityKey<UnusedDataRegistrar> UNUSED_DATA_REGISTRAR =
             CapabilityKey.of("feature.settings.unused-data-registrar", UnusedDataRegistrar.class);
+    public static final CapabilityKey<DiagnosticService> DIAGNOSTICS =
+            CapabilityKey.of("feature.settings.diagnostics", DiagnosticService.class);
 
     private SettingsCapabilities() {
     }

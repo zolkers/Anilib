@@ -142,7 +142,9 @@ Before that future bridge may activate anything, Android requires explicit
 package-certificate trust and performs a non-initializing audit of the required
 host-ABI groups. A signing-certificate change invalidates the stored decision.
 The removable Settings Bundle atomically persists shared appearance and policy
-preferences. System, light, and dark themes apply live on Android and desktop;
+preferences. Appearance applies live on Android and desktop; bounded storage,
+logs, crash reports, native diagnostic export, and allowlisted two-phase reset
+flows are available from its advanced route;
 the shared Aniyomi-style hierarchy also provides confirmed actions for clearing
 the common HTTP cookie jar, embedded-browser cookies, and response cache. Source
 API 1.6 optionally exposes source and title web pages through the shared Browse

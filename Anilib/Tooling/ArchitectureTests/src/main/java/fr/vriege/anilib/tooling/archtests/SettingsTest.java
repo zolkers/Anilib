@@ -1,6 +1,7 @@
 package fr.vriege.anilib.tooling.archtests;
 
 import fr.vriege.anilib.feature.settings.SettingsSnapshot;
+import fr.vriege.anilib.feature.settings.DiagnosticResetArea;
 import fr.vriege.anilib.feature.settings.AccentColor;
 import fr.vriege.anilib.feature.settings.LanguagePack;
 import fr.vriege.anilib.feature.settings.NavigationStyle;
@@ -9,6 +10,7 @@ import fr.vriege.anilib.feature.settings.ThemeFamily;
 import fr.vriege.anilib.feature.settings.ThemeMode;
 import fr.vriege.anilib.feature.settings.TypographyScale;
 import fr.vriege.anilib.feature.settings.runtime.FileSettingsService;
+import fr.vriege.anilib.feature.settings.runtime.FileDiagnosticService;
 import fr.vriege.anilib.feature.settings.runtime.DefaultUnusedDataMaintenance;
 import fr.vriege.anilib.feature.settings.ui.DefaultSettingsPresentation;
 import fr.vriege.anilib.feature.settings.ui.SettingsPresentation;
@@ -18,6 +20,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.Set;
 
 final class SettingsTest {
     private SettingsTest() {
@@ -30,10 +33,14 @@ final class SettingsTest {
         Path file = directory.resolve("settings.properties");
         try {
             FileSettingsService service = new FileSettingsService(file);
+            FileDiagnosticService diagnostics = new FileDiagnosticService(directory);
             counter.check(service.snapshot().equals(SettingsSnapshot.defaults()),
                     "settings must expose safe defaults before the first write");
 
-            SettingsPresentation presentation = new DefaultSettingsPresentation(service);
+            SettingsPresentation presentation = new DefaultSettingsPresentation(
+                    service,
+                    fr.vriege.anilib.feature.settings.UnusedDataCleanupResult::empty,
+                    diagnostics);
             AtomicInteger observations = new AtomicInteger();
             AutoCloseable observation = presentation.observe(ignored -> observations.incrementAndGet());
             counter.check(observations.get() == 1,
@@ -74,6 +81,22 @@ final class SettingsTest {
             presentation.setThemeMode(ThemeMode.LIGHT);
             counter.check(observations.get() == 12,
                     "closed settings observations must stop receiving changes");
+            diagnostics.recordLog("settings test log");
+            diagnostics.recordCrash("settings test crash", "bounded details");
+            counter.check(presentation.diagnostics().reports().size() == 2,
+                    "diagnostics must expose recorded logs and crash reports");
+            counter.check(Files.isRegularFile(presentation.exportDiagnostics()),
+                    "diagnostics must export a bounded archive");
+            var reset = presentation.planReset(Set.of(
+                    DiagnosticResetArea.LOGS,
+                    DiagnosticResetArea.CRASH_REPORTS));
+            presentation.executeReset(reset);
+            counter.check(presentation.diagnostics().reports().isEmpty(),
+                    "confirmed diagnostic reset must remove only selected reports");
+            reset = presentation.planReset(Set.of(DiagnosticResetArea.SETTINGS));
+            presentation.executeReset(reset);
+            counter.check(presentation.snapshot().equals(SettingsSnapshot.defaults()),
+                    "settings reset must restore and persist safe defaults");
             return counter.value;
         } finally {
             deleteDirectory(directory);
