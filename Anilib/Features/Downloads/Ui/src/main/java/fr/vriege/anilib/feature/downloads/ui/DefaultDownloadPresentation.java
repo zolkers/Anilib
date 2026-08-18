@@ -43,6 +43,11 @@ public final class DefaultDownloadPresentation implements DownloadPresentation {
     }
 
     @Override
+    public DownloadId enqueue(LibraryItemId libraryItemId, String sourceContentId) {
+        return downloads.enqueue(libraryItemId, sourceContentId);
+    }
+
+    @Override
     public void pause(DownloadId id) {
         downloads.pause(id);
     }

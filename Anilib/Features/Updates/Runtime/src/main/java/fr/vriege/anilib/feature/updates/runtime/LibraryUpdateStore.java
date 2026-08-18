@@ -32,7 +32,7 @@ import java.util.Set;
 
 final class LibraryUpdateStore {
     private static final int MAGIC = 0x55504454;
-    private static final int VERSION = 1;
+    private static final int VERSION = 2;
     private static final int MAXIMUM_BASELINES = 1_000_000;
     private static final int MAXIMUM_CONTENT_IDS = 10_000_000;
     private static final int MAXIMUM_EVENTS = 100_000;
@@ -147,10 +147,14 @@ final class LibraryUpdateStore {
 
     private static State decode(byte[] payload) {
         try (DataInputStream input = new DataInputStream(new ByteArrayInputStream(payload))) {
-            if (input.readInt() != MAGIC || input.readInt() != VERSION) {
+            if (input.readInt() != MAGIC) {
                 throw new LibraryUpdateException("Update state signature or version is invalid");
             }
-            LibraryUpdatePolicy policy = readPolicy(input);
+            int version = input.readInt();
+            if (version < 1 || version > VERSION) {
+                throw new LibraryUpdateException("Update state signature or version is invalid");
+            }
+            LibraryUpdatePolicy policy = readPolicy(input, version);
             Optional<Instant> lastRunAt = input.readBoolean()
                     ? Optional.of(Instant.parse(readString(input)))
                     : Optional.empty();
@@ -202,22 +206,28 @@ final class LibraryUpdateStore {
         output.writeBoolean(policy.skipNotStarted());
         writeStrings(output, policy.includedCategories());
         writeStrings(output, policy.excludedCategories());
+        writeItemIds(output, policy.includedTitles());
+        writeItemIds(output, policy.excludedTitles());
     }
 
-    private static LibraryUpdatePolicy readPolicy(DataInputStream input) throws IOException {
+    private static LibraryUpdatePolicy readPolicy(DataInputStream input, int version) throws IOException {
         UpdateInterval interval = UpdateInterval.valueOf(readString(input));
         boolean favoritesOnly = input.readBoolean();
         boolean skipCompleted = input.readBoolean();
         boolean skipNotStarted = input.readBoolean();
         Set<String> included = readStrings(input, MAXIMUM_CATEGORIES);
         Set<String> excluded = readStrings(input, MAXIMUM_CATEGORIES);
+        Set<LibraryItemId> includedTitles = version >= 2 ? readItemIds(input) : Set.of();
+        Set<LibraryItemId> excludedTitles = version >= 2 ? readItemIds(input) : Set.of();
         return new LibraryUpdatePolicy(
                 interval,
                 favoritesOnly,
                 skipCompleted,
                 skipNotStarted,
                 included,
-                excluded);
+                excluded,
+                includedTitles,
+                excludedTitles);
     }
 
     private static void writeEvent(DataOutputStream output, LibraryUpdateEvent event) throws IOException {
@@ -263,6 +273,18 @@ final class LibraryUpdateStore {
             }
         }
         return Set.copyOf(values);
+    }
+
+    private static void writeItemIds(
+            DataOutputStream output,
+            Collection<LibraryItemId> values) throws IOException {
+        writeStrings(output, values.stream().map(LibraryItemId::value).toList());
+    }
+
+    private static Set<LibraryItemId> readItemIds(DataInputStream input) throws IOException {
+        return readStrings(input, MAXIMUM_BASELINES).stream()
+                .map(LibraryItemId::new)
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
     }
 
     private static void writeString(DataOutputStream output, String value) throws IOException {

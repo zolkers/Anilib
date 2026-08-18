@@ -1,5 +1,6 @@
 package fr.vriege.anilib.platform.compose
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -18,6 +19,7 @@ import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -41,8 +43,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import fr.vriege.anilib.feature.library.MediaKind
+import fr.vriege.anilib.feature.downloads.ui.DownloadPresentation
 import fr.vriege.anilib.feature.updates.LibraryUpdateEvent
+import fr.vriege.anilib.feature.updates.LibraryUpdateEventId
 import fr.vriege.anilib.feature.updates.LibraryUpdatePolicy
+import fr.vriege.anilib.feature.updates.LibraryUpdateSkip
+import fr.vriege.anilib.feature.updates.LibraryUpdateSkipReason
 import fr.vriege.anilib.feature.updates.LibraryUpdateStatus
 import fr.vriege.anilib.feature.updates.UpdateInterval
 import fr.vriege.anilib.feature.updates.ui.UpdatePresentation
@@ -55,14 +61,23 @@ private val updateDateFormatter = DateTimeFormatter
     .ofLocalizedDateTime(FormatStyle.MEDIUM)
     .withLocale(Locale.getDefault())
     .withZone(ZoneId.systemDefault())
+private val updateDayFormatter = DateTimeFormatter
+    .ofLocalizedDate(FormatStyle.LONG)
+    .withLocale(Locale.getDefault())
+    .withZone(ZoneId.systemDefault())
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun UpdatesScreen(presentation: UpdatePresentation) {
+internal fun UpdatesScreen(
+    presentation: UpdatePresentation,
+    downloads: DownloadPresentation,
+) {
     var revision by remember(presentation) { mutableIntStateOf(0) }
     var commandError by remember(presentation) { mutableStateOf<String?>(null) }
     var kind by remember { mutableStateOf<MediaKind?>(null) }
     var unreadOnly by remember { mutableStateOf(false) }
+    var showSkipped by remember { mutableStateOf(false) }
+    var selection by remember { mutableStateOf<Set<LibraryUpdateEventId>>(emptySet()) }
     DisposableEffect(presentation) {
         val registration = presentation.observe { revision++ }
         onDispose { runCatching { registration.close() } }
@@ -88,6 +103,9 @@ internal fun UpdatesScreen(presentation: UpdatePresentation) {
                             Icon(Icons.Default.DoneAll, contentDescription = "Mark all read")
                         }
                     }
+                    TextButton(onClick = {
+                        selection = if (selection.isEmpty()) events.map(LibraryUpdateEvent::id).toSet() else emptySet()
+                    }) { Text(if (selection.isEmpty()) "Select" else "Clear") }
                     IconButton(
                         onClick = {
                             if (running) {
@@ -134,6 +152,43 @@ internal fun UpdatesScreen(presentation: UpdatePresentation) {
                         onClick = { unreadOnly = !unreadOnly },
                         label = { Text("Unread") },
                     )
+                    FilterChip(
+                        selected = showSkipped,
+                        onClick = { showSkipped = !showSkipped },
+                        label = { Text("Skipped (${snapshot.skippedTitles().size})") },
+                    )
+                }
+            }
+            if (selection.isNotEmpty()) {
+                item {
+                    SelectionActions(
+                        count = selection.size,
+                        markRead = { command { presentation.setEventsRead(selection, true) } },
+                        markUnread = { command { presentation.setEventsRead(selection, false) } },
+                        remove = {
+                            command { presentation.removeEvents(selection) }
+                            selection = emptySet()
+                        },
+                        exclude = {
+                            val itemIds = events.filter { selection.contains(it.id()) }
+                                .map(LibraryUpdateEvent::libraryItemId)
+                                .toSet()
+                            command {
+                                presentation.configure(copyPolicy(
+                                    snapshot.policy(),
+                                    includedTitles = snapshot.policy().includedTitles() - itemIds,
+                                    excludedTitles = snapshot.policy().excludedTitles() + itemIds,
+                                ))
+                            }
+                        },
+                        download = {
+                            events.filter { selection.contains(it.id()) }
+                                .filter { downloads.canEnqueue(it.libraryItemId()) }
+                                .forEach { event ->
+                                    command { downloads.enqueue(event.libraryItemId(), event.sourceContentId()) }
+                                }
+                        },
+                    )
                 }
             }
             if (running) {
@@ -164,7 +219,23 @@ internal fun UpdatesScreen(presentation: UpdatePresentation) {
                     }
                 }
             }
-            if (snapshot.events().isEmpty()) {
+            if (showSkipped) {
+                if (snapshot.skippedTitles().isEmpty()) {
+                    item { EmptyPage("No titles are currently skipped by the update policy.") }
+                } else {
+                    items(snapshot.skippedTitles(), key = { "skip-${it.libraryItemId().value()}" }) { skipped ->
+                        SkippedTitleCard(skipped) {
+                            command {
+                                presentation.configure(copyPolicy(
+                                    snapshot.policy(),
+                                    includedTitles = snapshot.policy().includedTitles() + skipped.libraryItemId(),
+                                    excludedTitles = snapshot.policy().excludedTitles() - skipped.libraryItemId(),
+                                ))
+                            }
+                        }
+                    }
+                }
+            } else if (snapshot.events().isEmpty()) {
                 item {
                     Spacer(Modifier.height(24.dp))
                     EmptyPage("No new chapters or episodes yet. Refresh once to establish the library baseline.")
@@ -172,10 +243,32 @@ internal fun UpdatesScreen(presentation: UpdatePresentation) {
             } else if (events.isEmpty()) {
                 item { EmptyPage("No updates match the active filters.") }
             } else {
-                items(
-                    events,
-                    key = { "${it.libraryItemId().value()}-${it.sourceContentId()}" },
-                ) { event -> UpdateEventCard(event) }
+                events.groupBy { eventDate(it) }.forEach { (date, datedEvents) ->
+                    item(key = "date-$date") {
+                        Text(date, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
+                    }
+                    items(
+                        datedEvents,
+                        key = { "${it.libraryItemId().value()}-${it.sourceContentId()}" },
+                    ) { event ->
+                        UpdateEventCard(
+                            event = event,
+                            selected = selection.contains(event.id()),
+                            selectionMode = selection.isNotEmpty(),
+                            select = {
+                                selection = if (selection.contains(event.id())) {
+                                    selection - event.id()
+                                } else {
+                                    selection + event.id()
+                                }
+                            },
+                            canDownload = downloads.canEnqueue(event.libraryItemId()),
+                            download = {
+                                command { downloads.enqueue(event.libraryItemId(), event.sourceContentId()) }
+                            },
+                        )
+                    }
+                }
             }
             item {
                 val lastRun = snapshot.lastRunAt().orElse(null)
@@ -207,10 +300,16 @@ private fun UpdateScheduleCard(policy: LibraryUpdatePolicy, configure: (LibraryU
                     Text("Library update schedule", fontWeight = FontWeight.SemiBold)
                     Text(intervalLabel(policy.interval()), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                TextButton(onClick = {
-                    val values = UpdateInterval.values()
-                    configure(copyPolicy(policy, interval = values[(policy.interval().ordinal + 1) % values.size]))
-                }) { Text("Change") }
+            }
+            Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
+                UpdateInterval.entries.forEach { interval ->
+                    FilterChip(
+                        selected = policy.interval() == interval,
+                        onClick = { configure(copyPolicy(policy, interval = interval)) },
+                        label = { Text(intervalLabel(interval)) },
+                        modifier = Modifier.padding(end = 6.dp),
+                    )
+                }
             }
             UpdateSwitch("Favorites only", policy.favoritesOnly()) {
                 configure(copyPolicy(policy, favoritesOnly = it))
@@ -238,8 +337,16 @@ private fun UpdateSwitch(label: String, checked: Boolean, update: (Boolean) -> U
 }
 
 @Composable
-private fun UpdateEventCard(event: LibraryUpdateEvent) {
+private fun UpdateEventCard(
+    event: LibraryUpdateEvent,
+    selected: Boolean,
+    selectionMode: Boolean,
+    select: () -> Unit,
+    canDownload: Boolean,
+    download: () -> Unit,
+) {
     Card(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = select),
         colors = CardDefaults.cardColors(
             containerColor = if (event.read()) {
                 MaterialTheme.colorScheme.surfaceContainer
@@ -248,8 +355,12 @@ private fun UpdateEventCard(event: LibraryUpdateEvent) {
             },
         ),
     ) {
-        Column(Modifier.fillMaxWidth().padding(16.dp)) {
-            Text(event.libraryTitle(), fontWeight = FontWeight.SemiBold)
+        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (selectionMode) {
+                Checkbox(checked = selected, onCheckedChange = { select() })
+            }
+            Column(Modifier.weight(1f)) {
+                Text(event.libraryTitle(), fontWeight = FontWeight.SemiBold)
             Text(event.contentTitle(), color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(
                 "${if (event.kind() == MediaKind.ANIME) "Episode" else "Chapter"} • " +
@@ -258,6 +369,43 @@ private fun UpdateEventCard(event: LibraryUpdateEvent) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp),
             )
+            }
+            TextButton(onClick = download, enabled = canDownload && !selectionMode) { Text("Download") }
+        }
+    }
+}
+
+@Composable
+private fun SelectionActions(
+    count: Int,
+    markRead: () -> Unit,
+    markUnread: () -> Unit,
+    remove: () -> Unit,
+    exclude: () -> Unit,
+    download: () -> Unit,
+) {
+    Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
+        Text("$count selected", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(12.dp))
+        TextButton(onClick = markRead) { Text("Read") }
+        TextButton(onClick = markUnread) { Text("Unread") }
+        TextButton(onClick = download) { Text("Download") }
+        TextButton(onClick = exclude) { Text("Exclude titles") }
+        TextButton(onClick = remove) { Text("Remove") }
+    }
+}
+
+@Composable
+private fun SkippedTitleCard(skipped: LibraryUpdateSkip, include: () -> Unit) {
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(skipped.title(), fontWeight = FontWeight.SemiBold)
+                Text(skipReasonLabel(skipped.reason()), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            TextButton(onClick = include) { Text("Always include") }
         }
     }
 }
@@ -268,6 +416,8 @@ private fun copyPolicy(
     favoritesOnly: Boolean = policy.favoritesOnly(),
     skipCompleted: Boolean = policy.skipCompleted(),
     skipNotStarted: Boolean = policy.skipNotStarted(),
+    includedTitles: Set<fr.vriege.anilib.feature.library.LibraryItemId> = policy.includedTitles(),
+    excludedTitles: Set<fr.vriege.anilib.feature.library.LibraryItemId> = policy.excludedTitles(),
 ): LibraryUpdatePolicy = LibraryUpdatePolicy(
     interval,
     favoritesOnly,
@@ -275,7 +425,22 @@ private fun copyPolicy(
     skipNotStarted,
     policy.includedCategories(),
     policy.excludedCategories(),
+    includedTitles,
+    excludedTitles,
 )
+
+private fun eventDate(event: LibraryUpdateEvent): String =
+    updateDayFormatter.format(event.publishedAt().orElse(event.discoveredAt()))
+
+private fun skipReasonLabel(reason: LibraryUpdateSkipReason): String = when (reason) {
+    LibraryUpdateSkipReason.NO_SOURCE_ORIGIN -> "No source origin"
+    LibraryUpdateSkipReason.TITLE_EXCLUDED -> "Excluded for this title"
+    LibraryUpdateSkipReason.NOT_FAVORITE -> "Not a favorite"
+    LibraryUpdateSkipReason.PUBLICATION_COMPLETED -> "Publication completed"
+    LibraryUpdateSkipReason.NOT_STARTED -> "Not started"
+    LibraryUpdateSkipReason.CATEGORY_EXCLUDED -> "Category excluded"
+    LibraryUpdateSkipReason.CATEGORY_NOT_INCLUDED -> "Category not included"
+}
 
 private fun intervalLabel(interval: UpdateInterval): String = when (interval) {
     UpdateInterval.MANUAL -> "Manual only"

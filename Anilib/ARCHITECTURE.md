@@ -212,15 +212,18 @@ Updates is a removable vertical over Library and Source. Its single shared job
 filters eligible titles, groups them by source, runs at most five source groups
 in parallel, and never overlaps with itself. Atomic feature-owned state retains
 the scheduling policy, per-title content baselines, recent unread discoveries,
-and last successful run; its versioned `library-updates` backup codec merges
-that state independently. The first fetch is deliberately silent, while later
+per-title include/exclude exceptions, and the last successful run. Every title
+outside the effective policy exposes a typed skip reason without persisting a
+second derived index. Its versioned `library-updates` backup codec merges that
+state independently. The first fetch is deliberately silent, while later
 source identities become chapter or episode events. A narrow notifier port maps
 progress, discoveries, failures, and progress cleanup to the desktop system tray
 or Android notification channels. Shared Java schedules work while the product
 is alive; Android additionally uses an inexact platform alarm to reopen the
 product after process death, consult the same durable due time, execute the same
-service, and close the graph. The shared Compose Updates screen owns no refresh
-behavior.
+service, and close the graph. The shared Compose Updates screen groups events by
+local date and delegates selection, read state, removal, exceptions, and exact
+download actions through the owning Java presentations.
 
 ApplicationUpdate is a separate removable vertical because checking the Anilib
 application release channel is not library-content update behavior. Its shared

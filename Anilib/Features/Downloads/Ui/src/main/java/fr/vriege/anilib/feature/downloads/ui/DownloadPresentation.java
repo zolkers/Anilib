@@ -22,6 +22,8 @@ public interface DownloadPresentation {
 
     DownloadId enqueue(LibraryItemId libraryItemId, SourceContentUnitId contentUnitId);
 
+    DownloadId enqueue(LibraryItemId libraryItemId, String sourceContentId);
+
     void pause(DownloadId id);
 
     void resume(DownloadId id);

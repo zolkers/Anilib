@@ -231,7 +231,7 @@ platform-specific.
   and per-title download management
 - [x] complete automatic-download rules, category rules, episode/chapter limits,
   and cleanup policies
-- [ ] add update date grouping, selection actions, skipped-reason views,
+- [x] add update date grouping, selection actions, skipped-reason views,
   per-item download actions, exceptions, and full schedule controls
 
 ### 6. Tracking and backup

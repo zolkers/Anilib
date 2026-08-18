@@ -174,7 +174,7 @@ public final class DefaultDownloadService
 
     @Override
     public synchronized DownloadId enqueue(LibraryItemId libraryItemId) {
-        return enqueue(libraryItemId, null);
+        return enqueue(libraryItemId, (SourceContentUnitId) null);
     }
 
     @Override
@@ -239,6 +239,21 @@ public final class DefaultDownloadService
         notifyListeners();
         schedule(record);
         return record.id;
+    }
+
+    @Override
+    public synchronized DownloadId enqueue(LibraryItemId libraryItemId, String sourceContentId) {
+        Objects.requireNonNull(libraryItemId, "libraryItemId must not be null");
+        if (sourceContentId == null || sourceContentId.isBlank()) {
+            throw new IllegalArgumentException("sourceContentId must not be blank");
+        }
+        LibraryOrigin origin = library.find(libraryItemId)
+                .flatMap(LibraryItem::origin)
+                .orElseThrow(() -> new DownloadException("Library item has no source origin"));
+        SourceCatalogueItemId itemId = new SourceCatalogueItemId(
+                SourceId.of(origin.sourceId()),
+                origin.sourceItemKey());
+        return enqueue(libraryItemId, new SourceContentUnitId(itemId, sourceContentId));
     }
 
     @Override

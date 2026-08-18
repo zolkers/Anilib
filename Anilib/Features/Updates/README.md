@@ -2,7 +2,7 @@
 
 Updates is the removable Aniyomi-style library refresh vertical. Shared Java
 owns one non-overlapping job, durable scheduling policy, per-title source
-baselines, a bounded unread feed, backup data, and platform-neutral progress
+baselines and exceptions, a bounded selectable unread feed, backup data, and platform-neutral progress
 notifications. Android and desktop render the same presentation model.
 
 ## Refresh behavior
@@ -15,6 +15,10 @@ notifications. Android and desktop render the same presentation model.
   identities become chapter or episode events;
 - cancellation, per-title failures, progress, last-run time, and next-run time
   are visible through one immutable snapshot;
+- excluded titles expose typed skip reasons and can be promoted to durable
+  per-title exceptions;
+- the shared feed groups discoveries by date and supports exact downloads,
+  selection, read/unread, removal, and exclusion actions;
 - policy, baselines, feed read state, and last-run time use atomic bounded
   persistence and the feature-owned `library-updates` backup section.
 

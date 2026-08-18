@@ -190,7 +190,7 @@ final class DownloadTest {
             QueuedPagedSource flaky = new QueuedPagedSource(true, false);
             try (DefaultDownloadService downloads = new DefaultDownloadService(
                     new SingleSourceRegistry(flaky), library, recoveryRoot, policy)) {
-                DownloadId id = downloads.enqueue(item.id(), flaky.unit("b").id());
+                DownloadId id = downloads.enqueue(item.id(), "b");
                 DownloadJobSnapshot failed = await(
                         downloads,
                         id,

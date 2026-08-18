@@ -98,7 +98,8 @@ search and binding, status, progress, score, dates, privacy, refresh, removal,
 restart-safe mirrors, and shared Android/desktop tracking screens.
 The removable Updates Bundle adds one non-overlapping background library job,
 five source lanes, favourite/status/category filters, durable chapter and
-episode baselines, an unread Updates feed, and a feature-owned backup section.
+episode baselines, per-title exceptions and skip reasons, a date-grouped
+selectable Updates feed with exact download actions, and a feature-owned backup section.
 Desktop delivers native tray notices; Android uses dedicated notification
 channels and an SDK alarm that resumes due work after process death. Both
 platforms render the same Aniyomi-style progress, schedule, filter, failure, and

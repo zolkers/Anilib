@@ -28,6 +28,7 @@ import fr.vriege.anilib.feature.source.SourceSdk;
 import fr.vriege.anilib.feature.source.SourceVideoStream;
 import fr.vriege.anilib.feature.source.StreamingSource;
 import fr.vriege.anilib.feature.updates.LibraryUpdateNotification;
+import fr.vriege.anilib.feature.updates.LibraryUpdateSkipReason;
 import fr.vriege.anilib.feature.updates.LibraryUpdateNotificationType;
 import fr.vriege.anilib.feature.updates.LibraryUpdateNotifier;
 import fr.vriege.anilib.feature.updates.LibraryUpdatePolicy;
@@ -98,6 +99,13 @@ final class UpdateTest {
                 counter.check(notifier.notifications.stream()
                                 .anyMatch(value -> value.type() == LibraryUpdateNotificationType.NEW_CONTENT),
                         "new content must be sent through the selected platform notifier");
+                var eventId = detected.events().getFirst().id();
+                updates.setEventsRead(Set.of(eventId), true);
+                counter.check(updates.snapshot().unreadCount() == 0,
+                        "selected update events must be markable as read");
+                updates.setEventsRead(Set.of(eventId), false);
+                counter.check(updates.snapshot().unreadCount() == 1,
+                        "selected update events must be markable as unread");
 
                 CountDownLatch entered = new CountDownLatch(1);
                 CountDownLatch release = new CountDownLatch(1);
@@ -113,16 +121,31 @@ final class UpdateTest {
                 updates.markAllRead();
                 counter.check(updates.snapshot().unreadCount() == 0,
                         "the Updates feed must persist its read state");
+                LibraryUpdatePolicy currentPolicy = updates.snapshot().policy();
+                updates.configure(new LibraryUpdatePolicy(
+                        currentPolicy.interval(),
+                        currentPolicy.favoritesOnly(),
+                        currentPolicy.skipCompleted(),
+                        currentPolicy.skipNotStarted(),
+                        currentPolicy.includedCategories(),
+                        currentPolicy.excludedCategories(),
+                        Set.of(item.id()),
+                        Set.of()));
                 backup = application.capability(BackupCapabilities.SERVICE).createBackup().path();
             }
 
             try (StartedAnilib restarted = start(sourceDirectory, source, new RecordingNotifier())) {
-                LibraryUpdateSnapshot durable = restarted.capability(UpdateCapabilities.SERVICE).snapshot();
+                LibraryUpdateService restartedUpdates = restarted.capability(UpdateCapabilities.SERVICE);
+                LibraryUpdateSnapshot durable = restartedUpdates.snapshot();
                 counter.check(durable.events().size() == 1 && durable.unreadCount() == 0,
                         "update discoveries and read state must survive a complete product restart");
                 counter.check(durable.policy().interval() == UpdateInterval.MANUAL
-                                && durable.policy().favoritesOnly(),
-                        "the automatic update policy must survive a complete product restart");
+                                && durable.policy().favoritesOnly()
+                                && durable.policy().includedTitles().contains(new LibraryItemId("updates-title")),
+                        "the automatic update policy and title exceptions must survive a complete restart");
+                restartedUpdates.removeEvents(Set.of(durable.events().getFirst().id()));
+                counter.check(restartedUpdates.snapshot().events().isEmpty(),
+                        "selected update events must be removable from the durable feed");
             }
 
             try (StartedAnilib restored = start(
@@ -169,6 +192,10 @@ final class UpdateTest {
             updates.runNow().join();
             counter.check(source.invocations() == 0,
                     "an excluded library category must skip source update calls");
+            counter.check(updates.snapshot().skippedTitles().size() == 1
+                            && updates.snapshot().skippedTitles().getFirst().reason()
+                            == LibraryUpdateSkipReason.CATEGORY_EXCLUDED,
+                    "skipped update titles must expose their exact policy reason");
 
             configuration.save(new LibraryConfigurationSnapshot(
                     preferences,
@@ -188,6 +215,34 @@ final class UpdateTest {
             updates.runNow().join();
             counter.check(source.invocations() == 1,
                     "an included library category must override the global category exclusion");
+
+            updates.configure(new LibraryUpdatePolicy(
+                    UpdateInterval.MANUAL,
+                    false,
+                    false,
+                    false,
+                    Set.of(),
+                    Set.of(),
+                    Set.of(),
+                    Set.of(item.id())));
+            updates.runNow().join();
+            counter.check(source.invocations() == 1
+                            && updates.snapshot().skippedTitles().getFirst().reason()
+                            == LibraryUpdateSkipReason.TITLE_EXCLUDED,
+                    "per-title exclusions must override the general update policy");
+
+            updates.configure(new LibraryUpdatePolicy(
+                    UpdateInterval.MANUAL,
+                    true,
+                    true,
+                    true,
+                    Set.of(),
+                    Set.of("Seasonal"),
+                    Set.of(item.id()),
+                    Set.of()));
+            updates.runNow().join();
+            counter.check(source.invocations() == 2 && updates.snapshot().skippedTitles().isEmpty(),
+                    "per-title inclusions must override favorite, progress, publication, and category skips");
         } finally {
             deleteDirectory(directory);
         }

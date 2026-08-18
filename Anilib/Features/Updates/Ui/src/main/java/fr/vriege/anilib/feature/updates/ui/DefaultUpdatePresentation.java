@@ -1,11 +1,13 @@
 package fr.vriege.anilib.feature.updates.ui;
 
 import fr.vriege.anilib.feature.updates.LibraryUpdatePolicy;
+import fr.vriege.anilib.feature.updates.LibraryUpdateEventId;
 import fr.vriege.anilib.feature.updates.LibraryUpdateService;
 import fr.vriege.anilib.feature.updates.LibraryUpdateSnapshot;
 
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.Set;
 
 public final class DefaultUpdatePresentation implements UpdatePresentation {
     private final LibraryUpdateService service;
@@ -37,6 +39,16 @@ public final class DefaultUpdatePresentation implements UpdatePresentation {
     @Override
     public void markAllRead() {
         service.markAllRead();
+    }
+
+    @Override
+    public void setEventsRead(Set<LibraryUpdateEventId> ids, boolean read) {
+        service.setEventsRead(ids, read);
+    }
+
+    @Override
+    public void removeEvents(Set<LibraryUpdateEventId> ids) {
+        service.removeEvents(ids);
     }
 
     @Override

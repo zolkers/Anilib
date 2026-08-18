@@ -28,7 +28,11 @@ public record LibraryUpdateEvent(
     }
 
     public LibraryUpdateEvent markRead() {
-        return read ? this : new LibraryUpdateEvent(
+        return withRead(true);
+    }
+
+    public LibraryUpdateEvent withRead(boolean value) {
+        return read == value ? this : new LibraryUpdateEvent(
                 libraryItemId,
                 libraryTitle,
                 kind,
@@ -36,6 +40,10 @@ public record LibraryUpdateEvent(
                 contentTitle,
                 publishedAt,
                 discoveredAt,
-                true);
+                value);
+    }
+
+    public LibraryUpdateEventId id() {
+        return new LibraryUpdateEventId(libraryItemId, sourceContentId);
     }
 }

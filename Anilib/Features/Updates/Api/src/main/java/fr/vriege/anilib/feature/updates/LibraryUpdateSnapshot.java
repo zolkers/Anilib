@@ -13,6 +13,7 @@ public record LibraryUpdateSnapshot(
         List<String> activeTitles,
         List<LibraryUpdateEvent> events,
         List<LibraryUpdateFailure> failures,
+        List<LibraryUpdateSkip> skippedTitles,
         Optional<Instant> lastRunAt,
         Optional<Instant> nextRunAt) {
     public LibraryUpdateSnapshot {
@@ -24,6 +25,7 @@ public record LibraryUpdateSnapshot(
         activeTitles = List.copyOf(activeTitles);
         events = List.copyOf(events);
         failures = List.copyOf(failures);
+        skippedTitles = List.copyOf(skippedTitles);
         lastRunAt = Objects.requireNonNull(lastRunAt, "lastRunAt must not be null");
         nextRunAt = Objects.requireNonNull(nextRunAt, "nextRunAt must not be null");
     }

@@ -618,7 +618,7 @@ private fun AppDestination(
                 navigate,
             )
         }
-        AppSection.UPDATES -> UpdatesScreen(updates)
+        AppSection.UPDATES -> UpdatesScreen(updates, downloads)
         AppSection.HISTORY -> HistoryPage(
             presentation,
             openReader,

@@ -18,6 +18,7 @@ import fr.vriege.anilib.feature.source.SourceId;
 import fr.vriege.anilib.feature.source.SourceRegistry;
 import fr.vriege.anilib.feature.source.StreamingSource;
 import fr.vriege.anilib.feature.updates.LibraryUpdateEvent;
+import fr.vriege.anilib.feature.updates.LibraryUpdateEventId;
 import fr.vriege.anilib.feature.updates.LibraryUpdateException;
 import fr.vriege.anilib.feature.updates.LibraryUpdateFailure;
 import fr.vriege.anilib.feature.updates.LibraryUpdateNotification;
@@ -25,6 +26,8 @@ import fr.vriege.anilib.feature.updates.LibraryUpdateNotificationType;
 import fr.vriege.anilib.feature.updates.LibraryUpdateNotifier;
 import fr.vriege.anilib.feature.updates.LibraryUpdatePolicy;
 import fr.vriege.anilib.feature.updates.LibraryUpdateService;
+import fr.vriege.anilib.feature.updates.LibraryUpdateSkip;
+import fr.vriege.anilib.feature.updates.LibraryUpdateSkipReason;
 import fr.vriege.anilib.feature.updates.LibraryUpdateSnapshot;
 import fr.vriege.anilib.feature.updates.LibraryUpdateStatus;
 import fr.vriege.anilib.feature.updates.UpdateInterval;
@@ -194,6 +197,7 @@ public final class DefaultLibraryUpdateService implements LibraryUpdateService, 
                 activeTitles,
                 visible.values().stream().sorted(EVENT_ORDER).toList(),
                 failures,
+                skippedTitles(durable.policy()),
                 durable.lastRunAt(),
                 nextRunAt);
     }
@@ -243,14 +247,47 @@ public final class DefaultLibraryUpdateService implements LibraryUpdateService, 
     }
 
     @Override
-    public void markAllRead() {
+    public synchronized void markAllRead() {
+        setEventsRead(snapshot().events().stream()
+                .map(LibraryUpdateEvent::id)
+                .collect(java.util.stream.Collectors.toUnmodifiableSet()), true);
+    }
+
+    @Override
+    public synchronized void setEventsRead(Set<LibraryUpdateEventId> ids, boolean read) {
+        Set<LibraryUpdateEventId> selected = Set.copyOf(
+                Objects.requireNonNull(ids, "ids must not be null"));
+        if (selected.isEmpty()) {
+            return;
+        }
         LibraryUpdateStore.State current = store.snapshot();
         store.replace(new LibraryUpdateStore.State(
                 current.policy(),
                 current.baselines(),
-                current.events().stream().map(LibraryUpdateEvent::markRead).toList(),
+                current.events().stream()
+                        .map(event -> selected.contains(event.id()) ? event.withRead(read) : event)
+                        .toList(),
                 current.lastRunAt()));
-        discovered = discovered.stream().map(LibraryUpdateEvent::markRead).toList();
+        discovered = discovered.stream()
+                .map(event -> selected.contains(event.id()) ? event.withRead(read) : event)
+                .toList();
+        notifyListeners();
+    }
+
+    @Override
+    public synchronized void removeEvents(Set<LibraryUpdateEventId> ids) {
+        Set<LibraryUpdateEventId> selected = Set.copyOf(
+                Objects.requireNonNull(ids, "ids must not be null"));
+        if (selected.isEmpty()) {
+            return;
+        }
+        LibraryUpdateStore.State current = store.snapshot();
+        store.replace(new LibraryUpdateStore.State(
+                current.policy(),
+                current.baselines(),
+                current.events().stream().filter(event -> !selected.contains(event.id())).toList(),
+                current.lastRunAt()));
+        discovered = discovered.stream().filter(event -> !selected.contains(event.id())).toList();
         notifyListeners();
     }
 
@@ -271,11 +308,28 @@ public final class DefaultLibraryUpdateService implements LibraryUpdateService, 
         List<LibraryUpdateEvent> events = current.events().stream()
                 .filter(event -> retainedIds.contains(event.libraryItemId()))
                 .toList();
+        Set<LibraryItemId> includedTitles = current.policy().includedTitles().stream()
+                .filter(retainedIds::contains)
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        Set<LibraryItemId> excludedTitles = current.policy().excludedTitles().stream()
+                .filter(retainedIds::contains)
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        LibraryUpdatePolicy cleanedPolicy = new LibraryUpdatePolicy(
+                current.policy().interval(),
+                current.policy().favoritesOnly(),
+                current.policy().skipCompleted(),
+                current.policy().skipNotStarted(),
+                current.policy().includedCategories(),
+                current.policy().excludedCategories(),
+                includedTitles,
+                excludedTitles);
         int removed = current.baselines().size() - baselines.size()
-                + current.events().size() - events.size();
+                + current.events().size() - events.size()
+                + current.policy().includedTitles().size() - includedTitles.size()
+                + current.policy().excludedTitles().size() - excludedTitles.size();
         if (removed > 0) {
             store.replace(new LibraryUpdateStore.State(
-                    current.policy(),
+                    cleanedPolicy,
                     baselines,
                     events,
                     current.lastRunAt()));
@@ -304,10 +358,10 @@ public final class DefaultLibraryUpdateService implements LibraryUpdateService, 
             Map<LibraryItemId, Set<String>> baselines = new ConcurrentHashMap<>(before.baselines());
             baselines.keySet().retainAll(existingIds);
             List<LibraryItem> eligible = libraryItems.stream()
-                    .filter(item -> eligible(
-                            item,
-                            before.policy(),
-                            libraryConfiguration.get()))
+                    .filter(item -> skipReason(
+                             item,
+                             before.policy(),
+                             libraryConfiguration.get()).isEmpty())
                     .sorted(Comparator.comparing(LibraryItem::title, String.CASE_INSENSITIVE_ORDER))
                     .toList();
             totalTitles = eligible.size();
@@ -456,22 +510,28 @@ public final class DefaultLibraryUpdateService implements LibraryUpdateService, 
                 totalTitles));
     }
 
-    private static boolean eligible(
+    private static Optional<LibraryUpdateSkipReason> skipReason(
             LibraryItem item,
             LibraryUpdatePolicy policy,
             LibraryConfigurationSnapshot configuration) {
         if (item.origin().isEmpty()) {
-            return false;
+            return Optional.of(LibraryUpdateSkipReason.NO_SOURCE_ORIGIN);
+        }
+        if (policy.includedTitles().contains(item.id())) {
+            return Optional.empty();
+        }
+        if (policy.excludedTitles().contains(item.id())) {
+            return Optional.of(LibraryUpdateSkipReason.TITLE_EXCLUDED);
         }
         if (policy.favoritesOnly() && !item.favorite()) {
-            return false;
+            return Optional.of(LibraryUpdateSkipReason.NOT_FAVORITE);
         }
         if (policy.skipCompleted()
                 && item.metadata().publicationStatus() == PublicationStatus.COMPLETED) {
-            return false;
+            return Optional.of(LibraryUpdateSkipReason.PUBLICATION_COMPLETED);
         }
         if (policy.skipNotStarted() && item.progress().isEmpty()) {
-            return false;
+            return Optional.of(LibraryUpdateSkipReason.NOT_STARTED);
         }
         Map<String, LibraryCategoryUpdatePolicy> categoryPolicies = configuration.categories()
                 .stream()
@@ -485,16 +545,28 @@ public final class DefaultLibraryUpdateService implements LibraryUpdateService, 
                 .map(categoryPolicies::get)
                 .anyMatch(LibraryCategoryUpdatePolicy.EXCLUDE::equals);
         if (explicitlyExcluded) {
-            return false;
+            return Optional.of(LibraryUpdateSkipReason.CATEGORY_EXCLUDED);
         }
         if (explicitlyIncluded) {
-            return true;
+            return Optional.empty();
         }
         if (!policy.includedCategories().isEmpty()
                 && java.util.Collections.disjoint(item.categories(), policy.includedCategories())) {
-            return false;
+            return Optional.of(LibraryUpdateSkipReason.CATEGORY_NOT_INCLUDED);
         }
-        return java.util.Collections.disjoint(item.categories(), policy.excludedCategories());
+        return java.util.Collections.disjoint(item.categories(), policy.excludedCategories())
+                ? Optional.empty()
+                : Optional.of(LibraryUpdateSkipReason.CATEGORY_EXCLUDED);
+    }
+
+    private List<LibraryUpdateSkip> skippedTitles(LibraryUpdatePolicy policy) {
+        LibraryConfigurationSnapshot configuration = libraryConfiguration.get();
+        return library.snapshot().stream()
+                .map(item -> skipReason(item, policy, configuration)
+                        .map(reason -> new LibraryUpdateSkip(item.id(), item.title(), reason)))
+                .flatMap(Optional::stream)
+                .sorted(Comparator.comparing(LibraryUpdateSkip::title, String.CASE_INSENSITIVE_ORDER))
+                .toList();
     }
 
     private static List<LibraryUpdateEvent> mergeEvents(
