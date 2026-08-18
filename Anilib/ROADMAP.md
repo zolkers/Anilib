@@ -256,9 +256,9 @@ platform-specific.
 
 ### 8. Local source
 
-- [ ] implement the complete local manga folder conventions, metadata, covers,
+- [x] implement the complete local manga folder conventions, metadata, covers,
   chapter ordering, and rescan actions
-- [ ] implement local anime metadata, episode JSON, video discovery, thumbnails,
+- [x] implement local anime metadata, episode JSON, video discovery, thumbnails,
   subtitles, and rescan actions
 
 ### 9. Release and application updates

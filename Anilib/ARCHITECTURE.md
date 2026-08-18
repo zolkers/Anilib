@@ -189,6 +189,14 @@ the original numeric source identity plus title URL. APK-adapted sources use
 that numeric identity too, so imported titles can reconnect without a package-
 name guess. Android and desktop execute this identical Java path.
 
+Local Source is a removable Source implementation. Its Java runtime owns an
+immutable, atomically replaced index over Aniyomi-compatible `local` and
+`localanime` roots, bounded dependency-free JSON parsing, file and archive
+validation, metadata, covers, chapter/episode ordering, local video streams,
+thumbnails, and subtitle association. Source API 1.7 exposes only a generic
+optional refresh action and episode thumbnail URI; Discovery owns the shared
+re-scan control and neither platform adapter interprets local folder formats.
+
 Player is a removable vertical over Library and Source. Source API 1.4 owns the
 optional `StreamingSource` extension contract and immutable episode, stream,
 format, request-header, and subtitle models. The Player Bundle resolves only

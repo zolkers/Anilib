@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tune
@@ -568,6 +569,7 @@ private fun SourceCatalogueScreen(
     openWebPage: (SourceWebPage) -> Unit,
     navigateUp: () -> Unit,
 ) {
+    val scope = rememberCoroutineScope()
     var query by remember(source.id()) { mutableStateOf("") }
     var searchActive by remember(source.id()) { mutableStateOf(false) }
     var page by remember(source.id(), listing) { mutableIntStateOf(1) }
@@ -587,6 +589,7 @@ private fun SourceCatalogueScreen(
         presentation.preferences(source.id())
     }
     val sourceWebPage = remember(source.id()) { presentation.sourceWebPage(source.id()).orElse(null) }
+    val supportsRefresh = remember(source.id()) { presentation.supportsRefresh(source.id()) }
     var result by remember(source.id(), listing, query, page, filterValues, preferenceRevision) {
         mutableStateOf<Result<SourcePage>?>(null)
     }
@@ -651,6 +654,24 @@ private fun SourceCatalogueScreen(
                     }
                 },
                 actions = {
+                    if (supportsRefresh) {
+                        IconButton(onClick = {
+                            notice = "Rescanning local folders…"
+                            scope.launch {
+                                withContext(Dispatchers.IO) {
+                                    runCatching { presentation.refresh(source.id()) }
+                                }.onSuccess {
+                                    page = 1
+                                    requestRevision++
+                                    notice = "Local folders rescanned"
+                                }.onFailure {
+                                    notice = it.message ?: "Local rescan failed"
+                                }
+                            }
+                        }) {
+                            Icon(Icons.Default.Refresh, contentDescription = "Rescan source")
+                        }
+                    }
                     if (sourceWebPage != null) {
                         IconButton(onClick = { openWebPage(sourceWebPage) }) {
                             Icon(Icons.Default.Public, contentDescription = "Open source website")

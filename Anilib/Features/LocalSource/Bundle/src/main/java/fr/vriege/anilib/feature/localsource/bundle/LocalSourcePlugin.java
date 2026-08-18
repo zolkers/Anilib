@@ -13,7 +13,7 @@ import java.nio.file.Path;
 
 public final class LocalSourcePlugin implements AnilibPlugin {
     private static final PluginManifest MANIFEST = PluginManifest.builder(
-                    ComponentDescriptor.of("feature.local-source", "Local source", "0.1.0"))
+                    ComponentDescriptor.of("feature.local-source", "Local source", "1.0.0"))
             .provides(LocalSourceCapabilities.CONTENT)
             .requires(SourceCapabilities.REGISTRAR)
             .build();

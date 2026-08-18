@@ -2,6 +2,7 @@ package fr.vriege.anilib.feature.source;
 
 import fr.vriege.anilib.foundation.validation.Preconditions;
 
+import java.net.URI;
 import java.time.Instant;
 import java.util.Optional;
 
@@ -10,7 +11,8 @@ public record SourceEpisode(
         String title,
         double episodeNumber,
         Optional<Instant> uploadedAt,
-        Optional<String> scanlator) {
+        Optional<String> scanlator,
+        Optional<URI> thumbnail) {
     public static final double UNKNOWN_NUMBER = -1.0d;
 
     public SourceEpisode {
@@ -23,5 +25,25 @@ public record SourceEpisode(
         scanlator = Preconditions.requireNonNull(scanlator, "scanlator")
                 .map(String::strip)
                 .filter(value -> !value.isEmpty());
+        thumbnail = Preconditions.requireNonNull(thumbnail, "thumbnail");
+        thumbnail.ifPresent(SourceEpisode::validateThumbnail);
+    }
+
+    public SourceEpisode(
+            SourceEpisodeId id,
+            String title,
+            double episodeNumber,
+            Optional<Instant> uploadedAt,
+            Optional<String> scanlator) {
+        this(id, title, episodeNumber, uploadedAt, scanlator, Optional.empty());
+    }
+
+    private static void validateThumbnail(URI uri) {
+        String scheme = uri.getScheme();
+        if (scheme == null || !(scheme.equalsIgnoreCase("http")
+                || scheme.equalsIgnoreCase("https")
+                || scheme.equalsIgnoreCase("file"))) {
+            throw new IllegalArgumentException("thumbnail must use http, https, or file");
+        }
     }
 }

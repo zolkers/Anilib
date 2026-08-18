@@ -156,7 +156,7 @@ final class DiscoveryTest {
                     "unknown filters must be rejected before reaching a source");
             counter.expectIllegalArgument(() -> discovery.setPreference(
                             LOCAL_SOURCE,
-                            "include-folders",
+                            "include-manga",
                             "sometimes"),
                     "invalid source preference values must be rejected");
 
@@ -206,7 +206,7 @@ final class DiscoveryTest {
                             20).equals(List.of(REMOTE_ANIME_ITEM)),
                     "seasonal anime migration must search a normalized franchise title");
 
-            discovery.setPreference(LOCAL_SOURCE, "include-folders", "false");
+            discovery.setPreference(LOCAL_SOURCE, "include-manga", "false");
             counter.check(discovery.browse(LOCAL_SOURCE, SourceListing.POPULAR, 1, 20, List.of()).items().isEmpty(),
                     "source preferences must affect subsequent browse requests immediately");
         }
@@ -215,12 +215,12 @@ final class DiscoveryTest {
     private static void verifiesPreferenceRestart(Counter counter, Path directory) {
         try (StartedAnilib product = StandardAnilib.start(directory)) {
             DiscoveryService discovery = product.capability(DiscoveryCapabilities.SERVICE);
-            String includeFolders = discovery.preferences(LOCAL_SOURCE).stream()
-                    .filter(preference -> preference.definition().id().equals("include-folders"))
+            String includeManga = discovery.preferences(LOCAL_SOURCE).stream()
+                    .filter(preference -> preference.definition().id().equals("include-manga"))
                     .findFirst()
                     .orElseThrow()
                     .value();
-            counter.check(includeFolders.equals("false"),
+            counter.check(includeManga.equals("false"),
                     "source preferences must survive a complete product restart");
         }
     }

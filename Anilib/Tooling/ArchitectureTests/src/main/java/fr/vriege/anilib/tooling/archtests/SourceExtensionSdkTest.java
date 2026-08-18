@@ -104,7 +104,9 @@ final class SourceExtensionSdkTest {
                 "current Source API must support its browser entry-point contract");
         counter.check(SourceSdk.API_VERSION.supports(new SourceApiVersion(1, 6)),
                 "current Source API must support its browser-policy contract");
-        counter.check(!SourceSdk.API_VERSION.supports(new SourceApiVersion(1, 7)),
+        counter.check(SourceSdk.API_VERSION.supports(new SourceApiVersion(1, 7)),
+                "current Source API must support refresh and episode thumbnails");
+        counter.check(!SourceSdk.API_VERSION.supports(new SourceApiVersion(1, 8)),
                 "current Source API must reject a newer minor contract");
     }
 

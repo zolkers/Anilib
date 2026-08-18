@@ -5,9 +5,12 @@ import fr.vriege.anilib.feature.localsource.LocalPage;
 import fr.vriege.anilib.feature.localsource.LocalPublication;
 import fr.vriege.anilib.feature.localsource.LocalPublicationId;
 import fr.vriege.anilib.feature.localsource.LocalPublicationType;
+import fr.vriege.anilib.feature.localsource.LocalSeriesMetadata;
 import fr.vriege.anilib.feature.localsource.LocalSourceException;
+import fr.vriege.anilib.feature.localsource.LocalSourceScan;
 import fr.vriege.anilib.feature.source.CatalogueSource;
 import fr.vriege.anilib.feature.source.PagedSource;
+import fr.vriege.anilib.feature.source.RefreshableSource;
 import fr.vriege.anilib.feature.source.SourceBrowseRequest;
 import fr.vriege.anilib.feature.source.SourceCatalogueItem;
 import fr.vriege.anilib.feature.source.SourceCatalogueItemId;
@@ -15,6 +18,8 @@ import fr.vriege.anilib.feature.source.SourceContentUnit;
 import fr.vriege.anilib.feature.source.SourceContentUnitId;
 import fr.vriege.anilib.feature.source.SourceContentKind;
 import fr.vriege.anilib.feature.source.SourceDescriptor;
+import fr.vriege.anilib.feature.source.SourceEpisode;
+import fr.vriege.anilib.feature.source.SourceEpisodeId;
 import fr.vriege.anilib.feature.source.SourceFilterDefinition;
 import fr.vriege.anilib.feature.source.SourceFilterType;
 import fr.vriege.anilib.feature.source.SourceId;
@@ -24,6 +29,9 @@ import fr.vriege.anilib.feature.source.SourcePreferenceDefinition;
 import fr.vriege.anilib.feature.source.SourcePreferenceType;
 import fr.vriege.anilib.feature.source.SourceSdk;
 import fr.vriege.anilib.feature.source.SourceSearchRequest;
+import fr.vriege.anilib.feature.source.SourceStreamFormat;
+import fr.vriege.anilib.feature.source.SourceVideoStream;
+import fr.vriege.anilib.feature.source.StreamingSource;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -42,26 +50,27 @@ import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
-public final class FileSystemLocalContentSource implements LocalContentSource, CatalogueSource, PagedSource {
+public final class FileSystemLocalContentSource
+        implements LocalContentSource, CatalogueSource, PagedSource, StreamingSource, RefreshableSource {
     private static final SourceDescriptor DESCRIPTOR = new SourceDescriptor(
             SourceId.of("anilib.local"),
             "Local library",
-            "1.0.0",
+            "2.0.0",
             "und",
-            Set.of(SourceContentKind.MANGA),
+            Set.of(SourceContentKind.MANGA, SourceContentKind.ANIME),
             SourceSdk.API_VERSION);
     private static final long MAX_PAGE_BYTES = 64L * 1024L * 1024L;
     private static final Set<String> IMAGE_EXTENSIONS =
             Set.of("bmp", "gif", "jpeg", "jpg", "png", "webp");
-    private static final Set<String> ARCHIVE_EXTENSIONS = Set.of("cbz", "zip");
+    private static final Set<String> ARCHIVE_EXTENSIONS = Set.of("cbz", "epub", "zip");
     private static final Comparator<String> NAME_ORDER =
             String.CASE_INSENSITIVE_ORDER.thenComparing(Comparator.naturalOrder());
     private static final List<SourceFilterDefinition> FILTERS = List.of(
             new SourceFilterDefinition(
-                    "format",
-                    "Format",
+                    "content",
+                    "Content",
                     SourceFilterType.SELECT,
-                    List.of("All", "Folders", "Archives"),
+                    List.of("All", "Manga", "Anime"),
                     "All",
                     ""),
             new SourceFilterDefinition(
@@ -80,23 +89,25 @@ public final class FileSystemLocalContentSource implements LocalContentSource, C
                     ""));
     private static final List<SourcePreferenceDefinition> PREFERENCES = List.of(
             new SourcePreferenceDefinition(
-                    "include-folders",
-                    "Include folders",
-                    "Show image folders in the local catalogue",
+                    "include-manga",
+                    "Include manga",
+                    "Show series from the Aniyomi local folder",
                     SourcePreferenceType.SWITCH,
                     List.of(),
                     "true",
                     false),
             new SourcePreferenceDefinition(
-                    "include-archives",
-                    "Include archives",
-                    "Show ZIP and CBZ archives in the local catalogue",
+                    "include-anime",
+                    "Include anime",
+                    "Show series from the Aniyomi localanime folder",
                     SourcePreferenceType.SWITCH,
                     List.of(),
                     "true",
                     false));
 
     private final Path root;
+    private final AniyomiLocalIndex index;
+    private volatile AniyomiLocalIndex.Snapshot snapshot;
 
     public FileSystemLocalContentSource(Path root) {
         this.root = Objects.requireNonNull(root, "root must not be null").toAbsolutePath().normalize();
@@ -105,6 +116,8 @@ public final class FileSystemLocalContentSource implements LocalContentSource, C
         } catch (IOException exception) {
             throw failure("create local source root", exception);
         }
+        index = new AniyomiLocalIndex(this.root);
+        snapshot = index.scan(1L);
     }
 
     @Override
@@ -114,16 +127,49 @@ public final class FileSystemLocalContentSource implements LocalContentSource, C
 
     @Override
     public List<LocalPublication> publications() {
+        List<LocalPublication> indexed = snapshot.series().stream()
+                .map(AniyomiLocalIndex.SeriesEntry::publication)
+                .toList();
         try (Stream<Path> entries = Files.list(root)) {
-            return entries
+            List<LocalPublication> legacy = entries
                     .filter(Predicate.not(Files::isSymbolicLink))
+                    .filter(path -> !path.equals(root.resolve("local")))
+                    .filter(path -> !path.equals(root.resolve("localanime")))
                     .filter(path -> Files.isDirectory(path) || isArchive(path))
                     .map(this::publication)
+                    .toList();
+            return Stream.concat(indexed.stream(), legacy.stream())
                     .sorted(Comparator.comparing(LocalPublication::title, NAME_ORDER))
                     .toList();
         } catch (IOException exception) {
             throw failure("discover local publications", exception);
         }
+    }
+
+    @Override
+    public Optional<LocalSeriesMetadata> metadata(LocalPublicationId publicationId) {
+        Objects.requireNonNull(publicationId, "publicationId must not be null");
+        return snapshot.series().stream()
+                .filter(value -> value.publication().id().equals(publicationId))
+                .map(AniyomiLocalIndex.SeriesEntry::metadata)
+                .findFirst();
+    }
+
+    @Override
+    public LocalSourceScan scan() {
+        return snapshot.report();
+    }
+
+    @Override
+    public synchronized LocalSourceScan rescan() {
+        AniyomiLocalIndex.Snapshot replacement = index.scan(snapshot.report().revision() + 1L);
+        snapshot = replacement;
+        return replacement.report();
+    }
+
+    @Override
+    public void refresh() {
+        rescan();
     }
 
     @Override
@@ -161,6 +207,17 @@ public final class FileSystemLocalContentSource implements LocalContentSource, C
     public List<SourceContentUnit> contentUnits(SourceCatalogueItemId itemId) {
         LocalPublicationId publicationId = publicationId(itemId);
         resolvePublication(publicationId);
+        if (publicationId.type() == LocalPublicationType.MANGA_SERIES) {
+            return series(publicationId).chapters().stream()
+                    .map(chapter -> new SourceContentUnit(
+                            new SourceContentUnitId(itemId, "chapter:" + chapter.relativePath()),
+                            chapter.title(),
+                            chapter.uploadedAt()))
+                    .toList();
+        }
+        if (publicationId.type() == LocalPublicationType.ANIME_SERIES) {
+            return List.of();
+        }
         return List.of(new SourceContentUnit(
                 new SourceContentUnitId(itemId, "local-content"),
                 "Local content",
@@ -170,10 +227,22 @@ public final class FileSystemLocalContentSource implements LocalContentSource, C
     @Override
     public List<SourcePageResource> pages(SourceContentUnitId contentUnitId) {
         Objects.requireNonNull(contentUnitId, "contentUnitId must not be null");
+        LocalPublicationId publicationId = publicationId(contentUnitId.itemId());
+        if (publicationId.type() == LocalPublicationType.MANGA_SERIES
+                && contentUnitId.value().startsWith("chapter:")) {
+            String relativePath = contentUnitId.value().substring("chapter:".length());
+            AniyomiLocalIndex.ChapterEntry chapter = chapter(publicationId, relativePath);
+            return chapterPages(publicationId, chapter).stream()
+                    .map(page -> new SourcePageResource(
+                            contentUnitId,
+                            page.entryName(),
+                            page.index(),
+                            page.size()))
+                    .toList();
+        }
         if (!contentUnitId.value().equals("local-content")) {
             throw new LocalSourceException("Unknown local content unit: " + contentUnitId.value());
         }
-        LocalPublicationId publicationId = publicationId(contentUnitId.itemId());
         return pages(publicationId).stream()
                 .map(page -> new SourcePageResource(
                         contentUnitId,
@@ -187,6 +256,24 @@ public final class FileSystemLocalContentSource implements LocalContentSource, C
     public byte[] readPage(SourcePageResource page) {
         Objects.requireNonNull(page, "page must not be null");
         LocalPublicationId publicationId = publicationId(page.contentUnitId().itemId());
+        if (publicationId.type() == LocalPublicationType.MANGA_SERIES
+                && page.contentUnitId().value().startsWith("chapter:")) {
+            String relativePath = page.contentUnitId().value().substring("chapter:".length());
+            AniyomiLocalIndex.ChapterEntry chapter = chapter(publicationId, relativePath);
+            LocalPage localPage = new LocalPage(
+                    publicationId,
+                    page.value(),
+                    page.index(),
+                    page.estimatedBytes());
+            LocalPage canonical = chapterPages(publicationId, chapter).stream()
+                    .filter(candidate -> candidate.entryName().equals(page.value()))
+                    .findFirst()
+                    .orElseThrow(() -> new LocalSourceException("Unknown local page: " + page.value()));
+            if (!canonical.equals(localPage)) {
+                throw new LocalSourceException("Local page metadata does not match the chapter index");
+            }
+            return readChapterPage(chapter, localPage);
+        }
         return read(new LocalPage(publicationId, page.value(), page.index(), page.estimatedBytes()));
     }
 
@@ -197,6 +284,10 @@ public final class FileSystemLocalContentSource implements LocalContentSource, C
         return switch (publicationId.type()) {
             case DIRECTORY -> directoryPages(publicationId, publication);
             case ZIP_ARCHIVE -> archivePages(publicationId, publication);
+            case MANGA_SERIES -> series(publicationId).chapters().stream()
+                    .flatMap(chapter -> chapterPages(publicationId, chapter).stream())
+                    .toList();
+            case ANIME_SERIES -> List.of();
         };
     }
 
@@ -214,7 +305,48 @@ public final class FileSystemLocalContentSource implements LocalContentSource, C
         return switch (page.publicationId().type()) {
             case DIRECTORY -> readDirectoryPage(publication, page);
             case ZIP_ARCHIVE -> readArchivePage(publication, page);
+            case MANGA_SERIES -> readStructuredPage(page);
+            case ANIME_SERIES -> throw new LocalSourceException("Anime publications do not contain pages");
         };
+    }
+
+    @Override
+    public List<SourceEpisode> episodes(SourceCatalogueItemId itemId) {
+        LocalPublicationId publicationId = publicationId(itemId);
+        if (publicationId.type() != LocalPublicationType.ANIME_SERIES) {
+            return List.of();
+        }
+        return series(publicationId).episodes().stream()
+                .map(episode -> new SourceEpisode(
+                        new SourceEpisodeId(itemId, "episode:" + episode.relativePath()),
+                        episode.title(),
+                        episode.number(),
+                        episode.uploadedAt(),
+                        episode.scanlator(),
+                        episode.thumbnail()))
+                .toList();
+    }
+
+    @Override
+    public List<SourceVideoStream> streams(SourceEpisodeId episodeId) {
+        Objects.requireNonNull(episodeId, "episodeId must not be null");
+        LocalPublicationId publicationId = publicationId(episodeId.itemId());
+        if (publicationId.type() != LocalPublicationType.ANIME_SERIES
+                || !episodeId.value().startsWith("episode:")) {
+            throw new LocalSourceException("Unknown local anime episode: " + episodeId.value());
+        }
+        String relativePath = episodeId.value().substring("episode:".length());
+        AniyomiLocalIndex.EpisodeEntry episode = series(publicationId).episodes().stream()
+                .filter(value -> value.relativePath().equals(relativePath))
+                .findFirst()
+                .orElseThrow(() -> new LocalSourceException("Unknown local anime episode: " + relativePath));
+        return List.of(new SourceVideoStream(
+                "local",
+                "Local file",
+                episode.video().toUri(),
+                SourceStreamFormat.PROGRESSIVE,
+                java.util.Map.of(),
+                episode.subtitles()));
     }
 
     private SourcePage cataloguePage(SourceBrowseRequest request, String query, boolean latest) {
@@ -223,11 +355,11 @@ public final class FileSystemLocalContentSource implements LocalContentSource, C
         request.filters().forEach(value -> filters.put(value.filterId(), value.value()));
         String normalizedQuery = query.strip().toLowerCase(Locale.ROOT);
         String titleFilter = filters.getOrDefault("title", "").strip().toLowerCase(Locale.ROOT);
-        String format = filters.getOrDefault("format", "All");
-        boolean includeFolders = Boolean.parseBoolean(
-                request.preferences().getOrDefault("include-folders", "true"));
-        boolean includeArchives = Boolean.parseBoolean(
-                request.preferences().getOrDefault("include-archives", "true"));
+        String content = filters.getOrDefault("content", "All");
+        boolean includeManga = Boolean.parseBoolean(
+                request.preferences().getOrDefault("include-manga", "true"));
+        boolean includeAnime = Boolean.parseBoolean(
+                request.preferences().getOrDefault("include-anime", "true"));
 
         Comparator<LocalPublication> order;
         if (latest) {
@@ -240,7 +372,7 @@ public final class FileSystemLocalContentSource implements LocalContentSource, C
         }
 
         List<SourceCatalogueItem> matches = publications().stream()
-                .filter(publication -> included(publication, includeFolders, includeArchives, format))
+                .filter(publication -> included(publication, includeManga, includeAnime, content))
                 .filter(publication -> contains(publication.title(), normalizedQuery))
                 .filter(publication -> contains(publication.title(), titleFilter))
                 .sorted(order)
@@ -253,15 +385,21 @@ public final class FileSystemLocalContentSource implements LocalContentSource, C
 
     private SourceCatalogueItem catalogueItem(LocalPublication publication) {
         String key = publication.id().type().name() + ":" + publication.id().relativePath();
-        String description = publication.id().type() == LocalPublicationType.DIRECTORY
-                ? "Local image folder"
-                : "Local ZIP/CBZ archive";
+        Optional<LocalSeriesMetadata> metadata = metadata(publication.id());
+        String description = metadata.map(FileSystemLocalContentSource::description)
+                .orElseGet(() -> legacyDescription(publication.id().type()));
+        Optional<java.net.URI> thumbnail = snapshot.series().stream()
+                .filter(value -> value.publication().id().equals(publication.id()))
+                .flatMap(value -> value.cover().stream())
+                .findFirst();
         return new SourceCatalogueItem(
                 new SourceCatalogueItemId(DESCRIPTOR.id(), key),
                 publication.title(),
                 description,
-                Optional.empty(),
-                SourceContentKind.MANGA);
+                thumbnail,
+                publication.id().type() == LocalPublicationType.ANIME_SERIES
+                        ? SourceContentKind.ANIME
+                        : SourceContentKind.MANGA);
     }
 
     private static LocalPublicationId publicationId(SourceCatalogueItemId itemId) {
@@ -291,20 +429,39 @@ public final class FileSystemLocalContentSource implements LocalContentSource, C
 
     private static boolean included(
             LocalPublication publication,
-            boolean includeFolders,
-            boolean includeArchives,
-            String format) {
-        boolean directory = publication.id().type() == LocalPublicationType.DIRECTORY;
-        if ((directory && !includeFolders) || (!directory && !includeArchives)) {
+            boolean includeManga,
+            boolean includeAnime,
+            String content) {
+        boolean anime = publication.id().type() == LocalPublicationType.ANIME_SERIES;
+        if ((anime && !includeAnime) || (!anime && !includeManga)) {
             return false;
         }
-        return format.equals("All")
-                || (format.equals("Folders") && directory)
-                || (format.equals("Archives") && !directory);
+        return content.equals("All")
+                || (content.equals("Manga") && !anime)
+                || (content.equals("Anime") && anime);
     }
 
     private static boolean contains(String title, String query) {
         return query.isEmpty() || title.toLowerCase(Locale.ROOT).contains(query);
+    }
+
+    private static String description(LocalSeriesMetadata metadata) {
+        List<String> values = new ArrayList<>();
+        metadata.author().ifPresent(value -> values.add("Author: " + value));
+        metadata.artist().ifPresent(value -> values.add("Artist: " + value));
+        if (!metadata.genres().isEmpty()) {
+            values.add(String.join(", ", metadata.genres()));
+        }
+        if (!metadata.description().isBlank()) {
+            values.add(metadata.description());
+        }
+        return values.isEmpty() ? "Local Aniyomi series" : String.join(" · ", values);
+    }
+
+    private static String legacyDescription(LocalPublicationType type) {
+        return type == LocalPublicationType.DIRECTORY
+                ? "Legacy local image folder"
+                : "Legacy local ZIP/CBZ archive";
     }
 
     private LocalPublication publication(Path path) {
@@ -332,6 +489,44 @@ public final class FileSystemLocalContentSource implements LocalContentSource, C
         } catch (IOException exception) {
             throw failure("index local directory " + id.relativePath(), exception);
         }
+    }
+
+    private AniyomiLocalIndex.SeriesEntry series(LocalPublicationId id) {
+        return snapshot.series().stream()
+                .filter(value -> value.publication().id().equals(id))
+                .findFirst()
+                .orElseThrow(() -> new LocalSourceException("Unknown local series: " + id.relativePath()));
+    }
+
+    private AniyomiLocalIndex.ChapterEntry chapter(LocalPublicationId id, String relativePath) {
+        return series(id).chapters().stream()
+                .filter(value -> value.relativePath().equals(relativePath))
+                .findFirst()
+                .orElseThrow(() -> new LocalSourceException("Unknown local chapter: " + relativePath));
+    }
+
+    private List<LocalPage> chapterPages(
+            LocalPublicationId publicationId,
+            AniyomiLocalIndex.ChapterEntry chapter) {
+        return chapter.archive()
+                ? archivePages(publicationId, chapter.path())
+                : directoryPages(publicationId, chapter.path());
+    }
+
+    private byte[] readChapterPage(AniyomiLocalIndex.ChapterEntry chapter, LocalPage page) {
+        return chapter.archive()
+                ? readArchivePage(chapter.path(), page)
+                : readDirectoryPage(chapter.path(), page);
+    }
+
+    private byte[] readStructuredPage(LocalPage page) {
+        List<AniyomiLocalIndex.ChapterEntry> matches = series(page.publicationId()).chapters().stream()
+                .filter(chapter -> chapterPages(page.publicationId(), chapter).contains(page))
+                .toList();
+        if (matches.size() != 1) {
+            throw new LocalSourceException("Structured local page is missing or ambiguous: " + page.entryName());
+        }
+        return readChapterPage(matches.getFirst(), page);
     }
 
     private List<LocalPage> archivePages(LocalPublicationId id, Path archive) {

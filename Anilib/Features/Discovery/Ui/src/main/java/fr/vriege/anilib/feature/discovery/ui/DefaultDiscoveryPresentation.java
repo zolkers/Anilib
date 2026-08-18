@@ -179,6 +179,16 @@ public final class DefaultDiscoveryPresentation implements DiscoveryPresentation
     }
 
     @Override
+    public boolean supportsRefresh(SourceId sourceId) {
+        return service.supportsRefresh(sourceId);
+    }
+
+    @Override
+    public void refresh(SourceId sourceId) {
+        service.refresh(sourceId);
+    }
+
+    @Override
     public Optional<SourceWebPage> sourceWebPage(SourceId sourceId) {
         return service.sourceWebPage(sourceId);
     }

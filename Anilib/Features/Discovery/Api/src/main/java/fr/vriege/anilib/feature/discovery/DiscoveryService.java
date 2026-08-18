@@ -26,6 +26,10 @@ public interface DiscoveryService {
 
     boolean supportsLatest(SourceId sourceId);
 
+    boolean supportsRefresh(SourceId sourceId);
+
+    void refresh(SourceId sourceId);
+
     Optional<SourceWebPage> sourceWebPage(SourceId sourceId);
 
     Optional<SourceWebPage> titleWebPage(SourceCatalogueItemId itemId);

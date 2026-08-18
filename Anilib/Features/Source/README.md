@@ -14,7 +14,9 @@ tracks. API version `1.5` adds the optional `WebSource` contract for source and
 title browser entry points without exposing a platform WebView type. API
 version `1.6` adds immutable per-page headers, an optional User-Agent, and
 source-declared challenge completion cookies so the shared browser can return a
-verified session to the HTTP client.
+verified session to the HTTP client. API version `1.7` adds the optional
+`RefreshableSource` contract and episode thumbnails without changing existing
+streaming implementations.
 
 ## Extension shape
 

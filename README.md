@@ -72,6 +72,11 @@ Browse shows live source-extension update badges and actions, compact fixed-dens
 rows, richer overflow menus, and asynchronous loading, retry, and error states.
 Source catalogues retain their grid/list choice independently and expose item
 menus for Library admission and WebView entry.
+The removable Local Source Bundle indexes Aniyomi-compatible `local` and
+`localanime` roots. It parses bounded `details.json`, `chapters.json`, and
+`episodes.json` metadata, exposes covers and episode thumbnails, naturally
+orders folder/ZIP/CBZ/EPUB chapters and MP4/MKV episodes, attaches sidecar
+subtitles, and refreshes its immutable index only through an explicit re-scan.
 Migration supports multi-title previews, seasonal anime matching, source and
 candidate comparison, title-preservation options, progress, cancellation, and
 targeted retry after partial failure.

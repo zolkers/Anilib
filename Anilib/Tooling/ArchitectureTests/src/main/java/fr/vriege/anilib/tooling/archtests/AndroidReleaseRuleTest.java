@@ -24,11 +24,10 @@ final class AndroidReleaseRuleTest {
                     ANILIB_ANDROID_KEY_ALIAS ANILIB_ANDROID_KEY_PASSWORD
                     writeAndroidReleaseChecksums MessageDigest.getInstance('SHA-256')
                     """);
-            write(repository.resolve("Anilib/Platforms/Android/module.properties"), """
-                    layer=PLATFORM
-                    language=KOTLIN
-                    externalDependencies=androidx.activity:activity-compose,androidx.preference:preference-ktx,io.github.kevinnzou:compose-webview-multiplatform
-                    """);
+            write(repository.resolve("Anilib/Platforms/Android/module.properties"),
+                    "layer=PLATFORM\nlanguage=KOTLIN\nexternalDependencies="
+                            + "androidx.activity:activity-compose,androidx.preference:preference-ktx,"
+                            + "io.github.kevinnzou:compose-webview-multiplatform\n");
             Path manifest = repository.resolve("Anilib/Platforms/Android/src/main/AndroidManifest.xml");
             write(manifest, """
                     android:usesCleartextTraffic="false" android:exported="false"

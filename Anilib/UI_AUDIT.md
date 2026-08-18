@@ -18,6 +18,7 @@ explicit so an architectural seam cannot be mistaken for a finished workflow.
 | History | [x] | Complete | Search, Today/Yesterday/date grouping, anime/manga filters and labels, title navigation, media-aware resume, and targeted removal are live |
 | Browse landing and sources | [x] | Complete | Anime/manga source, extension, and migration tabs expose update-count badges, fixed-density rows, source/extension overflow actions, global search, languages, pinning, latest, WebView, and repository navigation |
 | Source catalogue, search, and filters | [x] | Complete | Popular/latest, paging, search, filters, source preferences, per-source persisted list/grid display, item menus, WebView entry, and library admission are live |
+| Local source | [x] | Complete | Aniyomi-compatible manga/anime roots expose metadata, covers, ordered chapters/episodes, thumbnails, subtitles, and an explicit atomic re-scan action |
 | Migration | [x] | Complete | Multi-title selection, target-source comparison, seasonal anime matching, title options, candidate preview, progress, cancellation, and retry of partial failures are live |
 | Extensions and repositories | [x] | Partial | Repository catalogue, language/pin ordering, dedicated permission/trust/version/changelog details, install/update progress with retryable diagnostics, enable/remove, APK hand-off, source navigation, and Browse update badges are live; add full per-source management parity |
 | More hub | [x] | Partial | Core ordering and actions are live; add storage and help destinations plus richer download state |

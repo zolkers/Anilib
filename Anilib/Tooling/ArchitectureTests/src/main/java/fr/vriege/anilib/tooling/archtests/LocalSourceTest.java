@@ -1,18 +1,27 @@
 package fr.vriege.anilib.tooling.archtests;
 
 import fr.vriege.anilib.feature.localsource.LocalContentSource;
-import fr.vriege.anilib.feature.localsource.LocalPage;
 import fr.vriege.anilib.feature.localsource.LocalPublication;
 import fr.vriege.anilib.feature.localsource.LocalPublicationId;
 import fr.vriege.anilib.feature.localsource.LocalPublicationType;
+import fr.vriege.anilib.feature.localsource.LocalSeriesStatus;
 import fr.vriege.anilib.feature.localsource.LocalSourceException;
 import fr.vriege.anilib.feature.localsource.runtime.FileSystemLocalContentSource;
+import fr.vriege.anilib.feature.source.PagedSource;
+import fr.vriege.anilib.feature.source.SourceBrowseRequest;
+import fr.vriege.anilib.feature.source.SourceCatalogueItem;
+import fr.vriege.anilib.feature.source.SourceContentKind;
+import fr.vriege.anilib.feature.source.SourceContentUnit;
+import fr.vriege.anilib.feature.source.SourceEpisode;
+import fr.vriege.anilib.feature.source.SourcePageResource;
+import fr.vriege.anilib.feature.source.StreamingSource;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -28,8 +37,8 @@ final class LocalSourceTest {
         Path root = null;
         try {
             root = Files.createTempDirectory("anilib-local-source");
-            prepareFolder(root);
-            prepareArchive(root);
+            prepareManga(root);
+            prepareAnime(root);
             verifySource(root, counter);
         } catch (IOException exception) {
             throw new AssertionError("Local source test failed", exception);
@@ -47,34 +56,80 @@ final class LocalSourceTest {
     }
 
     private static void verifySource(Path root, Counter counter) throws IOException {
-        LocalContentSource source = new FileSystemLocalContentSource(root);
+        FileSystemLocalContentSource source = new FileSystemLocalContentSource(root);
         List<LocalPublication> publications = source.publications();
-        counter.check(publications.size() == 2, "local source must discover folder and CBZ publications");
-        counter.check(publications.get(0).title().equals("Archive"),
-                "local publications must use deterministic title ordering");
+        counter.check(publications.size() == 2,
+                "Aniyomi local and localanime folders must each expose their series");
+        LocalPublication manga = publication(publications, LocalPublicationType.MANGA_SERIES);
+        LocalPublication anime = publication(publications, LocalPublicationType.ANIME_SERIES);
+        counter.check(manga.title().equals("Configured Manga") && anime.title().equals("Configured Anime"),
+                "details.json titles must replace folder names");
+        counter.check(source.metadata(manga.id()).orElseThrow().status() == LocalSeriesStatus.COMPLETED,
+                "details.json metadata must retain the Aniyomi publication status");
+        counter.check(source.scan().mangaSeries() == 1 && source.scan().animeSeries() == 1,
+                "the scan report must count both local media kinds");
 
-        LocalPublication archive = publication(publications, LocalPublicationType.ZIP_ARCHIVE);
-        List<LocalPage> archivePages = source.pages(archive.id());
-        counter.check(archivePages.stream().map(LocalPage::entryName).toList()
-                        .equals(List.of("chapter/002.jpg", "chapter/010.png")),
-                "archive pages must be ordered and unsafe entries ignored");
-        counter.check(java.util.Arrays.equals(source.read(archivePages.get(0)), FIRST_IMAGE),
-                "archive page bytes must be readable");
-        LocalPage forged = new LocalPage(
-                archive.id(),
-                archivePages.get(0).entryName(),
-                99,
-                archivePages.get(0).size());
-        counter.expectSourceFailure(() -> source.read(forged),
-                "forged page metadata must be rejected");
+        List<SourceCatalogueItem> catalogue = source.popular(new SourceBrowseRequest(
+                1,
+                30,
+                List.of(),
+                Map.of("include-manga", "true", "include-anime", "true"))).items();
+        SourceCatalogueItem mangaItem = item(catalogue, SourceContentKind.MANGA);
+        SourceCatalogueItem animeItem = item(catalogue, SourceContentKind.ANIME);
+        counter.check(mangaItem.thumbnail().isPresent() && animeItem.thumbnail().isPresent(),
+                "cover.jpg must be exposed as the catalogue thumbnail");
+        counter.check(mangaItem.description().contains("Manga author"),
+                "local catalogue descriptions must include series metadata");
 
-        LocalPublication folder = publication(publications, LocalPublicationType.DIRECTORY);
-        List<LocalPage> folderPages = source.pages(folder.id());
-        counter.check(folderPages.stream().map(LocalPage::entryName).toList()
-                        .equals(List.of("chapter/001.jpg", "chapter/002.png")),
-                "folder pages must be recursively indexed in deterministic order");
-        counter.check(java.util.Arrays.equals(source.read(folderPages.get(1)), SECOND_IMAGE),
-                "folder page bytes must be readable");
+        verifyManga(source, mangaItem, counter);
+        verifyAnime(source, animeItem, root, counter);
+    }
+
+    private static void verifyManga(
+            PagedSource source,
+            SourceCatalogueItem manga,
+            Counter counter) {
+        List<SourceContentUnit> chapters = source.contentUnits(manga.id());
+        counter.check(chapters.stream().map(SourceContentUnit::title).toList()
+                        .equals(List.of("Chapter two", "Chapter ten")),
+                "chapters.json and numeric chapter ordering must be applied");
+        counter.check(chapters.getFirst().publishedAt().isPresent(),
+                "chapter upload dates must be parsed from chapters.json");
+        List<SourcePageResource> archivePages = source.pages(chapters.getFirst().id());
+        counter.check(archivePages.stream().map(SourcePageResource::value).toList()
+                        .equals(List.of("002.jpg", "010.png")),
+                "CBZ pages must be naturally indexed inside a structured manga chapter");
+        counter.check(java.util.Arrays.equals(source.readPage(archivePages.getFirst()), FIRST_IMAGE),
+                "structured manga chapter bytes must be readable");
+    }
+
+    private static void verifyAnime(
+            FileSystemLocalContentSource source,
+            SourceCatalogueItem anime,
+            Path root,
+            Counter counter) throws IOException {
+        StreamingSource streaming = source;
+        List<SourceEpisode> episodes = streaming.episodes(anime.id());
+        counter.check(episodes.stream().map(SourceEpisode::title).toList()
+                        .equals(List.of("First episode", "Episode ten")),
+                "episodes.json and numeric video ordering must be applied");
+        counter.check(episodes.getFirst().thumbnail().isPresent(),
+                "a matching local image must be exposed as the episode thumbnail");
+        var streams = streaming.streams(episodes.getFirst().id());
+        counter.check(streams.size() == 1 && streams.getFirst().location().getScheme().equals("file"),
+                "local videos must resolve to a progressive file stream");
+        counter.check(streams.getFirst().subtitles().size() == 1
+                        && streams.getFirst().subtitles().getFirst().language().orElseThrow().equals("en"),
+                "sidecar subtitles must be matched to the video and retain their language tag");
+
+        Path animeDirectory = root.resolve("localanime").resolve("Anime Folder");
+        Files.write(animeDirectory.resolve("ep02.mp4"), new byte[]{3});
+        counter.check(streaming.episodes(anime.id()).size() == 2,
+                "the durable local index must change only after an explicit rescan");
+        long revision = source.scan().revision();
+        counter.check(source.rescan().revision() == revision + 1
+                        && streaming.episodes(anime.id()).size() == 3,
+                "rescan must atomically refresh newly discovered local videos");
     }
 
     private static LocalPublication publication(
@@ -86,20 +141,58 @@ final class LocalSourceTest {
                 .orElseThrow();
     }
 
-    private static void prepareFolder(Path root) throws IOException {
-        Path chapter = Files.createDirectories(root.resolve("Folder Title").resolve("chapter"));
-        Files.write(chapter.resolve("002.png"), SECOND_IMAGE);
-        Files.write(chapter.resolve("001.jpg"), FIRST_IMAGE);
-        Files.writeString(chapter.resolve("notes.txt"), "ignored");
+    private static SourceCatalogueItem item(
+            List<SourceCatalogueItem> catalogue,
+            SourceContentKind kind) {
+        return catalogue.stream()
+                .filter(item -> item.contentKind() == kind)
+                .findFirst()
+                .orElseThrow();
     }
 
-    private static void prepareArchive(Path root) throws IOException {
-        try (ZipOutputStream output = new ZipOutputStream(Files.newOutputStream(root.resolve("Archive.cbz")))) {
-            writeEntry(output, "chapter/010.png", SECOND_IMAGE);
-            writeEntry(output, "chapter/002.jpg", FIRST_IMAGE);
-            writeEntry(output, "chapter/notes.txt", new byte[]{9});
-            writeEntry(output, "../escape.jpg", new byte[]{8});
+    private static void prepareManga(Path root) throws IOException {
+        Path series = Files.createDirectories(root.resolve("local").resolve("Manga Folder"));
+        Files.write(series.resolve("cover.jpg"), FIRST_IMAGE);
+        Files.writeString(series.resolve("details.json"), """
+                {
+                  "title": "Configured Manga",
+                  "author": "Manga author",
+                  "artist": "Manga artist",
+                  "description": "Local manga description",
+                  "genre": ["Action", "Drama"],
+                  "status": "2"
+                }
+                """);
+        Files.writeString(series.resolve("chapters.json"), """
+                [
+                  {"chapter_number": 10, "name": "Chapter ten"},
+                  {"chapter_number": 2, "name": "Chapter two", "date_upload": "2024-01-02T03:04:05"}
+                ]
+                """);
+        Path chapter = Files.createDirectories(series.resolve("chapter_10"));
+        Files.write(chapter.resolve("001.jpg"), SECOND_IMAGE);
+        try (ZipOutputStream output = new ZipOutputStream(Files.newOutputStream(series.resolve("chapter_2.cbz")))) {
+            writeEntry(output, "010.png", SECOND_IMAGE);
+            writeEntry(output, "002.jpg", FIRST_IMAGE);
         }
+    }
+
+    private static void prepareAnime(Path root) throws IOException {
+        Path series = Files.createDirectories(root.resolve("localanime").resolve("Anime Folder"));
+        Files.write(series.resolve("cover.jpg"), FIRST_IMAGE);
+        Files.write(series.resolve("ep01.jpg"), SECOND_IMAGE);
+        Files.write(series.resolve("ep01.mp4"), new byte[]{1});
+        Files.write(series.resolve("ep10.mkv"), new byte[]{2});
+        Files.writeString(series.resolve("ep01.en.srt"), "1\n00:00:00,000 --> 00:00:01,000\nHello");
+        Files.writeString(series.resolve("details.json"), """
+                {"title": "Configured Anime", "description": "Local anime", "status": 1}
+                """);
+        Files.writeString(series.resolve("episodes.json"), """
+                [
+                  {"episode_number": 10, "name": "Episode ten"},
+                  {"episode_number": 1, "name": "First episode", "scanlator": "Local group"}
+                ]
+                """);
     }
 
     private static void writeEntry(ZipOutputStream output, String name, byte[] bytes) throws IOException {
@@ -110,7 +203,7 @@ final class LocalSourceTest {
 
     private static void rejectsTraversal(Counter counter) {
         try {
-            new LocalPublicationId(LocalPublicationType.DIRECTORY, "../escape");
+            new LocalPublicationId(LocalPublicationType.MANGA_SERIES, "../escape");
             throw new AssertionError("Expected traversal identity rejection");
         } catch (IllegalArgumentException expected) {
             counter.value++;

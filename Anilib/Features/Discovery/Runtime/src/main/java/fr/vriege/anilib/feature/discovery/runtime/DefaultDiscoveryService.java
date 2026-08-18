@@ -12,6 +12,7 @@ import fr.vriege.anilib.feature.library.MediaKind;
 import fr.vriege.anilib.feature.library.PublicationStatus;
 import fr.vriege.anilib.feature.source.CatalogueSource;
 import fr.vriege.anilib.feature.source.InstalledSourceExtension;
+import fr.vriege.anilib.feature.source.RefreshableSource;
 import fr.vriege.anilib.feature.source.Source;
 import fr.vriege.anilib.feature.source.SourceBrowseRequest;
 import fr.vriege.anilib.feature.source.SourceCatalogueItem;
@@ -95,6 +96,22 @@ public final class DefaultDiscoveryService implements DiscoveryService {
     @Override
     public boolean supportsLatest(SourceId sourceId) {
         return catalogue(sourceId).supportsLatest();
+    }
+
+    @Override
+    public boolean supportsRefresh(SourceId sourceId) {
+        return registry.find(Objects.requireNonNull(sourceId, "sourceId must not be null"))
+                .filter(RefreshableSource.class::isInstance)
+                .isPresent();
+    }
+
+    @Override
+    public void refresh(SourceId sourceId) {
+        registry.find(Objects.requireNonNull(sourceId, "sourceId must not be null"))
+                .filter(RefreshableSource.class::isInstance)
+                .map(RefreshableSource.class::cast)
+                .orElseThrow(() -> new IllegalArgumentException("Source is not refreshable: " + sourceId))
+                .refresh();
     }
 
     @Override
