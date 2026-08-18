@@ -61,6 +61,9 @@ internal fun PlayerVideoSurface(
     controller: PlayerController,
     playback: PlayerPlayback,
     applyOrientationPolicy: (PlayerOrientationPolicy) -> Unit,
+    requestPictureInPicture: () -> Unit,
+    setPlayerActive: (Boolean) -> Unit,
+    setBackgroundAudio: (Boolean) -> Unit,
 ) {
     val bridge = playback as? ComposePlayerPlayback
     if (bridge == null) {
@@ -75,6 +78,7 @@ internal fun PlayerVideoSurface(
     var volume by remember(bridge) { mutableFloatStateOf(bridge.snapshot().volume()) }
     var orientation by remember(bridge) { mutableStateOf(PlayerOrientationPolicy.SYSTEM) }
     var customMenu by remember(bridge) { mutableStateOf(false) }
+    var backgroundAudio by remember(bridge) { mutableStateOf(false) }
     var leftAction by remember(bridge) { mutableStateOf(PlayerCustomAction.SEEK_BACK) }
     var rightAction by remember(bridge) { mutableStateOf(PlayerCustomAction.SEEK_FORWARD) }
     var drag by remember(bridge) { mutableStateOf(Offset.Zero) }
@@ -82,6 +86,13 @@ internal fun PlayerVideoSurface(
     DisposableEffect(orientation, applyOrientationPolicy) {
         applyOrientationPolicy(orientation)
         onDispose { applyOrientationPolicy(PlayerOrientationPolicy.SYSTEM) }
+    }
+    DisposableEffect(bridge, setPlayerActive, setBackgroundAudio) {
+        setPlayerActive(true)
+        onDispose {
+            setBackgroundAudio(false)
+            setPlayerActive(false)
+        }
     }
     DisposableEffect(bridge, player) {
         bridge.attach(player)
@@ -287,6 +298,15 @@ internal fun PlayerVideoSurface(
                         }
                         TextButton(onClick = ::cycleSpeed) {
                             Text("${bridge.snapshot().playbackSpeed()}×", color = Color.White)
+                        }
+                        TextButton(onClick = requestPictureInPicture) {
+                            Text("PiP", color = Color.White)
+                        }
+                        TextButton(onClick = {
+                            backgroundAudio = !backgroundAudio
+                            setBackgroundAudio(backgroundAudio)
+                        }) {
+                            Text(if (backgroundAudio) "Background on" else "Background off", color = Color.White)
                         }
                         IconButton(onClick = ::cycleOrientation) {
                             Icon(Icons.Default.ScreenRotation, "Orientation", tint = Color.White)

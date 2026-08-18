@@ -30,7 +30,7 @@ explicit so an architectural seam cannot be mistaken for a finished workflow.
 | Appearance settings | [x] | Partial | Live system/light/dark selection and a persistent Library/Updates/History/Browse/More start screen are available; add language packs, theme families, colors, typography, and navigation style |
 | Library and update settings | [x] | Partial | Wi-Fi policies and the complete update schedule/skip controls are live; add category defaults, exceptions, and automatic-download depth |
 | Reader settings and reader | [x] | Complete | Immersive pages, resume, slider, navigation modes, persisted gestures/display profiles, filters, transitions, Android orientation, chapter lists and navigation, durable read state, exact downloads, and complete menus are live |
-| Player settings and player | [x] | Partial | Searchable episodes, quality/subtitles/resume, protected media, native playback, complete controls and gestures, persistent global/per-title decoder, audio, subtitle and quality policies, plus intro/outro skipping are live; add PiP and platform-advanced controls |
+| Player settings and player | [x] | Partial | Searchable episodes, protected native playback, complete controls and gestures, persistent playback policies, intro/outro skipping, Android PiP, and foreground-service-backed background audio are live; add desktop platform-advanced controls |
 | Data, storage, and advanced settings | [x] | Partial | A dedicated page owns confirmed cookie/cache/WebView/database cleanup plus backup and About routes; add storage inspection, user agent, proxy/DoH, diagnostics, and crash logs |
 | WebView | [x] | Partial | Navigation, reload, progress, source headers/User-Agent, cookie transfer, challenge completion, and platform cleanup are live; add automatic challenge retry, file chooser, pop-ups, downloads, and browser settings |
 | About, help, and application updates | [x] | Partial | Version, platform, stable-channel check, release-page hand-off, project, and issue links are live; add licences, changelog, automatic installation, and channel choice |
@@ -59,6 +59,7 @@ explicit so an architectural seam cannot be mistaken for a finished workflow.
 - [x] Added Reader chapter lists/navigation, durable read/unread actions, exact chapter downloads, and complete menus.
 - [x] Added complete Player transport controls, gestures, speed/orientation, brightness/volume, lock, and configurable buttons.
 - [x] Added persistent Player decoder/audio/subtitle/quality policies, per-title overrides, and intro/outro skipping.
+- [x] Added Android automatic/manual picture-in-picture and explicit background-audio service behavior.
 - [x] Added episode search/unwatched filtering, download status filtering, and reader page retry.
 - [x] Verified backup inspection/rollback/import, tracking edit flows, and browser cookie/challenge handling.
 - [x] Added settings search and connected Sources, Tracking, Backup, and About to their working screens.

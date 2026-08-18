@@ -60,6 +60,9 @@ internal fun EpisodeScreen(
     presentation: PlayerPresentation,
     libraryItemId: LibraryItemId,
     applyOrientationPolicy: (PlayerOrientationPolicy) -> Unit,
+    requestPictureInPicture: () -> Unit,
+    setPlayerActive: (Boolean) -> Unit,
+    setBackgroundAudio: (Boolean) -> Unit,
     goBack: () -> Unit,
 ) {
     var revision by remember(presentation, libraryItemId) { mutableIntStateOf(0) }
@@ -78,7 +81,13 @@ internal fun EpisodeScreen(
     }
     val controller = activeController
     if (controller != null) {
-        PlayerSelectionScreen(controller, applyOrientationPolicy) { activeController = null }
+        PlayerSelectionScreen(
+            controller,
+            applyOrientationPolicy,
+            requestPictureInPicture,
+            setPlayerActive,
+            setBackgroundAudio,
+        ) { activeController = null }
         return
     }
     val episodesResult = remember(presentation, libraryItemId, revision) {
@@ -190,6 +199,9 @@ private fun EpisodeCard(episode: EpisodeSnapshot, open: () -> Unit) {
 private fun PlayerSelectionScreen(
     controller: PlayerController,
     applyOrientationPolicy: (PlayerOrientationPolicy) -> Unit,
+    requestPictureInPicture: () -> Unit,
+    setPlayerActive: (Boolean) -> Unit,
+    setBackgroundAudio: (Boolean) -> Unit,
     goBack: () -> Unit,
 ) {
     var revision by remember(controller) { mutableIntStateOf(0) }
@@ -232,7 +244,16 @@ private fun PlayerSelectionScreen(
             modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item { PlayerVideoSurface(controller, controller.playback(), applyOrientationPolicy) }
+            item {
+                PlayerVideoSurface(
+                    controller,
+                    controller.playback(),
+                    applyOrientationPolicy,
+                    requestPictureInPicture,
+                    setPlayerActive,
+                    setBackgroundAudio,
+                )
+            }
             item {
                 Text(snapshot.title(), fontWeight = FontWeight.Bold)
                 Text(

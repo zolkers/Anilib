@@ -5,7 +5,9 @@ import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.Build
+import android.app.PictureInPictureParams
 import android.graphics.BitmapFactory
+import android.util.Rational
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -33,6 +35,8 @@ import fr.vriege.anilib.platform.compose.BrowserRuntimeStatus
 
 class MainActivity : ComponentActivity() {
     private var product: AutoCloseable? = null
+    private var playerActive = false
+    private var backgroundAudio = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -97,6 +101,9 @@ class MainActivity : ComponentActivity() {
                 pageDecoder = ::decodePage,
                 applyReaderOrientationPolicy = ::applyReaderOrientationPolicy,
                 applyPlayerOrientationPolicy = ::applyPlayerOrientationPolicy,
+                requestPlayerPictureInPicture = ::enterPlayerPictureInPicture,
+                setPlayerActive = ::setPlayerActive,
+                setPlayerBackgroundAudio = ::setPlayerBackgroundAudio,
                 componentCount = componentCount,
             )
         }
@@ -104,11 +111,19 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         try {
+            if (isFinishing) setPlayerBackgroundAudio(false)
             product?.close()
             product = null
         } finally {
             super.onDestroy()
         }
+    }
+
+    override fun onUserLeaveHint() {
+        if (playerActive && !backgroundAudio && !isInPictureInPictureMode) {
+            enterPlayerPictureInPicture()
+        }
+        super.onUserLeaveHint()
     }
 
     private fun applyReaderOrientationPolicy(policy: ReaderOrientationPolicy) {
@@ -127,6 +142,30 @@ class MainActivity : ComponentActivity() {
             PlayerOrientationPolicy.LANDSCAPE -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
             PlayerOrientationPolicy.SENSOR -> ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR
         }
+    }
+
+    private fun setPlayerActive(active: Boolean) {
+        playerActive = active
+        if (!active) setPlayerBackgroundAudio(false)
+    }
+
+    private fun setPlayerBackgroundAudio(enabled: Boolean) {
+        if (backgroundAudio == enabled) return
+        backgroundAudio = enabled
+        AndroidBackgroundPlaybackService.setEnabled(this, enabled)
+    }
+
+    private fun enterPlayerPictureInPicture() {
+        if (!playerActive || !packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)) {
+            return
+        }
+        val parameters = PictureInPictureParams.Builder()
+            .setAspectRatio(Rational(16, 9))
+            .apply {
+                if (Build.VERSION.SDK_INT >= 31) setSeamlessResizeEnabled(true)
+            }
+            .build()
+        enterPictureInPictureMode(parameters)
     }
 
     private companion object {

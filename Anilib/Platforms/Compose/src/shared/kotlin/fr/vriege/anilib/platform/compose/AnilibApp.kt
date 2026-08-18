@@ -160,6 +160,9 @@ fun AnilibApp(
     pageDecoder: (ByteArray) -> ImageBitmap?,
     applyReaderOrientationPolicy: (ReaderOrientationPolicy) -> Unit,
     applyPlayerOrientationPolicy: (PlayerOrientationPolicy) -> Unit,
+    requestPlayerPictureInPicture: () -> Unit,
+    setPlayerActive: (Boolean) -> Unit,
+    setPlayerBackgroundAudio: (Boolean) -> Unit,
     componentCount: Int,
     darkTheme: Boolean = isSystemInDarkTheme(),
 ) {
@@ -212,7 +215,14 @@ fun AnilibApp(
                     downloads::enqueue,
                 ) { activeReader = null }
             } else if (playerTitle != null) {
-                EpisodeScreen(player, playerTitle, applyPlayerOrientationPolicy) {
+                EpisodeScreen(
+                    player,
+                    playerTitle,
+                    applyPlayerOrientationPolicy,
+                    requestPlayerPictureInPicture,
+                    setPlayerActive,
+                    setPlayerBackgroundAudio,
+                ) {
                     activePlayerTitle = null
                 }
             } else if (trackingTitle != null) {

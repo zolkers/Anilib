@@ -92,6 +92,9 @@ fun main() {
                 pageDecoder = ::decodePage,
                 applyReaderOrientationPolicy = {},
                 applyPlayerOrientationPolicy = {},
+                requestPlayerPictureInPicture = {},
+                setPlayerActive = {},
+                setPlayerBackgroundAudio = {},
                 componentCount = started.components().size,
                 darkTheme = desktopDarkTheme(),
             )

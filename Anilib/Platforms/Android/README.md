@@ -6,6 +6,12 @@ behavior, and extension contracts remain Java 21 code outside the Android
 module. Android SDK types and the exact audited AndroidX/Compose integrations
 stay in the platform boundary.
 
+Video playback enters Android picture-in-picture when the user leaves an active
+player, or immediately from the shared `PiP` control. The separate background
+audio control starts a declared media-playback foreground service and visible
+notification before the activity leaves the foreground; disabling it or leaving
+the player stops the service.
+
 ## Local package
 
 Use JDK 21 and an Android SDK containing platform 37, then run from the

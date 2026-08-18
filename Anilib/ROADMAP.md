@@ -219,7 +219,7 @@ platform-specific.
   brightness, volume, lock, and custom-button behavior
 - [x] add decoder, audio, subtitle, quality, skip-intro/outro, and per-title
   preference policies
-- [ ] add Android picture-in-picture and background/audio behavior
+- [x] add Android picture-in-picture and background/audio behavior
 - [ ] add desktop advanced controls and mpv-compatible policy where the selected
   native backend supports it
 

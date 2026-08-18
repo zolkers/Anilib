@@ -40,6 +40,8 @@ gestures, speed, brightness and volume adjustment, orientation, fullscreen,
 control locking, and two reconfigurable action buttons on Android and desktop.
 Its persistent global or per-title profile selects decoder and audio hints,
 quality and subtitle behavior, and configurable intro/outro skip boundaries.
+Android adds manual or automatic picture-in-picture and an explicit background
+audio mode backed by a media-playback foreground service and notification.
 The shared Library screen persists grid/list density, sorting, and its landing
 category. Its category manager creates, renames, reorders, and deletes durable
 categories while retaining per-category display and update policy.
