@@ -17,6 +17,10 @@ public interface ExtensionRepositoryPresentation {
 
     void setAutomaticUpdatesEnabled(boolean enabled);
 
+    void setLanguageEnabled(String languageTag, boolean enabled);
+
+    void setPinned(String packageName, boolean pinned);
+
     void trustKey(String keyId, String x509PublicKeyBase64);
 
     boolean forgetTrust(String keyId);

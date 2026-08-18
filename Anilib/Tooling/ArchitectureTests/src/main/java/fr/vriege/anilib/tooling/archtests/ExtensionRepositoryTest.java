@@ -2,6 +2,7 @@ package fr.vriege.anilib.tooling.archtests;
 
 import fr.vriege.anilib.feature.extensionrepository.ExtensionArtifactFormat;
 import fr.vriege.anilib.feature.extensionrepository.ExtensionArtifactMetadata;
+import fr.vriege.anilib.feature.extensionrepository.ExtensionBrowsePreferences;
 import fr.vriege.anilib.feature.extensionrepository.ExtensionContentKind;
 import fr.vriege.anilib.feature.extensionrepository.ExtensionInstallationState;
 import fr.vriege.anilib.feature.extensionrepository.ExtensionPackageMetadata;
@@ -15,6 +16,7 @@ import fr.vriege.anilib.feature.extensionrepository.runtime.AniyomiSourcePrefere
 import fr.vriege.anilib.feature.extensionrepository.runtime.DefaultExtensionInstallationService;
 import fr.vriege.anilib.feature.extensionrepository.runtime.DefaultExtensionRepositoryService;
 import fr.vriege.anilib.feature.extensionrepository.runtime.DefaultExtensionUpdateService;
+import fr.vriege.anilib.feature.extensionrepository.runtime.FileExtensionBrowsePreferenceStore;
 import fr.vriege.anilib.feature.extensionrepository.runtime.FileExtensionTrustStore;
 import fr.vriege.anilib.feature.extensionrepository.runtime.FileExtensionRepositoryStore;
 import fr.vriege.anilib.feature.extensionrepository.runtime.FileInstalledExtensionStore;
@@ -78,6 +80,7 @@ final class ExtensionRepositoryTest {
         parsesAniyomiAndPortableArtifacts(counter);
         rejectsUnsafeMetadata(counter);
         persistsAndRefreshesUserRepositories(counter);
+        persistsBrowsePreferences(counter);
         resolvesGitHubRepositoriesDynamically(counter);
         installsOnlyTrustedPortableBundles(counter);
         rejectsAdultSourcesWhenDisabled(counter);
@@ -188,6 +191,25 @@ final class ExtensionRepositoryTest {
                     "user repository URLs must survive product restart");
             counter.check(reopened.remove(INDEX) && reopened.repositories().isEmpty(),
                     "users must be able to remove their own repository URL");
+        } finally {
+            deleteDirectory(directory);
+        }
+    }
+
+    private static void persistsBrowsePreferences(Counter counter) {
+        Path directory = temporaryDirectory();
+        try {
+            Path preferencesFile = directory.resolve("extension-browse.tsv");
+            FileExtensionBrowsePreferenceStore store = new FileExtensionBrowsePreferenceStore(preferencesFile);
+            store.save(new ExtensionBrowsePreferences(
+                    Set.of("FR_fr", "en"),
+                    Set.of("publisher:anime/source", "publisher:manga/source")));
+            ExtensionBrowsePreferences reopened = new FileExtensionBrowsePreferenceStore(preferencesFile).snapshot();
+            counter.check(reopened.enabledLanguages().equals(Set.of("fr-fr", "en")),
+                    "extension language choices must be normalized and survive product restart");
+            counter.check(reopened.pinnedPackages().equals(
+                            Set.of("publisher:anime/source", "publisher:manga/source")),
+                    "pinned extension packages must survive Android and desktop restart");
         } finally {
             deleteDirectory(directory);
         }

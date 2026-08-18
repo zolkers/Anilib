@@ -14,10 +14,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -53,6 +55,7 @@ import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionRuntimeReport
 import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionRuntimeState
 import fr.vriege.anilib.feature.extensionrepository.ui.InstalledApkExtension
 import java.util.concurrent.CompletableFuture
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,6 +67,7 @@ internal fun ExtensionRepositoriesScreen(
     var view by remember { mutableStateOf(presentation.snapshot()) }
     var adding by remember { mutableStateOf(false) }
     var trusting by remember { mutableStateOf(false) }
+    var filteringLanguages by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var pendingApkTrust by remember { mutableStateOf<InstalledApkExtension?>(null) }
@@ -111,6 +115,9 @@ internal fun ExtensionRepositoriesScreen(
                     }
                 },
                 actions = {
+                    if (view.availableLanguages().isNotEmpty()) {
+                        TextButton(onClick = { filteringLanguages = true }) { Text("Languages") }
+                    }
                     TextButton(onClick = { trusting = true }) { Text("Trust key") }
                     IconButton(onClick = { refresh() }, enabled = !loading) {
                         Icon(Icons.Default.Refresh, contentDescription = "Refresh repositories")
@@ -226,7 +233,12 @@ internal fun ExtensionRepositoriesScreen(
                     ExtensionPackageCard(
                         extension = extension,
                         installed = installed,
+                        pinned = extension.packageName() in view.pinnedPackages(),
                         busy = loading,
+                        togglePinned = { pinned ->
+                            runCatching { presentation.setPinned(extension.packageName(), pinned) }
+                                .onFailure { error = it.message ?: "Extension pinning failed." }
+                        },
                         install = { complete(presentation.install(extension)) },
                         update = { complete(presentation.update(extension)) },
                         toggle = { enabled ->
@@ -293,6 +305,17 @@ internal fun ExtensionRepositoriesScreen(
                 runCatching { presentation.trustKey(keyId, publicKey) }
                     .onSuccess { trusting = false }
                     .onFailure { error = it.message ?: "Invalid publisher key." }
+            },
+        )
+    }
+    if (filteringLanguages) {
+        ExtensionLanguageDialog(
+            available = view.availableLanguages(),
+            enabled = view.enabledLanguages(),
+            dismiss = { filteringLanguages = false },
+            toggle = { language, enabled ->
+                runCatching { presentation.setLanguageEnabled(language, enabled) }
+                    .onFailure { error = it.message ?: "Extension language selection failed." }
             },
         )
     }
@@ -488,7 +511,9 @@ private fun RepositoryCard(repository: ExtensionRepositoryRow, remove: () -> Uni
 private fun ExtensionPackageCard(
     extension: ExtensionPackageMetadata,
     installed: InstalledExtensionPackage?,
+    pinned: Boolean,
     busy: Boolean,
+    togglePinned: (Boolean) -> Unit,
     install: () -> Unit,
     update: () -> Unit,
     toggle: (Boolean) -> Unit,
@@ -497,7 +522,20 @@ private fun ExtensionPackageCard(
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-            Text(extension.displayName(), fontWeight = FontWeight.Medium)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(extension.displayName(), fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                IconButton(onClick = { togglePinned(!pinned) }) {
+                    Icon(
+                        Icons.Default.PushPin,
+                        contentDescription = if (pinned) "Unpin extension" else "Pin extension",
+                        tint = if (pinned) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                    )
+                }
+            }
             Text(
                 "${extension.languageTag()} · v${extension.versionName()} · "
                     + extension.contentKind().name.lowercase(),
@@ -538,6 +576,42 @@ private fun ExtensionPackageCard(
             }
         }
     }
+}
+
+@Composable
+private fun ExtensionLanguageDialog(
+    available: List<String>,
+    enabled: Set<String>,
+    dismiss: () -> Unit,
+    toggle: (String, Boolean) -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = dismiss,
+        title = { Text("Extension languages") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                available.forEach { language ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Checkbox(
+                            checked = language in enabled,
+                            onCheckedChange = { selected -> toggle(language, selected) },
+                        )
+                        Text(extensionLanguageName(language))
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = dismiss) { Text("Done") } },
+    )
+}
+
+private fun extensionLanguageName(languageTag: String): String {
+    if (languageTag == "und") return "All languages"
+    return Locale.forLanguageTag(languageTag).getDisplayName(Locale.getDefault())
+        .ifBlank { languageTag }
 }
 
 @Composable

@@ -21,6 +21,13 @@ dynamically through its default branch, trying `index.min.json` before
 `index.json`, then through the conventional publication branch `repo`. Relative
 Bundle URLs remain relative to the fetched raw index.
 
+The shared Android/desktop repository screen stores its language selection and
+pinned package identities beside the repository list. An empty language
+selection means that all currently available languages are shown, so newly
+published languages are visible by default. At least one available language
+must remain enabled, and pinned packages are ordered before the rest without
+changing repository metadata.
+
 One entry may additionally advertise a portable artifact without breaking an
 Aniyomi client:
 

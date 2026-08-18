@@ -5,6 +5,7 @@ import fr.vriege.anilib.feature.extensionrepository.ExtensionRepositoryCapabilit
 import fr.vriege.anilib.feature.extensionrepository.runtime.DefaultExtensionInstallationService;
 import fr.vriege.anilib.feature.extensionrepository.runtime.DefaultExtensionRepositoryService;
 import fr.vriege.anilib.feature.extensionrepository.runtime.DefaultExtensionUpdateService;
+import fr.vriege.anilib.feature.extensionrepository.runtime.FileExtensionBrowsePreferenceStore;
 import fr.vriege.anilib.feature.extensionrepository.runtime.FileExtensionRepositoryStore;
 import fr.vriege.anilib.feature.extensionrepository.runtime.FileExtensionUpdatePolicyStore;
 import fr.vriege.anilib.feature.extensionrepository.ui.DefaultExtensionRepositoryPresentation;
@@ -78,7 +79,9 @@ public final class ExtensionRepositoryPlugin implements AnilibPlugin {
                 service,
                 installation,
                 updates,
-                settings);
+                settings,
+                new FileExtensionBrowsePreferenceStore(
+                        repositoryFile.resolveSibling("extension-browse.tsv")));
         context.own(updates);
         context.own(presentation);
         context.publish(ExtensionRepositoryCapabilities.SERVICE, service);
