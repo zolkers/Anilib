@@ -1,6 +1,7 @@
 package fr.vriege.anilib.platform.compose
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,8 +17,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CollectionsBookmark
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Explore
@@ -27,6 +30,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -34,10 +38,12 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -57,6 +63,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.vriege.anilib.feature.library.LibraryProgress
 import fr.vriege.anilib.feature.library.LibraryItemId
+import fr.vriege.anilib.feature.library.MediaKind
 import fr.vriege.anilib.feature.backup.ui.BackupPresentation
 import fr.vriege.anilib.feature.discovery.ui.DiscoveryPresentation
 import fr.vriege.anilib.feature.downloads.ui.DownloadPresentation
@@ -575,17 +582,99 @@ private fun LibraryPageContent(
     componentCount: Int,
     navigate: ((LibraryNavigator) -> Unit) -> Unit,
 ) {
-    Scaffold(topBar = { TopAppBar(title = { Text("Library") }) }) { padding ->
+    var query by remember { mutableStateOf("") }
+    var kind by remember { mutableStateOf<MediaKind?>(null) }
+    var category by remember { mutableStateOf<String?>(null) }
+    var favoritesOnly by remember { mutableStateOf(false) }
+    var descending by remember { mutableStateOf(false) }
+    val titles = overview.titles()
+        .asSequence()
+        .filter { query.isBlank() || it.title().contains(query, ignoreCase = true) }
+        .filter { kind == null || it.kind() == kind }
+        .filter { !favoritesOnly || it.favorite() }
+        .filter {
+            when (category) {
+                null -> true
+                "" -> it.categories().isEmpty()
+                else -> category in it.categories()
+            }
+        }
+        .sortedBy { it.title().lowercase(Locale.getDefault()) }
+        .toList()
+        .let { if (descending) it.reversed() else it }
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Library") },
+                actions = {
+                    androidx.compose.material3.TextButton(onClick = { descending = !descending }) {
+                        Text(if (descending) "Z-A" else "A-Z")
+                    }
+                },
+            )
+        },
+    ) { padding ->
         Column(
             modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 24.dp),
         ) {
             Text(librarySummary(overview), color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(12.dp))
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                label = { Text("Search your library") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                FilterChip(selected = kind == null, onClick = { kind = null }, label = { Text("All") })
+                FilterChip(
+                    selected = kind == MediaKind.ANIME,
+                    onClick = { kind = MediaKind.ANIME },
+                    label = { Text("Anime") },
+                )
+                FilterChip(
+                    selected = kind == MediaKind.MANGA,
+                    onClick = { kind = MediaKind.MANGA },
+                    label = { Text("Manga") },
+                )
+                FilterChip(
+                    selected = favoritesOnly,
+                    onClick = { favoritesOnly = !favoritesOnly },
+                    label = { Text("Favorites") },
+                )
+            }
+            if (overview.categories().isNotEmpty()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    FilterChip(
+                        selected = category == null,
+                        onClick = { category = null },
+                        label = { Text("All categories") },
+                    )
+                    FilterChip(selected = category == "", onClick = { category = "" }, label = { Text("Default") })
+                    overview.categories().forEach { value ->
+                        FilterChip(
+                            selected = category == value,
+                            onClick = { category = value },
+                            label = { Text(value) },
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
             if (overview.titles().isEmpty()) {
                 EmptyPage("Your library is empty. Add local content to begin.")
+            } else if (titles.isEmpty()) {
+                EmptyPage("No titles match the active library filters.")
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    items(overview.titles(), key = { it.id().value() }) { card ->
+                    items(titles, key = { it.id().value() }) { card ->
                         LibraryTitleCard(card) { navigate { it.openDetails(card.id()) } }
                     }
                     item {
@@ -646,6 +735,11 @@ private fun HistoryPage(
     navigate: ((LibraryNavigator) -> Unit) -> Unit,
 ) {
     val history = presentation.history()
+    var query by remember { mutableStateOf("") }
+    val entries = history.entries().filter {
+        query.isBlank() || it.title().contains(query, ignoreCase = true) ||
+            it.contentId().contains(query, ignoreCase = true)
+    }
     Scaffold(topBar = { TopAppBar(title = { Text("History") }) }) { padding ->
         Column(
             modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 24.dp),
@@ -654,12 +748,22 @@ private fun HistoryPage(
                 text = "${history.entries().size} recent entries",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(12.dp))
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                label = { Text("Search history") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(12.dp))
             if (history.entries().isEmpty()) {
                 EmptyPage("Titles you open will appear here.")
+            } else if (entries.isEmpty()) {
+                EmptyPage("No history entries match your search.")
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    items(history.entries()) { row ->
+                    items(entries) { row ->
                         HistoryCard(row) { navigate { it.openDetails(row.libraryItemId()) } }
                     }
                 }
@@ -746,7 +850,18 @@ private fun DetailsPage(
     track: () -> Unit,
     goBack: () -> Unit,
 ) {
-    Scaffold(topBar = { TopAppBar(title = { Text(details.title()) }) }) { padding ->
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(details.title(), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                navigationIcon = {
+                    IconButton(onClick = goBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+            )
+        },
+    ) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 24.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -786,9 +901,6 @@ private fun DetailsPage(
                     }
                     Button(onClick = download, enabled = canDownload) {
                         Text("Download")
-                    }
-                    Button(onClick = goBack) {
-                        Text("Back")
                     }
                 }
             }

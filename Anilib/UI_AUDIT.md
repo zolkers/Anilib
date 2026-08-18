@@ -12,10 +12,10 @@ explicit so an architectural seam cannot be mistaken for a finished workflow.
 | Screen group | Audited | Result | Next user-visible gap |
 | --- | --- | --- | --- |
 | Application shell and primary navigation | [x] | Partial | Add update/source badges, configurable start screen, and tab reselection behavior |
-| Library | [ ] | Partial | Anime/manga separation, category tabs, grid/list modes, search, filters, sorting, and selection actions |
-| Anime and manga details | [ ] | Partial | Artwork header, content-unit lists, status actions, related titles, metadata editing, and share/web actions |
-| Updates | [ ] | Partial | Date grouping, selection actions, update errors, skipped reasons, and per-item download controls |
-| History | [ ] | Partial | Search, date grouping, remove history, resume action, and separate anime/manga presentation |
+| Library | [x] | Partial | Search, anime/manga/favourite/category filters, and title sorting are live; add grid modes, selection actions, category policy, and persistence |
+| Anime and manga details | [x] | Partial | Shared facts and reader/player/download/tracking actions are live; add artwork, content-unit lists, related titles, editing, and share/web actions |
+| Updates | [x] | Partial | Scheduling, refresh/cancel, failures, progress, read state, and anime/manga/unread filters are live; add date grouping, selection actions, skipped reasons, and per-item download controls |
+| History | [x] | Partial | Search and detail navigation are live; add date grouping, remove/resume actions, and separate anime/manga presentation |
 | Browse landing and sources | [ ] | Partial | Match the anime/manga source and extension tabs, update badges, source menu actions, and layout density |
 | Source catalogue, search, and filters | [ ] | Partial | Toolbar parity, display modes, source pinning actions, filter sheet behavior, and item menus |
 | Migration | [ ] | Partial | Source selection, per-title result selection, migration options, seasonal anime handling, and progress states |
@@ -42,6 +42,9 @@ explicit so an architectural seam cannot be mistaken for a finished workflow.
 - [x] Added working shared category counts, library statistics, and About screens.
 - [x] Added live downloaded-only and incognito switches to More.
 - [x] Added a live pending-download summary to More.
+- [x] Added library search, media/favourite/category filters, and deterministic title sorting.
+- [x] Added searchable history plus anime/manga/unread update filters.
+- [x] Added conventional back navigation to title details.
 - [x] Kept every result shared by Android and desktop; no feature behavior was copied into a platform launcher.
 
 The audit is intentionally grouped by user workflow. Aniyomi currently spreads

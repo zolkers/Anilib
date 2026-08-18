@@ -1,5 +1,6 @@
 package fr.vriege.anilib.platform.compose
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.DoneAll
@@ -17,6 +19,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -58,12 +61,17 @@ private val updateDateFormatter = DateTimeFormatter
 internal fun UpdatesScreen(presentation: UpdatePresentation) {
     var revision by remember(presentation) { mutableIntStateOf(0) }
     var commandError by remember(presentation) { mutableStateOf<String?>(null) }
+    var kind by remember { mutableStateOf<MediaKind?>(null) }
+    var unreadOnly by remember { mutableStateOf(false) }
     DisposableEffect(presentation) {
         val registration = presentation.observe { revision++ }
         onDispose { runCatching { registration.close() } }
     }
     val snapshot = remember(presentation, revision) { presentation.snapshot() }
     val running = snapshot.status() == LibraryUpdateStatus.RUNNING
+    val events = snapshot.events().filter {
+        (kind == null || it.kind() == kind) && (!unreadOnly || !it.read())
+    }
     val command: (() -> Unit) -> Unit = { action ->
         runCatching(action)
             .onSuccess { commandError = null }
@@ -105,6 +113,29 @@ internal fun UpdatesScreen(presentation: UpdatePresentation) {
             item {
                 UpdateScheduleCard(snapshot.policy()) { policy -> command { presentation.configure(policy) } }
             }
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    FilterChip(selected = kind == null, onClick = { kind = null }, label = { Text("All") })
+                    FilterChip(
+                        selected = kind == MediaKind.ANIME,
+                        onClick = { kind = MediaKind.ANIME },
+                        label = { Text("Anime") },
+                    )
+                    FilterChip(
+                        selected = kind == MediaKind.MANGA,
+                        onClick = { kind = MediaKind.MANGA },
+                        label = { Text("Manga") },
+                    )
+                    FilterChip(
+                        selected = unreadOnly,
+                        onClick = { unreadOnly = !unreadOnly },
+                        label = { Text("Unread") },
+                    )
+                }
+            }
             if (running) {
                 item {
                     Column {
@@ -138,9 +169,11 @@ internal fun UpdatesScreen(presentation: UpdatePresentation) {
                     Spacer(Modifier.height(24.dp))
                     EmptyPage("No new chapters or episodes yet. Refresh once to establish the library baseline.")
                 }
+            } else if (events.isEmpty()) {
+                item { EmptyPage("No updates match the active filters.") }
             } else {
                 items(
-                    snapshot.events(),
+                    events,
                     key = { "${it.libraryItemId().value()}-${it.sourceContentId()}" },
                 ) { event -> UpdateEventCard(event) }
             }
