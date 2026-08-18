@@ -1,6 +1,9 @@
 package fr.vriege.anilib.feature.updates.runtime;
 
 import fr.vriege.anilib.feature.library.LibraryCatalog;
+import fr.vriege.anilib.feature.library.LibraryCategory;
+import fr.vriege.anilib.feature.library.LibraryCategoryUpdatePolicy;
+import fr.vriege.anilib.feature.library.LibraryConfigurationSnapshot;
 import fr.vriege.anilib.feature.library.LibraryItem;
 import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.library.LibraryOrigin;
@@ -51,6 +54,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
 
 public final class DefaultLibraryUpdateService implements LibraryUpdateService, AutoCloseable {
     private static final int SOURCE_LANES = 5;
@@ -69,6 +73,7 @@ public final class DefaultLibraryUpdateService implements LibraryUpdateService, 
     private final ExecutorService workers;
     private final ScheduledExecutorService scheduler;
     private final BooleanSupplier largeTransfersAllowed;
+    private final Supplier<LibraryConfigurationSnapshot> libraryConfiguration;
     private final CopyOnWriteArrayList<Runnable> listeners = new CopyOnWriteArrayList<>();
     private final AtomicBoolean cancellation = new AtomicBoolean();
     private volatile LibraryUpdateStatus status = LibraryUpdateStatus.IDLE;
@@ -87,7 +92,14 @@ public final class DefaultLibraryUpdateService implements LibraryUpdateService, 
             SourceRegistry sources,
             LibraryUpdateNotifier notifier,
             Path stateFile) {
-        this(library, sources, notifier, stateFile, Clock.systemUTC(), () -> true);
+        this(
+                library,
+                sources,
+                notifier,
+                stateFile,
+                Clock.systemUTC(),
+                LibraryConfigurationSnapshot::defaults,
+                () -> true);
     }
 
     public DefaultLibraryUpdateService(
@@ -96,7 +108,31 @@ public final class DefaultLibraryUpdateService implements LibraryUpdateService, 
             LibraryUpdateNotifier notifier,
             Path stateFile,
             BooleanSupplier largeTransfersAllowed) {
-        this(library, sources, notifier, stateFile, Clock.systemUTC(), largeTransfersAllowed);
+        this(
+                library,
+                sources,
+                notifier,
+                stateFile,
+                Clock.systemUTC(),
+                LibraryConfigurationSnapshot::defaults,
+                largeTransfersAllowed);
+    }
+
+    public DefaultLibraryUpdateService(
+            LibraryCatalog library,
+            SourceRegistry sources,
+            LibraryUpdateNotifier notifier,
+            Path stateFile,
+            Supplier<LibraryConfigurationSnapshot> libraryConfiguration,
+            BooleanSupplier largeTransfersAllowed) {
+        this(
+                library,
+                sources,
+                notifier,
+                stateFile,
+                Clock.systemUTC(),
+                libraryConfiguration,
+                largeTransfersAllowed);
     }
 
     public DefaultLibraryUpdateService(
@@ -106,6 +142,24 @@ public final class DefaultLibraryUpdateService implements LibraryUpdateService, 
             Path stateFile,
             Clock clock,
             BooleanSupplier largeTransfersAllowed) {
+        this(
+                library,
+                sources,
+                notifier,
+                stateFile,
+                clock,
+                LibraryConfigurationSnapshot::defaults,
+                largeTransfersAllowed);
+    }
+
+    public DefaultLibraryUpdateService(
+            LibraryCatalog library,
+            SourceRegistry sources,
+            LibraryUpdateNotifier notifier,
+            Path stateFile,
+            Clock clock,
+            Supplier<LibraryConfigurationSnapshot> libraryConfiguration,
+            BooleanSupplier largeTransfersAllowed) {
         this.library = Objects.requireNonNull(library, "library must not be null");
         this.sources = Objects.requireNonNull(sources, "sources must not be null");
         this.notifier = Objects.requireNonNull(notifier, "notifier must not be null");
@@ -113,6 +167,9 @@ public final class DefaultLibraryUpdateService implements LibraryUpdateService, 
         this.largeTransfersAllowed = Objects.requireNonNull(
                 largeTransfersAllowed,
                 "largeTransfersAllowed must not be null");
+        this.libraryConfiguration = Objects.requireNonNull(
+                libraryConfiguration,
+                "libraryConfiguration must not be null");
         store = new LibraryUpdateStore(stateFile);
         coordinator = Executors.newSingleThreadExecutor(task -> daemon(task, "anilib-library-update"));
         workers = Executors.newFixedThreadPool(
@@ -247,7 +304,10 @@ public final class DefaultLibraryUpdateService implements LibraryUpdateService, 
             Map<LibraryItemId, Set<String>> baselines = new ConcurrentHashMap<>(before.baselines());
             baselines.keySet().retainAll(existingIds);
             List<LibraryItem> eligible = libraryItems.stream()
-                    .filter(item -> eligible(item, before.policy()))
+                    .filter(item -> eligible(
+                            item,
+                            before.policy(),
+                            libraryConfiguration.get()))
                     .sorted(Comparator.comparing(LibraryItem::title, String.CASE_INSENSITIVE_ORDER))
                     .toList();
             totalTitles = eligible.size();
@@ -396,7 +456,10 @@ public final class DefaultLibraryUpdateService implements LibraryUpdateService, 
                 totalTitles));
     }
 
-    private static boolean eligible(LibraryItem item, LibraryUpdatePolicy policy) {
+    private static boolean eligible(
+            LibraryItem item,
+            LibraryUpdatePolicy policy,
+            LibraryConfigurationSnapshot configuration) {
         if (item.origin().isEmpty()) {
             return false;
         }
@@ -409,6 +472,23 @@ public final class DefaultLibraryUpdateService implements LibraryUpdateService, 
         }
         if (policy.skipNotStarted() && item.progress().isEmpty()) {
             return false;
+        }
+        Map<String, LibraryCategoryUpdatePolicy> categoryPolicies = configuration.categories()
+                .stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        LibraryCategory::name,
+                        LibraryCategory::updatePolicy));
+        boolean explicitlyIncluded = item.categories().stream()
+                .map(categoryPolicies::get)
+                .anyMatch(LibraryCategoryUpdatePolicy.INCLUDE::equals);
+        boolean explicitlyExcluded = item.categories().stream()
+                .map(categoryPolicies::get)
+                .anyMatch(LibraryCategoryUpdatePolicy.EXCLUDE::equals);
+        if (explicitlyExcluded) {
+            return false;
+        }
+        if (explicitlyIncluded) {
+            return true;
         }
         if (!policy.includedCategories().isEmpty()
                 && java.util.Collections.disjoint(item.categories(), policy.includedCategories())) {

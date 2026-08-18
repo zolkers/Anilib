@@ -6,6 +6,8 @@ import fr.vriege.anilib.kernel.CapabilityKey;
 public final class LibraryCapabilities {
     public static final CapabilityKey<LibraryCatalog> CATALOG =
             CapabilityKey.of("feature.library.catalog", LibraryCatalog.class);
+    public static final CapabilityKey<LibraryConfiguration> CONFIGURATION =
+            CapabilityKey.of("feature.library.configuration", LibraryConfiguration.class);
     public static final CapabilityKey<BackupSectionCodec> BACKUP_CODEC =
             CapabilityKey.of("feature.library.backup-codec", BackupSectionCodec.class);
 

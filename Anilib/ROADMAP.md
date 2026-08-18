@@ -178,11 +178,11 @@ platform-specific.
 
 ### 1. Library, details, history, and statistics
 
-- [ ] add persisted grid/list modes, density, sorting, and configurable default
+- [x] add persisted grid/list modes, density, sorting, and configurable default
   category or landing behavior
 - [ ] add multi-selection and bulk category, favourite, download, migrate, and
   delete actions
-- [ ] add category create, rename, reorder, delete, per-category display, and
+- [x] add category create, rename, reorder, delete, per-category display, and
   update policies
 - [ ] add complete anime/manga detail units, artwork, metadata editing, related
   titles, share, open-in-WebView, and source actions

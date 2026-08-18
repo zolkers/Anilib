@@ -11,11 +11,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -31,7 +33,10 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import fr.vriege.anilib.feature.library.MediaKind
+import fr.vriege.anilib.feature.library.LibraryCategory
+import fr.vriege.anilib.feature.library.LibraryCategoryUpdatePolicy
 import fr.vriege.anilib.feature.library.ui.LibraryOverview
+import fr.vriege.anilib.feature.library.ui.LibraryPresentation
 import fr.vriege.anilib.feature.applicationupdate.ui.ApplicationUpdatePresentation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -39,26 +44,163 @@ import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun CategoriesScreen(overview: LibraryOverview, goBack: () -> Unit) {
-    MoreScaffold("Categories", goBack) { padding ->
-        val counts = overview.categories().associateWith { category ->
-            overview.titles().count { category in it.categories() }
+internal fun CategoriesScreen(presentation: LibraryPresentation, goBack: () -> Unit) {
+    var revision by remember(presentation) { mutableStateOf(0) }
+    val overview = remember(presentation, revision) { presentation.library() }
+    var newCategory by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
+    fun update(action: () -> Unit) {
+        try {
+            action()
+            error = null
+            revision++
+        } catch (failure: RuntimeException) {
+            error = failure.message ?: "Unable to update categories."
         }
+    }
+    MoreScaffold("Categories", goBack) { padding ->
         val uncategorized = overview.titles().count { it.categories().isEmpty() }
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 24.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            item { SummaryCard("Default", "$uncategorized titles") }
-            counts.forEach { (category, count) ->
-                item(key = category) { SummaryCard(category, "$count titles") }
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    OutlinedTextField(
+                        value = newCategory,
+                        onValueChange = { newCategory = it },
+                        label = { Text("New category") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Button(
+                        enabled = newCategory.isNotBlank(),
+                        onClick = {
+                            update { presentation.createCategory(newCategory.trim()) }
+                            if (error == null) newCategory = ""
+                        },
+                    ) { Text("Add") }
+                }
+                error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }
-            if (counts.isEmpty() && uncategorized == 0) {
+            item { SummaryCard("Default", "$uncategorized titles") }
+            overview.categoryConfigurations().forEachIndexed { index, category ->
+                val count = overview.titles().count { category.name() in it.categories() }
+                item(key = category.name()) {
+                    CategoryCard(
+                        category,
+                        count,
+                        index,
+                        overview.categoryConfigurations().lastIndex,
+                        rename = { next ->
+                            update { presentation.renameCategory(category.name(), next) }
+                        },
+                        move = { target ->
+                            update { presentation.moveCategory(category.name(), target) }
+                        },
+                        setUpdatePolicy = { policy ->
+                            update { presentation.setCategoryUpdatePolicy(category.name(), policy) }
+                        },
+                        delete = { update { presentation.deleteCategory(category.name()) } },
+                    )
+                }
+            }
+            if (overview.categories().isEmpty() && uncategorized == 0) {
                 item { EmptyPage("Categories will appear when titles are added to the library.") }
             }
         }
     }
 }
+
+@Composable
+private fun CategoryCard(
+    category: LibraryCategory,
+    count: Int,
+    index: Int,
+    lastIndex: Int,
+    rename: (String) -> Unit,
+    move: (Int) -> Unit,
+    setUpdatePolicy: (LibraryCategoryUpdatePolicy) -> Unit,
+    delete: () -> Unit,
+) {
+    var editing by remember(category.name()) { mutableStateOf(false) }
+    var confirmingDelete by remember(category.name()) { mutableStateOf(false) }
+    var nextName by remember(category.name()) { mutableStateOf(category.name()) }
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(18.dp)) {
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(category.name(), fontWeight = FontWeight.Medium)
+                    Text("$count titles", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                TextButton(enabled = index > 0, onClick = { move(index - 1) }) { Text("Up") }
+                TextButton(enabled = index < lastIndex, onClick = { move(index + 1) }) { Text("Down") }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = { editing = true }) { Text("Rename") }
+                TextButton(onClick = {
+                    setUpdatePolicy(category.updatePolicy().next())
+                }) { Text("Updates: ${category.updatePolicy().label()}") }
+                TextButton(onClick = { confirmingDelete = true }) { Text("Delete") }
+            }
+        }
+    }
+    if (editing) {
+        AlertDialog(
+            onDismissRequest = { editing = false },
+            title = { Text("Rename category") },
+            text = {
+                OutlinedTextField(
+                    value = nextName,
+                    onValueChange = { nextName = it },
+                    label = { Text("Category name") },
+                    singleLine = true,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = nextName.isNotBlank(),
+                    onClick = {
+                        rename(nextName.trim())
+                        editing = false
+                    },
+                ) { Text("Rename") }
+            },
+            dismissButton = { TextButton(onClick = { editing = false }) { Text("Cancel") } },
+        )
+    }
+    if (confirmingDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmingDelete = false },
+            title = { Text("Delete ${category.name()}?") },
+            text = { Text("Titles stay in the library and lose this category assignment.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    delete()
+                    confirmingDelete = false
+                }) { Text("Delete") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmingDelete = false }) { Text("Cancel") }
+            },
+        )
+    }
+}
+
+private fun LibraryCategoryUpdatePolicy.next(): LibraryCategoryUpdatePolicy = when (this) {
+    LibraryCategoryUpdatePolicy.DEFAULT -> LibraryCategoryUpdatePolicy.INCLUDE
+    LibraryCategoryUpdatePolicy.INCLUDE -> LibraryCategoryUpdatePolicy.EXCLUDE
+    LibraryCategoryUpdatePolicy.EXCLUDE -> LibraryCategoryUpdatePolicy.DEFAULT
+}
+
+private fun LibraryCategoryUpdatePolicy.label(): String =
+    name.lowercase().replaceFirstChar(Char::uppercase)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

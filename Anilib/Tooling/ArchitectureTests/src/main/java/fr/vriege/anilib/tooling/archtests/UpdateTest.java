@@ -3,10 +3,17 @@ package fr.vriege.anilib.tooling.archtests;
 import fr.vriege.anilib.configuration.standard.StandardAnilib;
 import fr.vriege.anilib.feature.backup.BackupCapabilities;
 import fr.vriege.anilib.feature.library.LibraryCapabilities;
+import fr.vriege.anilib.feature.library.LibraryCategory;
+import fr.vriege.anilib.feature.library.LibraryCategoryUpdatePolicy;
+import fr.vriege.anilib.feature.library.LibraryConfigurationSnapshot;
+import fr.vriege.anilib.feature.library.LibraryDisplayDensity;
+import fr.vriege.anilib.feature.library.LibraryDisplayMode;
+import fr.vriege.anilib.feature.library.LibraryDisplayPreferences;
 import fr.vriege.anilib.feature.library.LibraryItem;
 import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.library.LibraryOrigin;
 import fr.vriege.anilib.feature.library.MediaKind;
+import fr.vriege.anilib.feature.library.LibrarySort;
 import fr.vriege.anilib.feature.player.PlayerBackends;
 import fr.vriege.anilib.feature.network.NetworkStatus;
 import fr.vriege.anilib.feature.settings.ui.SettingsUiCapabilities;
@@ -44,6 +51,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicInteger;
 
 final class UpdateTest {
     private static final SourceId SOURCE_ID = SourceId.of("test.updates");
@@ -56,6 +64,7 @@ final class UpdateTest {
     static int run() {
         Counter counter = new Counter();
         enforcesNetworkPolicy(counter);
+        enforcesCategoryPolicies(counter);
         cleansOrphanedUpdateState(counter);
         Path sourceDirectory = temporaryDirectory("anilib-updates-source");
         Path targetDirectory = temporaryDirectory("anilib-updates-target");
@@ -132,6 +141,56 @@ final class UpdateTest {
             deleteDirectory(targetDirectory);
         }
         return counter.value;
+    }
+
+    private static void enforcesCategoryPolicies(Counter counter) {
+        Path directory = temporaryDirectory("anilib-updates-category-policy");
+        MutableStreamingSource source = new MutableStreamingSource(List.of(episode("episode-1", 1.0d)));
+        try (StartedAnilib application = start(directory, source, new RecordingNotifier())) {
+            LibraryItem item = new LibraryItem(
+                    new LibraryItemId("updates-category-policy"),
+                    "Category policy",
+                    MediaKind.ANIME,
+                    Instant.parse("2026-08-01T00:00:00Z"),
+                    Set.of("Seasonal"))
+                    .withOrigin(new LibraryOrigin(SOURCE_ID.toString(), SOURCE_ITEM_ID.value()));
+            application.capability(LibraryCapabilities.CATALOG).save(item);
+            var configuration = application.capability(LibraryCapabilities.CONFIGURATION);
+            LibraryDisplayPreferences preferences = LibraryDisplayPreferences.defaults();
+            configuration.save(new LibraryConfigurationSnapshot(
+                    preferences,
+                    List.of(new LibraryCategory(
+                            "Seasonal",
+                            LibraryDisplayMode.GRID,
+                            LibraryDisplayDensity.COMFORTABLE,
+                            LibrarySort.TITLE_ASCENDING,
+                            LibraryCategoryUpdatePolicy.EXCLUDE))));
+            LibraryUpdateService updates = application.capability(UpdateCapabilities.SERVICE);
+            updates.runNow().join();
+            counter.check(source.invocations() == 0,
+                    "an excluded library category must skip source update calls");
+
+            configuration.save(new LibraryConfigurationSnapshot(
+                    preferences,
+                    List.of(new LibraryCategory(
+                            "Seasonal",
+                            LibraryDisplayMode.GRID,
+                            LibraryDisplayDensity.COMFORTABLE,
+                            LibrarySort.TITLE_ASCENDING,
+                            LibraryCategoryUpdatePolicy.INCLUDE))));
+            updates.configure(new LibraryUpdatePolicy(
+                    UpdateInterval.MANUAL,
+                    false,
+                    false,
+                    false,
+                    Set.of(),
+                    Set.of("Seasonal")));
+            updates.runNow().join();
+            counter.check(source.invocations() == 1,
+                    "an included library category must override the global category exclusion");
+        } finally {
+            deleteDirectory(directory);
+        }
     }
 
     private static void enforcesNetworkPolicy(Counter counter) {
@@ -268,6 +327,7 @@ final class UpdateTest {
 
     private static final class MutableStreamingSource implements StreamingSource {
         private final AtomicReference<List<SourceEpisode>> episodes;
+        private final AtomicInteger invocations = new AtomicInteger();
         private volatile CountDownLatch entered;
         private volatile CountDownLatch release;
 
@@ -277,6 +337,10 @@ final class UpdateTest {
 
         private void replace(List<SourceEpisode> replacement) {
             episodes.set(List.copyOf(replacement));
+        }
+
+        private int invocations() {
+            return invocations.get();
         }
 
         private void block(CountDownLatch nextEntered, CountDownLatch nextRelease) {
@@ -302,6 +366,7 @@ final class UpdateTest {
 
         @Override
         public List<SourceEpisode> episodes(SourceCatalogueItemId itemId) {
+            invocations.incrementAndGet();
             CountDownLatch enteredLatch = entered;
             CountDownLatch releaseLatch = release;
             if (enteredLatch != null && releaseLatch != null) {

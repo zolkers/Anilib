@@ -2,6 +2,7 @@ package fr.vriege.anilib.feature.updates.bundle;
 
 import fr.vriege.anilib.feature.library.LibraryCapabilities;
 import fr.vriege.anilib.feature.library.LibraryCatalog;
+import fr.vriege.anilib.feature.library.LibraryConfiguration;
 import fr.vriege.anilib.feature.network.NetworkCapabilities;
 import fr.vriege.anilib.feature.network.NetworkStatus;
 import fr.vriege.anilib.feature.settings.SettingsCapabilities;
@@ -27,6 +28,7 @@ public final class UpdatePlugin implements AnilibPlugin {
     private static final PluginManifest MANIFEST = PluginManifest.builder(
                     ComponentDescriptor.of("feature.updates", "Library updates", "0.1.0"))
             .requires(LibraryCapabilities.CATALOG)
+            .requires(LibraryCapabilities.CONFIGURATION)
             .requires(SourceCapabilities.REGISTRY)
             .requires(NetworkCapabilities.STATUS)
             .requires(SettingsCapabilities.SERVICE)
@@ -54,6 +56,8 @@ public final class UpdatePlugin implements AnilibPlugin {
     @Override
     public void install(PluginInstallationContext context) {
         LibraryCatalog library = context.require(LibraryCapabilities.CATALOG);
+        LibraryConfiguration libraryConfiguration = context.require(
+                LibraryCapabilities.CONFIGURATION);
         SourceRegistry sources = context.require(SourceCapabilities.REGISTRY);
         NetworkStatus network = context.require(NetworkCapabilities.STATUS);
         SettingsService settings = context.require(SettingsCapabilities.SERVICE);
@@ -63,6 +67,7 @@ public final class UpdatePlugin implements AnilibPlugin {
                 sources,
                 notifier,
                 stateFile,
+                libraryConfiguration::snapshot,
                 () -> !settings.snapshot().updateOnlyOnWifi() || network.allowsLargeTransfers()));
         context.own(cleanup.register("updates", service::cleanUnusedData));
         context.publish(UpdateCapabilities.SERVICE, service);

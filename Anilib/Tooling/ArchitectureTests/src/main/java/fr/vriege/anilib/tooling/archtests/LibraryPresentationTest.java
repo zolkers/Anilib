@@ -1,6 +1,9 @@
 package fr.vriege.anilib.tooling.archtests;
 
 import fr.vriege.anilib.feature.library.LibraryHistoryEntry;
+import fr.vriege.anilib.feature.library.LibraryCategoryUpdatePolicy;
+import fr.vriege.anilib.feature.library.LibraryDisplayDensity;
+import fr.vriege.anilib.feature.library.LibraryDisplayMode;
 import fr.vriege.anilib.feature.library.LibraryItem;
 import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.library.LibraryProgress;
@@ -8,6 +11,7 @@ import fr.vriege.anilib.feature.library.LibraryTitleMetadata;
 import fr.vriege.anilib.feature.library.MediaKind;
 import fr.vriege.anilib.feature.library.PublicationStatus;
 import fr.vriege.anilib.feature.library.core.InMemoryLibraryCatalog;
+import fr.vriege.anilib.feature.library.core.InMemoryLibraryConfiguration;
 import fr.vriege.anilib.feature.library.ui.DefaultLibraryPresentation;
 import fr.vriege.anilib.feature.library.ui.LibraryDetails;
 import fr.vriege.anilib.feature.library.ui.LibraryNavigationState;
@@ -27,7 +31,9 @@ final class LibraryPresentationTest {
     static int run() {
         Counter counter = new Counter();
         InMemoryLibraryCatalog catalog = populatedCatalog();
-        LibraryPresentation presentation = new DefaultLibraryPresentation(catalog);
+        LibraryPresentation presentation = new DefaultLibraryPresentation(
+                catalog,
+                new InMemoryLibraryConfiguration());
 
         LibraryOverview overview = presentation.library();
         counter.check(
@@ -41,6 +47,36 @@ final class LibraryPresentationTest {
                 "cards must expose sorted categories");
         counter.check(overview.titles().getFirst().progress().orElseThrow().position() == 7,
                 "cards must preserve typed progress");
+        counter.check(overview.displayPreferences().mode() == LibraryDisplayMode.GRID,
+                "library display mode must have a stable default");
+
+        presentation.setDefaultCategory(java.util.Optional.of("Anime"));
+        presentation.setDisplayMode(LibraryDisplayMode.LIST);
+        presentation.setDisplayDensity(LibraryDisplayDensity.COMPACT);
+        presentation.setCategoryUpdatePolicy("Anime", LibraryCategoryUpdatePolicy.EXCLUDE);
+        overview = presentation.library();
+        counter.check(overview.displayPreferences().mode() == LibraryDisplayMode.LIST
+                        && overview.displayPreferences().density() == LibraryDisplayDensity.COMPACT,
+                "the selected category must own its display preferences");
+        counter.check(overview.categoryConfigurations().getFirst().updatePolicy()
+                        == LibraryCategoryUpdatePolicy.EXCLUDE,
+                "category update policy must be editable");
+
+        presentation.createCategory("Archive");
+        presentation.moveCategory("Archive", 0);
+        presentation.renameCategory("Anime", "Animation");
+        counter.check(catalog.find(new LibraryItemId("zulu")).orElseThrow()
+                        .categories().contains("Animation"),
+                "renaming a category must update assigned titles");
+        counter.check(presentation.library().displayPreferences().defaultCategory()
+                        .orElseThrow().equals("Animation"),
+                "renaming the landing category must preserve the selection");
+        presentation.deleteCategory("Animation");
+        counter.check(catalog.find(new LibraryItemId("zulu")).orElseThrow()
+                        .categories().equals(Set.of("Seasonal")),
+                "deleting a category must remove title assignments");
+        counter.check(presentation.library().displayPreferences().defaultCategory().isEmpty(),
+                "deleting the landing category must restore the all-titles landing");
 
         LibraryItemId zuluId = overview.titles().getFirst().id();
         LibraryDetails details = presentation.details(zuluId).orElseThrow();

@@ -16,6 +16,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -62,7 +65,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.vriege.anilib.feature.library.LibraryProgress
+import fr.vriege.anilib.feature.library.LibraryDisplayDensity
+import fr.vriege.anilib.feature.library.LibraryDisplayMode
 import fr.vriege.anilib.feature.library.LibraryItemId
+import fr.vriege.anilib.feature.library.LibrarySort
 import fr.vriege.anilib.feature.library.MediaKind
 import fr.vriege.anilib.feature.backup.ui.BackupPresentation
 import fr.vriege.anilib.feature.discovery.ui.DiscoveryPresentation
@@ -536,7 +542,7 @@ private fun AppDestination(
                 downloadError,
                 openTracking,
             )
-            else -> LibraryPageContent(presentation.library(), componentCount, navigate)
+            else -> LibraryPageContent(presentation, componentCount, navigate)
         }
         AppSection.UPDATES -> UpdatesScreen(updates)
         AppSection.HISTORY -> HistoryPage(presentation) { transition ->
@@ -557,7 +563,7 @@ private fun AppDestination(
             MoreDestination.DOWNLOADS -> DownloadsScreen(downloads, closeMore)
             MoreDestination.BACKUP -> BackupScreen(backup, backupImportPicker, closeMore)
             MoreDestination.TRACKING -> TrackerAccountsScreen(tracking, closeMore)
-            MoreDestination.CATEGORIES -> CategoriesScreen(presentation.library(), closeMore)
+            MoreDestination.CATEGORIES -> CategoriesScreen(presentation, closeMore)
             MoreDestination.STATISTICS -> StatisticsScreen(presentation.library(), closeMore)
             MoreDestination.EXTENSION_REPOSITORIES -> ExtensionRepositoriesScreen(
                 extensionRepositories,
@@ -598,15 +604,28 @@ private fun AppDestination(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun LibraryPageContent(
-    overview: LibraryOverview,
+    presentation: LibraryPresentation,
     componentCount: Int,
     navigate: ((LibraryNavigator) -> Unit) -> Unit,
 ) {
+    var revision by remember(presentation) { mutableStateOf(0) }
+    val overview = remember(presentation, revision) { presentation.library() }
     var query by remember { mutableStateOf("") }
     var kind by remember { mutableStateOf<MediaKind?>(null) }
-    var category by remember { mutableStateOf<String?>(null) }
+    var category by remember(presentation) {
+        mutableStateOf(overview.displayPreferences().defaultCategory().orElse(null))
+    }
     var favoritesOnly by remember { mutableStateOf(false) }
-    var descending by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    fun update(action: () -> Unit) {
+        try {
+            action()
+            error = null
+            revision++
+        } catch (failure: RuntimeException) {
+            error = failure.message ?: "Unable to update the library display."
+        }
+    }
     val titles = overview.titles()
         .asSequence()
         .filter { query.isBlank() || it.title().contains(query, ignoreCase = true) }
@@ -619,16 +638,36 @@ private fun LibraryPageContent(
                 else -> category in it.categories()
             }
         }
-        .sortedBy { it.title().lowercase(Locale.getDefault()) }
         .toList()
-        .let { if (descending) it.reversed() else it }
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Library") },
                 actions = {
-                    androidx.compose.material3.TextButton(onClick = { descending = !descending }) {
-                        Text(if (descending) "Z-A" else "A-Z")
+                    androidx.compose.material3.TextButton(onClick = {
+                        update {
+                            presentation.setDisplayMode(
+                                if (overview.displayPreferences().mode() == LibraryDisplayMode.GRID) {
+                                    LibraryDisplayMode.LIST
+                                } else {
+                                    LibraryDisplayMode.GRID
+                                },
+                            )
+                        }
+                    }) {
+                        Text(if (overview.displayPreferences().mode() == LibraryDisplayMode.GRID) "Grid" else "List")
+                    }
+                    androidx.compose.material3.TextButton(onClick = {
+                        update {
+                            presentation.setDisplayDensity(overview.displayPreferences().density().next())
+                        }
+                    }) {
+                        Text(overview.displayPreferences().density().label())
+                    }
+                    androidx.compose.material3.TextButton(onClick = {
+                        update { presentation.setSort(overview.displayPreferences().sort().next()) }
+                    }) {
+                        Text(overview.displayPreferences().sort().label())
                     }
                 },
             )
@@ -638,6 +677,7 @@ private fun LibraryPageContent(
             modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 24.dp),
         ) {
             Text(librarySummary(overview), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             Spacer(Modifier.height(12.dp))
             OutlinedTextField(
                 value = query,
@@ -674,14 +714,27 @@ private fun LibraryPageContent(
                 ) {
                     FilterChip(
                         selected = category == null,
-                        onClick = { category = null },
+                        onClick = {
+                            category = null
+                            update { presentation.setDefaultCategory(java.util.Optional.empty()) }
+                        },
                         label = { Text("All categories") },
                     )
-                    FilterChip(selected = category == "", onClick = { category = "" }, label = { Text("Default") })
+                    FilterChip(
+                        selected = category == "",
+                        onClick = {
+                            category = ""
+                            update { presentation.setDefaultCategory(java.util.Optional.empty()) }
+                        },
+                        label = { Text("Default") },
+                    )
                     overview.categories().forEach { value ->
                         FilterChip(
                             selected = category == value,
-                            onClick = { category = value },
+                            onClick = {
+                                category = value
+                                update { presentation.setDefaultCategory(java.util.Optional.of(value)) }
+                            },
                             label = { Text(value) },
                         )
                     }
@@ -693,21 +746,59 @@ private fun LibraryPageContent(
             } else if (titles.isEmpty()) {
                 EmptyPage("No titles match the active library filters.")
             } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    items(titles, key = { it.id().value() }) { card ->
-                        LibraryTitleCard(card) { navigate { it.openDetails(card.id()) } }
+                Text(
+                    text = "$componentCount feature bundles active",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = 8.dp),
+                )
+                if (overview.displayPreferences().mode() == LibraryDisplayMode.GRID) {
+                    LazyVerticalGrid(
+                        columns = GridCells.Adaptive(overview.displayPreferences().density().minimumCardWidth()),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        gridItems(titles, key = { it.id().value() }) { card ->
+                            LibraryTitleCard(card) { navigate { it.openDetails(card.id()) } }
+                        }
                     }
-                    item {
-                        Text(
-                            text = "$componentCount feature bundles active",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(vertical = 18.dp),
-                        )
+                } else {
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        items(titles, key = { it.id().value() }) { card ->
+                            LibraryTitleCard(card) { navigate { it.openDetails(card.id()) } }
+                        }
                     }
                 }
             }
         }
     }
+}
+
+private fun LibraryDisplayDensity.next(): LibraryDisplayDensity = when (this) {
+    LibraryDisplayDensity.COMPACT -> LibraryDisplayDensity.COMFORTABLE
+    LibraryDisplayDensity.COMFORTABLE -> LibraryDisplayDensity.RELAXED
+    LibraryDisplayDensity.RELAXED -> LibraryDisplayDensity.COMPACT
+}
+
+private fun LibraryDisplayDensity.label(): String = name.lowercase().replaceFirstChar(Char::uppercase)
+
+private fun LibraryDisplayDensity.minimumCardWidth() = when (this) {
+    LibraryDisplayDensity.COMPACT -> 140.dp
+    LibraryDisplayDensity.COMFORTABLE -> 180.dp
+    LibraryDisplayDensity.RELAXED -> 240.dp
+}
+
+private fun LibrarySort.next(): LibrarySort = when (this) {
+    LibrarySort.TITLE_ASCENDING -> LibrarySort.TITLE_DESCENDING
+    LibrarySort.TITLE_DESCENDING -> LibrarySort.ADDED_NEWEST
+    LibrarySort.ADDED_NEWEST -> LibrarySort.ADDED_OLDEST
+    LibrarySort.ADDED_OLDEST -> LibrarySort.TITLE_ASCENDING
+}
+
+private fun LibrarySort.label(): String = when (this) {
+    LibrarySort.TITLE_ASCENDING -> "A-Z"
+    LibrarySort.TITLE_DESCENDING -> "Z-A"
+    LibrarySort.ADDED_NEWEST -> "Newest"
+    LibrarySort.ADDED_OLDEST -> "Oldest"
 }
 
 @Composable

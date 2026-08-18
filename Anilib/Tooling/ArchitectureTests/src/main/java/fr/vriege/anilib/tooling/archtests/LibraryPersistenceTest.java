@@ -1,6 +1,12 @@
 package fr.vriege.anilib.tooling.archtests;
 
 import fr.vriege.anilib.feature.library.LibraryItem;
+import fr.vriege.anilib.feature.library.LibraryCategory;
+import fr.vriege.anilib.feature.library.LibraryCategoryUpdatePolicy;
+import fr.vriege.anilib.feature.library.LibraryConfigurationSnapshot;
+import fr.vriege.anilib.feature.library.LibraryDisplayDensity;
+import fr.vriege.anilib.feature.library.LibraryDisplayMode;
+import fr.vriege.anilib.feature.library.LibraryDisplayPreferences;
 import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.library.LibraryOrigin;
 import fr.vriege.anilib.feature.library.LibraryHistoryEntry;
@@ -9,6 +15,7 @@ import fr.vriege.anilib.feature.library.LibraryTitleMetadata;
 import fr.vriege.anilib.feature.library.MediaKind;
 import fr.vriege.anilib.feature.library.PublicationStatus;
 import fr.vriege.anilib.feature.library.runtime.FileLibraryCatalog;
+import fr.vriege.anilib.feature.library.runtime.FileLibraryConfiguration;
 
 import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
@@ -32,6 +39,7 @@ final class LibraryPersistenceTest {
         Counter counter = new Counter();
         try {
             roundTripsCurrentFormat(counter);
+            roundTripsLibraryConfiguration(counter);
             migratesVersionZero(counter);
             migratesVersionOne(counter);
             migratesVersionTwo(counter);
@@ -39,6 +47,34 @@ final class LibraryPersistenceTest {
             throw new AssertionError("Library persistence test failed", exception);
         }
         return counter.value;
+    }
+
+    private static void roundTripsLibraryConfiguration(Counter counter) throws IOException {
+        Path directory = Files.createTempDirectory("anilib-library-configuration");
+        Path file = directory.resolve("library.configuration");
+        try {
+            FileLibraryConfiguration configuration = new FileLibraryConfiguration(file);
+            LibraryDisplayPreferences preferences = new LibraryDisplayPreferences(
+                    LibraryDisplayMode.LIST,
+                    LibraryDisplayDensity.COMPACT,
+                    fr.vriege.anilib.feature.library.LibrarySort.ADDED_NEWEST,
+                    java.util.Optional.of("Seasonal"));
+            LibraryConfigurationSnapshot snapshot = new LibraryConfigurationSnapshot(
+                    preferences,
+                    List.of(new LibraryCategory(
+                            "Seasonal",
+                            LibraryDisplayMode.GRID,
+                            LibraryDisplayDensity.RELAXED,
+                            fr.vriege.anilib.feature.library.LibrarySort.TITLE_DESCENDING,
+                            LibraryCategoryUpdatePolicy.EXCLUDE)));
+            configuration.save(snapshot);
+            counter.check(new FileLibraryConfiguration(file).snapshot().equals(snapshot),
+                    "library display and category configuration must survive restart");
+            counter.check(noTemporaryFiles(directory),
+                    "atomic library configuration save must not leave temporary files");
+        } finally {
+            deleteDirectory(directory);
+        }
     }
 
     private static void roundTripsCurrentFormat(Counter counter) throws IOException {
