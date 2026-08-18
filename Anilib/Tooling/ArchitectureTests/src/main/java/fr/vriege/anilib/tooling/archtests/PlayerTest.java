@@ -10,8 +10,13 @@ import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.library.LibraryOrigin;
 import fr.vriege.anilib.feature.library.MediaKind;
 import fr.vriege.anilib.feature.player.EpisodeSnapshot;
+import fr.vriege.anilib.feature.player.PlayerBackend;
 import fr.vriege.anilib.feature.player.PlayerCapabilities;
 import fr.vriege.anilib.feature.player.PlayerException;
+import fr.vriege.anilib.feature.player.PlayerMedia;
+import fr.vriege.anilib.feature.player.PlayerPlayback;
+import fr.vriege.anilib.feature.player.PlayerPlaybackSnapshot;
+import fr.vriege.anilib.feature.player.PlayerPlaybackStatus;
 import fr.vriege.anilib.feature.player.PlayerService;
 import fr.vriege.anilib.feature.player.PlayerSession;
 import fr.vriege.anilib.feature.player.ui.PlayerPresentation;
@@ -29,6 +34,7 @@ import fr.vriege.anilib.feature.source.SourceVideoStream;
 import fr.vriege.anilib.feature.source.StreamingSource;
 import fr.vriege.anilib.feature.source.SourceExtensionPlugin;
 import fr.vriege.anilib.foundation.component.ComponentDescriptor;
+import fr.vriege.anilib.framework.http.runtime.UrlConnectionHttpTransport;
 import fr.vriege.anilib.kernel.AnilibPlugin;
 import fr.vriege.anilib.kernel.StartedAnilib;
 
@@ -37,6 +43,7 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -76,15 +83,20 @@ final class PlayerTest {
         Path directory = temporaryDirectory("anilib-player-state");
         LibraryItemId libraryItemId;
         AtomicInteger notifications = new AtomicInteger();
+        RecordingBackend backend = new RecordingBackend();
         try {
             try (StartedAnilib application = StandardAnilib.start(
                     directory,
+                    new UrlConnectionHttpTransport(),
+                    backend,
                     List.of(sourcePlugin(new TestStreamingSource(false))))) {
                 LibraryCatalog library = application.capability(LibraryCapabilities.CATALOG);
                 LibraryItem item = animeItem("player-state");
                 libraryItemId = item.id();
                 library.save(item);
                 PlayerService player = application.capability(PlayerCapabilities.SERVICE);
+                counter.check(application.capability(PlayerCapabilities.BACKEND) == backend,
+                        "Player Bundle must publish the platform-selected media backend");
                 PlayerPresentation presentation = application.capability(PlayerUiCapabilities.PRESENTATION);
                 counter.check(player.canOpen(item.id()),
                         "Player must recognize anime from a streaming source");
@@ -98,6 +110,16 @@ final class PlayerTest {
                         "new episodes must not fabricate playback state");
                 AutoCloseable registration = player.observe(notifications::incrementAndGet);
                 try (PlayerSession session = player.open(item.id(), FIRST_EPISODE.id())) {
+                    counter.check(backend.opened.size() == 1,
+                            "opening a Player session must open one platform playback handle");
+                    counter.check(backend.opened.getFirst().media.stream().id().equals("hls-1080"),
+                            "platform playback must receive the selected source stream");
+                    session.play();
+                    counter.check(session.playback().snapshot().status() == PlayerPlaybackStatus.PLAYING,
+                            "Player commands must delegate through the narrow playback handle");
+                    session.seekTo(1_500L);
+                    counter.check(session.playback().snapshot().positionMillis() == 1_500L,
+                            "Player seeks must remain independent from the platform engine type");
                     counter.check(session.snapshot().streams().size() == 2,
                             "Player must expose every validated stream candidate");
                     counter.check(session.snapshot().selectedStreamId().equals("hls-1080"),
@@ -106,6 +128,8 @@ final class PlayerTest {
                     counter.check(session.snapshot().selectedSubtitleId().orElseThrow().equals("sub-en"),
                             "Player must retain a selected subtitle track");
                     session.selectStream("progressive-720");
+                    counter.check(backend.opened.size() == 2 && backend.opened.getFirst().closed,
+                            "changing streams must replace and close the platform playback handle");
                     counter.check(session.snapshot().selectedSubtitleId().isEmpty(),
                             "changing streams must clear an unavailable subtitle");
                     expectPlayerFailure(
@@ -310,6 +334,92 @@ final class PlayerTest {
                     Map.of(),
                     List.of());
             return List.of(hls, progressive);
+        }
+    }
+
+    private static final class RecordingBackend implements PlayerBackend {
+        private final List<RecordingPlayback> opened = new ArrayList<>();
+
+        @Override
+        public String id() {
+            return "recording";
+        }
+
+        @Override
+        public boolean available() {
+            return true;
+        }
+
+        @Override
+        public PlayerPlayback open(PlayerMedia media) {
+            RecordingPlayback playback = new RecordingPlayback(media);
+            opened.add(playback);
+            return playback;
+        }
+    }
+
+    private static final class RecordingPlayback implements PlayerPlayback {
+        private final PlayerMedia media;
+        private PlayerPlaybackStatus status = PlayerPlaybackStatus.PAUSED;
+        private long position;
+        private float volume = 1.0f;
+        private float speed = 1.0f;
+        private boolean closed;
+
+        private RecordingPlayback(PlayerMedia media) {
+            this.media = media;
+            position = media.startPositionMillis();
+        }
+
+        @Override
+        public PlayerMedia media() {
+            return media;
+        }
+
+        @Override
+        public PlayerPlaybackSnapshot snapshot() {
+            return new PlayerPlaybackSnapshot(
+                    status,
+                    position,
+                    -1L,
+                    volume,
+                    speed,
+                    Optional.empty());
+        }
+
+        @Override
+        public void play() {
+            status = PlayerPlaybackStatus.PLAYING;
+        }
+
+        @Override
+        public void pause() {
+            status = PlayerPlaybackStatus.PAUSED;
+        }
+
+        @Override
+        public void seekTo(long positionMillis) {
+            position = positionMillis;
+        }
+
+        @Override
+        public void setVolume(float value) {
+            volume = value;
+        }
+
+        @Override
+        public void setPlaybackSpeed(float value) {
+            speed = value;
+        }
+
+        @Override
+        public void selectSubtitle(Optional<String> subtitleId) {
+            // The Player session validates ownership before delegation.
+        }
+
+        @Override
+        public void close() {
+            closed = true;
         }
     }
 

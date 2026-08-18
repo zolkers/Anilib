@@ -1,7 +1,10 @@
 package fr.vriege.anilib.feature.player.runtime;
 
 import fr.vriege.anilib.feature.player.PlaybackState;
+import fr.vriege.anilib.feature.player.PlayerBackend;
 import fr.vriege.anilib.feature.player.PlayerException;
+import fr.vriege.anilib.feature.player.PlayerMedia;
+import fr.vriege.anilib.feature.player.PlayerPlayback;
 import fr.vriege.anilib.feature.player.PlayerSession;
 import fr.vriege.anilib.feature.player.PlayerSessionSnapshot;
 import fr.vriege.anilib.feature.source.SourceSubtitleTrack;
@@ -15,17 +18,30 @@ import java.util.Optional;
 final class DefaultPlayerSession implements PlayerSession {
     private final DefaultPlayerService service;
     private final PlayerSessionSnapshot initial;
+    private final PlayerBackend backend;
     private String selectedStreamId;
     private Optional<String> selectedSubtitleId;
     private PlaybackState playback;
+    private PlayerPlayback mediaPlayback;
     private boolean closed;
 
-    DefaultPlayerSession(DefaultPlayerService service, PlayerSessionSnapshot initial) {
+    DefaultPlayerSession(
+            DefaultPlayerService service,
+            PlayerBackend backend,
+            PlayerSessionSnapshot initial) {
         this.service = Objects.requireNonNull(service, "service must not be null");
+        this.backend = Objects.requireNonNull(backend, "backend must not be null");
         this.initial = Objects.requireNonNull(initial, "initial must not be null");
         selectedStreamId = initial.selectedStreamId();
         selectedSubtitleId = initial.selectedSubtitleId();
         playback = initial.playback();
+        mediaPlayback = openPlayback(initial.selectedStream(), selectedSubtitleId);
+    }
+
+    @Override
+    public synchronized PlayerPlayback playback() {
+        ensureOpen();
+        return mediaPlayback;
     }
 
     @Override
@@ -45,11 +61,26 @@ final class DefaultPlayerSession implements PlayerSession {
     public synchronized void selectStream(String streamId) {
         ensureOpen();
         SourceVideoStream selected = stream(streamId);
-        selectedStreamId = selected.id();
-        if (selectedSubtitleId.isPresent() && selected.subtitles().stream()
-                .noneMatch(track -> track.id().equals(selectedSubtitleId.orElseThrow()))) {
-            selectedSubtitleId = Optional.empty();
+        Optional<String> subtitle = selectedSubtitleId;
+        String subtitleValue = subtitle.orElse(null);
+        if (subtitleValue != null && selected.subtitles().stream()
+                .noneMatch(track -> track.id().equals(subtitleValue))) {
+            subtitle = Optional.empty();
         }
+        PlayerPlayback replacement = openPlayback(selected, subtitle);
+        try {
+            mediaPlayback.close();
+        } catch (RuntimeException failure) {
+            try {
+                replacement.close();
+            } catch (RuntimeException cleanupFailure) {
+                failure.addSuppressed(cleanupFailure);
+            }
+            throw failure;
+        }
+        mediaPlayback = replacement;
+        selectedStreamId = selected.id();
+        selectedSubtitleId = subtitle;
     }
 
     @Override
@@ -64,7 +95,38 @@ final class DefaultPlayerSession implements PlayerSession {
                 throw new PlayerException("Subtitle does not belong to the selected stream");
             }
         }
+        mediaPlayback.selectSubtitle(requested);
         selectedSubtitleId = requested;
+    }
+
+    @Override
+    public synchronized void play() {
+        ensureOpen();
+        mediaPlayback.play();
+    }
+
+    @Override
+    public synchronized void pause() {
+        ensureOpen();
+        mediaPlayback.pause();
+    }
+
+    @Override
+    public synchronized void seekTo(long positionMillis) {
+        ensureOpen();
+        mediaPlayback.seekTo(positionMillis);
+    }
+
+    @Override
+    public synchronized void setVolume(float volume) {
+        ensureOpen();
+        mediaPlayback.setVolume(volume);
+    }
+
+    @Override
+    public synchronized void setPlaybackSpeed(float speed) {
+        ensureOpen();
+        mediaPlayback.setPlaybackSpeed(speed);
     }
 
     @Override
@@ -90,6 +152,19 @@ final class DefaultPlayerSession implements PlayerSession {
                 .orElseThrow(() -> new PlayerException("Unknown video stream: " + value));
     }
 
+    private PlayerPlayback openPlayback(
+            SourceVideoStream stream,
+            Optional<String> subtitleId) {
+        PlayerMedia media = new PlayerMedia(
+                initial.title() + " - " + initial.episode().title(),
+                stream,
+                subtitleId,
+                playback.positionMillis());
+        return Objects.requireNonNull(
+                backend.open(media),
+                "player backend returned null playback");
+    }
+
     private void ensureOpen() {
         if (closed) {
             throw new PlayerException("Player session is closed");
@@ -100,7 +175,11 @@ final class DefaultPlayerSession implements PlayerSession {
     public synchronized void close() {
         if (!closed) {
             closed = true;
-            service.removeSession(this);
+            try {
+                mediaPlayback.close();
+            } finally {
+                service.removeSession(this);
+            }
         }
     }
 }

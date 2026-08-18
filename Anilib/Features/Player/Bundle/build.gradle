@@ -4,7 +4,7 @@ dependencies {
     implementation project(':Anilib:Kernel:Api')
     implementation project(':Anilib:Features:Library:Api')
     implementation project(':Anilib:Features:Source:Api')
-    implementation project(':Anilib:Features:Player:Api')
+    api project(':Anilib:Features:Player:Api')
     implementation project(':Anilib:Features:Player:Runtime')
     implementation project(':Anilib:Features:Player:Ui')
 }

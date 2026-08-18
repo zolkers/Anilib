@@ -4,7 +4,7 @@ module fr.vriege.anilib.feature.player.bundle {
     requires transitive fr.vriege.anilib.kernel.api;
     requires fr.vriege.anilib.feature.library.api;
     requires fr.vriege.anilib.feature.source.api;
-    requires fr.vriege.anilib.feature.player.api;
+    requires transitive fr.vriege.anilib.feature.player.api;
     requires fr.vriege.anilib.feature.player.runtime;
     requires fr.vriege.anilib.feature.player.ui;
 

@@ -9,6 +9,8 @@ import fr.vriege.anilib.feature.library.LibraryProgress;
 import fr.vriege.anilib.feature.library.MediaKind;
 import fr.vriege.anilib.feature.player.EpisodeSnapshot;
 import fr.vriege.anilib.feature.player.PlaybackState;
+import fr.vriege.anilib.feature.player.PlayerBackend;
+import fr.vriege.anilib.feature.player.PlayerBackends;
 import fr.vriege.anilib.feature.player.PlayerException;
 import fr.vriege.anilib.feature.player.PlayerService;
 import fr.vriege.anilib.feature.player.PlayerSession;
@@ -37,6 +39,7 @@ public final class DefaultPlayerService implements PlayerService, AutoCloseable 
     private final SourceRegistry sources;
     private final LibraryCatalog library;
     private final PlaybackStateStore states;
+    private final PlayerBackend backend;
     private final Clock clock;
     private final Set<DefaultPlayerSession> sessions = new HashSet<>();
     private final Set<Runnable> listeners = new HashSet<>();
@@ -46,18 +49,28 @@ public final class DefaultPlayerService implements PlayerService, AutoCloseable 
             SourceRegistry sources,
             LibraryCatalog library,
             Path stateFile) {
-        this(sources, library, new PlaybackStateStore(stateFile), Clock.systemUTC());
+        this(sources, library, stateFile, PlayerBackends.unavailable());
+    }
+
+    public DefaultPlayerService(
+            SourceRegistry sources,
+            LibraryCatalog library,
+            Path stateFile,
+            PlayerBackend backend) {
+        this(sources, library, new PlaybackStateStore(stateFile), Clock.systemUTC(), backend);
     }
 
     DefaultPlayerService(
             SourceRegistry sources,
             LibraryCatalog library,
             PlaybackStateStore states,
-            Clock clock) {
+            Clock clock,
+            PlayerBackend backend) {
         this.sources = Objects.requireNonNull(sources, "sources must not be null");
         this.library = Objects.requireNonNull(library, "library must not be null");
         this.states = Objects.requireNonNull(states, "states must not be null");
         this.clock = Objects.requireNonNull(clock, "clock must not be null");
+        this.backend = Objects.requireNonNull(backend, "backend must not be null");
     }
 
     @Override
@@ -119,7 +132,7 @@ public final class DefaultPlayerService implements PlayerService, AutoCloseable 
                 streams.getFirst().id(),
                 Optional.empty(),
                 playback);
-        DefaultPlayerSession session = new DefaultPlayerSession(this, snapshot);
+        DefaultPlayerSession session = new DefaultPlayerSession(this, backend, snapshot);
         sessions.add(session);
         return session;
     }

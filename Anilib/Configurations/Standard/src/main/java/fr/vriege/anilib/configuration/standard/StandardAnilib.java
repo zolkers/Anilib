@@ -7,6 +7,8 @@ import fr.vriege.anilib.feature.network.bundle.NetworkPlugin;
 import fr.vriege.anilib.feature.reader.bundle.ReaderPlugin;
 import fr.vriege.anilib.feature.downloads.bundle.DownloadPlugin;
 import fr.vriege.anilib.feature.player.PlayerCapabilities;
+import fr.vriege.anilib.feature.player.PlayerBackend;
+import fr.vriege.anilib.feature.player.PlayerBackends;
 import fr.vriege.anilib.feature.player.bundle.PlayerPlugin;
 import fr.vriege.anilib.feature.backup.bundle.BackupPlugin;
 import fr.vriege.anilib.feature.source.bundle.SourceSdkPlugin;
@@ -34,15 +36,32 @@ public final class StandardAnilib {
     public static StartedAnilib start(
             Path dataDirectory,
             Collection<? extends AnilibPlugin> additionalPlugins) {
-        return start(dataDirectory, new UrlConnectionHttpTransport(), additionalPlugins);
+        return start(
+                dataDirectory,
+                new UrlConnectionHttpTransport(),
+                PlayerBackends.unavailable(),
+                additionalPlugins);
     }
 
     public static StartedAnilib start(
             Path dataDirectory,
             HttpTransport httpTransport,
             Collection<? extends AnilibPlugin> additionalPlugins) {
+        return start(
+                dataDirectory,
+                httpTransport,
+                PlayerBackends.unavailable(),
+                additionalPlugins);
+    }
+
+    public static StartedAnilib start(
+            Path dataDirectory,
+            HttpTransport httpTransport,
+            PlayerBackend playerBackend,
+            Collection<? extends AnilibPlugin> additionalPlugins) {
         Objects.requireNonNull(dataDirectory, "dataDirectory must not be null");
         Objects.requireNonNull(httpTransport, "httpTransport must not be null");
+        Objects.requireNonNull(playerBackend, "playerBackend must not be null");
         Objects.requireNonNull(additionalPlugins, "additionalPlugins must not be null");
         Path libraryFile = dataDirectory.toAbsolutePath().normalize().resolve("library.anilib");
         Path localContent = dataDirectory.toAbsolutePath().normalize().resolve("local-content");
@@ -59,7 +78,7 @@ public final class StandardAnilib {
         plugins.add(new DiscoveryPlugin(sourcePreferences));
         plugins.add(new ReaderPlugin());
         plugins.add(new DownloadPlugin(downloads));
-        plugins.add(new PlayerPlugin(playbackState));
+        plugins.add(new PlayerPlugin(playbackState, playerBackend));
         plugins.add(new BackupPlugin(backups, List.of(PlayerCapabilities.BACKUP_CODEC)));
         plugins.addAll(additionalPlugins);
         return new DefaultPluginEngine().start(List.copyOf(plugins));

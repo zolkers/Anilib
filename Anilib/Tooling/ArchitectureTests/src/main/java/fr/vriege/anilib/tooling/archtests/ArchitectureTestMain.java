@@ -100,6 +100,8 @@ public final class ArchitectureTestMain {
                     "Reader Bundle must publish its shared presentation capability");
             check(application.capability(PlayerCapabilities.SERVICE) != null,
                     "Player Bundle must publish its episode capability");
+            check(!application.capability(PlayerCapabilities.BACKEND).available(),
+                    "headless Standard product must publish its explicit unavailable media backend");
             check(application.capability(PlayerCapabilities.BACKUP_CODEC) != null,
                     "Player Bundle must publish its self-owned backup codec");
             check(application.capability(PlayerUiCapabilities.PRESENTATION) != null,
