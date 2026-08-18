@@ -2,6 +2,7 @@ package fr.vriege.anilib.tooling.archtests;
 
 import fr.vriege.anilib.configuration.standard.StandardAnilib;
 import fr.vriege.anilib.feature.discovery.DiscoveryCapabilities;
+import fr.vriege.anilib.feature.discovery.DiscoveryCatalogueDisplayMode;
 import fr.vriege.anilib.feature.discovery.DiscoveryService;
 import fr.vriege.anilib.feature.discovery.ui.DiscoveryPresentation;
 import fr.vriege.anilib.feature.discovery.ui.DiscoveryUiCapabilities;
@@ -212,6 +213,7 @@ final class DiscoveryTest {
             DiscoveryPresentation presentation = product.capability(DiscoveryUiCapabilities.PRESENTATION);
             presentation.setSourcePinned(REMOTE_SOURCE, true);
             presentation.setSourceLanguageEnabled(SourceContentKind.MANGA, "en", false);
+            presentation.setCatalogueDisplayMode(REMOTE_SOURCE, DiscoveryCatalogueDisplayMode.LIST);
             counter.check(presentation.pinnedSources().equals(Set.of(REMOTE_SOURCE)),
                     "pinned sources must be reflected by the shared presentation immediately");
             counter.check(presentation.sourceSections(SourceContentKind.MANGA).stream()
@@ -229,6 +231,9 @@ final class DiscoveryTest {
                     "pinned sources must survive Android and desktop restart");
             counter.check(!presentation.enabledSourceLanguages(SourceContentKind.MANGA).contains("en"),
                     "source language choices must survive Android and desktop restart");
+            counter.check(presentation.catalogueDisplayMode(REMOTE_SOURCE)
+                            == DiscoveryCatalogueDisplayMode.LIST,
+                    "catalogue display choices must survive Android and desktop restart");
         }
     }
 

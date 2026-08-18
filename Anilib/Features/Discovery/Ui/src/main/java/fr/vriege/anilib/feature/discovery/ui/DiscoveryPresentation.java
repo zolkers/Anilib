@@ -1,6 +1,7 @@
 package fr.vriege.anilib.feature.discovery.ui;
 
 import fr.vriege.anilib.feature.discovery.SourcePreferenceSnapshot;
+import fr.vriege.anilib.feature.discovery.DiscoveryCatalogueDisplayMode;
 import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.source.SourceCatalogueItem;
 import fr.vriege.anilib.feature.source.SourceCatalogueItemId;
@@ -32,6 +33,10 @@ public interface DiscoveryPresentation {
     void setSourceLanguageEnabled(SourceContentKind contentKind, String languageTag, boolean enabled);
 
     void setSourcePinned(SourceId sourceId, boolean pinned);
+
+    DiscoveryCatalogueDisplayMode catalogueDisplayMode(SourceId sourceId);
+
+    void setCatalogueDisplayMode(SourceId sourceId, DiscoveryCatalogueDisplayMode displayMode);
 
     List<InstalledSourceExtension> extensions(SourceContentKind contentKind);
 

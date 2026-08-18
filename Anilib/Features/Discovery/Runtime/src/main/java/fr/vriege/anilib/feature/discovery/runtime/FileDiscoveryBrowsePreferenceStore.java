@@ -2,6 +2,7 @@ package fr.vriege.anilib.feature.discovery.runtime;
 
 import fr.vriege.anilib.feature.discovery.DiscoveryBrowsePreferenceStore;
 import fr.vriege.anilib.feature.discovery.DiscoveryBrowsePreferences;
+import fr.vriege.anilib.feature.discovery.DiscoveryCatalogueDisplayMode;
 import fr.vriege.anilib.feature.source.SourceContentKind;
 import fr.vriege.anilib.feature.source.SourceId;
 import fr.vriege.anilib.foundation.validation.Preconditions;
@@ -15,6 +16,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Base64;
 import java.util.EnumMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -36,6 +38,7 @@ public final class FileDiscoveryBrowsePreferenceStore implements DiscoveryBrowse
         }
         Map<SourceContentKind, Set<String>> languages = new EnumMap<>(SourceContentKind.class);
         Set<SourceId> pinned = new LinkedHashSet<>();
+        Map<SourceId, DiscoveryCatalogueDisplayMode> displayModes = new LinkedHashMap<>();
         int values = 0;
         try {
             for (String line : Files.readAllLines(file, StandardCharsets.UTF_8)) {
@@ -52,6 +55,14 @@ public final class FileDiscoveryBrowsePreferenceStore implements DiscoveryBrowse
                     if (!pinned.add(SourceId.of(decode(columns[1])))) {
                         throw new IllegalStateException("Duplicate pinned discovery source");
                     }
+                } else if (columns.length == 3 && columns[0].equals("display")) {
+                    SourceId sourceId = SourceId.of(decode(columns[1]));
+                    DiscoveryCatalogueDisplayMode previous = displayModes.put(
+                            sourceId,
+                            DiscoveryCatalogueDisplayMode.valueOf(columns[2]));
+                    if (previous != null) {
+                        throw new IllegalStateException("Duplicate catalogue display preference");
+                    }
                 } else {
                     throw new IllegalStateException("Invalid discovery browse preference row");
                 }
@@ -60,7 +71,7 @@ public final class FileDiscoveryBrowsePreferenceStore implements DiscoveryBrowse
                     throw new IllegalStateException("Too many discovery browse preferences");
                 }
             }
-            return new DiscoveryBrowsePreferences(languages, pinned);
+            return new DiscoveryBrowsePreferences(languages, pinned, displayModes);
         } catch (IllegalArgumentException exception) {
             throw new IllegalStateException("Invalid discovery browse preference value", exception);
         } catch (IOException exception) {
@@ -72,7 +83,8 @@ public final class FileDiscoveryBrowsePreferenceStore implements DiscoveryBrowse
     public synchronized void save(DiscoveryBrowsePreferences preferences) {
         DiscoveryBrowsePreferences value = Preconditions.requireNonNull(preferences, "preferences");
         int count = value.pinnedSources().size()
-                + value.enabledLanguages().values().stream().mapToInt(Set::size).sum();
+                + value.enabledLanguages().values().stream().mapToInt(Set::size).sum()
+                + value.catalogueDisplayModes().size();
         if (count > MAX_VALUES) {
             throw new IllegalArgumentException("Too many discovery browse preferences");
         }
@@ -85,7 +97,10 @@ public final class FileDiscoveryBrowsePreferenceStore implements DiscoveryBrowse
                 .map(SourceId::toString)
                 .sorted()
                 .map(source -> "pinned\t" + encode(source));
-        write(Stream.concat(languageRows, pinnedRows).toList());
+        Stream<String> displayRows = value.catalogueDisplayModes().entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(entry -> "display\t" + encode(entry.getKey().toString()) + "\t" + entry.getValue().name());
+        write(Stream.concat(Stream.concat(languageRows, pinnedRows), displayRows).toList());
     }
 
     private void write(List<String> lines) {

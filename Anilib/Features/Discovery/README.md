@@ -17,6 +17,7 @@ The service provides:
   network-origin details.
 - durable per-media language visibility and pinned source ordering shared by
   Android and desktop.
+- durable per-source grid/list catalogue display and item action menus.
 
 Discovery does not install or scan extensions. Product configurations still
 select source Bundles explicitly, and the Source registry remains the only

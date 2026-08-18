@@ -70,6 +70,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.vriege.anilib.feature.discovery.SourcePreferenceSnapshot
+import fr.vriege.anilib.feature.discovery.DiscoveryCatalogueDisplayMode
 import fr.vriege.anilib.feature.discovery.ui.DiscoveryPresentation
 import fr.vriege.anilib.feature.discovery.ui.DiscoverySourceSection
 import fr.vriege.anilib.feature.extensionrepository.ExtensionContentKind
@@ -558,7 +559,11 @@ private fun SourceCatalogueScreen(
     var query by remember(source.id()) { mutableStateOf("") }
     var searchActive by remember(source.id()) { mutableStateOf(false) }
     var page by remember(source.id(), listing) { mutableIntStateOf(1) }
-    var grid by remember(source.id()) { mutableStateOf(true) }
+    var grid by remember(source.id()) {
+        mutableStateOf(
+            presentation.catalogueDisplayMode(source.id()) == DiscoveryCatalogueDisplayMode.GRID,
+        )
+    }
     var showFilters by remember(source.id()) { mutableStateOf(false) }
     var showPreferences by remember(source.id()) { mutableStateOf(false) }
     var filterValues by remember(source.id()) { mutableStateOf<Map<String, String>>(emptyMap()) }
@@ -644,7 +649,21 @@ private fun SourceCatalogueScreen(
                             Icon(Icons.Default.Search, contentDescription = "Search")
                         }
                     }
-                    IconButton(onClick = { grid = !grid }) {
+                    IconButton(onClick = {
+                        val nextMode = if (grid) {
+                            DiscoveryCatalogueDisplayMode.LIST
+                        } else {
+                            DiscoveryCatalogueDisplayMode.GRID
+                        }
+                        runCatching { presentation.setCatalogueDisplayMode(source.id(), nextMode) }
+                            .onSuccess {
+                                grid = nextMode == DiscoveryCatalogueDisplayMode.GRID
+                                notice = if (grid) "Grid view selected" else "List view selected"
+                            }
+                            .onFailure {
+                                notice = it.message ?: "Display choice could not be saved"
+                            }
+                    }) {
                         Icon(
                             if (grid) Icons.AutoMirrored.Filled.ViewList else Icons.Default.GridView,
                             contentDescription = "Display mode",
@@ -751,7 +770,16 @@ private fun CatalogueCard(
 ) {
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
         Column(modifier = Modifier.fillMaxWidth().padding(14.dp)) {
-            Text(item.title(), fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Row(verticalAlignment = Alignment.Top) {
+                Text(
+                    item.title(),
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                CatalogueItemMenu(item, add, webPage, openWebPage)
+            }
             Spacer(Modifier.height(8.dp))
             Text(
                 item.description(),
@@ -764,13 +792,6 @@ private fun CatalogueCard(
                 Icon(Icons.Default.Add, contentDescription = null)
                 Spacer(Modifier.width(6.dp))
                 Text("Library")
-            }
-            if (webPage != null) {
-                TextButton(onClick = { openWebPage(webPage) }) {
-                    Icon(Icons.Default.Public, contentDescription = null)
-                    Spacer(Modifier.width(6.dp))
-                    Text("WebView")
-                }
             }
         }
     }
@@ -791,16 +812,44 @@ private fun CatalogueRow(
             Text(item.title(), fontWeight = FontWeight.Medium)
             Text(item.description(), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        IconButton(onClick = { add(item) }) {
-            Icon(Icons.Default.Add, contentDescription = "Add to Library")
+        CatalogueItemMenu(item, add, webPage, openWebPage)
+    }
+    HorizontalDivider(modifier = Modifier.padding(start = 20.dp))
+}
+
+@Composable
+private fun CatalogueItemMenu(
+    item: SourceCatalogueItem,
+    add: (SourceCatalogueItem) -> Unit,
+    webPage: SourceWebPage?,
+    openWebPage: (SourceWebPage) -> Unit,
+) {
+    var expanded by remember(item.id()) { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { expanded = true }) {
+            Icon(Icons.Default.MoreVert, contentDescription = "Actions for ${item.title()}")
         }
-        if (webPage != null) {
-            IconButton(onClick = { openWebPage(webPage) }) {
-                Icon(Icons.Default.Public, contentDescription = "Open title in WebView")
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenuItem(
+                text = { Text("Add to Library") },
+                leadingIcon = { Icon(Icons.Default.Add, contentDescription = null) },
+                onClick = {
+                    expanded = false
+                    add(item)
+                },
+            )
+            webPage?.let { page ->
+                DropdownMenuItem(
+                    text = { Text("Open in WebView") },
+                    leadingIcon = { Icon(Icons.Default.Public, contentDescription = null) },
+                    onClick = {
+                        expanded = false
+                        openWebPage(page)
+                    },
+                )
             }
         }
     }
-    HorizontalDivider(modifier = Modifier.padding(start = 20.dp))
 }
 
 @Composable

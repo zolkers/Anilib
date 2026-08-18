@@ -40,6 +40,8 @@ Statistics combine library status/source/language/progress and activity with
 tracker scores and persisted player duration without failing on unavailable sources.
 Browse shows live source-extension update badges and actions, compact fixed-density
 rows, richer overflow menus, and asynchronous loading, retry, and error states.
+Source catalogues retain their grid/list choice independently and expose item
+menus for Library admission and WebView entry.
 Dedicated extension details expose permissions, publisher and installed signing
 identity, available and installed versions, changelog, progress, retry, and
 failure diagnostics before lifecycle actions.

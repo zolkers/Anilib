@@ -2,6 +2,7 @@ package fr.vriege.anilib.feature.discovery.ui;
 
 import fr.vriege.anilib.feature.discovery.DiscoveryBrowsePreferenceStore;
 import fr.vriege.anilib.feature.discovery.DiscoveryBrowsePreferences;
+import fr.vriege.anilib.feature.discovery.DiscoveryCatalogueDisplayMode;
 import fr.vriege.anilib.feature.discovery.DiscoveryService;
 import fr.vriege.anilib.feature.discovery.SourcePreferenceSnapshot;
 import fr.vriege.anilib.feature.library.LibraryItemId;
@@ -116,7 +117,10 @@ public final class DefaultDiscoveryPresentation implements DiscoveryPresentation
         } else {
             languages.put(kind, Set.copyOf(selected));
         }
-        browsePreferences.save(new DiscoveryBrowsePreferences(languages, current.pinnedSources()));
+        browsePreferences.save(new DiscoveryBrowsePreferences(
+                languages,
+                current.pinnedSources(),
+                current.catalogueDisplayModes()));
     }
 
     @Override
@@ -129,7 +133,38 @@ public final class DefaultDiscoveryPresentation implements DiscoveryPresentation
         } else {
             sources.remove(id);
         }
-        browsePreferences.save(new DiscoveryBrowsePreferences(current.enabledLanguages(), sources));
+        browsePreferences.save(new DiscoveryBrowsePreferences(
+                current.enabledLanguages(),
+                sources,
+                current.catalogueDisplayModes()));
+    }
+
+    @Override
+    public DiscoveryCatalogueDisplayMode catalogueDisplayMode(SourceId sourceId) {
+        return browsePreferences.snapshot().catalogueDisplayMode(sourceId);
+    }
+
+    @Override
+    public void setCatalogueDisplayMode(SourceId sourceId, DiscoveryCatalogueDisplayMode displayMode) {
+        SourceId id = Objects.requireNonNull(sourceId, "sourceId must not be null");
+        if (service.source(id).isEmpty()) {
+            throw new IllegalArgumentException("Unknown source: " + id);
+        }
+        DiscoveryCatalogueDisplayMode mode = Objects.requireNonNull(
+                displayMode,
+                "displayMode must not be null");
+        DiscoveryBrowsePreferences current = browsePreferences.snapshot();
+        Map<SourceId, DiscoveryCatalogueDisplayMode> modes = new LinkedHashMap<>(
+                current.catalogueDisplayModes());
+        if (mode == DiscoveryCatalogueDisplayMode.GRID) {
+            modes.remove(id);
+        } else {
+            modes.put(id, mode);
+        }
+        browsePreferences.save(new DiscoveryBrowsePreferences(
+                current.enabledLanguages(),
+                current.pinnedSources(),
+                modes));
     }
 
     @Override

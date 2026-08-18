@@ -197,7 +197,7 @@ platform-specific.
   Aniyomi density and loading/error states
 - [x] add a dedicated extension detail route with permissions, trust identity,
   versions, changelog, install progress, retry, and failure diagnostics
-- [ ] persist catalogue grid/list choice and add catalogue item menus
+- [x] persist catalogue grid/list choice and add catalogue item menus
 - [ ] add batch migration, seasonal-anime handling, source comparison, options,
   preview, progress, cancellation, and partial-failure recovery
 - [ ] run public compatibility fixtures for Anilib repository indexes that use
