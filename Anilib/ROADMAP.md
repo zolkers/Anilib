@@ -198,7 +198,7 @@ platform-specific.
 - [x] add a dedicated extension detail route with permissions, trust identity,
   versions, changelog, install progress, retry, and failure diagnostics
 - [x] persist catalogue grid/list choice and add catalogue item menus
-- [ ] add batch migration, seasonal-anime handling, source comparison, options,
+- [x] add batch migration, seasonal-anime handling, source comparison, options,
   preview, progress, cancellation, and partial-failure recovery
 - [ ] run public compatibility fixtures for Anilib repository indexes that use
   the Yuzono and Keiyoushi JSON shapes without redistributing their catalogues

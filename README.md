@@ -42,6 +42,9 @@ Browse shows live source-extension update badges and actions, compact fixed-dens
 rows, richer overflow menus, and asynchronous loading, retry, and error states.
 Source catalogues retain their grid/list choice independently and expose item
 menus for Library admission and WebView entry.
+Migration supports multi-title previews, seasonal anime matching, source and
+candidate comparison, title-preservation options, progress, cancellation, and
+targeted retry after partial failure.
 Dedicated extension details expose permissions, publisher and installed signing
 identity, available and installed versions, changelog, progress, retry, and
 failure diagnostics before lifecycle actions.

@@ -12,7 +12,8 @@ The service provides:
 - validated source filters and durable source preferences;
 - duplicate-safe admission into Library with a stable source origin;
 - migration between sources while preserving library identity, categories,
-  favourite state, progress, and history.
+  favourite state, progress, and history, with batch preview, seasonal anime
+  matching, source comparison, cancellation, and partial-failure recovery.
 - installed anime/manga extension lists with declared permission and exact
   network-origin details.
 - durable per-media language visibility and pinned source ordering shared by

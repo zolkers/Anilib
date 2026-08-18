@@ -59,5 +59,20 @@ public interface DiscoveryService {
             SourceId targetSourceId,
             int limit);
 
+    default List<SourceCatalogueItem> migrationCandidates(
+            LibraryItemId libraryItemId,
+            SourceId targetSourceId,
+            MigrationOptions options,
+            int limit) {
+        return migrationCandidates(libraryItemId, targetSourceId, limit);
+    }
+
     void migrate(LibraryItemId libraryItemId, SourceCatalogueItem target);
+
+    default void migrate(
+            LibraryItemId libraryItemId,
+            SourceCatalogueItem target,
+            MigrationOptions options) {
+        migrate(libraryItemId, target);
+    }
 }

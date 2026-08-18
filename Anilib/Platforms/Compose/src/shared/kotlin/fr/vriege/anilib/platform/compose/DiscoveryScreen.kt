@@ -71,6 +71,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.vriege.anilib.feature.discovery.SourcePreferenceSnapshot
 import fr.vriege.anilib.feature.discovery.DiscoveryCatalogueDisplayMode
+import fr.vriege.anilib.feature.discovery.MigrationOptions
 import fr.vriege.anilib.feature.discovery.ui.DiscoveryPresentation
 import fr.vriege.anilib.feature.discovery.ui.DiscoverySourceSection
 import fr.vriege.anilib.feature.extensionrepository.ExtensionContentKind
@@ -78,6 +79,7 @@ import fr.vriege.anilib.feature.extensionrepository.ExtensionPackageMetadata
 import fr.vriege.anilib.feature.extensionrepository.ExtensionUpdateCandidate
 import fr.vriege.anilib.feature.extensionrepository.ui.ExtensionRepositoryPresentation
 import fr.vriege.anilib.feature.library.MediaKind
+import fr.vriege.anilib.feature.library.LibraryItemId
 import fr.vriege.anilib.feature.library.ui.LibraryCard
 import fr.vriege.anilib.feature.library.ui.LibraryPresentation
 import fr.vriege.anilib.feature.source.SourceCatalogueItem
@@ -95,6 +97,7 @@ import fr.vriege.anilib.feature.source.SourceId
 import fr.vriege.anilib.feature.source.SourceWebPage
 import fr.vriege.anilib.framework.http.HttpCookieJar
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -1202,72 +1205,340 @@ private fun MigrationContent(
     val mediaKind = if (kind == SourceContentKind.ANIME) MediaKind.ANIME else MediaKind.MANGA
     val titles = library.library().titles().filter { it.kind() == mediaKind }
     val targets = presentation.sourceSections(kind).flatMap { it.sources() }
-    var selected by remember(kind) { mutableStateOf<LibraryCard?>(null) }
+    val scope = rememberCoroutineScope()
+    val cancellation = remember(kind) { AtomicBoolean(false) }
+    var selectedIds by remember(kind) { mutableStateOf<Set<LibraryItemId>>(emptySet()) }
     var selectedTarget by remember(kind) { mutableStateOf<SourceDescriptor?>(null) }
-    var candidates by remember(kind) { mutableStateOf<List<SourceCatalogueItem>>(emptyList()) }
+    var preserveTitle by remember(kind) { mutableStateOf(false) }
+    var seasonalSearch by remember(kind) { mutableStateOf(kind == SourceContentKind.ANIME) }
+    var previews by remember(kind) { mutableStateOf<List<MigrationPreviewEntry>>(emptyList()) }
+    var outcomes by remember(kind) { mutableStateOf<List<MigrationOutcome>>(emptyList()) }
+    var targetMenuExpanded by remember(kind) { mutableStateOf(false) }
+    var working by remember(kind) { mutableStateOf(false) }
+    var completed by remember(kind) { mutableIntStateOf(0) }
+    var total by remember(kind) { mutableIntStateOf(0) }
+    var operation by remember(kind) { mutableStateOf<String?>(null) }
     var message by remember(kind) { mutableStateOf<String?>(null) }
+
+    fun options() = MigrationOptions(preserveTitle, seasonalSearch)
+
+    fun buildPreview() {
+        val target = selectedTarget ?: return
+        val selectedTitles = titles.filter { it.id() in selectedIds }
+        val selectedOptions = options()
+        cancellation.set(false)
+        previews = emptyList()
+        outcomes = emptyList()
+        completed = 0
+        total = selectedTitles.size
+        operation = "Building migration preview"
+        message = null
+        working = true
+        scope.launch {
+            for (title in selectedTitles) {
+                if (cancellation.get()) {
+                    break
+                }
+                val result = withContext(Dispatchers.IO) {
+                    runCatching {
+                        presentation.migrationCandidates(title.id(), target.id(), selectedOptions, 20)
+                    }
+                }
+                previews = previews + MigrationPreviewEntry(
+                    title = title,
+                    currentSource = library.details(title.id()).flatMap { it.origin() }
+                        .map { it.sourceId() }
+                        .orElse("Local or unknown source"),
+                    targetSource = target.displayName(),
+                    candidates = result.getOrDefault(emptyList()),
+                    selectedIndex = 0,
+                    error = result.exceptionOrNull()?.message,
+                )
+                completed++
+            }
+            working = false
+            operation = null
+            message = if (cancellation.get()) {
+                "Preview cancelled after $completed of $total titles."
+            } else {
+                "Preview ready for ${previews.count { it.candidates.isNotEmpty() }} of $total titles."
+            }
+        }
+    }
+
+    fun migrate(entries: List<MigrationPreviewEntry>) {
+        val selectedOptions = options()
+        cancellation.set(false)
+        outcomes = emptyList()
+        completed = 0
+        total = entries.size
+        operation = "Migrating titles"
+        message = null
+        working = true
+        scope.launch {
+            for (entry in entries) {
+                if (cancellation.get()) {
+                    break
+                }
+                val candidate = entry.candidates.getOrNull(entry.selectedIndex)
+                if (candidate == null) {
+                    outcomes = outcomes + MigrationOutcome(entry, "No migration candidate selected")
+                    completed++
+                    continue
+                }
+                val result = withContext(Dispatchers.IO) {
+                    runCatching { presentation.migrate(entry.title.id(), candidate, selectedOptions) }
+                }
+                outcomes = outcomes + MigrationOutcome(entry, result.exceptionOrNull()?.message)
+                completed++
+            }
+            working = false
+            operation = null
+            val failures = outcomes.count { it.error != null }
+            message = when {
+                cancellation.get() -> "Migration cancelled after $completed of $total titles."
+                failures == 0 -> "$completed titles migrated successfully."
+                else -> "${completed - failures} migrated; $failures failed and can be retried."
+            }
+            if (!cancellation.get() && failures == 0) {
+                selectedIds = emptySet()
+                previews = emptyList()
+            }
+        }
+    }
+
     if (titles.isEmpty()) {
         EmptyDiscovery("Add ${kind.name.lowercase(Locale.ROOT)} titles to your Library before migrating.")
         return
     }
     LazyColumn(modifier = Modifier.fillMaxSize()) {
+        item {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text("Batch migration", fontWeight = FontWeight.SemiBold)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(
+                        onClick = {
+                            selectedIds = if (selectedIds.size == titles.size) {
+                                emptySet()
+                            } else {
+                                titles.mapTo(linkedSetOf()) { it.id() }
+                            }
+                            previews = emptyList()
+                        },
+                    ) {
+                        Text(if (selectedIds.size == titles.size) "Clear selection" else "Select all")
+                    }
+                    Box {
+                        OutlinedButton(onClick = { targetMenuExpanded = true }) {
+                            Text(selectedTarget?.displayName() ?: "Target source")
+                        }
+                        DropdownMenu(
+                            expanded = targetMenuExpanded,
+                            onDismissRequest = { targetMenuExpanded = false },
+                        ) {
+                            targets.forEach { target ->
+                                DropdownMenuItem(
+                                    text = { Text("${target.displayName()} · ${languageName(target.languageTag())}") },
+                                    onClick = {
+                                        selectedTarget = target
+                                        targetMenuExpanded = false
+                                        previews = emptyList()
+                                    },
+                                )
+                            }
+                        }
+                    }
+                }
+                SwitchRow("Preserve original titles", preserveTitle) {
+                    preserveTitle = it
+                    previews = emptyList()
+                }
+                if (kind == SourceContentKind.ANIME) {
+                    SwitchRow("Match seasonal anime titles", seasonalSearch) {
+                        seasonalSearch = it
+                        previews = emptyList()
+                    }
+                }
+                Button(
+                    onClick = { buildPreview() },
+                    enabled = !working && selectedIds.isNotEmpty() && selectedTarget != null,
+                ) {
+                    Text("Preview ${selectedIds.size} selected")
+                }
+            }
+            HorizontalDivider()
+        }
+        if (working) {
+            item {
+                Card(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                        Text(operation ?: "Migration in progress", fontWeight = FontWeight.Medium)
+                        Text("$completed / $total", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        TextButton(onClick = { cancellation.set(true) }) { Text("Cancel") }
+                    }
+                }
+            }
+        }
         message?.let {
             item {
                 Text(it, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(16.dp))
             }
         }
         items(titles, key = { it.id().value() }) { title ->
-            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp)) {
-                Text(title.title(), fontWeight = FontWeight.Medium)
-                TextButton(
-                    enabled = targets.isNotEmpty(),
-                    onClick = {
-                        selected = title
-                        selectedTarget = null
-                        candidates = emptyList()
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Checkbox(
+                    checked = title.id() in selectedIds,
+                    enabled = !working && targets.isNotEmpty(),
+                    onCheckedChange = { checked ->
+                        selectedIds = if (checked) selectedIds + title.id() else selectedIds - title.id()
+                        previews = emptyList()
                     },
-                ) {
-                    Text(if (targets.isEmpty()) "No target source" else "Select target source")
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(title.title(), fontWeight = FontWeight.Medium)
+                    Text(
+                        library.details(title.id()).flatMap { it.origin() }
+                            .map { it.sourceId() }
+                            .orElse("Local or unknown source"),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 12.sp,
+                    )
                 }
             }
-            if (selected?.id() == title.id()) {
-                targets.forEach { target ->
-                    TextButton(
-                        onClick = {
-                            selectedTarget = target
-                            candidates = presentation.migrationCandidates(title.id(), target.id(), 20)
-                        },
-                        modifier = Modifier.padding(start = 28.dp),
-                    ) {
-                        Text(
-                            if (selectedTarget?.id() == target.id()) {
-                                "${target.displayName()} (selected)"
-                            } else {
-                                target.displayName()
-                            },
-                        )
-                    }
-                }
-                candidates.forEach { candidate ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(start = 36.dp, end = 20.dp, bottom = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(candidate.title(), modifier = Modifier.weight(1f))
-                        Button(onClick = {
-                            presentation.migrate(title.id(), candidate)
-                            message = "${title.title()} migrated to ${candidate.title()}"
-                            selected = null
-                            selectedTarget = null
-                            candidates = emptyList()
-                        }) {
-                            Icon(Icons.Default.Check, contentDescription = null)
-                            Text("Migrate")
+            HorizontalDivider()
+        }
+        if (previews.isNotEmpty()) {
+            item {
+                Text(
+                    "Migration preview",
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(16.dp),
+                )
+            }
+            items(previews, key = { it.title.id().value() }) { preview ->
+                MigrationPreviewCard(preview) { selectedCandidate ->
+                    previews = previews.map {
+                        if (it.title.id() == preview.title.id()) {
+                            it.copy(selectedIndex = selectedCandidate)
+                        } else {
+                            it
                         }
                     }
                 }
             }
-            HorizontalDivider()
+            item {
+                Button(
+                    onClick = { migrate(previews.filter { it.candidates.isNotEmpty() }) },
+                    enabled = !working && previews.any { it.candidates.isNotEmpty() },
+                    modifier = Modifier.padding(16.dp),
+                ) {
+                    Icon(Icons.Default.Check, contentDescription = null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Migrate previewed titles")
+                }
+            }
+        }
+        if (outcomes.isNotEmpty()) {
+            item {
+                Text("Migration results", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(16.dp))
+            }
+            items(outcomes, key = { it.preview.title.id().value() }) { outcome ->
+                Text(
+                    outcome.error?.let { "${outcome.preview.title.title()}: $it" }
+                        ?: "${outcome.preview.title.title()}: migrated",
+                    color = if (outcome.error == null) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.error
+                    },
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
+                )
+            }
+            val failed = outcomes.filter { it.error != null }.map { it.preview }
+            if (failed.isNotEmpty()) {
+                item {
+                    TextButton(onClick = { migrate(failed) }, enabled = !working) {
+                        Text("Retry ${failed.size} failed")
+                    }
+                }
+            }
+        }
+    }
+}
+
+private data class MigrationPreviewEntry(
+    val title: LibraryCard,
+    val currentSource: String,
+    val targetSource: String,
+    val candidates: List<SourceCatalogueItem>,
+    val selectedIndex: Int,
+    val error: String?,
+)
+
+private data class MigrationOutcome(
+    val preview: MigrationPreviewEntry,
+    val error: String?,
+)
+
+@Composable
+private fun MigrationPreviewCard(
+    preview: MigrationPreviewEntry,
+    selectCandidate: (Int) -> Unit,
+) {
+    var expanded by remember(preview.title.id()) { mutableStateOf(false) }
+    val candidate = preview.candidates.getOrNull(preview.selectedIndex)
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 5.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(14.dp)) {
+            Text(preview.title.title(), fontWeight = FontWeight.Medium)
+            Text(
+                "Current: ${preview.currentSource}",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                "Target: ${preview.targetSource}",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (candidate == null) {
+                Text(
+                    preview.error ?: "No compatible candidate found",
+                    color = MaterialTheme.colorScheme.error,
+                )
+            } else {
+                Text("Match: ${candidate.title()}", fontWeight = FontWeight.Medium)
+                Text(
+                    candidate.description(),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (preview.candidates.size > 1) {
+                    Box {
+                        TextButton(onClick = { expanded = true }) {
+                            Text("Choose match (${preview.candidates.size})")
+                        }
+                        DropdownMenu(expanded, onDismissRequest = { expanded = false }) {
+                            preview.candidates.forEachIndexed { index, option ->
+                                DropdownMenuItem(
+                                    text = { Text(option.title()) },
+                                    onClick = {
+                                        expanded = false
+                                        selectCandidate(index)
+                                    },
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }

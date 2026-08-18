@@ -4,6 +4,7 @@ import fr.vriege.anilib.configuration.standard.StandardAnilib;
 import fr.vriege.anilib.feature.discovery.DiscoveryCapabilities;
 import fr.vriege.anilib.feature.discovery.DiscoveryCatalogueDisplayMode;
 import fr.vriege.anilib.feature.discovery.DiscoveryService;
+import fr.vriege.anilib.feature.discovery.MigrationOptions;
 import fr.vriege.anilib.feature.discovery.ui.DiscoveryPresentation;
 import fr.vriege.anilib.feature.discovery.ui.DiscoveryUiCapabilities;
 import fr.vriege.anilib.feature.library.LibraryCapabilities;
@@ -12,6 +13,7 @@ import fr.vriege.anilib.feature.library.LibraryHistoryEntry;
 import fr.vriege.anilib.feature.library.LibraryItem;
 import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.library.LibraryProgress;
+import fr.vriege.anilib.feature.library.MediaKind;
 import fr.vriege.anilib.feature.source.CatalogueSource;
 import fr.vriege.anilib.feature.source.SourceBrowseRequest;
 import fr.vriege.anilib.feature.source.SourceCatalogueItem;
@@ -52,6 +54,12 @@ final class DiscoveryTest {
             "A remote migration target.",
             Optional.empty(),
             SourceContentKind.MANGA);
+    private static final SourceCatalogueItem REMOTE_ANIME_ITEM = new SourceCatalogueItem(
+            new SourceCatalogueItemId(REMOTE_SOURCE, "alpha-hero"),
+            "Alpha Hero",
+            "A seasonal anime migration target.",
+            Optional.empty(),
+            SourceContentKind.ANIME);
 
     private DiscoveryTest() {
     }
@@ -174,6 +182,9 @@ final class DiscoveryTest {
                     20);
             counter.check(candidates.equals(List.of(REMOTE_ITEM)),
                     "migration must search the explicitly selected target source");
+            discovery.migrate(libraryItemId, candidates.getFirst(), new MigrationOptions(true, false));
+            counter.check(library.find(libraryItemId).orElseThrow().title().equals("Alpha Hero"),
+                    "migration options must preserve the user-owned title when requested");
             discovery.migrate(libraryItemId, candidates.getFirst());
             LibraryItem migrated = library.find(libraryItemId).orElseThrow();
             counter.check(migrated.id().equals(libraryItemId)
@@ -185,6 +196,15 @@ final class DiscoveryTest {
                             && migrated.progress().equals(enriched.progress())
                             && migrated.history().equals(enriched.history()),
                     "migration must preserve user-owned library state");
+
+            LibraryItem seasonalAnime = LibraryItem.create("Alpha Hero Season 2", MediaKind.ANIME);
+            library.save(seasonalAnime);
+            counter.check(discovery.migrationCandidates(
+                            seasonalAnime.id(),
+                            REMOTE_SOURCE,
+                            new MigrationOptions(false, true),
+                            20).equals(List.of(REMOTE_ANIME_ITEM)),
+                    "seasonal anime migration must search a normalized franchise title");
 
             discovery.setPreference(LOCAL_SOURCE, "include-folders", "false");
             counter.check(discovery.browse(LOCAL_SOURCE, SourceListing.POPULAR, 1, 20, List.of()).items().isEmpty(),
@@ -253,7 +273,7 @@ final class DiscoveryTest {
                 "Remote catalogue",
                 "1.0.0",
                 "en",
-                Set.of(SourceContentKind.MANGA),
+                Set.of(SourceContentKind.ANIME, SourceContentKind.MANGA),
                 SourceSdk.API_VERSION);
 
         @Override
@@ -263,7 +283,7 @@ final class DiscoveryTest {
 
         @Override
         public SourcePage popular(SourceBrowseRequest request) {
-            return new SourcePage(List.of(REMOTE_ITEM), false);
+            return new SourcePage(List.of(REMOTE_ITEM, REMOTE_ANIME_ITEM), false);
         }
 
         @Override
@@ -279,8 +299,10 @@ final class DiscoveryTest {
         @Override
         public SourcePage search(SourceSearchRequest request) {
             String query = request.query().toLowerCase(Locale.ROOT);
-            boolean matches = REMOTE_ITEM.title().toLowerCase(Locale.ROOT).contains(query);
-            return new SourcePage(matches ? List.of(REMOTE_ITEM) : List.of(), false);
+            List<SourceCatalogueItem> matches = List.of(REMOTE_ITEM, REMOTE_ANIME_ITEM).stream()
+                    .filter(item -> item.title().toLowerCase(Locale.ROOT).contains(query))
+                    .toList();
+            return new SourcePage(matches, false);
         }
 
         @Override

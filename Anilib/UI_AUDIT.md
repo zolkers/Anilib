@@ -18,7 +18,7 @@ explicit so an architectural seam cannot be mistaken for a finished workflow.
 | History | [x] | Complete | Search, Today/Yesterday/date grouping, anime/manga filters and labels, title navigation, media-aware resume, and targeted removal are live |
 | Browse landing and sources | [x] | Complete | Anime/manga source, extension, and migration tabs expose update-count badges, fixed-density rows, source/extension overflow actions, global search, languages, pinning, latest, WebView, and repository navigation |
 | Source catalogue, search, and filters | [x] | Complete | Popular/latest, paging, search, filters, source preferences, per-source persisted list/grid display, item menus, WebView entry, and library admission are live |
-| Migration | [x] | Partial | Source/title selection and migration are live; add batch options, seasonal anime handling, comparison detail, and progress states |
+| Migration | [x] | Complete | Multi-title selection, target-source comparison, seasonal anime matching, title options, candidate preview, progress, cancellation, and retry of partial failures are live |
 | Extensions and repositories | [x] | Partial | Repository catalogue, language/pin ordering, dedicated permission/trust/version/changelog details, install/update progress with retryable diagnostics, enable/remove, APK hand-off, source navigation, and Browse update badges are live; add full per-source management parity |
 | More hub | [x] | Partial | Core ordering and actions are live; add storage and help destinations plus richer download state |
 | Categories | [x] | Partial | The shared screen shows real counts plus create, rename, reorder, delete, display, and update policies |
@@ -51,6 +51,7 @@ explicit so an architectural seam cannot be mistaken for a finished workflow.
 - [x] Added dedicated extension details with permissions, trust identity, versions, changelog, progress, retry, and failure diagnostics.
 - [x] Verified catalogue paging, global/per-source search, filters, preferences, WebView entry, and migration routes.
 - [x] Persisted each source catalogue's grid/list choice and added item action menus.
+- [x] Completed batch migration with seasonal matching, source comparison, preview, progress, cancellation, and partial-failure retry.
 - [x] Added episode search/unwatched filtering, download status filtering, and reader page retry.
 - [x] Verified backup inspection/rollback/import, tracking edit flows, and browser cookie/challenge handling.
 - [x] Added settings search and connected Sources, Tracking, Backup, and About to their working screens.

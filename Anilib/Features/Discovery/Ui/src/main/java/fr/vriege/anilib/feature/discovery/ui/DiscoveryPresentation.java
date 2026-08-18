@@ -2,6 +2,7 @@ package fr.vriege.anilib.feature.discovery.ui;
 
 import fr.vriege.anilib.feature.discovery.SourcePreferenceSnapshot;
 import fr.vriege.anilib.feature.discovery.DiscoveryCatalogueDisplayMode;
+import fr.vriege.anilib.feature.discovery.MigrationOptions;
 import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.source.SourceCatalogueItem;
 import fr.vriege.anilib.feature.source.SourceCatalogueItemId;
@@ -75,5 +76,20 @@ public interface DiscoveryPresentation {
             SourceId targetSourceId,
             int limit);
 
+    default List<SourceCatalogueItem> migrationCandidates(
+            LibraryItemId libraryItemId,
+            SourceId targetSourceId,
+            MigrationOptions options,
+            int limit) {
+        return migrationCandidates(libraryItemId, targetSourceId, limit);
+    }
+
     void migrate(LibraryItemId libraryItemId, SourceCatalogueItem target);
+
+    default void migrate(
+            LibraryItemId libraryItemId,
+            SourceCatalogueItem target,
+            MigrationOptions options) {
+        migrate(libraryItemId, target);
+    }
 }

@@ -1,6 +1,7 @@
 package fr.vriege.anilib.feature.discovery.runtime;
 
 import fr.vriege.anilib.feature.discovery.DiscoveryService;
+import fr.vriege.anilib.feature.discovery.MigrationOptions;
 import fr.vriege.anilib.feature.discovery.SourcePreferenceSnapshot;
 import fr.vriege.anilib.feature.library.LibraryCatalog;
 import fr.vriege.anilib.feature.library.LibraryItem;
@@ -206,26 +207,58 @@ public final class DefaultDiscoveryService implements DiscoveryService {
             LibraryItemId libraryItemId,
             SourceId targetSourceId,
             int limit) {
+        return migrationCandidates(libraryItemId, targetSourceId, MigrationOptions.defaults(), limit);
+    }
+
+    @Override
+    public List<SourceCatalogueItem> migrationCandidates(
+            LibraryItemId libraryItemId,
+            SourceId targetSourceId,
+            MigrationOptions options,
+            int limit) {
         if (limit < 1 || limit > 100) {
             throw new IllegalArgumentException("limit must be between 1 and 100");
         }
         LibraryItem item = library.find(libraryItemId)
                 .orElseThrow(() -> new IllegalArgumentException("Unknown library item: " + libraryItemId));
-        return search(targetSourceId, item.title(), 1, limit, List.of()).items().stream()
+        MigrationOptions selectedOptions = Objects.requireNonNull(options, "options must not be null");
+        String query = selectedOptions.seasonalAnimeSearch() && item.kind() == MediaKind.ANIME
+                ? seasonalTitle(item.title())
+                : item.title();
+        return search(targetSourceId, query, 1, limit, List.of()).items().stream()
                 .filter(candidate -> mediaKind(candidate.contentKind()) == item.kind())
                 .toList();
     }
 
     @Override
     public void migrate(LibraryItemId libraryItemId, SourceCatalogueItem target) {
+        migrate(libraryItemId, target, MigrationOptions.defaults());
+    }
+
+    @Override
+    public void migrate(
+            LibraryItemId libraryItemId,
+            SourceCatalogueItem target,
+            MigrationOptions options) {
         Objects.requireNonNull(target, "target must not be null");
+        MigrationOptions selectedOptions = Objects.requireNonNull(options, "options must not be null");
         LibraryItem current = library.find(libraryItemId)
                 .orElseThrow(() -> new IllegalArgumentException("Unknown library item: " + libraryItemId));
         if (mediaKind(target.contentKind()) != current.kind()) {
             throw new IllegalArgumentException("Migration target must keep the library media kind");
         }
         catalogue(target.id().sourceId());
-        library.save(current.migratedTo(target.title(), origin(target), metadata(target)));
+        library.save(current.migratedTo(
+                selectedOptions.preserveOriginalTitle() ? current.title() : target.title(),
+                origin(target),
+                metadata(target)));
+    }
+
+    private static String seasonalTitle(String title) {
+        String simplified = title.replaceFirst(
+                "(?i)\\s+(?:season\\s+\\d+|part\\s+\\d+|\\d+(?:st|nd|rd|th)\\s+season)$",
+                "");
+        return simplified.isBlank() ? title : simplified;
     }
 
     private SourceBrowseRequest request(

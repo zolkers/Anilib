@@ -4,6 +4,7 @@ import fr.vriege.anilib.feature.discovery.DiscoveryBrowsePreferenceStore;
 import fr.vriege.anilib.feature.discovery.DiscoveryBrowsePreferences;
 import fr.vriege.anilib.feature.discovery.DiscoveryCatalogueDisplayMode;
 import fr.vriege.anilib.feature.discovery.DiscoveryService;
+import fr.vriege.anilib.feature.discovery.MigrationOptions;
 import fr.vriege.anilib.feature.discovery.SourcePreferenceSnapshot;
 import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.source.SourceCatalogueItem;
@@ -241,8 +242,25 @@ public final class DefaultDiscoveryPresentation implements DiscoveryPresentation
     }
 
     @Override
+    public List<SourceCatalogueItem> migrationCandidates(
+            LibraryItemId libraryItemId,
+            SourceId targetSourceId,
+            MigrationOptions options,
+            int limit) {
+        return service.migrationCandidates(libraryItemId, targetSourceId, options, limit);
+    }
+
+    @Override
     public void migrate(LibraryItemId libraryItemId, SourceCatalogueItem target) {
         service.migrate(libraryItemId, target);
+    }
+
+    @Override
+    public void migrate(
+            LibraryItemId libraryItemId,
+            SourceCatalogueItem target,
+            MigrationOptions options) {
+        service.migrate(libraryItemId, target, options);
     }
 
     private Set<String> effectiveLanguages(
