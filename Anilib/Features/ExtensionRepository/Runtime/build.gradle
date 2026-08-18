@@ -1,6 +1,7 @@
 dependencies {
     implementation project(':Anilib:Foundation')
+    api project(':Anilib:Kernel:Api')
     api project(':Anilib:Framework:Http:Api')
-    implementation project(':Anilib:Features:Source:Api')
+    api project(':Anilib:Features:Source:Api')
     api project(':Anilib:Features:ExtensionRepository:Api')
 }

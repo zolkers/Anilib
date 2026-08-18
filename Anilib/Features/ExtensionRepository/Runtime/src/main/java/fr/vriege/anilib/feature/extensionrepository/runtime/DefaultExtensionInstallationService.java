@@ -2,6 +2,7 @@ package fr.vriege.anilib.feature.extensionrepository.runtime;
 
 import fr.vriege.anilib.feature.extensionrepository.ExtensionArtifactFormat;
 import fr.vriege.anilib.feature.extensionrepository.ExtensionArtifactMetadata;
+import fr.vriege.anilib.feature.extensionrepository.ExtensionBundleLoadFailure;
 import fr.vriege.anilib.feature.extensionrepository.ExtensionInstallationService;
 import fr.vriege.anilib.feature.extensionrepository.ExtensionInstallationState;
 import fr.vriege.anilib.feature.extensionrepository.ExtensionPackageMetadata;
@@ -14,7 +15,6 @@ import fr.vriege.anilib.framework.http.HttpRequest;
 import fr.vriege.anilib.framework.http.HttpResponse;
 import fr.vriege.anilib.foundation.validation.Preconditions;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
@@ -38,16 +38,10 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
 
 /** Verified portable-Bundle lifecycle using only JDK cryptography and storage. */
 public final class DefaultExtensionInstallationService implements ExtensionInstallationService {
-    private static final String DESCRIPTOR = "META-INF/anilib-extension.properties";
     private static final int MAX_ARTIFACT_BYTES = 16 * 1024 * 1024;
-    private static final int MAX_DESCRIPTOR_BYTES = 32 * 1024;
-    private static final int MAX_ARCHIVE_ENTRIES = 4_096;
     private static final int MAX_REDIRECTS = 5;
     private static final Duration MINIMUM_INTERVAL = Duration.ofMillis(250);
     private static final HexFormat HEX = HexFormat.of();
@@ -59,16 +53,25 @@ public final class DefaultExtensionInstallationService implements ExtensionInsta
     private final Clock clock;
     private final Map<String, InstalledExtensionPackage> installed;
     private final Map<String, PublicKey> trustedKeys;
+    private final List<ExtensionBundleLoadFailure> loadFailures;
 
     public DefaultExtensionInstallationService(
             Path installationDirectory,
             AnilibHttpClient client) {
+        this(installationDirectory, client, List.of());
+    }
+
+    public DefaultExtensionInstallationService(
+            Path installationDirectory,
+            AnilibHttpClient client,
+            List<ExtensionBundleLoadFailure> loadFailures) {
         this(
                 installationDirectory,
                 client,
                 Clock.systemUTC(),
                 new FileInstalledExtensionStore(installationDirectory.resolve("installed.tsv")),
-                new FileExtensionTrustStore(installationDirectory.resolve("trusted-keys.txt")));
+                new FileExtensionTrustStore(installationDirectory.resolve("trusted-keys.txt")),
+                loadFailures);
     }
 
     public DefaultExtensionInstallationService(
@@ -77,6 +80,16 @@ public final class DefaultExtensionInstallationService implements ExtensionInsta
             Clock clock,
             FileInstalledExtensionStore installedStore,
             FileExtensionTrustStore trustStore) {
+        this(installationDirectory, client, clock, installedStore, trustStore, List.of());
+    }
+
+    public DefaultExtensionInstallationService(
+            Path installationDirectory,
+            AnilibHttpClient client,
+            Clock clock,
+            FileInstalledExtensionStore installedStore,
+            FileExtensionTrustStore trustStore,
+            List<ExtensionBundleLoadFailure> loadFailures) {
         Path root = Preconditions.requireNonNull(installationDirectory, "installationDirectory")
                 .toAbsolutePath()
                 .normalize();
@@ -87,6 +100,7 @@ public final class DefaultExtensionInstallationService implements ExtensionInsta
         this.trustStore = Preconditions.requireNonNull(trustStore, "trustStore");
         installed = new LinkedHashMap<>(installedStore.load());
         trustedKeys = new LinkedHashMap<>(trustStore.load());
+        this.loadFailures = List.copyOf(Preconditions.requireNonNull(loadFailures, "loadFailures"));
     }
 
     @Override
@@ -95,6 +109,11 @@ public final class DefaultExtensionInstallationService implements ExtensionInsta
                 .sorted(Comparator.comparing(InstalledExtensionPackage::displayName)
                         .thenComparing(InstalledExtensionPackage::packageName))
                 .toList();
+    }
+
+    @Override
+    public List<ExtensionBundleLoadFailure> loadFailures() {
+        return loadFailures;
     }
 
     @Override
@@ -288,46 +307,15 @@ public final class DefaultExtensionInstallationService implements ExtensionInsta
             byte[] bytes,
             ExtensionPackageMetadata metadata,
             SourceApiVersion requiredApi) {
-        Properties descriptor = descriptor(bytes);
-        if (!metadata.packageName().equals(descriptor.getProperty("package"))) {
+        PortableSourceBundleDescriptor descriptor = PortableSourceBundleDescriptor.read(bytes);
+        if (!metadata.packageName().equals(descriptor.packageName())) {
             throw new SecurityException("Portable Bundle descriptor package does not match repository metadata");
         }
-        if (!Long.toString(metadata.versionCode()).equals(descriptor.getProperty("versionCode"))) {
+        if (metadata.versionCode() != descriptor.versionCode()) {
             throw new SecurityException("Portable Bundle descriptor version does not match repository metadata");
         }
-        if (!requiredApi.toString().equals(descriptor.getProperty("api"))) {
+        if (!requiredApi.equals(descriptor.apiVersion())) {
             throw new SecurityException("Portable Bundle descriptor API does not match repository metadata");
-        }
-    }
-
-    private Properties descriptor(byte[] bytes) {
-        try (ZipInputStream archive = new ZipInputStream(new ByteArrayInputStream(bytes))) {
-            ZipEntry entry;
-            int count = 0;
-            Properties descriptor = null;
-            while ((entry = archive.getNextEntry()) != null) {
-                if (++count > MAX_ARCHIVE_ENTRIES) {
-                    throw new SecurityException("Portable Bundle contains too many archive entries");
-                }
-                if (DESCRIPTOR.equals(entry.getName())) {
-                    if (descriptor != null || entry.isDirectory()) {
-                        throw new SecurityException("Portable Bundle descriptor must be one regular entry");
-                    }
-                    byte[] content = archive.readNBytes(MAX_DESCRIPTOR_BYTES + 1);
-                    if (content.length > MAX_DESCRIPTOR_BYTES) {
-                        throw new SecurityException("Portable Bundle descriptor exceeds 32 KiB");
-                    }
-                    descriptor = new Properties();
-                    descriptor.load(new java.io.StringReader(new String(content, StandardCharsets.UTF_8)));
-                }
-                archive.closeEntry();
-            }
-            if (descriptor == null) {
-                throw new SecurityException("Portable Bundle descriptor is missing");
-            }
-            return descriptor;
-        } catch (IOException exception) {
-            throw new SecurityException("Portable Bundle is not a readable ZIP/JAR archive", exception);
         }
     }
 
@@ -356,13 +344,7 @@ public final class DefaultExtensionInstallationService implements ExtensionInsta
     }
 
     private Path artifactPath(InstalledExtensionPackage extension) {
-        String fileName = extension.packageName() + "-" + extension.versionCode()
-                + "-" + extension.sha256().substring(0, 16) + ".jar";
-        Path resolved = artifactDirectory.resolve(fileName).normalize();
-        if (!resolved.getParent().equals(artifactDirectory)) {
-            throw new IllegalStateException("Extension artifact path escapes its managed directory");
-        }
-        return resolved;
+        return PortableExtensionArtifacts.path(artifactDirectory.getParent(), extension);
     }
 
     private InstalledExtensionPackage requireInstalled(String packageName) {

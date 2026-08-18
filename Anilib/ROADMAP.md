@@ -67,7 +67,7 @@ platform-specific.
 
 - [x] user-managed extension repository URLs using the Aniyomi index shape
 - [x] signed portable Anilib artifacts with trust, install, update, disable, and remove
-- [ ] load enabled portable Bundles into the Source registry through an explicit
+- [x] load enabled portable Bundles into the Source registry through an explicit
   restart-isolated module boundary
 - [x] Android-only HTTPS download and user-confirmed PackageInstaller hand-off
   for user-supplied Aniyomi extension APKs

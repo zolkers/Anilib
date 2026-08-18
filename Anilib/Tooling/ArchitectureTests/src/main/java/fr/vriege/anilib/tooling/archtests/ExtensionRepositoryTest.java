@@ -237,7 +237,15 @@ final class ExtensionRepositoryTest {
             ByteArrayOutputStream bytes = new ByteArrayOutputStream();
             try (ZipOutputStream archive = new ZipOutputStream(bytes)) {
                 archive.putNextEntry(new ZipEntry("META-INF/anilib-extension.properties"));
-                archive.write(("package=" + packageName + "\nversionCode=" + versionCode + "\napi=" + api + "\n")
+                archive.write(("package=" + packageName
+                        + "\nversionCode=" + versionCode
+                        + "\napi=" + api
+                        + "\nmodule=" + packageName
+                        + "\nsource.count=1"
+                        + "\nsource.0.id=example.source"
+                        + "\nsource.0.component=extension.example.source"
+                        + "\nsource.0.name=Example"
+                        + "\nsource.0.factory=" + packageName + ".ExampleFactory\n")
                         .getBytes(StandardCharsets.UTF_8));
                 archive.closeEntry();
             }

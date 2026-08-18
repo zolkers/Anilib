@@ -1,5 +1,6 @@
 package fr.vriege.anilib.feature.extensionrepository.bundle;
 
+import fr.vriege.anilib.feature.extensionrepository.ExtensionBundleLoadFailure;
 import fr.vriege.anilib.feature.extensionrepository.ExtensionRepositoryCapabilities;
 import fr.vriege.anilib.feature.extensionrepository.runtime.DefaultExtensionInstallationService;
 import fr.vriege.anilib.feature.extensionrepository.runtime.DefaultExtensionRepositoryService;
@@ -14,6 +15,7 @@ import fr.vriege.anilib.kernel.PluginInstallationContext;
 import fr.vriege.anilib.kernel.PluginManifest;
 
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Objects;
 
 /** Composition unit for user-managed Aniyomi-compatible extension repositories. */
@@ -30,11 +32,19 @@ public final class ExtensionRepositoryPlugin implements AnilibPlugin {
             .build();
 
     private final Path repositoryFile;
+    private final List<ExtensionBundleLoadFailure> loadFailures;
 
     public ExtensionRepositoryPlugin(Path repositoryFile) {
+        this(repositoryFile, List.of());
+    }
+
+    public ExtensionRepositoryPlugin(
+            Path repositoryFile,
+            List<ExtensionBundleLoadFailure> loadFailures) {
         this.repositoryFile = Objects.requireNonNull(repositoryFile, "repositoryFile must not be null")
                 .toAbsolutePath()
                 .normalize();
+        this.loadFailures = List.copyOf(Objects.requireNonNull(loadFailures, "loadFailures must not be null"));
     }
 
     @Override
@@ -50,7 +60,8 @@ public final class ExtensionRepositoryPlugin implements AnilibPlugin {
                 client);
         DefaultExtensionInstallationService installation = new DefaultExtensionInstallationService(
                 repositoryFile.resolveSibling("extensions"),
-                client);
+                client,
+                loadFailures);
         DefaultExtensionRepositoryPresentation presentation = new DefaultExtensionRepositoryPresentation(
                 service,
                 installation);

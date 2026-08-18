@@ -6,6 +6,9 @@ import java.util.List;
 public interface ExtensionInstallationService {
     List<InstalledExtensionPackage> installed();
 
+    /** Failures observed while selecting enabled Bundles during the current startup. */
+    List<ExtensionBundleLoadFailure> loadFailures();
+
     List<String> trustedKeyIds();
 
     void trust(String keyId, String x509PublicKeyBase64);

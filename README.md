@@ -60,8 +60,11 @@ URLs, parses the Aniyomi repository shape with strict resource limits, and
 shows the resulting APK and portable Anilib artifacts in the shared Browse
 experience. User-trusted Ed25519 publisher keys protect portable downloads,
 whose checksum, signature, Source API compatibility, and internal descriptor
-are verified before durable install, update, disable, or removal. Anilib ships
-with no third-party source catalogue.
+are verified before durable install, update, disable, or removal. Enabled
+portable Bundles are revalidated on restart and loaded through one explicit,
+in-memory JPMS layer per artifact into the shared Source registry; a broken
+artifact is reported without blocking valid Bundles. Anilib ships with no
+third-party source catalogue.
 The removable Settings Bundle atomically persists shared appearance and policy
 preferences. System, light, and dark themes apply live on Android and desktop;
 the shared Aniyomi-style hierarchy also provides confirmed actions for clearing

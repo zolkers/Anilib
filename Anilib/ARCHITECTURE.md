@@ -83,8 +83,16 @@ is wrapped with exact scheme, host, and port checks; redirects are surfaced so
 each hop is authorized independently. AnilibJava additionally confines modules
 with `layer=EXTENSION` to the Source/HTTP contracts and rejects direct network,
 filesystem, reflection, Kernel, or raw Network imports. This is a capability
-boundary for product-selected modules; arbitrary untrusted bytecode is not
-loaded or claimed to be safely sandboxed.
+boundary for product-selected modules, not a bytecode security sandbox.
+
+User-installed portable source Bundles remain explicit graph selections.
+Standard reads only enabled, checksum-matched artifacts during product startup;
+their signed descriptor names the JPMS module and every Source factory, so
+there is no classpath or service scan. Each archive is bounded, held in memory,
+and resolved into its own child module layer against only the Source SDK. Load
+failures are retained by the Extension Repository capability while other valid
+Bundles continue into the immutable Kernel graph. Enable, disable, and update
+therefore take effect on the next restart.
 
 Discovery is a separate vertical feature over the Source registry and Library
 catalog. Its Java service owns paging, global and per-source search, validated

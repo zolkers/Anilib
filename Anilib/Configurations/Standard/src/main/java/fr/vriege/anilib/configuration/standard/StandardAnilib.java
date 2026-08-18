@@ -3,6 +3,8 @@ package fr.vriege.anilib.configuration.standard;
 import fr.vriege.anilib.feature.library.bundle.LibraryPlugin;
 import fr.vriege.anilib.feature.discovery.bundle.DiscoveryPlugin;
 import fr.vriege.anilib.feature.extensionrepository.bundle.ExtensionRepositoryPlugin;
+import fr.vriege.anilib.feature.extensionrepository.bundle.ExtensionBundleSelection;
+import fr.vriege.anilib.feature.extensionrepository.bundle.InstalledExtensionBundles;
 import fr.vriege.anilib.feature.localsource.bundle.LocalSourcePlugin;
 import fr.vriege.anilib.feature.network.bundle.NetworkPlugin;
 import fr.vriege.anilib.feature.settings.bundle.SettingsPlugin;
@@ -107,19 +109,21 @@ public final class StandardAnilib {
         Path settings = dataDirectory.toAbsolutePath().normalize().resolve("settings.properties");
         Path sourcePreferences = dataDirectory.toAbsolutePath().normalize().resolve("source-preferences.properties");
         Path extensionRepositories = dataDirectory.toAbsolutePath().normalize().resolve("extension-repositories.txt");
+        Path extensions = dataDirectory.toAbsolutePath().normalize().resolve("extensions");
         Path downloads = dataDirectory.toAbsolutePath().normalize().resolve("downloads");
         Path playbackState = dataDirectory.toAbsolutePath().normalize().resolve("playback-state.anilib");
         Path trackingState = dataDirectory.toAbsolutePath().normalize().resolve("tracking.anilib");
         Path updateState = dataDirectory.toAbsolutePath().normalize().resolve("library-updates.anilib");
         Path backups = dataDirectory.toAbsolutePath().normalize().resolve("backups");
         List<AnilibPlugin> plugins = new ArrayList<>();
+        ExtensionBundleSelection extensionSelection = InstalledExtensionBundles.select(extensions);
         plugins.add(new LibraryPlugin(libraryFile));
         plugins.add(new SourceSdkPlugin());
         plugins.add(new LocalSourcePlugin(localContent));
         plugins.add(new NetworkPlugin(httpCache, httpTransport));
         plugins.add(new SettingsPlugin(settings));
         plugins.add(new DiscoveryPlugin(sourcePreferences));
-        plugins.add(new ExtensionRepositoryPlugin(extensionRepositories));
+        plugins.add(new ExtensionRepositoryPlugin(extensionRepositories, extensionSelection.failures()));
         plugins.add(new ReaderPlugin());
         plugins.add(new DownloadPlugin(downloads));
         plugins.add(new PlayerPlugin(playbackState, playerBackend));
@@ -131,6 +135,7 @@ public final class StandardAnilib {
                         PlayerCapabilities.BACKUP_CODEC,
                         TrackerCapabilities.BACKUP_CODEC,
                         UpdateCapabilities.BACKUP_CODEC)));
+        plugins.addAll(extensionSelection.bundles());
         plugins.addAll(additionalPlugins);
         return new DefaultPluginEngine().start(List.copyOf(plugins));
     }
