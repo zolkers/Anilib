@@ -5,12 +5,13 @@ import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-/** Prevents source extension modules from bypassing their capability-limited factory context. */
-public final class SourceExtensionIsolationRule implements AnilibJavaRule {
-    private static final Set<String> ALLOWED_DEPENDENCIES = Set.of(
+/** Prevents source and tracker extensions from bypassing their capability-limited factory context. */
+public final class ExtensionIsolationRule implements AnilibJavaRule {
+    private static final String SOURCE_SDK = "feature.source.api";
+    private static final String TRACKER_SDK = "feature.tracker.api";
+    private static final Set<String> COMMON_DEPENDENCIES = Set.of(
             "foundation",
-            "framework.http.api",
-            "feature.source.api");
+            "framework.http.api");
     private static final Pattern FORBIDDEN_ACCESS = Pattern.compile(
             "\\b(?:java\\.net\\.http\\."
                     + "|java\\.net\\.(?:URL|URLConnection|HttpURLConnection|Socket|ServerSocket|Datagram)"
@@ -20,12 +21,12 @@ public final class SourceExtensionIsolationRule implements AnilibJavaRule {
                     + "|fr\\.vriege\\.anilib\\.feature\\.network\\."
                     + "|fr\\.vriege\\.anilib\\.kernel\\.)");
 
-    public SourceExtensionIsolationRule() {
+    public ExtensionIsolationRule() {
     }
 
     @Override
     public String name() {
-        return "source-extension-isolation";
+        return "extension-isolation";
     }
 
     @Override
@@ -45,15 +46,22 @@ public final class SourceExtensionIsolationRule implements AnilibJavaRule {
 
     private void validateModule(ModuleMetadata module, List<Diagnostic> diagnostics) {
         if (!module.role().equals("BUNDLE")) {
-            diagnostics.add(diagnostic(module, "Source extension module role must be BUNDLE"));
+            diagnostics.add(diagnostic(module, "Extension module role must be BUNDLE"));
         }
-        if (!module.dependencies().contains("feature.source.api")) {
-            diagnostics.add(diagnostic(module, "Source extension must depend on feature.source.api"));
+        long sdkCount = module.dependencies().stream()
+                .filter(dependency -> dependency.equals(SOURCE_SDK) || dependency.equals(TRACKER_SDK))
+                .count();
+        if (sdkCount != 1) {
+            diagnostics.add(diagnostic(
+                    module,
+                    "Extension must depend on exactly one supported extension SDK"));
         }
         for (String dependency : module.dependencies()) {
-            if (!ALLOWED_DEPENDENCIES.contains(dependency)) {
+            if (!COMMON_DEPENDENCIES.contains(dependency)
+                    && !dependency.equals(SOURCE_SDK)
+                    && !dependency.equals(TRACKER_SDK)) {
                 diagnostics.add(diagnostic(module,
-                        "Source extension dependency bypasses isolation: " + dependency));
+                        "Extension dependency bypasses isolation: " + dependency));
             }
         }
     }
@@ -65,7 +73,7 @@ public final class SourceExtensionIsolationRule implements AnilibJavaRule {
                         name(),
                         source.path(),
                         index + 1,
-                        "Source extension must use only its granted SourceExtensionContext"));
+                        "Extension must use only its granted extension context"));
             }
         }
     }

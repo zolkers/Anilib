@@ -4,7 +4,7 @@ import fr.vriege.anilib.tooling.javaquality.Diagnostic;
 import fr.vriege.anilib.tooling.javaquality.JavaSource;
 import fr.vriege.anilib.tooling.javaquality.ModuleMetadata;
 import fr.vriege.anilib.tooling.javaquality.RepositorySnapshot;
-import fr.vriege.anilib.tooling.javaquality.SourceExtensionIsolationRule;
+import fr.vriege.anilib.tooling.javaquality.ExtensionIsolationRule;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -27,9 +27,23 @@ final class SourceExtensionIsolationRuleTest {
                         "package fr.vriege.anilib.extension.safe;",
                         "import fr.vriege.anilib.feature.source.SourceExtensionContext;",
                         "import fr.vriege.anilib.framework.http.HttpRequest;"));
-        SourceExtensionIsolationRule rule = new SourceExtensionIsolationRule();
+        ExtensionIsolationRule rule = new ExtensionIsolationRule();
         check(rule.analyze(snapshot(root, safeModule, safeSource)).isEmpty(),
                 "an extension using only its SDK context must pass isolation checks");
+
+        ModuleMetadata safeTrackerModule = module(
+                "extension.safe-tracker",
+                "BUNDLE",
+                List.of("foundation", "framework.http.api", "feature.tracker.api"));
+        JavaSource safeTrackerSource = source(
+                safeTrackerModule,
+                "SafeTracker.java",
+                List.of(
+                        "package fr.vriege.anilib.extension.safe_tracker;",
+                        "import fr.vriege.anilib.feature.tracker.TrackerExtensionContext;",
+                        "import fr.vriege.anilib.framework.http.HttpRequest;"));
+        check(rule.analyze(snapshot(root, safeTrackerModule, safeTrackerSource)).isEmpty(),
+                "a tracker extension using only its SDK context must pass isolation checks");
 
         ModuleMetadata unsafeModule = module(
                 "extension.unsafe",
@@ -46,7 +60,7 @@ final class SourceExtensionIsolationRuleTest {
                 "an extension bypass must report role, dependency, and direct network access");
         check(diagnostics.stream().anyMatch(diagnostic -> diagnostic.message().contains("granted")),
                 "extension bypass diagnostics must direct authors to the granted context");
-        return 3;
+        return 4;
     }
 
     private static ModuleMetadata module(
