@@ -29,7 +29,8 @@ public final class BuildDependencyRule implements AnilibJavaRule {
                     ANDROID_BUILD,
                     Set.of(
                             "'androidx.activity:activity-compose:1.13.0'",
-                            "'androidx.preference:preference-ktx:1.2.1'")),
+                            "'androidx.preference:preference-ktx:1.2.1'",
+                            "'io.github.kevinnzou:compose-webview-multiplatform:2.0.3'")),
             Map.entry(
                     COMPOSE_BUILD,
                     Set.of(
@@ -41,7 +42,9 @@ public final class BuildDependencyRule implements AnilibJavaRule {
                             "'io.github.kdroidfilter:composemediaplayer:0.11.4'")),
             Map.entry(
                     DESKTOP_BUILD,
-                    Set.of("compose.desktop.currentOs")));
+                    Set.of(
+                            "compose.desktop.currentOs",
+                            "'io.github.kevinnzou:compose-webview-multiplatform:2.0.3'")));
     private static final Map<String, Set<String>> ALLOWED_EXTERNAL_PLUGINS = Map.ofEntries(
             Map.entry(
                     ANDROID_BUILD,

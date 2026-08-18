@@ -4,6 +4,7 @@ import fr.vriege.anilib.feature.settings.DiagnosticResetArea;
 import fr.vriege.anilib.feature.settings.DiagnosticResetPlan;
 import fr.vriege.anilib.feature.settings.DiagnosticService;
 import fr.vriege.anilib.feature.settings.DiagnosticSnapshot;
+import fr.vriege.anilib.feature.settings.BrowserPolicy;
 import fr.vriege.anilib.feature.settings.SettingsService;
 import fr.vriege.anilib.feature.settings.SettingsSnapshot;
 import fr.vriege.anilib.feature.settings.AccentColor;
@@ -73,6 +74,11 @@ public final class DefaultSettingsPresentation implements SettingsPresentation {
     @Override
     public void setNavigationStyle(NavigationStyle navigationStyle) {
         service.replace(service.snapshot().withNavigationStyle(navigationStyle));
+    }
+
+    @Override
+    public void setBrowserPolicy(BrowserPolicy browserPolicy) {
+        service.replace(service.snapshot().withBrowserPolicy(browserPolicy));
     }
 
     @Override

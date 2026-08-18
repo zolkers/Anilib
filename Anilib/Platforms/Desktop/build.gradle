@@ -32,6 +32,7 @@ dependencies {
     implementation project(':Anilib:Kernel:Api')
     implementation project(':Anilib:Platforms:Compose')
     implementation compose.desktop.currentOs
+    implementation 'io.github.kevinnzou:compose-webview-multiplatform:2.0.3'
 }
 
 kotlin {

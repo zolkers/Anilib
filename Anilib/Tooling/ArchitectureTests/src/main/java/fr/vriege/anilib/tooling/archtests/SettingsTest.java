@@ -2,6 +2,7 @@ package fr.vriege.anilib.tooling.archtests;
 
 import fr.vriege.anilib.feature.settings.SettingsSnapshot;
 import fr.vriege.anilib.feature.settings.DiagnosticResetArea;
+import fr.vriege.anilib.feature.settings.BrowserPolicy;
 import fr.vriege.anilib.feature.settings.AccentColor;
 import fr.vriege.anilib.feature.settings.LanguagePack;
 import fr.vriege.anilib.feature.settings.NavigationStyle;
@@ -52,12 +53,15 @@ final class SettingsTest {
             presentation.setAccentColor(AccentColor.SAKURA);
             presentation.setTypographyScale(TypographyScale.LARGE);
             presentation.setNavigationStyle(NavigationStyle.NAVIGATION_RAIL);
+            BrowserPolicy browserPolicy = new BrowserPolicy(
+                    true, true, false, false, true, true, 125);
+            presentation.setBrowserPolicy(browserPolicy);
             presentation.setStartScreen(StartScreen.BROWSE);
             presentation.setShowAdultContent(true);
             presentation.setIncognitoMode(true);
             presentation.setDownloadOnlyOnWifi(false);
             presentation.setUpdateOnlyOnWifi(false);
-            counter.check(observations.get() == 12,
+            counter.check(observations.get() == 13,
                     "every settings change must publish one immutable snapshot");
             close(observation);
 
@@ -68,6 +72,7 @@ final class SettingsTest {
                     AccentColor.SAKURA,
                     TypographyScale.LARGE,
                     NavigationStyle.NAVIGATION_RAIL,
+                    browserPolicy,
                     StartScreen.BROWSE,
                     true,
                     true,
@@ -79,7 +84,7 @@ final class SettingsTest {
                     "settings must survive a service restart");
 
             presentation.setThemeMode(ThemeMode.LIGHT);
-            counter.check(observations.get() == 12,
+            counter.check(observations.get() == 13,
                     "closed settings observations must stop receiving changes");
             diagnostics.recordLog("settings test log");
             diagnostics.recordCrash("settings test crash", "bounded details");

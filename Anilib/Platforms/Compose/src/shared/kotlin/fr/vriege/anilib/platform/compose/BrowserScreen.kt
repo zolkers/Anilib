@@ -25,6 +25,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,8 +37,12 @@ import com.multiplatform.webview.web.rememberWebViewNavigator
 import com.multiplatform.webview.web.rememberWebViewState
 import fr.vriege.anilib.framework.http.HttpCookieJar
 import fr.vriege.anilib.feature.source.SourceWebPage
+import fr.vriege.anilib.feature.settings.BrowserPolicy
 import java.net.URI
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+
+internal val LocalBrowserPolicy = staticCompositionLocalOf { BrowserPolicy.defaults() }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -46,23 +51,56 @@ internal fun BrowserScreen(
     cookieJar: HttpCookieJar,
     runtimeStatus: BrowserRuntimeStatus,
     close: () -> Unit,
+    challengeComplete: () -> Unit = close,
 ) {
     if (!runtimeStatus.available) {
         BrowserUnavailable(runtimeStatus.message, close)
         return
     }
     val uri = page.location()
+    val policy = LocalBrowserPolicy.current
+    val platformController = LocalBrowserPlatformController.current
     val initialHeaders = remember(page, cookieJar) { browserHeaders(cookieJar, page) }
     val state = rememberWebViewState(uri.toString(), initialHeaders) {
         customUserAgentString = page.userAgent().orElse(null)
-        androidWebSettings.domStorageEnabled = true
+        isJavaScriptEnabled = policy.javaScriptEnabled()
+        androidWebSettings.domStorageEnabled = policy.domStorageEnabled()
+        androidWebSettings.textZoom = policy.textZoomPercent()
+        desktopWebSettings.disablePopupWindows = !policy.popupsEnabled()
     }
     val navigator = rememberWebViewNavigator()
     val scope = rememberCoroutineScope()
     var challengeSolved by remember(page) { mutableStateOf(page.completionCookies().isEmpty()) }
     var challengeChecked by remember(page) { mutableStateOf(false) }
+    var platformMessage by remember(page) { mutableStateOf<String?>(null) }
+    val platformBridge = platformController.rememberBridge(policy) { platformMessage = it }
     LaunchedEffect(uri, state.cookieManager) {
         seedCookies(uri, initialHeaders, state.cookieManager)
+    }
+    LaunchedEffect(state.loadingState, policy.automaticChallengeRetry()) {
+        if (state.loadingState is LoadingState.Finished
+            && policy.automaticChallengeRetry()
+            && page.completionCookies().isNotEmpty()
+            && !challengeSolved
+        ) {
+            delay(400)
+            val loadedUri = currentWebUri(state.lastLoadedUrl, uri)
+            val complete = runCatching {
+                challengeCookiesPresent(
+                    listOf(uri, loadedUri),
+                    state.cookieManager,
+                    page.completionCookies(),
+                )
+            }.getOrDefault(false)
+            if (complete) {
+                challengeSolved = true
+                runCatching { syncCookies(uri, state.cookieManager, cookieJar) }
+                if (loadedUri != uri) {
+                    runCatching { syncCookies(loadedUri, state.cookieManager, cookieJar) }
+                }
+                challengeComplete()
+            }
+        }
     }
     val closeBrowser: () -> Unit = {
         scope.launch {
@@ -146,10 +184,21 @@ internal fun BrowserScreen(
                     }
                 }
             }
+            platformMessage?.let { message ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(message, modifier = Modifier.weight(1f))
+                    TextButton(onClick = { platformMessage = null }) { Text("Dismiss") }
+                }
+            }
             WebView(
                 state = state,
                 navigator = navigator,
                 captureBackPresses = true,
+                platformWebViewParams = platformBridge.parameters,
+                onCreated = platformBridge.onCreated,
                 modifier = Modifier.fillMaxSize(),
             )
         }

@@ -59,7 +59,8 @@ public final class AndroidReleaseRule implements AnilibJavaRule {
                 diagnostics,
                 "layer=PLATFORM",
                 "language=KOTLIN",
-                "externalDependencies=androidx.activity:activity-compose,androidx.preference:preference-ktx");
+                "externalDependencies=androidx.activity:activity-compose,androidx.preference:preference-ktx,"
+                        + "io.github.kevinnzou:compose-webview-multiplatform");
         requireTokens(
                 repository,
                 MANIFEST,

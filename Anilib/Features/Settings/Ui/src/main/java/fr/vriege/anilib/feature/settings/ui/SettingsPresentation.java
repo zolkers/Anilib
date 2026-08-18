@@ -3,6 +3,7 @@ package fr.vriege.anilib.feature.settings.ui;
 import fr.vriege.anilib.feature.settings.DiagnosticResetArea;
 import fr.vriege.anilib.feature.settings.DiagnosticResetPlan;
 import fr.vriege.anilib.feature.settings.DiagnosticSnapshot;
+import fr.vriege.anilib.feature.settings.BrowserPolicy;
 import fr.vriege.anilib.feature.settings.SettingsSnapshot;
 import fr.vriege.anilib.feature.settings.AccentColor;
 import fr.vriege.anilib.feature.settings.LanguagePack;
@@ -33,6 +34,8 @@ public interface SettingsPresentation {
     void setTypographyScale(TypographyScale typographyScale);
 
     void setNavigationStyle(NavigationStyle navigationStyle);
+
+    void setBrowserPolicy(BrowserPolicy browserPolicy);
 
     void setStartScreen(StartScreen startScreen);
 

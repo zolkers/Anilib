@@ -75,6 +75,7 @@ class MainActivity : ComponentActivity() {
             startupReports = apkActivation.reports,
         )
         val browserDataController = AndroidBrowserDataController(this)
+        val browserPlatformController = AndroidBrowserPlatformController()
         val backupImportPicker = AndroidBackupImportPicker(this)
         val componentCount = started.components().size
         setContent {
@@ -87,6 +88,7 @@ class MainActivity : ComponentActivity() {
                 browserCookies = started.capability(NetworkCapabilities.COOKIES),
                 browserRuntimeStatus = BrowserRuntimeStatus.ready(),
                 browserDataController = browserDataController,
+                browserPlatformController = browserPlatformController,
                 settingsPresentation = started.capability(SettingsUiCapabilities.PRESENTATION),
                 reader = reader,
                 player = player,

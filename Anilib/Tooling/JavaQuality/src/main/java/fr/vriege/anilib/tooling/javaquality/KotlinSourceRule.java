@@ -19,6 +19,7 @@ public final class KotlinSourceRule implements AnilibJavaRule {
                     "androidx.activity.",
                     "androidx.compose.",
                     "androidx.preference.",
+                    "com.multiplatform.webview.",
                     "dalvik."),
             "platform.compose", Set.of(
                     "androidx.compose.",
@@ -26,7 +27,12 @@ public final class KotlinSourceRule implements AnilibJavaRule {
                     "dev.datlag.kcef.",
                     "io.github.kdroidfilter.composemediaplayer.",
                     "kotlinx.coroutines."),
-            "platform.desktop", Set.of("androidx.compose.", "org.jetbrains.compose.", "org.jetbrains.skia."));
+            "platform.desktop", Set.of(
+                    "androidx.compose.",
+                    "com.multiplatform.webview.",
+                    "org.cef.",
+                    "org.jetbrains.compose.",
+                    "org.jetbrains.skia."));
 
     public KotlinSourceRule() {
     }

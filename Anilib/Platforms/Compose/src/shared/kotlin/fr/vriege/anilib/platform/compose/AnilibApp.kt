@@ -155,6 +155,7 @@ fun AnilibApp(
     browserCookies: HttpCookieJar,
     browserRuntimeStatus: BrowserRuntimeStatus,
     browserDataController: BrowserDataController,
+    browserPlatformController: BrowserPlatformController,
     settingsPresentation: SettingsPresentation,
     reader: ReaderPresentation,
     player: PlayerPresentation,
@@ -216,6 +217,8 @@ fun AnilibApp(
             currentDensity.density,
             currentDensity.fontScale * settings.typographyScale().multiplier(),
         ),
+        LocalBrowserPolicy provides settings.browserPolicy(),
+        LocalBrowserPlatformController provides browserPlatformController,
     ) {
         MaterialTheme(colorScheme = appColorScheme(settings, useDarkTheme)) {
             Surface(modifier = Modifier.fillMaxSize()) {

@@ -128,6 +128,14 @@ Chromium locks its profile while KCEF is alive; the desktop browser adapter
 removes only its normalized cache subtree, without following links, before the
 next KCEF initialization.
 
+Browser behavior follows the same split. Settings persists a platform-neutral
+policy for scripting, DOM storage, file selection, pop-ups, downloads, text
+zoom, and challenge retry. Shared Compose applies common WebSettings and cookie
+completion logic. Android alone owns Activity-result file selection and
+DownloadManager; desktop alone owns CEF dialog, life-span, and download
+handlers. Pop-ups are redirected into the current trusted browser surface, and
+no provider name or platform SDK type crosses into a feature module.
+
 Reader is another removable vertical over Library and Source. Its Bundle
 resolves a library origin only through the typed Source registry and accepts
 only sources implementing the versioned `PagedSource` contract. The shared

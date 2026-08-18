@@ -168,7 +168,16 @@ internal fun DiscoveryScreen(
     }
 
     browserPage?.let { page ->
-        BrowserScreen(page, browserCookies, browserRuntimeStatus) { browserPage = null }
+        BrowserScreen(
+            page,
+            browserCookies,
+            browserRuntimeStatus,
+            close = { browserPage = null },
+            challengeComplete = {
+                browserPage = null
+                sourceBrowseRevision++
+            },
+        )
         return
     }
 

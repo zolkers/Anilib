@@ -78,6 +78,7 @@ fun main() {
                 browserCookies = started.capability(NetworkCapabilities.COOKIES),
                 browserRuntimeStatus = browserRuntimeStatus,
                 browserDataController = browserDataController,
+                browserPlatformController = DesktopBrowserPlatformController(),
                 settingsPresentation = started.capability(SettingsUiCapabilities.PRESENTATION),
                 reader = reader,
                 player = player,

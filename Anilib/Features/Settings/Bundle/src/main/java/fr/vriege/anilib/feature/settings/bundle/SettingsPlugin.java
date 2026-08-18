@@ -18,7 +18,7 @@ import java.util.Objects;
 
 public final class SettingsPlugin implements AnilibPlugin {
     private static final PluginManifest MANIFEST = PluginManifest.builder(
-                    ComponentDescriptor.of("feature.settings", "Settings", "1.1.0"))
+                    ComponentDescriptor.of("feature.settings", "Settings", "1.2.0"))
             .provides(SettingsCapabilities.SERVICE)
             .provides(SettingsCapabilities.DIAGNOSTICS)
             .provides(SettingsCapabilities.UNUSED_DATA_REGISTRAR)

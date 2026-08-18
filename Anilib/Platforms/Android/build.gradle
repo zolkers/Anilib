@@ -94,6 +94,7 @@ dependencies {
     implementation project(':Anilib:Platforms:Compose')
     implementation 'androidx.activity:activity-compose:1.13.0'
     implementation 'androidx.preference:preference-ktx:1.2.1'
+    implementation 'io.github.kevinnzou:compose-webview-multiplatform:2.0.3'
 }
 
 def androidReleaseDirectory = layout.buildDirectory.dir('outputs/apk/release')

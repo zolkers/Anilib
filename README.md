@@ -151,8 +151,9 @@ API 1.6 optionally exposes source and title web pages through the shared Browse
 surface; Android renders them with System WebView and desktop with KCEF while
 both exchange session cookies with the platform-neutral HTTP jar. Sources can
 carry their request headers and User-Agent into that browser and declare the
-cookies that prove a web challenge is complete. Policy enforcement and deeper
-rows remain tracked explicitly in the parity matrix. A separate confirmed
+cookies that prove a web challenge is complete. Browser policy also controls
+file selection, same-surface pop-ups, platform downloads, text zoom, and
+automatic cookie-driven challenge retry. A separate confirmed
 action clears Android WebView cache and site storage immediately; desktop
 schedules the locked KCEF profile for removal before the next engine startup.
 The repository also contains the dependency-free

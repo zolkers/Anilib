@@ -251,7 +251,7 @@ platform-specific.
   per-source network diagnostics
 - [x] add storage inspection, logs, crash reports, exportable diagnostics, and
   safe reset flows
-- [ ] add WebView file chooser, pop-ups, downloads, browser settings, and
+- [x] add WebView file chooser, pop-ups, downloads, browser settings, and
   automatic challenge retry without provider-specific code in shared modules
 
 ### 8. Local source

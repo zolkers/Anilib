@@ -3,6 +3,7 @@ package fr.vriege.anilib.feature.settings.runtime;
 import fr.vriege.anilib.feature.settings.SettingsService;
 import fr.vriege.anilib.feature.settings.SettingsSnapshot;
 import fr.vriege.anilib.feature.settings.AccentColor;
+import fr.vriege.anilib.feature.settings.BrowserPolicy;
 import fr.vriege.anilib.feature.settings.LanguagePack;
 import fr.vriege.anilib.feature.settings.NavigationStyle;
 import fr.vriege.anilib.feature.settings.StartScreen;
@@ -35,6 +36,13 @@ public final class FileSettingsService implements SettingsService {
     private static final String ACCENT = "appearance.accent";
     private static final String TYPOGRAPHY = "appearance.typography";
     private static final String NAVIGATION = "appearance.navigation";
+    private static final String BROWSER_JAVA_SCRIPT = "browser.java-script";
+    private static final String BROWSER_DOM_STORAGE = "browser.dom-storage";
+    private static final String BROWSER_FILE_CHOOSER = "browser.file-chooser";
+    private static final String BROWSER_POPUPS = "browser.popups";
+    private static final String BROWSER_DOWNLOADS = "browser.downloads";
+    private static final String BROWSER_CHALLENGE_RETRY = "browser.challenge-retry";
+    private static final String BROWSER_TEXT_ZOOM = "browser.text-zoom";
     private static final String START_SCREEN = "appearance.start-screen";
     private static final String ADULT_CONTENT = "content.show-adult";
     private static final String INCOGNITO = "privacy.incognito";
@@ -97,6 +105,7 @@ public final class FileSettingsService implements SettingsService {
                 enumValue(values.getProperty(ACCENT), defaults.accentColor(), AccentColor.class),
                 enumValue(values.getProperty(TYPOGRAPHY), defaults.typographyScale(), TypographyScale.class),
                 enumValue(values.getProperty(NAVIGATION), defaults.navigationStyle(), NavigationStyle.class),
+                browserPolicy(values, defaults.browserPolicy()),
                 enumValue(values.getProperty(START_SCREEN), defaults.startScreen(), StartScreen.class),
                 flag(values, ADULT_CONTENT, defaults.showAdultContent()),
                 flag(values, INCOGNITO, defaults.incognitoMode()),
@@ -112,6 +121,14 @@ public final class FileSettingsService implements SettingsService {
         values.setProperty(ACCENT, setting(settings.accentColor()));
         values.setProperty(TYPOGRAPHY, setting(settings.typographyScale()));
         values.setProperty(NAVIGATION, setting(settings.navigationStyle()));
+        BrowserPolicy browser = settings.browserPolicy();
+        values.setProperty(BROWSER_JAVA_SCRIPT, Boolean.toString(browser.javaScriptEnabled()));
+        values.setProperty(BROWSER_DOM_STORAGE, Boolean.toString(browser.domStorageEnabled()));
+        values.setProperty(BROWSER_FILE_CHOOSER, Boolean.toString(browser.fileChooserEnabled()));
+        values.setProperty(BROWSER_POPUPS, Boolean.toString(browser.popupsEnabled()));
+        values.setProperty(BROWSER_DOWNLOADS, Boolean.toString(browser.downloadsEnabled()));
+        values.setProperty(BROWSER_CHALLENGE_RETRY, Boolean.toString(browser.automaticChallengeRetry()));
+        values.setProperty(BROWSER_TEXT_ZOOM, Integer.toString(browser.textZoomPercent()));
         values.setProperty(START_SCREEN, settings.startScreen().name().toLowerCase(Locale.ROOT));
         values.setProperty(ADULT_CONTENT, Boolean.toString(settings.showAdultContent()));
         values.setProperty(INCOGNITO, Boolean.toString(settings.incognitoMode()));
@@ -166,6 +183,23 @@ public final class FileSettingsService implements SettingsService {
             return false;
         }
         return fallback;
+    }
+
+    private static BrowserPolicy browserPolicy(Properties values, BrowserPolicy defaults) {
+        try {
+            return new BrowserPolicy(
+                    flag(values, BROWSER_JAVA_SCRIPT, defaults.javaScriptEnabled()),
+                    flag(values, BROWSER_DOM_STORAGE, defaults.domStorageEnabled()),
+                    flag(values, BROWSER_FILE_CHOOSER, defaults.fileChooserEnabled()),
+                    flag(values, BROWSER_POPUPS, defaults.popupsEnabled()),
+                    flag(values, BROWSER_DOWNLOADS, defaults.downloadsEnabled()),
+                    flag(values, BROWSER_CHALLENGE_RETRY, defaults.automaticChallengeRetry()),
+                    Integer.parseInt(values.getProperty(
+                            BROWSER_TEXT_ZOOM,
+                            Integer.toString(defaults.textZoomPercent()))));
+        } catch (IllegalArgumentException exception) {
+            return defaults;
+        }
     }
 
     private static void moveAtomically(Path source, Path destination) throws IOException {

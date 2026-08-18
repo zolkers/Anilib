@@ -32,7 +32,7 @@ explicit so an architectural seam cannot be mistaken for a finished workflow.
 | Reader settings and reader | [x] | Complete | Immersive pages, resume, slider, navigation modes, persisted gestures/display profiles, filters, transitions, Android orientation, chapter lists and navigation, durable read state, exact downloads, and complete menus are live |
 | Player settings and player | [x] | Complete | Searchable episodes, protected native playback, complete controls and gestures, persistent policies, intro/outro skipping, Android PiP/background audio, and capability-negotiated desktop controls are live |
 | Data, storage, and advanced settings | [x] | Complete | Durable network policy, per-source diagnostics, bounded storage inspection, logs/crash reports, native ZIP export, allowlisted plan/confirm resets, cleanup, backup, and About routes are live |
-| WebView | [x] | Partial | Navigation, reload, progress, source headers/User-Agent, cookie transfer, challenge completion, and platform cleanup are live; add automatic challenge retry, file chooser, pop-ups, downloads, and browser settings |
+| WebView | [x] | Complete | Navigation, reload, progress, durable JavaScript/DOM/files/pop-up/download/text-zoom policy, cookie transfer, platform handlers, cleanup, and cookie-driven automatic challenge retry are live |
 | About, help, and application updates | [x] | Partial | Version, platform, stable-channel check, release-page hand-off, project, and issue links are live; add licences, changelog, automatic installation, and channel choice |
 
 ## Completed in the first pass

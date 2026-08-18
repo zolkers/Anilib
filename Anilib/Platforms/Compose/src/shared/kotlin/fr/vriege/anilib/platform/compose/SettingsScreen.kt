@@ -40,6 +40,7 @@ import fr.vriege.anilib.feature.network.NetworkPolicy
 import fr.vriege.anilib.feature.settings.SettingsSnapshot
 import fr.vriege.anilib.feature.settings.DiagnosticResetArea
 import fr.vriege.anilib.feature.settings.DiagnosticResetPlan
+import fr.vriege.anilib.feature.settings.BrowserPolicy
 import fr.vriege.anilib.feature.settings.LanguagePack
 import fr.vriege.anilib.feature.settings.ThemeMode
 import fr.vriege.anilib.feature.settings.TypographyScale
@@ -70,6 +71,7 @@ internal fun SettingsScreen(
     var networkPolicyDialog by remember { mutableStateOf(false) }
     var diagnosticsDialog by remember { mutableStateOf(false) }
     var resetPlan by remember { mutableStateOf<DiagnosticResetPlan?>(null) }
+    var browserSettingsDialog by remember { mutableStateOf(false) }
     val browserCookies = remember { WebViewCookieManager() }
     val scope = rememberCoroutineScope()
 
@@ -132,6 +134,7 @@ internal fun SettingsScreen(
             requestMaintenance = { confirmation = it },
             openNetworkPolicy = { networkPolicyDialog = true },
             openDiagnostics = { diagnosticsDialog = true },
+            openBrowserSettings = { browserSettingsDialog = true },
             goBack = { destination = null },
         )
     }
@@ -161,6 +164,13 @@ internal fun SettingsScreen(
             diagnosticExportPicker,
             requestReset = { resetPlan = it },
             close = { diagnosticsDialog = false },
+        )
+    }
+    if (browserSettingsDialog) {
+        BrowserSettingsDialog(
+            settings.browserPolicy(),
+            presentation::setBrowserPolicy,
+            close = { browserSettingsDialog = false },
         )
     }
     resetPlan?.let { plan ->
@@ -286,6 +296,7 @@ private fun SettingsDetail(
     requestMaintenance: (MaintenanceAction) -> Unit,
     openNetworkPolicy: () -> Unit,
     openDiagnostics: () -> Unit,
+    openBrowserSettings: () -> Unit,
     goBack: () -> Unit,
 ) {
     Scaffold(topBar = { SettingsTopBar(destination.title, goBack) }) { padding ->
@@ -401,6 +412,13 @@ private fun SettingsDetail(
                         )
                     }
                     item {
+                        SettingsRow(
+                            "Browser settings",
+                            "JavaScript, storage, files, pop-ups, downloads, challenge retry, and text zoom",
+                            openBrowserSettings,
+                        )
+                    }
+                    item {
                         SettingsRow("Clear cookies", "Sign out browser sessions for every source") {
                             requestMaintenance(MaintenanceAction.COOKIES)
                         }
@@ -435,6 +453,65 @@ private fun SettingsDetail(
             }
         }
     }
+}
+
+@Composable
+private fun BrowserSettingsDialog(
+    initial: BrowserPolicy,
+    save: (BrowserPolicy) -> Unit,
+    close: () -> Unit,
+) {
+    var javaScript by remember(initial) { mutableStateOf(initial.javaScriptEnabled()) }
+    var domStorage by remember(initial) { mutableStateOf(initial.domStorageEnabled()) }
+    var fileChooser by remember(initial) { mutableStateOf(initial.fileChooserEnabled()) }
+    var popups by remember(initial) { mutableStateOf(initial.popupsEnabled()) }
+    var downloads by remember(initial) { mutableStateOf(initial.downloadsEnabled()) }
+    var challengeRetry by remember(initial) { mutableStateOf(initial.automaticChallengeRetry()) }
+    var textZoom by remember(initial) { mutableStateOf(initial.textZoomPercent().toString()) }
+    var error by remember { mutableStateOf<String?>(null) }
+    AlertDialog(
+        onDismissRequest = close,
+        title = { Text("Browser settings") },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                SettingsSwitchRow("JavaScript", "Allow website scripts", javaScript) { javaScript = it }
+                SettingsSwitchRow("DOM storage", "Allow website local storage", domStorage) { domStorage = it }
+                SettingsSwitchRow("File chooser", "Allow user-initiated file selection", fileChooser) {
+                    fileChooser = it
+                }
+                SettingsSwitchRow("Pop-ups", "Open requested windows in the current browser", popups) {
+                    popups = it
+                }
+                SettingsSwitchRow("Downloads", "Hand downloads to the platform", downloads) { downloads = it }
+                SettingsSwitchRow(
+                    "Automatic challenge retry",
+                    "Retry the source as soon as all completion cookies exist",
+                    challengeRetry,
+                ) { challengeRetry = it }
+                OutlinedTextField(textZoom, { textZoom = it }, label = { Text("Text zoom (50–200%)") })
+                error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                runCatching {
+                    BrowserPolicy(
+                        javaScript,
+                        domStorage,
+                        fileChooser,
+                        popups,
+                        downloads,
+                        challengeRetry,
+                        textZoom.toInt(),
+                    )
+                }.onSuccess {
+                    save(it)
+                    close()
+                }.onFailure { error = it.message ?: "Invalid browser settings" }
+            }) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = close) { Text("Cancel") } },
+    )
 }
 
 @Composable

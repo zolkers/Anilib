@@ -27,7 +27,7 @@ final class AndroidReleaseRuleTest {
             write(repository.resolve("Anilib/Platforms/Android/module.properties"), """
                     layer=PLATFORM
                     language=KOTLIN
-                    externalDependencies=androidx.activity:activity-compose,androidx.preference:preference-ktx
+                    externalDependencies=androidx.activity:activity-compose,androidx.preference:preference-ktx,io.github.kevinnzou:compose-webview-multiplatform
                     """);
             Path manifest = repository.resolve("Anilib/Platforms/Android/src/main/AndroidManifest.xml");
             write(manifest, """
