@@ -13,10 +13,12 @@ import fr.vriege.anilib.framework.http.runtime.DefaultAnilibHttpClient;
 import fr.vriege.anilib.framework.http.runtime.FileHttpResponseCache;
 import fr.vriege.anilib.framework.http.runtime.HostHttpRateLimiter;
 import fr.vriege.anilib.framework.http.runtime.JdkHttpCookieJar;
+import fr.vriege.anilib.framework.http.runtime.MediaHeaderProxy;
 import fr.vriege.anilib.framework.http.runtime.UrlConnectionHttpTransport;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.HttpURLConnection;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -40,6 +42,7 @@ final class HttpFrameworkTest {
         managesCookies(counter);
         enforcesHostIntervals(counter);
         executesAndCachesRealJdkRequests(counter);
+        relaysProtectedMediaAndHlsReferences(counter);
         return counter.value;
     }
 
@@ -224,6 +227,97 @@ final class HttpFrameworkTest {
         }
     }
 
+    private static void relaysProtectedMediaAndHlsReferences(Counter counter) {
+        AtomicInteger authorizedRequests = new AtomicInteger();
+        AtomicInteger rangedRequests = new AtomicInteger();
+        HttpServer upstream = startMediaServer(authorizedRequests, rangedRequests);
+        try (MediaHeaderProxy proxy = new MediaHeaderProxy()) {
+            URI mediaRoot = URI.create("http://127.0.0.1:" + upstream.getAddress().getPort() + "/media/");
+            URI routed = proxy.route(
+                    mediaRoot.resolve("master.m3u8"),
+                    Map.of("Referer", "https://source.example/", "Cookie", "session=protected"));
+            ProxyResponse playlist = fetch(routed, Map.of());
+            counter.check(playlist.status() == 200 && playlist.contentType().contains("mpegurl"),
+                    "media relay must preserve playlist status and content type");
+            String segmentRoute = playlist.body().lines()
+                    .filter(line -> !line.isBlank() && !line.startsWith("#"))
+                    .findFirst()
+                    .orElseThrow();
+            int keyStart = playlist.body().indexOf("URI=\"") + "URI=\"".length();
+            int keyEnd = playlist.body().indexOf('"', keyStart);
+            String keyRoute = playlist.body().substring(keyStart, keyEnd);
+            counter.check(segmentRoute.startsWith("http://127.0.0.1:")
+                            && keyRoute.startsWith("http://127.0.0.1:"),
+                    "media relay must rewrite HLS segments and key attributes to private routes");
+            ProxyResponse segment = fetch(URI.create(segmentRoute), Map.of("Range", "bytes=0-"));
+            ProxyResponse key = fetch(URI.create(keyRoute), Map.of());
+            counter.check(rangedRequests.get() == 1,
+                    "media relay must forward player byte-range requests");
+            counter.check(segment.body().equals("segment") && key.body().equals("key"),
+                    "rewritten HLS routes must return their original upstream resources");
+            counter.check(authorizedRequests.get() == 3,
+                    "stream headers must be inherited by playlists, segments, and encryption keys");
+        } finally {
+            upstream.stop(0);
+        }
+    }
+
+    private static HttpServer startMediaServer(
+            AtomicInteger authorizedRequests,
+            AtomicInteger rangedRequests) {
+        try {
+            HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+            server.createContext("/media/", exchange -> {
+                String path = exchange.getRequestURI().getPath();
+                String cookie = exchange.getRequestHeaders().getFirst("Cookie");
+                boolean authorized = "https://source.example/".equals(
+                        exchange.getRequestHeaders().getFirst("Referer"))
+                        && cookie != null
+                        && cookie.contains("session=protected")
+                        && (path.endsWith("master.m3u8") || cookie.contains("media=granted"));
+                if (authorized) {
+                    authorizedRequests.incrementAndGet();
+                }
+                if (exchange.getRequestHeaders().containsKey("Range")) {
+                    rangedRequests.incrementAndGet();
+                }
+                if (path.endsWith("master.m3u8")) {
+                    exchange.getResponseHeaders().set("Content-Type", "application/vnd.apple.mpegurl");
+                    exchange.getResponseHeaders().add("Set-Cookie", "media=granted; Path=/media");
+                    respond(exchange, "#EXTM3U\n#EXT-X-KEY:METHOD=AES-128,URI=\"key.bin\"\nsegment.ts\n");
+                } else if (path.endsWith("key.bin")) {
+                    respond(exchange, "key");
+                } else {
+                    respond(exchange, "segment");
+                }
+            });
+            server.start();
+            return server;
+        } catch (IOException exception) {
+            throw new AssertionError("Unable to start the protected media test server", exception);
+        }
+    }
+
+    private static ProxyResponse fetch(URI uri, Map<String, String> headers) {
+        try {
+            HttpURLConnection connection = (HttpURLConnection) uri.toURL().openConnection();
+            connection.setConnectTimeout(5_000);
+            connection.setReadTimeout(5_000);
+            headers.forEach(connection::setRequestProperty);
+            int status = connection.getResponseCode();
+            String contentType = java.util.Objects.toString(connection.getContentType(), "");
+            String body;
+            try (java.io.InputStream input = connection.getInputStream()) {
+                body = new String(input.readAllBytes(), StandardCharsets.UTF_8);
+            } finally {
+                connection.disconnect();
+            }
+            return new ProxyResponse(status, contentType, body);
+        } catch (IOException exception) {
+            throw new AssertionError("Unable to fetch a media relay test route", exception);
+        }
+    }
+
     private static void respond(HttpExchange exchange, String value) throws IOException {
         byte[] response = value.getBytes(StandardCharsets.UTF_8);
         exchange.sendResponseHeaders(200, response.length);
@@ -268,5 +362,8 @@ final class HttpFrameworkTest {
                 value++;
             }
         }
+    }
+
+    private record ProxyResponse(int status, String contentType, String body) {
     }
 }

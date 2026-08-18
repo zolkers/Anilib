@@ -7,6 +7,7 @@ import fr.vriege.anilib.feature.player.PlayerMedia
 import fr.vriege.anilib.feature.player.PlayerPlayback
 import fr.vriege.anilib.feature.player.PlayerPlaybackSnapshot
 import fr.vriege.anilib.feature.player.PlayerPlaybackStatus
+import fr.vriege.anilib.framework.http.runtime.MediaHeaderProxy
 import io.github.kdroidfilter.composemediaplayer.InitialPlayerState
 import io.github.kdroidfilter.composemediaplayer.SubtitleTrack
 import io.github.kdroidfilter.composemediaplayer.VideoPlayerState
@@ -25,6 +26,25 @@ class ComposePlayerBackend : PlayerBackend {
 internal class ComposePlayerPlayback(
     private val media: PlayerMedia,
 ) : PlayerPlayback {
+    private val headerProxy = if (
+        media.stream().headers().isNotEmpty() || media.stream().subtitles().any { it.headers().isNotEmpty() }
+    ) {
+        MediaHeaderProxy()
+    } else {
+        null
+    }
+    private val mediaLocation = if (media.stream().headers().isEmpty()) {
+        media.stream().location().toString()
+    } else {
+        headerProxy!!.route(media.stream().location(), media.stream().headers()).toString()
+    }
+    private val subtitleLocations = media.stream().subtitles().associate { subtitle ->
+        subtitle.id() to if (subtitle.headers().isEmpty()) {
+            subtitle.location().toString()
+        } else {
+            headerProxy!!.route(subtitle.location(), subtitle.headers()).toString()
+        }
+    }
     @Volatile
     private var state: VideoPlayerState? = null
     private var requestedVolume = 1f
@@ -120,7 +140,7 @@ internal class ComposePlayerPlayback(
         player.volume = requestedVolume
         player.playbackSpeed = requestedSpeed
         player.onPlaybackEnded = { ended = true }
-        player.openUri(media.stream().location().toString(), InitialPlayerState.PLAY)
+        player.openUri(mediaLocation, InitialPlayerState.PLAY)
         applySubtitle(player)
     }
 
@@ -151,7 +171,7 @@ internal class ComposePlayerPlayback(
             SubtitleTrack(
                 label = sourceTrack.label(),
                 language = sourceTrack.language().orElse("und"),
-                src = sourceTrack.location().toString(),
+                src = subtitleLocations.getValue(sourceTrack.id()),
             ),
         )
     }
@@ -175,6 +195,7 @@ internal class ComposePlayerPlayback(
     override fun close() = synchronized(this) {
         if (!closed) {
             state?.let { detach(it) }
+            headerProxy?.close()
             closed = true
         }
     }
