@@ -47,7 +47,7 @@ modularity behind the UI; Aniyomi remains the product reference.
 - [x] episode model, stream selection, subtitles, and playback state
 - [x] platform media backends behind a narrow player capability
 - [x] tracker SDK and opt-in tracker bundles
-- [ ] background library updates and notifications
+- [x] background library updates and notifications
 
 ## Phase 5 — release products
 

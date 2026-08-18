@@ -162,6 +162,20 @@ extensions. Core stores no credentials. It atomically persists only remote
 title mirrors and owns their versioned `tracking` backup section. Android and
 desktop share the same account settings, search, binding, and editing surfaces.
 
+Updates is a removable vertical over Library and Source. Its single shared job
+filters eligible titles, groups them by source, runs at most five source groups
+in parallel, and never overlaps with itself. Atomic feature-owned state retains
+the scheduling policy, per-title content baselines, recent unread discoveries,
+and last successful run; its versioned `library-updates` backup codec merges
+that state independently. The first fetch is deliberately silent, while later
+source identities become chapter or episode events. A narrow notifier port maps
+progress, discoveries, failures, and progress cleanup to the desktop system tray
+or Android notification channels. Shared Java schedules work while the product
+is alive; Android additionally uses an inexact platform alarm to reopen the
+product after process death, consult the same durable due time, execute the same
+service, and close the graph. The shared Compose Updates screen owns no refresh
+behavior.
+
 HTTP is split at the platform boundary. Framework contracts own immutable
 requests and responses plus cookie, cache, rate-limit, and low-level transport
 ports. One shared policy engine applies those contracts. Desktop injects the
