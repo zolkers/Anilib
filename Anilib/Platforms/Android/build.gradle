@@ -89,6 +89,7 @@ dependencies {
     implementation project(':Anilib:Features:Tracker:Ui')
     implementation project(':Anilib:Features:Updates:Api')
     implementation project(':Anilib:Features:Updates:Ui')
+    implementation project(':Anilib:Features:ApplicationUpdate:Ui')
     implementation project(':Anilib:Platforms:Compose')
     implementation 'androidx.activity:activity-compose:1.13.0'
     implementation 'androidx.preference:preference-ktx:1.2.1'

@@ -87,6 +87,7 @@ import fr.vriege.anilib.feature.reader.ui.ReaderPresentation
 import fr.vriege.anilib.feature.player.ui.PlayerPresentation
 import fr.vriege.anilib.feature.tracker.ui.TrackerPresentation
 import fr.vriege.anilib.feature.updates.ui.UpdatePresentation
+import fr.vriege.anilib.feature.applicationupdate.ui.ApplicationUpdatePresentation
 import fr.vriege.anilib.framework.http.HttpCookieJar
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -117,6 +118,7 @@ fun AnilibApp(
     backupImportPicker: BackupImportPicker,
     tracking: TrackerPresentation,
     updates: UpdatePresentation,
+    applicationUpdates: ApplicationUpdatePresentation,
     pageDecoder: (ByteArray) -> ImageBitmap?,
     componentCount: Int,
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -219,6 +221,7 @@ fun AnilibApp(
                             backupImportPicker,
                             tracking,
                             updates,
+                            applicationUpdates,
                             destination,
                             section,
                             componentCount,
@@ -254,6 +257,7 @@ fun AnilibApp(
                             backupImportPicker,
                             tracking,
                             updates,
+                            applicationUpdates,
                             destination,
                             section,
                             componentCount,
@@ -296,6 +300,7 @@ private fun ExpandedShell(
     backupImportPicker: BackupImportPicker,
     tracking: TrackerPresentation,
     updates: UpdatePresentation,
+    applicationUpdates: ApplicationUpdatePresentation,
     destination: LibraryNavigationState,
     section: AppSection,
     componentCount: Int,
@@ -334,6 +339,7 @@ private fun ExpandedShell(
                 backupImportPicker,
                 tracking,
                 updates,
+                applicationUpdates,
                 destination,
                 section,
                 componentCount,
@@ -373,6 +379,7 @@ private fun CompactShell(
     backupImportPicker: BackupImportPicker,
     tracking: TrackerPresentation,
     updates: UpdatePresentation,
+    applicationUpdates: ApplicationUpdatePresentation,
     destination: LibraryNavigationState,
     section: AppSection,
     componentCount: Int,
@@ -409,6 +416,7 @@ private fun CompactShell(
                 backupImportPicker,
                 tracking,
                 updates,
+                applicationUpdates,
                 destination,
                 section,
                 componentCount,
@@ -491,6 +499,7 @@ private fun AppDestination(
     backupImportPicker: BackupImportPicker,
     tracking: TrackerPresentation,
     updates: UpdatePresentation,
+    applicationUpdates: ApplicationUpdatePresentation,
     destination: LibraryNavigationState,
     section: AppSection,
     componentCount: Int,
@@ -564,7 +573,7 @@ private fun AppDestination(
                 { openMore(MoreDestination.ABOUT) },
                 closeMore,
             )
-            MoreDestination.ABOUT -> AboutScreen(componentCount, closeMore)
+            MoreDestination.ABOUT -> AboutScreen(componentCount, applicationUpdates, closeMore)
             null -> MorePage(
                 componentCount,
                 settings,

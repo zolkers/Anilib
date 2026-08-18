@@ -33,7 +33,7 @@ explicit so an architectural seam cannot be mistaken for a finished workflow.
 | Player settings and player | [x] | Partial | Searchable/unwatched episode list, qualities, subtitles, resume, protected media relay, and native Android/desktop playback are live; add complete controls, gestures, decoder/audio policy, PiP, and custom buttons |
 | Data, storage, and advanced settings | [x] | Partial | Confirmed cookie/cache/WebView/database cleanup and backup storage are live; add storage inspection, user agent, proxy/DoH, diagnostics, and crash logs |
 | WebView | [x] | Partial | Navigation, reload, progress, source headers/User-Agent, cookie transfer, challenge completion, and platform cleanup are live; add automatic challenge retry, file chooser, pop-ups, downloads, and browser settings |
-| About, help, and application updates | [ ] | Partial | Version/build metadata, licences, changelog, help links, update check, and release channel |
+| About, help, and application updates | [x] | Partial | Version, platform, stable-channel check, release-page hand-off, project, and issue links are live; add licences, changelog, automatic installation, and channel choice |
 
 ## Completed in the first pass
 
@@ -50,6 +50,7 @@ explicit so an architectural seam cannot be mistaken for a finished workflow.
 - [x] Added episode search/unwatched filtering, download status filtering, and reader page retry.
 - [x] Verified backup inspection/rollback/import, tracking edit flows, and browser cookie/challenge handling.
 - [x] Added settings search and connected Sources, Tracking, Backup, and About to their working screens.
+- [x] Added one shared stable application-update check with version comparison and release-page hand-off.
 - [x] Kept every result shared by Android and desktop; no feature behavior was copied into a platform launcher.
 
 The audit is intentionally grouped by user workflow. Aniyomi currently spreads

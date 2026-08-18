@@ -1,0 +1,4 @@
+dependencies {
+    api project(':Anilib:Features:ApplicationUpdate:Api')
+    implementation project(':Anilib:Kernel:Api')
+}

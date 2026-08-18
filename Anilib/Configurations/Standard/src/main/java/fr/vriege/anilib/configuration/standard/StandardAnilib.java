@@ -23,6 +23,7 @@ import fr.vriege.anilib.feature.updates.LibraryUpdateNotifiers;
 import fr.vriege.anilib.feature.updates.UpdateCapabilities;
 import fr.vriege.anilib.feature.updates.bundle.UpdatePlugin;
 import fr.vriege.anilib.feature.backup.bundle.BackupPlugin;
+import fr.vriege.anilib.feature.applicationupdate.bundle.ApplicationUpdatePlugin;
 import fr.vriege.anilib.feature.source.bundle.SourceSdkPlugin;
 import fr.vriege.anilib.framework.http.HttpTransport;
 import fr.vriege.anilib.framework.http.runtime.UrlConnectionHttpTransport;
@@ -147,6 +148,7 @@ public final class StandardAnilib {
         plugins.add(new PlayerPlugin(playbackState, playerBackend));
         plugins.add(new TrackerPlugin(trackingState));
         plugins.add(new UpdatePlugin(updateState, updateNotifier));
+        plugins.add(ApplicationUpdatePlugin.currentRuntime());
         plugins.add(new BackupPlugin(
                 backups,
                 List.of(

@@ -22,7 +22,7 @@ workflow or settings depth is not yet complete.
 | Settings | Partial | Removable Settings Bundle, atomic persistence, observable snapshots, live system/light/dark theme, enforced adult/incognito/Wi-Fi policies, shared hierarchy, working network actions, and live More switches for incognito/downloaded-only | Connect every remaining row and finish the screen audit |
 | Network maintenance | Partial | Shared cookies/cache/rate limits plus confirmed Android/desktop actions to clear HTTP cookies, HTTP cache, WebView cookies, browser cache, site storage, and orphaned feature records | Default user agent, proxy/DoH policy, and diagnostics |
 | WebView | Partial | Source API 1.6 source/title entry points, Android System WebView, desktop KCEF, navigation controls, bidirectional shared-cookie handoff, per-source headers/User-Agent, challenge-cookie verification, and confirmed data clearing | Automatic provider-specific challenge retry, file chooser/pop-up/download handling, and browser settings |
-| Release products | Partial | MSI/DEB/DMG matrix and Android APK pipeline | Release publication, app update channels, extension update channels, and production signing operations |
+| Release products | Partial | MSI/DEB/DMG matrix, Android APK pipeline, extension update channels, and a shared stable GitHub release check with release-page hand-off | Automatic application installation, release publication, and production signing operations |
 
 ## Compatibility policy
 

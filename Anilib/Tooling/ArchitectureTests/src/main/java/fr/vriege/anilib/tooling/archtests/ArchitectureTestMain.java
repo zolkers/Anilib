@@ -18,6 +18,8 @@ import fr.vriege.anilib.feature.tracker.TrackerCapabilities;
 import fr.vriege.anilib.feature.tracker.ui.TrackerUiCapabilities;
 import fr.vriege.anilib.feature.updates.UpdateCapabilities;
 import fr.vriege.anilib.feature.updates.ui.UpdateUiCapabilities;
+import fr.vriege.anilib.feature.applicationupdate.ApplicationUpdateCapabilities;
+import fr.vriege.anilib.feature.applicationupdate.ui.ApplicationUpdateUiCapabilities;
 import fr.vriege.anilib.feature.downloads.DownloadCapabilities;
 import fr.vriege.anilib.feature.downloads.ui.DownloadUiCapabilities;
 import fr.vriege.anilib.feature.extensionrepository.ExtensionRepositoryCapabilities;
@@ -75,6 +77,7 @@ public final class ArchitectureTestMain {
         assertions += PlayerTest.run();
         assertions += TrackerTest.run();
         assertions += UpdateTest.run();
+        assertions += ApplicationUpdateTest.run();
         assertions += DownloadTest.run();
         assertions += BackupTest.run();
         assertions += SettingsTest.run();
@@ -93,7 +96,7 @@ public final class ArchitectureTestMain {
             LibraryItem item = LibraryItem.create("A test title", MediaKind.MANGA);
             catalog.save(item);
             check(catalog.find(item.id()).orElseThrow().equals(item), "library must return saved item");
-            check(application.components().size() == 13, "standard product must install thirteen bootstrap bundles");
+            check(application.components().size() == 14, "standard product must install fourteen bootstrap bundles");
             check(application.capability(ExtensionRepositoryCapabilities.SERVICE).repositories().isEmpty(),
                     "standard product must ship without a third-party extension repository");
             check(application.capability(ExtensionRepositoryCapabilities.INSTALLATION).installed().isEmpty(),
@@ -147,6 +150,10 @@ public final class ArchitectureTestMain {
                     "Updates Bundle must publish its self-owned backup codec");
             check(application.capability(UpdateUiCapabilities.PRESENTATION) != null,
                     "Updates Bundle must publish its shared presentation capability");
+            check(application.capability(ApplicationUpdateCapabilities.SERVICE) != null,
+                    "Application Update Bundle must publish its update capability");
+            check(application.capability(ApplicationUpdateUiCapabilities.PRESENTATION) != null,
+                    "Application Update Bundle must publish its shared presentation capability");
             check(application.capability(DownloadCapabilities.SERVICE) != null,
                     "Downloads Bundle must publish its queue capability");
             check(application.capability(DownloadUiCapabilities.PRESENTATION) != null,

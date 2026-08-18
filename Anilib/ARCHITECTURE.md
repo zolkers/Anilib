@@ -219,6 +219,15 @@ product after process death, consult the same durable due time, execute the same
 service, and close the graph. The shared Compose Updates screen owns no refresh
 behavior.
 
+ApplicationUpdate is a separate removable vertical because checking the Anilib
+application release channel is not library-content update behavior. Its shared
+Java service performs a bounded request to the configured GitHub Releases API,
+parses only the stable release identity and HTTPS release page, and compares
+numeric semantic versions without a third-party library. The Bundle publishes
+one immutable presentation consumed by the shared About screen. Android and
+desktop therefore expose the same manual check and release-page hand-off while
+their launchers supply only the current packaged version and platform identity.
+
 HTTP is split at the platform boundary. Framework contracts own immutable
 requests and responses plus cookie, cache, rate-limit, and low-level transport
 ports. One shared policy engine applies those contracts. Desktop injects the

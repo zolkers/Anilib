@@ -20,6 +20,7 @@ import fr.vriege.anilib.feature.downloads.ui.DownloadUiCapabilities
 import fr.vriege.anilib.feature.backup.ui.BackupUiCapabilities
 import fr.vriege.anilib.feature.tracker.ui.TrackerUiCapabilities
 import fr.vriege.anilib.feature.updates.ui.UpdateUiCapabilities
+import fr.vriege.anilib.feature.applicationupdate.ui.ApplicationUpdateUiCapabilities
 import fr.vriege.anilib.framework.http.jdk.JdkHttpTransport
 import fr.vriege.anilib.kernel.StartedAnilib
 import fr.vriege.anilib.platform.compose.AnilibApp
@@ -85,6 +86,7 @@ fun main() {
                 backupImportPicker = DesktopBackupImportPicker(),
                 tracking = tracking,
                 updates = updates,
+                applicationUpdates = started.capability(ApplicationUpdateUiCapabilities.PRESENTATION),
                 pageDecoder = ::decodePage,
                 componentCount = started.components().size,
                 darkTheme = desktopDarkTheme(),

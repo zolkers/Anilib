@@ -11,19 +11,31 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import fr.vriege.anilib.feature.library.MediaKind
 import fr.vriege.anilib.feature.library.ui.LibraryOverview
+import fr.vriege.anilib.feature.applicationupdate.ui.ApplicationUpdatePresentation
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,7 +83,16 @@ internal fun StatisticsScreen(overview: LibraryOverview, goBack: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun AboutScreen(componentCount: Int, goBack: () -> Unit) {
+internal fun AboutScreen(
+    componentCount: Int,
+    updates: ApplicationUpdatePresentation,
+    goBack: () -> Unit,
+) {
+    var snapshot by remember(updates) { mutableStateOf(updates.snapshot()) }
+    var checking by remember(updates) { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val uriHandler = LocalUriHandler.current
+    val available = snapshot.availableRelease().orElse(null)
     MoreScaffold("About", goBack) { padding ->
         Column(
             modifier = Modifier.fillMaxSize().padding(padding).padding(24.dp),
@@ -83,8 +104,44 @@ internal fun AboutScreen(componentCount: Int, goBack: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             SummaryCard("Runtime", "$componentCount feature bundles active")
+            SummaryCard("Version", snapshot.currentVersion().display())
+            SummaryCard("Update channel", "Stable · ${snapshot.platform().name.lowercase()}")
             SummaryCard("Source format", "Signed portable Anilib Bundles")
             SummaryCard("Platforms", "Android and desktop")
+            snapshot.error().orElse(null)?.let { error ->
+                Text(error, color = MaterialTheme.colorScheme.error)
+            }
+            if (available == null) {
+                Button(
+                    enabled = !checking,
+                    onClick = {
+                        checking = true
+                        scope.launch {
+                            snapshot = withContext(Dispatchers.IO) { updates.checkNow() }
+                            checking = false
+                        }
+                    },
+                ) {
+                    Text(if (checking) "Checking…" else "Check for updates")
+                }
+            } else {
+                Text(
+                    "Anilib ${available.version().display()} is available.",
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Button(onClick = { uriHandler.openUri(available.releasePage().toString()) }) {
+                    Text("Open release")
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = { uriHandler.openUri("https://github.com/zolkers/Anilib") }) {
+                    Text("Project")
+                }
+                TextButton(onClick = { uriHandler.openUri("https://github.com/zolkers/Anilib/issues") }) {
+                    Text("Help")
+                }
+            }
         }
     }
 }

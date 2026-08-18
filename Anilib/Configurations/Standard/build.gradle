@@ -19,5 +19,6 @@ dependencies {
     implementation project(':Anilib:Features:Tracker:Bundle')
     api project(':Anilib:Features:Updates:Api')
     implementation project(':Anilib:Features:Updates:Bundle')
+    implementation project(':Anilib:Features:ApplicationUpdate:Bundle')
     implementation project(':Anilib:Features:Backup:Bundle')
 }

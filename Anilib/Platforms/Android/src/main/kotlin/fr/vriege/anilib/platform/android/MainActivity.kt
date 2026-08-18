@@ -22,6 +22,7 @@ import fr.vriege.anilib.feature.downloads.ui.DownloadUiCapabilities
 import fr.vriege.anilib.feature.backup.ui.BackupUiCapabilities
 import fr.vriege.anilib.feature.tracker.ui.TrackerUiCapabilities
 import fr.vriege.anilib.feature.updates.ui.UpdateUiCapabilities
+import fr.vriege.anilib.feature.applicationupdate.ui.ApplicationUpdateUiCapabilities
 import fr.vriege.anilib.framework.http.runtime.UrlConnectionHttpTransport
 import fr.vriege.anilib.platform.compose.AnilibApp
 import fr.vriege.anilib.platform.compose.ComposePlayerBackend
@@ -34,6 +35,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         LibraryUpdateReceiver.schedule(this)
+        val packagedVersion = packageManager.getPackageInfo(packageName, 0).versionName ?: "0.1.0"
+        System.setProperty("anilib.version", packagedVersion)
         if (Build.VERSION.SDK_INT >= 33 &&
             checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) {
@@ -85,6 +88,7 @@ class MainActivity : ComponentActivity() {
                 backupImportPicker = backupImportPicker,
                 tracking = tracking,
                 updates = updates,
+                applicationUpdates = started.capability(ApplicationUpdateUiCapabilities.PRESENTATION),
                 pageDecoder = ::decodePage,
                 componentCount = componentCount,
             )

@@ -61,6 +61,7 @@ platform-specific.
 - [x] reproducible desktop packages for Windows, Linux, and macOS
 - [x] Android APK using only Android SDK/platform APIs beyond shared Anilib code
 - [x] extension signing, compatibility metadata, and update channels
+- [x] shared stable application update checks and release-page hand-off
 - [x] import compatibility for user-owned Aniyomi backups where legally and
   technically feasible
 
@@ -125,7 +126,8 @@ platform-specific.
   - [x] audit and align the Browse, source catalogue, migration, and extension baseline
   - [x] audit and align the Reader, Player, Downloads, Backup, Tracking, and WebView baseline
   - [x] audit the Settings hierarchy and connect every already implemented destination
-  - [ ] finish dedicated Settings destinations, About, Help, and application updates
+  - [x] audit and align About, Help, and stable application update checks
+  - [ ] finish dedicated Settings destination depth
 
 Each checkbox should land through a Bundle that can be removed from the
 Standard configuration without changing unrelated features.
