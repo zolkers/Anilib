@@ -1,0 +1,7 @@
+dependencies {
+    implementation project(':Anilib:Features:Source:Api')
+}
+
+tasks.named('jar') {
+    archiveFileName = 'anilib-example-source.jar'
+}

@@ -321,7 +321,7 @@ public final class DefaultExtensionInstallationService implements ExtensionInsta
 
     private void writeArtifact(InstalledExtensionPackage extension, byte[] bytes) {
         Path destination = artifactPath(extension);
-        Path temporary = artifactDirectory.resolve(extension.packageName() + ".tmp");
+        Path temporary = destination.resolveSibling(destination.getFileName() + ".tmp");
         try {
             Files.createDirectories(artifactDirectory);
             Files.write(temporary, bytes);

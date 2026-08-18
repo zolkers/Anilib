@@ -17,13 +17,9 @@ public record InstalledExtensionPackage(
         String sha256,
         Instant installedAt) {
     private static final Pattern SHA_256 = Pattern.compile("[0-9a-f]{64}");
-    private static final Pattern PACKAGE_NAME = Pattern.compile("[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z0-9_]+)+");
 
     public InstalledExtensionPackage {
-        packageName = Preconditions.requireNonBlank(packageName, "packageName");
-        if (!PACKAGE_NAME.matcher(packageName).matches()) {
-            throw new IllegalArgumentException("packageName must use Java package syntax");
-        }
+        packageName = ExtensionPackageIdentifiers.requireValid(packageName);
         displayName = Preconditions.requireNonBlank(displayName, "displayName");
         if (versionCode < 0) {
             throw new IllegalArgumentException("versionCode must not be negative");

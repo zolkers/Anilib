@@ -65,8 +65,9 @@ portable Bundles are revalidated on restart and loaded through one explicit,
 in-memory JPMS layer per artifact into the shared Source registry; a broken
 artifact is reported without blocking valid Bundles. Anilib ships with no
 third-party source catalogue. A pasted GitHub repository URL is resolved through
-its default branch, with dynamic `index.min.json` then `index.json` discovery;
-the same signed portable Bundle is installed by Android and desktop.
+its default branch and conventional `repo` publication branch, with dynamic
+`index.min.json` then `index.json` discovery; the same signed portable Bundle is
+installed by Android and desktop.
 On Android, the same screen inventories installed Aniyomi extension APKs that
 the OS already exposes, including their source entrypoints, Aniyomi library
 generation,

@@ -89,7 +89,7 @@ final class ExtensionRepositoryTest {
         String index = """
                 [{
                   "name":"Aniyomi: Example",
-                  "pkg":"eu.kanade.tachiyomi.animeextension.en.example",
+                  "pkg":"vendor:any/pkg@v1",
                   "apk":"example-v14.2.apk",
                   "lang":"en",
                   "code":2,
@@ -113,6 +113,8 @@ final class ExtensionRepositoryTest {
                 """.formatted(SHA_256);
         List<ExtensionPackageMetadata> packages = new AniyomiRepositoryIndexParser().parse(INDEX, index);
         ExtensionPackageMetadata extension = packages.getFirst();
+        counter.check(extension.packageName().equals("vendor:any/pkg@v1"),
+                "pkg must remain an opaque publisher identity without a vendor-prefix restriction");
         counter.check(extension.artifacts().size() == 2,
                 "one compatible index entry must expose APK and portable Bundle artifacts");
         counter.check(extension.artifacts().getFirst().format() == ExtensionArtifactFormat.ANIYOMI_APK,
@@ -133,7 +135,13 @@ final class ExtensionRepositoryTest {
                         [{"name":"Bad","pkg":"invalid","apk":"bad.apk","lang":"en",
                         "code":1,"version":"1","sources":[]}]
                         """),
-                "repository entries must reject invalid package identities and empty sources");
+                "repository entries must reject empty source declarations");
+        counter.expectIllegalArgument(
+                () -> parser.parse(INDEX, """
+                        [{"name":"Bad","pkg":"line\\nbreak","apk":"bad.apk","lang":"en",
+                        "code":1,"version":"1","sources":[{"name":"Bad","lang":"en","id":"1"}]}]
+                        """),
+                "repository package identities must reject control characters");
         counter.expectIllegalArgument(
                 () -> parser.parse(INDEX, """
                         [{"name":"Bad","pkg":"a.b","apk":"http://bad.example/a.apk","lang":"en",
@@ -202,10 +210,12 @@ final class ExtensionRepositoryTest {
                     "a GitHub repository URL must resolve to its dynamic JSON index");
             counter.check(client.requests.equals(List.of(
                             URI.create("https://raw.githubusercontent.com/example/anilib-sources/HEAD/index.min.json"),
-                            URI.create("https://raw.githubusercontent.com/example/anilib-sources/HEAD/index.json"))),
-                    "GitHub resolution must prefer index.min.json and fall back to index.json");
+                            URI.create("https://raw.githubusercontent.com/example/anilib-sources/HEAD/index.json"),
+                            URI.create("https://raw.githubusercontent.com/example/anilib-sources/repo/index.min.json"),
+                            URI.create("https://raw.githubusercontent.com/example/anilib-sources/repo/index.json"))),
+                    "GitHub resolution must search default and publication branches deterministically");
             counter.check(snapshot.packages().getFirst().artifacts().getFirst().uri().equals(
-                            URI.create("https://raw.githubusercontent.com/example/anilib-sources/HEAD/portable.jar")),
+                            URI.create("https://raw.githubusercontent.com/example/anilib-sources/repo/portable.jar")),
                     "relative Bundle URLs must resolve beside the fetched GitHub index");
         } finally {
             deleteDirectory(directory);
@@ -216,8 +226,9 @@ final class ExtensionRepositoryTest {
         Path directory = temporaryDirectory();
         try {
             KeyPair keyPair = keyPair();
-            byte[] versionOne = bundle("eu.example.extension", 1, "1.4");
-            ExtensionPackageMetadata first = portablePackage(versionOne, keyPair, 1);
+            String packageId = "vendor:any/pkg@v1";
+            byte[] versionOne = bundle(packageId, 1, "1.4");
+            ExtensionPackageMetadata first = portablePackage(packageId, versionOne, keyPair, 1);
             DefaultExtensionInstallationService service = installationService(
                     directory,
                     new RecordingClient(versionOne));
@@ -230,11 +241,15 @@ final class ExtensionRepositoryTest {
             counter.check(service.installed().getFirst().state() == ExtensionInstallationState.DISABLED,
                     "installed portable Bundles must support durable disable state");
 
-            byte[] versionTwo = bundle("eu.example.extension", 2, "1.4");
+            byte[] versionTwo = bundle(packageId, 2, "1.4");
             DefaultExtensionInstallationService reopened = installationService(
                     directory,
                     new RecordingClient(versionTwo));
-            InstalledExtensionPackage updated = reopened.update(portablePackage(versionTwo, keyPair, 2));
+            InstalledExtensionPackage updated = reopened.update(portablePackage(
+                    packageId,
+                    versionTwo,
+                    keyPair,
+                    2));
             counter.check(updated.versionCode() == 2
                             && updated.state() == ExtensionInstallationState.DISABLED,
                     "a verified newer Bundle must update without silently enabling a disabled extension");
@@ -444,12 +459,16 @@ final class ExtensionRepositoryTest {
                 "shared Android and desktop preference selections must reach the APK source before requests");
     }
 
-    private static ExtensionPackageMetadata portablePackage(byte[] bundle, KeyPair keyPair, long versionCode) {
+    private static ExtensionPackageMetadata portablePackage(
+            String packageName,
+            byte[] bundle,
+            KeyPair keyPair,
+            long versionCode) {
         String checksum = sha256(bundle);
         String signature = signature(bundle, keyPair);
         return new ExtensionPackageMetadata(
                 "Example",
-                "eu.example.extension",
+                packageName,
                 "en",
                 versionCode,
                 "1." + versionCode,
@@ -473,12 +492,12 @@ final class ExtensionRepositoryTest {
                 archive.write(("package=" + packageName
                         + "\nversionCode=" + versionCode
                         + "\napi=" + api
-                        + "\nmodule=" + packageName
+                        + "\nmodule=fr.vriege.anilib.fixture"
                         + "\nsource.count=1"
                         + "\nsource.0.id=example.source"
                         + "\nsource.0.component=extension.example.source"
                         + "\nsource.0.name=Example"
-                        + "\nsource.0.factory=" + packageName + ".ExampleFactory\n")
+                        + "\nsource.0.factory=fr.vriege.anilib.fixture.ExampleFactory\n")
                         .getBytes(StandardCharsets.UTF_8));
                 archive.closeEntry();
             }
@@ -566,7 +585,7 @@ final class ExtensionRepositoryTest {
         @Override
         public HttpResponse execute(HttpRequest request) {
             requests.add(request.uri());
-            if (request.uri().getPath().endsWith("index.min.json")) {
+            if (!request.uri().getPath().equals("/example/anilib-sources/repo/index.json")) {
                 return new HttpResponse(404, Map.of(), new byte[0], false);
             }
             return new HttpResponse(200, Map.of("content-type", List.of("application/json")), index, false);

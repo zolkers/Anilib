@@ -66,8 +66,16 @@ platform-specific.
 ## Phase 6 — bring-your-own sources and complete settings
 
 - [x] user-managed extension repository URLs using the Aniyomi index shape
-- [x] resolve GitHub repository URLs dynamically through default-branch
-  `index.min.json` and `index.json` candidates on Android and desktop
+- [x] preserve arbitrary printable `pkg` identities without vendor-prefix rules,
+  using path-safe hashed artifact storage
+- [x] resolve GitHub repository URLs dynamically through default-branch and
+  publication-branch `index.min.json`/`index.json` candidates on Android and desktop
+- [x] official `fr.vriege.anilib` source template compiled as an isolated portable module
+- [x] dependency-free SourcePublisher for reproducible JAR packaging, Ed25519 keys,
+  SHA-256 checksums, signatures, and deterministic full/minified indexes
+- [x] ready-to-run GitHub Actions publication workflow targeting a `repo` branch
+- [x] end-to-end example that packages, signs, installs, restarts, and browses the
+  same source through the Android/desktop product graph
 - [x] signed portable Anilib artifacts with trust, install, update, disable, and remove
 - [x] load enabled portable Bundles into the Source registry through an explicit
   restart-isolated module boundary

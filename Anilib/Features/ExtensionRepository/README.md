@@ -10,10 +10,16 @@ artifact downloads require HTTPS, redirects are revalidated hop by hop, index
 size and nesting are bounded, duplicate packages are rejected, and URLs with
 credentials or fragments are invalid.
 
+`pkg` is an opaque publisher identity: no `eu.kanade`, reverse-domain, vendor,
+or Java-package prefix is required. Anilib preserves printable Unicode values
+verbatim and derives separate hashed local filenames, so accepting another
+ecosystem's identity cannot escape the managed extension directory.
+
 Users may paste either a direct HTTPS index URL or a GitHub repository URL such
 as `https://github.com/publisher/anilib-sources`. A GitHub repository is resolved
 dynamically through its default branch, trying `index.min.json` before
-`index.json`. Relative Bundle URLs remain relative to the fetched raw index.
+`index.json`, then through the conventional publication branch `repo`. Relative
+Bundle URLs remain relative to the fetched raw index.
 
 One entry may additionally advertise a portable artifact without breaking an
 Aniyomi client:

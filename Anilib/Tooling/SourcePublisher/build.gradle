@@ -1,0 +1,8 @@
+plugins {
+    id 'application'
+}
+
+application {
+    mainModule = 'fr.vriege.anilib.tooling.sourcepublisher'
+    mainClass = 'fr.vriege.anilib.tooling.sourcepublisher.SourcePublisherMain'
+}

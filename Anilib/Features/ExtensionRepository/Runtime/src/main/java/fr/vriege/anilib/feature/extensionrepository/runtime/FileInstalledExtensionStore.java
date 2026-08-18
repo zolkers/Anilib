@@ -72,7 +72,7 @@ public final class FileInstalledExtensionStore {
     private static InstalledExtensionPackage decode(String[] fields) {
         try {
             return new InstalledExtensionPackage(
-                    fields[0],
+                    decodePackageName(fields[0]),
                     decodeText(fields[1]),
                     Long.parseLong(fields[2]),
                     decodeText(fields[3]),
@@ -88,7 +88,7 @@ public final class FileInstalledExtensionStore {
     private static String encode(InstalledExtensionPackage extension) {
         return String.join(
                 "\t",
-                extension.packageName(),
+                "b64:" + encodeText(extension.packageName()),
                 encodeText(extension.displayName()),
                 Long.toString(extension.versionCode()),
                 encodeText(extension.versionName()),
@@ -104,6 +104,10 @@ public final class FileInstalledExtensionStore {
 
     private static String decodeText(String value) {
         return new String(Base64.getUrlDecoder().decode(value), StandardCharsets.UTF_8);
+    }
+
+    private static String decodePackageName(String value) {
+        return value.startsWith("b64:") ? decodeText(value.substring(4)) : value;
     }
 
     private void writeAtomically(String content) {

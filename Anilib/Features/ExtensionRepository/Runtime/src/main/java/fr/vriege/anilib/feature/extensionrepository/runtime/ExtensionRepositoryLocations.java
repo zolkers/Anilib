@@ -29,7 +29,9 @@ final class ExtensionRepositoryLocations {
         String root = "https://" + RAW_GITHUB_HOST + "/" + owner + "/" + repository + "/HEAD/";
         return List.of(
                 URI.create(root + "index.min.json"),
-                URI.create(root + "index.json"));
+                URI.create(root + "index.json"),
+                URI.create(root.replace("/HEAD/", "/repo/") + "index.min.json"),
+                URI.create(root.replace("/HEAD/", "/repo/") + "index.json"));
     }
 
     private static String stripGitSuffix(String repository) {

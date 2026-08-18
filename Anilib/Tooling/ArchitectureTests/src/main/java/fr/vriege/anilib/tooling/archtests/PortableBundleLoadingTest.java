@@ -205,7 +205,7 @@ final class PortableBundleLoadingTest {
             InstalledExtensionPackage extension,
             byte[] bytes) {
         Path artifact = installationDirectory.resolve("artifacts").resolve(
-                extension.packageName() + "-" + extension.versionCode()
+                packageHash(extension.packageName()) + "-" + extension.versionCode()
                         + "-" + extension.sha256().substring(0, 16) + ".jar");
         try {
             Files.createDirectories(artifact.getParent());
@@ -218,6 +218,16 @@ final class PortableBundleLoadingTest {
     private static String sha256(byte[] value) {
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value));
+        } catch (GeneralSecurityException exception) {
+            throw new AssertionError("JDK must provide SHA-256", exception);
+        }
+    }
+
+    private static String packageHash(String packageName) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest(packageName.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest, 0, 16);
         } catch (GeneralSecurityException exception) {
             throw new AssertionError("JDK must provide SHA-256", exception);
         }

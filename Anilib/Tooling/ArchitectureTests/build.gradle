@@ -4,6 +4,7 @@ plugins {
 
 dependencies {
     implementation project(':Anilib:Tooling:JavaQuality')
+    implementation project(':Anilib:Tooling:SourcePublisher')
     implementation project(':Anilib:Foundation')
     implementation project(':Anilib:Kernel:Api')
     implementation project(':Anilib:Kernel:Runtime')
@@ -57,4 +58,14 @@ dependencies {
 application {
     mainModule = 'fr.vriege.anilib.tooling.archtests'
     mainClass = 'fr.vriege.anilib.tooling.archtests.ArchitectureTestMain'
+}
+
+tasks.named('run') {
+    dependsOn ':Anilib:Examples:SourceTemplate:jar'
+    systemProperty 'anilib.example.source.classes', project(':Anilib:Examples:SourceTemplate')
+            .layout.buildDirectory.dir('classes/java/main').get().asFile.absolutePath
+    systemProperty 'anilib.example.source.descriptor', project(':Anilib:Examples:SourceTemplate')
+            .file('src/main/resources/META-INF/anilib-extension.properties').absolutePath
+    systemProperty 'anilib.example.source.configuration', project(':Anilib:Examples:SourceTemplate')
+            .file('source-publisher.properties').absolutePath
 }

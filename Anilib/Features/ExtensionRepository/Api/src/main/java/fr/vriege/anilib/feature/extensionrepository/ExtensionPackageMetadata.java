@@ -6,7 +6,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
-import java.util.regex.Pattern;
 
 /** One extension package advertised by a user-supplied repository. */
 public record ExtensionPackageMetadata(
@@ -19,14 +18,9 @@ public record ExtensionPackageMetadata(
         ExtensionContentKind contentKind,
         List<ExtensionSourceMetadata> sources,
         List<ExtensionArtifactMetadata> artifacts) {
-    private static final Pattern PACKAGE_NAME = Pattern.compile("[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z0-9_]+)+");
-
     public ExtensionPackageMetadata {
         displayName = Preconditions.requireNonBlank(displayName, "displayName");
-        packageName = Preconditions.requireNonBlank(packageName, "packageName");
-        if (!PACKAGE_NAME.matcher(packageName).matches()) {
-            throw new IllegalArgumentException("packageName must use Java package syntax");
-        }
+        packageName = ExtensionPackageIdentifiers.requireValid(packageName);
         languageTag = normalizeLanguage(languageTag);
         if (versionCode < 0) {
             throw new IllegalArgumentException("versionCode must not be negative");
