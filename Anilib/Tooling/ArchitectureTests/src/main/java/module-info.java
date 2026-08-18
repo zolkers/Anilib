@@ -5,12 +5,14 @@ module fr.vriege.anilib.tooling.archtests {
     requires fr.vriege.anilib.framework.http.api;
     requires fr.vriege.anilib.framework.http.runtime;
     requires fr.vriege.anilib.framework.http.jdk.runtime;
+    requires fr.vriege.anilib.framework.backup.api;
     requires fr.vriege.anilib.foundation;
     requires fr.vriege.anilib.kernel.api;
     requires fr.vriege.anilib.kernel.runtime;
     requires fr.vriege.anilib.configuration.standard;
     requires fr.vriege.anilib.feature.discovery.api;
     requires fr.vriege.anilib.feature.discovery.ui;
+    requires fr.vriege.anilib.feature.discovery.runtime;
     requires fr.vriege.anilib.feature.covercache.api;
     requires fr.vriege.anilib.feature.covercache.runtime;
     requires fr.vriege.anilib.feature.covercache.bundle;
@@ -30,4 +32,7 @@ module fr.vriege.anilib.tooling.archtests {
     requires fr.vriege.anilib.feature.downloads.api;
     requires fr.vriege.anilib.feature.downloads.runtime;
     requires fr.vriege.anilib.feature.downloads.ui;
+    requires fr.vriege.anilib.feature.backup.api;
+    requires fr.vriege.anilib.feature.backup.runtime;
+    requires fr.vriege.anilib.feature.backup.ui;
 }

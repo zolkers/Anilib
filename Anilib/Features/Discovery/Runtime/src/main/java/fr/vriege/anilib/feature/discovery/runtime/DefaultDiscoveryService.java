@@ -42,9 +42,16 @@ public final class DefaultDiscoveryService implements DiscoveryService {
     private final FileSourcePreferenceStore preferences;
 
     public DefaultDiscoveryService(SourceRegistry registry, LibraryCatalog library, Path preferenceFile) {
+        this(registry, library, new FileSourcePreferenceStore(preferenceFile));
+    }
+
+    public DefaultDiscoveryService(
+            SourceRegistry registry,
+            LibraryCatalog library,
+            FileSourcePreferenceStore preferences) {
         this.registry = Objects.requireNonNull(registry, "registry must not be null");
         this.library = Objects.requireNonNull(library, "library must not be null");
-        preferences = new FileSourcePreferenceStore(preferenceFile);
+        this.preferences = Objects.requireNonNull(preferences, "preferences must not be null");
     }
 
     @Override

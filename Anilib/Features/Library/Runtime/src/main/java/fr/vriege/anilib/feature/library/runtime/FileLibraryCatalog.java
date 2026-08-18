@@ -56,6 +56,19 @@ public final class FileLibraryCatalog implements LibraryCatalog {
     }
 
     @Override
+    public synchronized void replaceAll(Collection<LibraryItem> replacement) {
+        Objects.requireNonNull(replacement, "replacement must not be null");
+        Map<LibraryItemId, LibraryItem> next = new LinkedHashMap<>();
+        for (LibraryItem item : replacement) {
+            Objects.requireNonNull(item, "replacement must not contain null items");
+            if (next.putIfAbsent(item.id(), item) != null) {
+                throw new IllegalArgumentException("replacement contains duplicate library item ids");
+            }
+        }
+        persistAndReplace(next.values());
+    }
+
+    @Override
     public synchronized boolean remove(LibraryItemId id) {
         Objects.requireNonNull(id, "id must not be null");
         if (!items.containsKey(id)) {

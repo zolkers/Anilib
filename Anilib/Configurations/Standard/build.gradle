@@ -10,4 +10,5 @@ dependencies {
     implementation project(':Anilib:Features:Discovery:Bundle')
     implementation project(':Anilib:Features:Reader:Bundle')
     implementation project(':Anilib:Features:Downloads:Bundle')
+    implementation project(':Anilib:Features:Backup:Bundle')
 }

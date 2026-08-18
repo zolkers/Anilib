@@ -11,6 +11,8 @@ import fr.vriege.anilib.feature.library.PublicationStatus;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.EOFException;
@@ -30,6 +32,7 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Objects;
 import java.util.Set;
 
 /** Owns the versioned on-disk format and atomic replacement protocol. */
@@ -49,10 +52,26 @@ final class LibraryFileStore {
 
     LoadResult load() throws IOException {
         if (!Files.exists(file)) {
-            return new LoadResult(List.of(), false);
+            return new LoadResult(List.of(), false, CURRENT_VERSION);
         }
-        try (DataInputStream input = new DataInputStream(
-                new BufferedInputStream(Files.newInputStream(file)))) {
+        return read(new BufferedInputStream(Files.newInputStream(file)));
+    }
+
+    static LoadResult decode(byte[] payload) throws IOException {
+        Objects.requireNonNull(payload, "payload must not be null");
+        return read(new ByteArrayInputStream(payload));
+    }
+
+    static byte[] encode(Collection<LibraryItem> items) throws IOException {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        try (DataOutputStream output = new DataOutputStream(new BufferedOutputStream(bytes))) {
+            writeCurrent(output, items);
+        }
+        return bytes.toByteArray();
+    }
+
+    private static LoadResult read(java.io.InputStream source) throws IOException {
+        try (DataInputStream input = new DataInputStream(source)) {
             if (input.readInt() != MAGIC) {
                 throw new IOException("Invalid Anilib library file signature");
             }
@@ -67,7 +86,7 @@ final class LibraryFileStore {
             if (input.read() != -1) {
                 throw new IOException("Unexpected trailing data in Anilib library file");
             }
-            return new LoadResult(items, version < CURRENT_VERSION);
+            return new LoadResult(items, version < CURRENT_VERSION, version);
         } catch (EOFException exception) {
             throw new IOException("Truncated Anilib library file", exception);
         } catch (IllegalArgumentException | DateTimeException exception) {
@@ -97,14 +116,23 @@ final class LibraryFileStore {
                 StandardOpenOption.TRUNCATE_EXISTING);
              DataOutputStream output = new DataOutputStream(
                      new BufferedOutputStream(Channels.newOutputStream(channel)))) {
-            output.writeInt(MAGIC);
-            output.writeInt(CURRENT_VERSION);
-            output.writeInt(ordered.size());
-            for (LibraryItem item : ordered) {
-                writeVersionThreeItem(output, item);
-            }
+            writeCurrent(output, ordered);
             output.flush();
             channel.force(true);
+        }
+    }
+
+    private static void writeCurrent(
+            DataOutputStream output,
+            Collection<LibraryItem> items) throws IOException {
+        List<LibraryItem> ordered = items.stream()
+                .sorted(Comparator.comparing(LibraryItem::id))
+                .toList();
+        output.writeInt(MAGIC);
+        output.writeInt(CURRENT_VERSION);
+        output.writeInt(ordered.size());
+        for (LibraryItem item : ordered) {
+            writeVersionThreeItem(output, item);
         }
     }
 
@@ -386,7 +414,7 @@ final class LibraryFileStore {
         }
     }
 
-    record LoadResult(List<LibraryItem> items, boolean migrationRequired) {
+    record LoadResult(List<LibraryItem> items, boolean migrationRequired, int version) {
         LoadResult {
             items = List.copyOf(items);
         }

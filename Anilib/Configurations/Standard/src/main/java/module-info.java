@@ -10,6 +10,7 @@ module fr.vriege.anilib.configuration.standard {
     requires fr.vriege.anilib.feature.discovery.bundle;
     requires fr.vriege.anilib.feature.reader.bundle;
     requires fr.vriege.anilib.feature.downloads.bundle;
+    requires fr.vriege.anilib.feature.backup.bundle;
 
     exports fr.vriege.anilib.configuration.standard;
 }

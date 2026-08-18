@@ -2,6 +2,8 @@ package fr.vriege.anilib.feature.discovery.bundle;
 
 import fr.vriege.anilib.feature.discovery.DiscoveryCapabilities;
 import fr.vriege.anilib.feature.discovery.runtime.DefaultDiscoveryService;
+import fr.vriege.anilib.feature.discovery.runtime.DiscoveryBackupCodec;
+import fr.vriege.anilib.feature.discovery.runtime.FileSourcePreferenceStore;
 import fr.vriege.anilib.feature.discovery.ui.DefaultDiscoveryPresentation;
 import fr.vriege.anilib.feature.discovery.ui.DiscoveryUiCapabilities;
 import fr.vriege.anilib.feature.library.LibraryCapabilities;
@@ -23,6 +25,7 @@ public final class DiscoveryPlugin implements AnilibPlugin {
             .requires(SourceCapabilities.REGISTRY)
             .requires(LibraryCapabilities.CATALOG)
             .provides(DiscoveryCapabilities.SERVICE)
+            .provides(DiscoveryCapabilities.BACKUP_CODEC)
             .provides(DiscoveryUiCapabilities.PRESENTATION)
             .build();
 
@@ -43,8 +46,10 @@ public final class DiscoveryPlugin implements AnilibPlugin {
     public void install(PluginInstallationContext context) {
         SourceRegistry sources = context.require(SourceCapabilities.REGISTRY);
         LibraryCatalog library = context.require(LibraryCapabilities.CATALOG);
-        DefaultDiscoveryService service = new DefaultDiscoveryService(sources, library, preferenceFile);
+        FileSourcePreferenceStore preferences = new FileSourcePreferenceStore(preferenceFile);
+        DefaultDiscoveryService service = new DefaultDiscoveryService(sources, library, preferences);
         context.publish(DiscoveryCapabilities.SERVICE, service);
+        context.publish(DiscoveryCapabilities.BACKUP_CODEC, new DiscoveryBackupCodec(preferences));
         context.publish(DiscoveryUiCapabilities.PRESENTATION, new DefaultDiscoveryPresentation(service));
     }
 }

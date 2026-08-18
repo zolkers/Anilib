@@ -14,7 +14,9 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.Objects;
+import java.util.Map;
 import java.util.Properties;
+import java.util.TreeMap;
 
 /** Atomic JDK properties store for source-owned preference values. */
 public final class FileSourcePreferenceStore {
@@ -31,8 +33,27 @@ public final class FileSourcePreferenceStore {
     }
 
     public synchronized void set(SourceId sourceId, String preferenceId, String value) {
-        values.setProperty(key(sourceId, preferenceId), Objects.requireNonNull(value, "value must not be null"));
-        save();
+        Properties next = copy(values);
+        next.setProperty(key(sourceId, preferenceId), Objects.requireNonNull(value, "value must not be null"));
+        persistAndReplace(next);
+    }
+
+    public synchronized Map<String, String> snapshot() {
+        Map<String, String> snapshot = new TreeMap<>();
+        values.forEach((key, value) -> snapshot.put(key.toString(), value.toString()));
+        return Map.copyOf(snapshot);
+    }
+
+    public synchronized void replaceAll(Map<String, String> replacement) {
+        Objects.requireNonNull(replacement, "replacement must not be null");
+        Properties next = new Properties();
+        replacement.forEach((key, value) -> {
+            if (Objects.requireNonNull(key, "preference key must not be null").isBlank()) {
+                throw new IllegalArgumentException("preference key must not be blank");
+            }
+            next.setProperty(key, Objects.requireNonNull(value, "preference value must not be null"));
+        });
+        persistAndReplace(next);
     }
 
     private void load() {
@@ -49,7 +70,7 @@ public final class FileSourcePreferenceStore {
         }
     }
 
-    private void save() {
+    private void persistAndReplace(Properties replacement) {
         Path parent = file.getParent();
         Path temporary = null;
         try {
@@ -61,7 +82,7 @@ public final class FileSourcePreferenceStore {
                     StandardOpenOption.TRUNCATE_EXISTING);
                  BufferedWriter writer = new BufferedWriter(
                          Channels.newWriter(channel, StandardCharsets.UTF_8))) {
-                values.store(writer, "Anilib source preferences");
+                replacement.store(writer, "Anilib source preferences");
                 writer.flush();
                 channel.force(true);
             }
@@ -77,6 +98,14 @@ public final class FileSourcePreferenceStore {
                 }
             }
         }
+        values.clear();
+        values.putAll(replacement);
+    }
+
+    private static Properties copy(Properties source) {
+        Properties copy = new Properties();
+        copy.putAll(source);
+        return copy;
     }
 
     private static void moveAtomically(Path source, Path destination) throws IOException {

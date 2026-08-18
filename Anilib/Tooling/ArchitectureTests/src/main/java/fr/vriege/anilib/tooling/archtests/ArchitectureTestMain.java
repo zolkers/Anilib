@@ -2,6 +2,7 @@ package fr.vriege.anilib.tooling.archtests;
 
 import fr.vriege.anilib.configuration.standard.StandardAnilib;
 import fr.vriege.anilib.feature.library.LibraryCapabilities;
+import fr.vriege.anilib.feature.discovery.DiscoveryCapabilities;
 import fr.vriege.anilib.feature.library.LibraryCatalog;
 import fr.vriege.anilib.feature.library.LibraryItem;
 import fr.vriege.anilib.feature.library.MediaKind;
@@ -11,6 +12,8 @@ import fr.vriege.anilib.feature.reader.ReaderCapabilities;
 import fr.vriege.anilib.feature.reader.ui.ReaderUiCapabilities;
 import fr.vriege.anilib.feature.downloads.DownloadCapabilities;
 import fr.vriege.anilib.feature.downloads.ui.DownloadUiCapabilities;
+import fr.vriege.anilib.feature.backup.BackupCapabilities;
+import fr.vriege.anilib.feature.backup.ui.BackupUiCapabilities;
 import fr.vriege.anilib.feature.library.ui.LibraryUiCapabilities;
 import fr.vriege.anilib.feature.source.SourceCapabilities;
 import fr.vriege.anilib.feature.source.SourceId;
@@ -56,6 +59,7 @@ public final class ArchitectureTestMain {
         assertions += HttpFrameworkTest.run();
         assertions += ReaderTest.run();
         assertions += DownloadTest.run();
+        assertions += BackupTest.run();
         System.out.println("Architecture tests: " + assertions + " assertions passed.");
     }
 
@@ -71,7 +75,7 @@ public final class ArchitectureTestMain {
             LibraryItem item = LibraryItem.create("A test title", MediaKind.MANGA);
             catalog.save(item);
             check(catalog.find(item.id()).orElseThrow().equals(item), "library must return saved item");
-            check(application.components().size() == 7, "standard product must install seven bootstrap bundles");
+            check(application.components().size() == 8, "standard product must install eight bootstrap bundles");
             check(application.capability(LocalSourceCapabilities.CONTENT).publications().isEmpty(),
                     "standard product must expose the local source capability");
             SourceRegistry sourceRegistry = application.capability(SourceCapabilities.REGISTRY);
@@ -83,6 +87,10 @@ public final class ArchitectureTestMain {
                     "standard product must publish the HTTP client capability");
             check(application.capability(LibraryUiCapabilities.PRESENTATION).library().titles().size() == 1,
                     "Library Bundle must publish its presentation capability");
+            check(application.capability(LibraryCapabilities.BACKUP_CODEC) != null,
+                    "Library Bundle must publish its self-owned backup codec");
+            check(application.capability(DiscoveryCapabilities.BACKUP_CODEC) != null,
+                    "Discovery Bundle must publish its self-owned backup codec");
             check(application.capability(ReaderCapabilities.SERVICE) != null,
                     "Reader Bundle must publish its reader capability");
             check(application.capability(ReaderUiCapabilities.PRESENTATION) != null,
@@ -91,6 +99,10 @@ public final class ArchitectureTestMain {
                     "Downloads Bundle must publish its queue capability");
             check(application.capability(DownloadUiCapabilities.PRESENTATION) != null,
                     "Downloads Bundle must publish its shared presentation capability");
+            check(application.capability(BackupCapabilities.SERVICE) != null,
+                    "Backup Bundle must publish its archive capability");
+            check(application.capability(BackupUiCapabilities.PRESENTATION) != null,
+                    "Backup Bundle must publish its shared presentation capability");
             check(catalog.remove(item.id()), "library must remove existing item");
         } finally {
             deleteDirectory(dataDirectory);

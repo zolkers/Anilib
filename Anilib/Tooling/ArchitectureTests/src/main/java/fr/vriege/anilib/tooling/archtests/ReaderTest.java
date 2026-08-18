@@ -248,6 +248,12 @@ final class ReaderTest {
         }
 
         @Override
+        public synchronized void replaceAll(java.util.Collection<LibraryItem> replacement) {
+            items.clear();
+            replacement.forEach(item -> items.put(item.id(), item));
+        }
+
+        @Override
         public synchronized boolean remove(LibraryItemId id) {
             return items.remove(id) != null;
         }

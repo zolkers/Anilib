@@ -4,6 +4,7 @@ import fr.vriege.anilib.feature.library.LibraryCatalog;
 import fr.vriege.anilib.feature.library.LibraryItem;
 import fr.vriege.anilib.feature.library.LibraryItemId;
 
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -36,6 +37,20 @@ public final class InMemoryLibraryCatalog implements LibraryCatalog {
     public synchronized void save(LibraryItem item) {
         Objects.requireNonNull(item, "item must not be null");
         items.put(item.id(), item);
+    }
+
+    @Override
+    public synchronized void replaceAll(Collection<LibraryItem> replacement) {
+        Objects.requireNonNull(replacement, "replacement must not be null");
+        Map<LibraryItemId, LibraryItem> next = new LinkedHashMap<>();
+        for (LibraryItem item : replacement) {
+            Objects.requireNonNull(item, "replacement must not contain null items");
+            if (next.putIfAbsent(item.id(), item) != null) {
+                throw new IllegalArgumentException("replacement contains duplicate library item ids");
+            }
+        }
+        items.clear();
+        items.putAll(next);
     }
 
     @Override
