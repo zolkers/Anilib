@@ -29,9 +29,11 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.NewReleases
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -55,6 +57,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -89,6 +92,9 @@ import fr.vriege.anilib.feature.settings.SettingsSnapshot
 import fr.vriege.anilib.feature.settings.StartScreen
 import fr.vriege.anilib.feature.settings.ThemeMode
 import fr.vriege.anilib.feature.settings.ui.SettingsPresentation
+import fr.vriege.anilib.feature.source.SourceContentKind
+import fr.vriege.anilib.feature.source.SourceCatalogueItem
+import fr.vriege.anilib.feature.source.SourceId
 import fr.vriege.anilib.feature.reader.ui.ReaderController
 import fr.vriege.anilib.feature.reader.ui.ReaderPresentation
 import fr.vriege.anilib.feature.player.ui.PlayerPresentation
@@ -100,6 +106,9 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 private val dateTimeFormatter = DateTimeFormatter
@@ -542,7 +551,13 @@ private fun AppDestination(
                 downloadError,
                 openTracking,
             )
-            else -> LibraryPageContent(presentation, componentCount, navigate)
+            else -> LibraryPageContent(
+                presentation,
+                discovery,
+                downloads,
+                componentCount,
+                navigate,
+            )
         }
         AppSection.UPDATES -> UpdatesScreen(updates)
         AppSection.HISTORY -> HistoryPage(presentation) { transition ->
@@ -605,6 +620,8 @@ private fun AppDestination(
 @Composable
 private fun LibraryPageContent(
     presentation: LibraryPresentation,
+    discovery: DiscoveryPresentation,
+    downloads: DownloadPresentation,
     componentCount: Int,
     navigate: ((LibraryNavigator) -> Unit) -> Unit,
 ) {
@@ -617,6 +634,11 @@ private fun LibraryPageContent(
     }
     var favoritesOnly by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var selectionMode by remember { mutableStateOf(false) }
+    var selected by remember { mutableStateOf(setOf<LibraryItemId>()) }
+    var categoryAction by remember { mutableStateOf(false) }
+    var confirmingDelete by remember { mutableStateOf(false) }
+    var migrating by remember { mutableStateOf(false) }
     fun update(action: () -> Unit) {
         try {
             action()
@@ -644,6 +666,12 @@ private fun LibraryPageContent(
             TopAppBar(
                 title = { Text("Library") },
                 actions = {
+                    androidx.compose.material3.TextButton(onClick = {
+                        selectionMode = !selectionMode
+                        if (!selectionMode) selected = emptySet()
+                    }) {
+                        Text(if (selectionMode) "Done" else "Select")
+                    }
                     androidx.compose.material3.TextButton(onClick = {
                         update {
                             presentation.setDisplayMode(
@@ -678,6 +706,57 @@ private fun LibraryPageContent(
         ) {
             Text(librarySummary(overview), color = MaterialTheme.colorScheme.onSurfaceVariant)
             error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            if (selectionMode) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("${selected.size} selected", fontWeight = FontWeight.SemiBold)
+                    androidx.compose.material3.TextButton(
+                        enabled = titles.isNotEmpty(),
+                        onClick = {
+                            selected = if (selected.size == titles.size) {
+                                emptySet()
+                            } else {
+                                titles.mapTo(linkedSetOf()) { it.id() }
+                            }
+                        },
+                    ) { Text("All") }
+                    androidx.compose.material3.TextButton(
+                        enabled = selected.isNotEmpty(),
+                        onClick = { update { presentation.setFavorite(selected, true) } },
+                    ) { Text("Favorite") }
+                    androidx.compose.material3.TextButton(
+                        enabled = selected.isNotEmpty(),
+                        onClick = { update { presentation.setFavorite(selected, false) } },
+                    ) { Text("Unfavorite") }
+                    androidx.compose.material3.TextButton(
+                        enabled = selected.isNotEmpty() && overview.categories().isNotEmpty(),
+                        onClick = { categoryAction = true },
+                    ) { Text("Category") }
+                    androidx.compose.material3.TextButton(
+                        enabled = selected.isNotEmpty(),
+                        onClick = {
+                            selected.forEach { id ->
+                                runCatching {
+                                    if (downloads.canEnqueue(id)) downloads.enqueue(id)
+                                }.onFailure { failure ->
+                                    error = failure.message ?: "Unable to enqueue a download."
+                                }
+                            }
+                        },
+                    ) { Text("Download") }
+                    androidx.compose.material3.TextButton(
+                        enabled = selected.isNotEmpty(),
+                        onClick = { migrating = true },
+                    ) { Text("Migrate") }
+                    androidx.compose.material3.TextButton(
+                        enabled = selected.isNotEmpty(),
+                        onClick = { confirmingDelete = true },
+                    ) { Text("Delete") }
+                }
+            }
             Spacer(Modifier.height(12.dp))
             OutlinedTextField(
                 value = query,
@@ -758,19 +837,213 @@ private fun LibraryPageContent(
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         gridItems(titles, key = { it.id().value() }) { card ->
-                            LibraryTitleCard(card) { navigate { it.openDetails(card.id()) } }
+                            LibraryTitleCard(
+                                card,
+                                card.id() in selected,
+                                selectionMode,
+                                { selected = selected.toggle(card.id()) },
+                                { navigate { it.openDetails(card.id()) } },
+                            )
                         }
                     }
                 } else {
                     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         items(titles, key = { it.id().value() }) { card ->
-                            LibraryTitleCard(card) { navigate { it.openDetails(card.id()) } }
+                            LibraryTitleCard(
+                                card,
+                                card.id() in selected,
+                                selectionMode,
+                                { selected = selected.toggle(card.id()) },
+                                { navigate { it.openDetails(card.id()) } },
+                            )
                         }
                     }
                 }
             }
         }
     }
+    if (categoryAction) {
+        BulkCategoryDialog(
+            categories = overview.categories(),
+            dismiss = { categoryAction = false },
+            add = { value ->
+                update { presentation.addToCategory(selected, value) }
+                categoryAction = false
+            },
+            remove = { value ->
+                update { presentation.removeFromCategory(selected, value) }
+                categoryAction = false
+            },
+        )
+    }
+    if (confirmingDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmingDelete = false },
+            title = { Text("Delete ${selected.size} titles?") },
+            text = { Text("This removes the selected titles from your library.") },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    update { presentation.deleteTitles(selected) }
+                    selected = emptySet()
+                    selectionMode = false
+                    confirmingDelete = false
+                }) { Text("Delete") }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { confirmingDelete = false }) {
+                    Text("Cancel")
+                }
+            },
+        )
+    }
+    if (migrating) {
+        BulkMigrationDialog(
+            cards = overview.titles().filter { it.id() in selected },
+            discovery = discovery,
+            dismiss = { migrating = false },
+            completed = {
+                migrating = false
+                selected = emptySet()
+                selectionMode = false
+                revision++
+            },
+        )
+    }
+}
+
+private fun Set<LibraryItemId>.toggle(id: LibraryItemId): Set<LibraryItemId> =
+    if (id in this) this - id else this + id
+
+@Composable
+private fun BulkCategoryDialog(
+    categories: List<String>,
+    dismiss: () -> Unit,
+    add: (String) -> Unit,
+    remove: (String) -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = dismiss,
+        title = { Text("Update categories") },
+        text = {
+            Column {
+                categories.forEach { category ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(category, modifier = Modifier.weight(1f))
+                        androidx.compose.material3.TextButton(onClick = { add(category) }) {
+                            Text("Add")
+                        }
+                        androidx.compose.material3.TextButton(onClick = { remove(category) }) {
+                            Text("Remove")
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            androidx.compose.material3.TextButton(onClick = dismiss) { Text("Close") }
+        },
+    )
+}
+
+@Composable
+private fun BulkMigrationDialog(
+    cards: List<LibraryCard>,
+    discovery: DiscoveryPresentation,
+    dismiss: () -> Unit,
+    completed: () -> Unit,
+) {
+    var index by remember(cards) { mutableStateOf(0) }
+    var candidates by remember(cards) { mutableStateOf(listOf<SourceCatalogueItem>()) }
+    var targetSource by remember(cards) { mutableStateOf<SourceId?>(null) }
+    var loading by remember(cards) { mutableStateOf(false) }
+    var error by remember(cards) { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+    val current = cards.getOrNull(index)
+    if (current == null) {
+        completed()
+        return
+    }
+    val contentKind = if (current.kind() == MediaKind.ANIME) {
+        SourceContentKind.ANIME
+    } else {
+        SourceContentKind.MANGA
+    }
+    val sources = remember(current.id()) {
+        discovery.sourceSections(contentKind).flatMap { it.sources() }
+    }
+    fun selectSource(sourceId: SourceId) {
+        targetSource = sourceId
+        loading = true
+        error = null
+        scope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    discovery.migrationCandidates(current.id(), sourceId, 20)
+                }
+            }.onSuccess { values ->
+                candidates = values
+                if (values.isEmpty()) error = "No migration candidates found."
+            }.onFailure { failure ->
+                error = failure.message ?: "Unable to load migration candidates."
+            }
+            loading = false
+        }
+    }
+    fun migrate(target: SourceCatalogueItem) {
+        loading = true
+        error = null
+        scope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) { discovery.migrate(current.id(), target) }
+            }.onSuccess {
+                index++
+                targetSource = null
+                candidates = emptyList()
+                if (index >= cards.size) completed()
+            }.onFailure { failure ->
+                error = failure.message ?: "Unable to migrate ${current.title()}."
+            }
+            loading = false
+        }
+    }
+    AlertDialog(
+        onDismissRequest = dismiss,
+        title = { Text("Migrate ${index + 1} of ${cards.size}") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(current.title(), fontWeight = FontWeight.SemiBold)
+                error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                if (loading) {
+                    Text("Loading…")
+                } else if (targetSource == null) {
+                    Text("Choose a target source")
+                    sources.take(12).forEach { source ->
+                        androidx.compose.material3.TextButton(onClick = { selectSource(source.id()) }) {
+                            Text("${source.displayName()} · ${source.languageTag()}")
+                        }
+                    }
+                } else {
+                    androidx.compose.material3.TextButton(onClick = {
+                        targetSource = null
+                        candidates = emptyList()
+                    }) { Text("Change source") }
+                    candidates.take(12).forEach { candidate ->
+                        androidx.compose.material3.TextButton(onClick = { migrate(candidate) }) {
+                            Text(candidate.title())
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            androidx.compose.material3.TextButton(onClick = dismiss) { Text("Cancel") }
+        },
+    )
 }
 
 private fun LibraryDisplayDensity.next(): LibraryDisplayDensity = when (this) {
@@ -802,9 +1075,15 @@ private fun LibrarySort.label(): String = when (this) {
 }
 
 @Composable
-private fun LibraryTitleCard(card: LibraryCard, openDetails: () -> Unit) {
+private fun LibraryTitleCard(
+    card: LibraryCard,
+    selected: Boolean,
+    selectionMode: Boolean,
+    select: () -> Unit,
+    openDetails: () -> Unit,
+) {
     Card(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = openDetails),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = if (selectionMode) select else openDetails),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
@@ -812,6 +1091,9 @@ private fun LibraryTitleCard(card: LibraryCard, openDetails: () -> Unit) {
             modifier = Modifier.fillMaxWidth().padding(18.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            if (selectionMode) {
+                Checkbox(selected, onCheckedChange = { select() })
+            }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = card.title(),

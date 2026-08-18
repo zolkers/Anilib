@@ -180,7 +180,7 @@ platform-specific.
 
 - [x] add persisted grid/list modes, density, sorting, and configurable default
   category or landing behavior
-- [ ] add multi-selection and bulk category, favourite, download, migrate, and
+- [x] add multi-selection and bulk category, favourite, download, migrate, and
   delete actions
 - [x] add category create, rename, reorder, delete, per-category display, and
   update policies

@@ -12,7 +12,7 @@ explicit so an architectural seam cannot be mistaken for a finished workflow.
 | Screen group | Audited | Result | Next user-visible gap |
 | --- | --- | --- | --- |
 | Application shell and primary navigation | [x] | Partial | Add update/source badges, configurable start screen, and tab reselection behavior |
-| Library | [x] | Partial | Search, anime/manga/favourite/category filters, persisted grid/list density, sorting, and category landing are live; add selection actions |
+| Library | [x] | Partial | Search, filters, persisted display choices, multi-selection, and bulk category/favourite/download/migrate/delete actions are live |
 | Anime and manga details | [x] | Partial | Shared facts and reader/player/download/tracking actions are live; add artwork, content-unit lists, related titles, editing, and share/web actions |
 | Updates | [x] | Partial | Scheduling, refresh/cancel, failures, progress, read state, and anime/manga/unread filters are live; add date grouping, selection actions, skipped reasons, and per-item download controls |
 | History | [x] | Partial | Search and detail navigation are live; add date grouping, remove/resume actions, and separate anime/manga presentation |
@@ -44,6 +44,7 @@ explicit so an architectural seam cannot be mistaken for a finished workflow.
 - [x] Added a live pending-download summary to More.
 - [x] Added library search, media/favourite/category filters, and deterministic title sorting.
 - [x] Added persisted grid/list density and sorting, category landing, full category CRUD, and per-category policies.
+- [x] Added library multi-selection with bulk category, favourite, download, migration, and confirmed deletion.
 - [x] Added searchable history plus anime/manga/unread update filters.
 - [x] Added conventional back navigation to title details.
 - [x] Connected Browse extension tabs directly to repository management.

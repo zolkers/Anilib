@@ -31,6 +31,8 @@ vertical, and webtoon navigation, plus one immersive shared reader screen.
 The shared Library screen persists grid/list density, sorting, and its landing
 category. Its category manager creates, renames, reorders, and deletes durable
 categories while retaining per-category display and update policy.
+Multi-selection exposes bulk category, favourite, download, guided migration,
+and confirmed deletion actions from the same shared Android/desktop screen.
 The removable Downloads Bundle adds a durable queue, bounded concurrent jobs,
 pause/cancel/resume controls, restart-safe partial downloads, storage quotas,
 and offline reading through the same Reader on Android and desktop.

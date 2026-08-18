@@ -8,6 +8,7 @@ import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.library.LibrarySort;
 
 import java.util.Optional;
+import java.util.Set;
 
 public interface LibraryPresentation {
     LibraryOverview library();
@@ -35,4 +36,12 @@ public interface LibraryPresentation {
     void updateCategory(LibraryCategory category);
 
     void setCategoryUpdatePolicy(String name, LibraryCategoryUpdatePolicy policy);
+
+    void setFavorite(Set<LibraryItemId> ids, boolean favorite);
+
+    void addToCategory(Set<LibraryItemId> ids, String category);
+
+    void removeFromCategory(Set<LibraryItemId> ids, String category);
+
+    void deleteTitles(Set<LibraryItemId> ids);
 }

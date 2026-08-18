@@ -217,6 +217,60 @@ public final class DefaultLibraryPresentation implements LibraryPresentation {
                 policy));
     }
 
+    @Override
+    public synchronized void setFavorite(Set<LibraryItemId> ids, boolean favorite) {
+        replaceSelected(ids, item -> item.withFavorite(favorite));
+    }
+
+    @Override
+    public synchronized void addToCategory(Set<LibraryItemId> ids, String category) {
+        requireCategory(normalizedConfiguration().categories(), category);
+        replaceSelected(ids, item -> {
+            Set<String> categories = new LinkedHashSet<>(item.categories());
+            categories.add(category);
+            return item.withCategories(categories);
+        });
+    }
+
+    @Override
+    public synchronized void removeFromCategory(Set<LibraryItemId> ids, String category) {
+        requireCategory(normalizedConfiguration().categories(), category);
+        replaceSelected(ids, item -> removeCategory(item, category));
+    }
+
+    @Override
+    public synchronized void deleteTitles(Set<LibraryItemId> ids) {
+        Set<LibraryItemId> selected = validatedSelection(ids);
+        catalog.replaceAll(catalog.snapshot().stream()
+                .filter(item -> !selected.contains(item.id()))
+                .toList());
+    }
+
+    private void replaceSelected(
+            Set<LibraryItemId> ids,
+            java.util.function.UnaryOperator<LibraryItem> operation) {
+        Objects.requireNonNull(operation, "operation must not be null");
+        Set<LibraryItemId> selected = validatedSelection(ids);
+        catalog.replaceAll(catalog.snapshot().stream()
+                .map(item -> selected.contains(item.id()) ? operation.apply(item) : item)
+                .toList());
+    }
+
+    private Set<LibraryItemId> validatedSelection(Set<LibraryItemId> ids) {
+        Set<LibraryItemId> selected = Set.copyOf(
+                Objects.requireNonNull(ids, "ids must not be null"));
+        if (selected.isEmpty()) {
+            throw new IllegalArgumentException("ids must not be empty");
+        }
+        Set<LibraryItemId> available = catalog.snapshot().stream()
+                .map(LibraryItem::id)
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        if (!available.containsAll(selected)) {
+            throw new IllegalArgumentException("ids contain an unknown library title");
+        }
+        return selected;
+    }
+
     private void updateActiveDisplay(
             Optional<LibraryDisplayMode> mode,
             Optional<LibraryDisplayDensity> density,

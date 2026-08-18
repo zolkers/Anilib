@@ -78,6 +78,22 @@ final class LibraryPresentationTest {
         counter.check(presentation.library().displayPreferences().defaultCategory().isEmpty(),
                 "deleting the landing category must restore the all-titles landing");
 
+        Set<LibraryItemId> bulkSelection = Set.of(
+                new LibraryItemId("alpha"),
+                new LibraryItemId("beta"));
+        presentation.addToCategory(bulkSelection, "Archive");
+        presentation.setFavorite(bulkSelection, true);
+        counter.check(catalog.find(new LibraryItemId("alpha")).orElseThrow().favorite()
+                        && catalog.find(new LibraryItemId("beta")).orElseThrow()
+                        .categories().contains("Archive"),
+                "bulk category and favourite actions must update every selected title");
+        presentation.removeFromCategory(bulkSelection, "Archive");
+        presentation.deleteTitles(Set.of(new LibraryItemId("beta")));
+        counter.check(catalog.find(new LibraryItemId("beta")).isEmpty()
+                        && !catalog.find(new LibraryItemId("alpha")).orElseThrow()
+                        .categories().contains("Archive"),
+                "bulk category removal and deletion must be atomic catalog mutations");
+
         LibraryItemId zuluId = overview.titles().getFirst().id();
         LibraryDetails details = presentation.details(zuluId).orElseThrow();
         counter.check(details.description().equals("A complete presentation title."),
