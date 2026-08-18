@@ -8,6 +8,7 @@ import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.library.LibrarySort;
 import fr.vriege.anilib.feature.library.LibraryTitleMetadata;
 
+import java.time.Instant;
 import java.util.Optional;
 import java.util.Set;
 
@@ -17,6 +18,8 @@ public interface LibraryPresentation {
     Optional<LibraryDetails> details(LibraryItemId id);
 
     LibraryHistory history();
+
+    void removeHistoryEntry(LibraryItemId id, String contentId, Instant openedAt);
 
     void setDisplayMode(LibraryDisplayMode mode);
 

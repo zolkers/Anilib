@@ -119,6 +119,19 @@ final class LibraryPresentationTest {
                 "global history must be reverse chronological across titles");
         counter.check(presentation.history().entries().getFirst().title().equals("Zulu"),
                 "history rows must retain their owning title");
+        counter.check(presentation.history().entries().getFirst().kind() == MediaKind.ANIME
+                        && presentation.history().entries().get(1).kind() == MediaKind.MANGA,
+                "history rows must distinguish anime and manga presentation");
+        var removedHistory = presentation.history().entries().getFirst();
+        presentation.removeHistoryEntry(
+                removedHistory.libraryItemId(),
+                removedHistory.contentId(),
+                removedHistory.openedAt());
+        counter.check(presentation.history().entries().stream()
+                        .noneMatch(row -> row.libraryItemId().equals(removedHistory.libraryItemId())
+                                && row.contentId().equals(removedHistory.contentId())
+                                && row.openedAt().equals(removedHistory.openedAt())),
+                "history removal must durably target the selected visit");
         LibraryTitleMetadata edited = new LibraryTitleMetadata(
                 "Edited description",
                 List.of("Editor"),

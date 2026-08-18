@@ -14,6 +14,7 @@ import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.library.LibrarySort;
 import fr.vriege.anilib.feature.library.LibraryTitleMetadata;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -80,6 +81,17 @@ public final class DefaultLibraryPresentation implements LibraryPresentation {
                 .sorted(HISTORY_ORDER)
                 .toList();
         return new LibraryHistory(rows);
+    }
+
+    @Override
+    public synchronized void removeHistoryEntry(
+            LibraryItemId id,
+            String contentId,
+            Instant openedAt) {
+        Objects.requireNonNull(id, "id must not be null");
+        LibraryItem item = catalog.find(id)
+                .orElseThrow(() -> new IllegalArgumentException("Unknown library title: " + id));
+        catalog.save(item.withoutHistoryEntry(contentId, openedAt));
     }
 
     @Override
@@ -517,6 +529,7 @@ public final class DefaultLibraryPresentation implements LibraryPresentation {
         return new LibraryHistoryRow(
                 item.id(),
                 item.title(),
+                item.kind(),
                 entry.contentId(),
                 entry.openedAt(),
                 entry.position());

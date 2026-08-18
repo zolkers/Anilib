@@ -186,7 +186,7 @@ platform-specific.
   update policies
 - [x] add complete anime/manga detail units, artwork, metadata editing, related
   titles, share, open-in-WebView, and source actions
-- [ ] add history date grouping, resume/remove actions, and distinct anime/manga
+- [x] add history date grouping, resume/remove actions, and distinct anime/manga
   presentation
 - [ ] expand statistics by status, source, language, score, duration, progress,
   and activity period

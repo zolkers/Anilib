@@ -93,6 +93,16 @@ public record LibraryItem(
         return copy(categories, favorite, progress, nextHistory, metadata);
     }
 
+    public LibraryItem withoutHistoryEntry(String contentId, Instant openedAt) {
+        Preconditions.requireNonBlank(contentId, "contentId");
+        Preconditions.requireNonNull(openedAt, "openedAt");
+        List<LibraryHistoryEntry> nextHistory = history.stream()
+                .filter(entry -> !entry.contentId().equals(contentId)
+                        || !entry.openedAt().equals(openedAt))
+                .toList();
+        return copy(categories, favorite, progress, nextHistory, metadata);
+    }
+
     public LibraryItem withMetadata(LibraryTitleMetadata nextMetadata) {
         return copy(categories, favorite, progress, history, nextMetadata);
     }

@@ -113,6 +113,7 @@ import fr.vriege.anilib.framework.http.HttpRequest
 import fr.vriege.anilib.feature.player.EpisodeSnapshot
 import java.net.URI
 import java.time.Duration
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -593,7 +594,12 @@ private fun AppDestination(
             )
         }
         AppSection.UPDATES -> UpdatesScreen(updates)
-        AppSection.HISTORY -> HistoryPage(presentation) { transition ->
+        AppSection.HISTORY -> HistoryPage(
+            presentation,
+            openReader,
+            openPlayer,
+            readerError ?: playerError,
+        ) { transition ->
             navigate(transition)
             openSection(AppSection.LIBRARY)
         }
@@ -1158,13 +1164,22 @@ private fun LibraryTitleCard(
 @Composable
 private fun HistoryPage(
     presentation: LibraryPresentation,
+    openReader: (LibraryItemId) -> Unit,
+    openPlayer: (LibraryItemId) -> Unit,
+    resumeError: String?,
     navigate: ((LibraryNavigator) -> Unit) -> Unit,
 ) {
-    val history = presentation.history()
+    var revision by remember { mutableStateOf(0) }
+    val history = remember(revision) { presentation.history() }
     var query by remember { mutableStateOf("") }
+    var kind by remember { mutableStateOf<MediaKind?>(null) }
     val entries = history.entries().filter {
-        query.isBlank() || it.title().contains(query, ignoreCase = true) ||
-            it.contentId().contains(query, ignoreCase = true)
+        (kind == null || it.kind() == kind) &&
+            (query.isBlank() || it.title().contains(query, ignoreCase = true) ||
+                it.contentId().contains(query, ignoreCase = true))
+    }
+    val groups = entries.groupBy { row ->
+        row.openedAt().atZone(ZoneId.systemDefault()).toLocalDate()
     }
     Scaffold(topBar = { TopAppBar(title = { Text("History") }) }) { padding ->
         Column(
@@ -1182,6 +1197,19 @@ private fun HistoryPage(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                FilterChip(kind == null, { kind = null }, label = { Text("All") })
+                FilterChip(kind == MediaKind.ANIME, { kind = MediaKind.ANIME }, label = {
+                    Text("Anime")
+                })
+                FilterChip(kind == MediaKind.MANGA, { kind = MediaKind.MANGA }, label = {
+                    Text("Manga")
+                })
+            }
+            resumeError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             Spacer(Modifier.height(12.dp))
             if (history.entries().isEmpty()) {
                 EmptyPage("Titles you open will appear here.")
@@ -1189,8 +1217,42 @@ private fun HistoryPage(
                 EmptyPage("No history entries match your search.")
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    items(entries) { row ->
-                        HistoryCard(row) { navigate { it.openDetails(row.libraryItemId()) } }
+                    groups.forEach { (date, rows) ->
+                        item(key = "history-date-$date") {
+                            Text(
+                                historyDateLabel(date),
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                        items(
+                            rows,
+                            key = { row ->
+                                "${row.libraryItemId().value()}-${row.contentId()}-${row.openedAt()}"
+                            },
+                        ) { row ->
+                            HistoryCard(
+                                row,
+                                resume = {
+                                    if (row.kind() == MediaKind.ANIME) {
+                                        openPlayer(row.libraryItemId())
+                                    } else {
+                                        openReader(row.libraryItemId())
+                                    }
+                                },
+                                remove = {
+                                    presentation.removeHistoryEntry(
+                                        row.libraryItemId(),
+                                        row.contentId(),
+                                        row.openedAt(),
+                                    )
+                                    revision++
+                                },
+                                openDetails = {
+                                    navigate { it.openDetails(row.libraryItemId()) }
+                                },
+                            )
+                        }
                     }
                 }
             }
@@ -1199,7 +1261,12 @@ private fun HistoryPage(
 }
 
 @Composable
-private fun HistoryCard(row: LibraryHistoryRow, openDetails: () -> Unit) {
+private fun HistoryCard(
+    row: LibraryHistoryRow,
+    resume: () -> Unit,
+    remove: () -> Unit,
+    openDetails: () -> Unit,
+) {
     Card(
         modifier = Modifier.fillMaxWidth().clickable(onClick = openDetails),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
@@ -1208,14 +1275,31 @@ private fun HistoryCard(row: LibraryHistoryRow, openDetails: () -> Unit) {
             Text(row.title(), fontWeight = FontWeight.SemiBold, fontSize = 17.sp)
             Spacer(Modifier.height(5.dp))
             Text(
-                text = "${row.contentId()} | Position ${row.position()}",
+                text = "${formatEnum(row.kind())} | ${row.contentId()} | Position ${row.position()}",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
                 text = dateTimeFormatter.format(row.openedAt()),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                androidx.compose.material3.TextButton(onClick = resume) {
+                    Text(if (row.kind() == MediaKind.ANIME) "Watch" else "Read")
+                }
+                androidx.compose.material3.TextButton(onClick = remove) { Text("Remove") }
+            }
         }
+    }
+}
+
+private fun historyDateLabel(date: LocalDate): String {
+    val today = LocalDate.now(ZoneId.systemDefault())
+    return when (date) {
+        today -> "Today"
+        today.minusDays(1) -> "Yesterday"
+        else -> DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
+            .withLocale(Locale.getDefault())
+            .format(date)
     }
 }
 

@@ -34,6 +34,8 @@ categories while retaining per-category display and update policy.
 Anime and manga details retain artwork and genres, expose chapter or episode
 lists and related titles, edit durable metadata, share through the host, and
 open both title and source pages in the shared WebView workflow.
+History is grouped by local date, searchable and filterable by anime or manga,
+with media-aware resume and persistent removal actions on every visit.
 Multi-selection exposes bulk category, favourite, download, guided migration,
 and confirmed deletion actions from the same shared Android/desktop screen.
 The removable Downloads Bundle adds a durable queue, bounded concurrent jobs,
