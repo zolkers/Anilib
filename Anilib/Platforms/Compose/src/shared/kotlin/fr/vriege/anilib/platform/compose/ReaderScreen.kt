@@ -201,6 +201,7 @@ internal fun ReaderScreen(
                 )
             },
     ) {
+        val reducedMotion = LocalReducedMotion.current
         decodedPage.getOrNull()?.let { image ->
             val frame = ReaderPageFrame(
                 image,
@@ -210,7 +211,9 @@ internal fun ReaderScreen(
             )
             AnimatedContent(
                 targetState = frame,
-                transitionSpec = { readerTransition(display.transition()) },
+                transitionSpec = {
+                    readerTransition(if (reducedMotion) ReaderPageTransition.NONE else display.transition())
+                },
                 label = "reader-page",
             ) { current ->
                 ReaderPages(

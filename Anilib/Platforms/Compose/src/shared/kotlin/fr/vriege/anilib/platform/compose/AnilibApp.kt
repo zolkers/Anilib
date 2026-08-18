@@ -221,6 +221,7 @@ fun AnilibApp(
         LocalBrowserPolicy provides settings.browserPolicy(),
         LocalBrowserPlatformController provides browserPlatformController,
         LocalApplicationUpdatePlatformController provides applicationUpdatePlatformController,
+        LocalReducedMotion provides settings.reducedMotion(),
     ) {
         MaterialTheme(colorScheme = appColorScheme(settings, useDarkTheme)) {
             Surface(modifier = Modifier.fillMaxSize()) {

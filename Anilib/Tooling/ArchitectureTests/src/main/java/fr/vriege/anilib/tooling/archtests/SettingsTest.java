@@ -52,6 +52,7 @@ final class SettingsTest {
             presentation.setThemeFamily(ThemeFamily.AMOLED);
             presentation.setAccentColor(AccentColor.SAKURA);
             presentation.setTypographyScale(TypographyScale.LARGE);
+            presentation.setReducedMotion(true);
             presentation.setNavigationStyle(NavigationStyle.NAVIGATION_RAIL);
             BrowserPolicy browserPolicy = new BrowserPolicy(
                     true, true, false, false, true, true, 125);
@@ -61,7 +62,7 @@ final class SettingsTest {
             presentation.setIncognitoMode(true);
             presentation.setDownloadOnlyOnWifi(false);
             presentation.setUpdateOnlyOnWifi(false);
-            counter.check(observations.get() == 13,
+            counter.check(observations.get() == 14,
                     "every settings change must publish one immutable snapshot");
             close(observation);
 
@@ -71,6 +72,7 @@ final class SettingsTest {
                     ThemeFamily.AMOLED,
                     AccentColor.SAKURA,
                     TypographyScale.LARGE,
+                    true,
                     NavigationStyle.NAVIGATION_RAIL,
                     browserPolicy,
                     StartScreen.BROWSE,
@@ -84,7 +86,7 @@ final class SettingsTest {
                     "settings must survive a service restart");
 
             presentation.setThemeMode(ThemeMode.LIGHT);
-            counter.check(observations.get() == 13,
+            counter.check(observations.get() == 14,
                     "closed settings observations must stop receiving changes");
             diagnostics.recordLog("settings test log");
             diagnostics.recordCrash("settings test crash", "bounded details");

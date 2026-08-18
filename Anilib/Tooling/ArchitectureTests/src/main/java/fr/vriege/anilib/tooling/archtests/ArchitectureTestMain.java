@@ -69,6 +69,7 @@ public final class ArchitectureTestMain {
         assertions += DesktopReleaseRuleTest.run();
         assertions += AndroidReleaseRuleTest.run();
         assertions += ApplicationReleaseRuleTest.run();
+        assertions += SecurityBoundaryRuleTest.run();
         assertions += ExtensionRepositoryTest.run();
         assertions += SourcePublisherTest.run();
         assertions += PortableBundleLoadingTest.run();
@@ -85,6 +86,7 @@ public final class ArchitectureTestMain {
         assertions += DownloadTest.run();
         assertions += BackupTest.run();
         assertions += SettingsTest.run();
+        assertions += PerformanceBudgetTest.run();
         System.out.println("Architecture tests: " + assertions + " assertions passed.");
     }
 

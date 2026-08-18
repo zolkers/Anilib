@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -447,7 +449,11 @@ internal fun AboutScreen(
     val available = snapshot.availableRelease().orElse(null)
     MoreScaffold("About", goBack) { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(24.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Text("Anilib", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
@@ -550,6 +556,22 @@ internal fun AboutScreen(
                     Text("Help")
                 }
             }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = {
+                    uriHandler.openUri("https://github.com/zolkers/Anilib/blob/main/THIRD_PARTY.md")
+                }) {
+                    Text("Third-party notices")
+                }
+                TextButton(onClick = {
+                    uriHandler.openUri("https://github.com/zolkers/Anilib/blob/main/PRIVACY.md")
+                }) {
+                    Text("Privacy")
+                }
+            }
+            Text(
+                "Copyright 2026 Victor Riegert · Apache License 2.0",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

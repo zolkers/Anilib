@@ -280,13 +280,25 @@ platform-specific.
   on compact and expanded layouts
 - [ ] add end-to-end tests for repository install, browse, read/play, download,
   backup/restore, update, and offline restart on Android and desktop
+  - [x] dependency-free workflow fixtures cover every shared service boundary
+  - [ ] execute the joined journey through each packaged platform UI
 - [ ] complete accessibility semantics, keyboard navigation, focus, screen-reader,
   contrast, reduced-motion, and large-text audits
+  - [x] persist reduced motion, disable reader transitions, retain scalable text,
+    document the compact/expanded audit, and keep platform controls semantic
+  - [ ] execute keyboard, focus, screen-reader, contrast, and large-text passes on
+    every packaged route
 - [ ] measure startup, memory, scrolling, reader cache, player relay, download, and
   large-library performance; set regression budgets
-- [ ] perform a security review of extension trust, archive parsing, WebView,
+  - [x] gate startup and atomic 10,000-title persistence/reopen budgets
+  - [ ] record platform profiler traces for memory, scrolling, reader, relay, and
+    download budgets
+- [x] perform a security review of extension trust, archive parsing, WebView,
   loopback media relay, backup import, updater, and release supply chain
 - [ ] complete user-facing localization and legal/licence notices
+  - [x] expose project licence, third-party inventory, privacy notice, changelog,
+    and release-specific licence from the scrollable About route
+  - [ ] translate every remaining user-facing string in each advertised language
 
 ## Definition of product parity
 

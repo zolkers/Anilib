@@ -52,6 +52,7 @@ final class LocalSourceTest {
             }
         }
         rejectsTraversal(counter);
+        rejectsArchiveEntryFlood(counter);
         return counter.value;
     }
 
@@ -207,6 +208,43 @@ final class LocalSourceTest {
             throw new AssertionError("Expected traversal identity rejection");
         } catch (IllegalArgumentException expected) {
             counter.value++;
+        }
+    }
+
+    private static void rejectsArchiveEntryFlood(Counter counter) {
+        Path root = null;
+        try {
+            root = Files.createTempDirectory("anilib-local-archive-limit");
+            Path series = Files.createDirectories(root.resolve("local").resolve("Archive flood"));
+            Path archive = series.resolve("chapter.cbz");
+            try (ZipOutputStream output = new ZipOutputStream(Files.newOutputStream(archive))) {
+                for (int index = 0; index <= 10_000; index++) {
+                    writeEntry(output, String.format("%05d.jpg", index), new byte[0]);
+                }
+            }
+            FileSystemLocalContentSource source = new FileSystemLocalContentSource(root);
+            SourceCatalogueItem item = source.popular(new SourceBrowseRequest(
+                    1,
+                    30,
+                    List.of(),
+                    Map.of("include-manga", "true", "include-anime", "true"))).items().getFirst();
+            SourceContentUnit chapter = source.contentUnits(item.id()).getFirst();
+            try {
+                source.pages(chapter.id());
+                throw new AssertionError("Expected archive entry limit rejection");
+            } catch (fr.vriege.anilib.feature.localsource.LocalSourceException expected) {
+                counter.value++;
+            }
+        } catch (IOException exception) {
+            throw new AssertionError("Unable to test local archive entry limit", exception);
+        } finally {
+            if (root != null) {
+                try {
+                    deleteTree(root);
+                } catch (IOException exception) {
+                    throw new AssertionError("Unable to clean archive limit test", exception);
+                }
+            }
         }
     }
 

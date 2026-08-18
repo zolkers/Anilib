@@ -35,6 +35,7 @@ public final class FileSettingsService implements SettingsService {
     private static final String THEME_FAMILY = "appearance.theme-family";
     private static final String ACCENT = "appearance.accent";
     private static final String TYPOGRAPHY = "appearance.typography";
+    private static final String REDUCED_MOTION = "accessibility.reduced-motion";
     private static final String NAVIGATION = "appearance.navigation";
     private static final String BROWSER_JAVA_SCRIPT = "browser.java-script";
     private static final String BROWSER_DOM_STORAGE = "browser.dom-storage";
@@ -104,6 +105,7 @@ public final class FileSettingsService implements SettingsService {
                 enumValue(values.getProperty(THEME_FAMILY), defaults.themeFamily(), ThemeFamily.class),
                 enumValue(values.getProperty(ACCENT), defaults.accentColor(), AccentColor.class),
                 enumValue(values.getProperty(TYPOGRAPHY), defaults.typographyScale(), TypographyScale.class),
+                flag(values, REDUCED_MOTION, defaults.reducedMotion()),
                 enumValue(values.getProperty(NAVIGATION), defaults.navigationStyle(), NavigationStyle.class),
                 browserPolicy(values, defaults.browserPolicy()),
                 enumValue(values.getProperty(START_SCREEN), defaults.startScreen(), StartScreen.class),
@@ -120,6 +122,7 @@ public final class FileSettingsService implements SettingsService {
         values.setProperty(THEME_FAMILY, setting(settings.themeFamily()));
         values.setProperty(ACCENT, setting(settings.accentColor()));
         values.setProperty(TYPOGRAPHY, setting(settings.typographyScale()));
+        values.setProperty(REDUCED_MOTION, Boolean.toString(settings.reducedMotion()));
         values.setProperty(NAVIGATION, setting(settings.navigationStyle()));
         BrowserPolicy browser = settings.browserPolicy();
         values.setProperty(BROWSER_JAVA_SCRIPT, Boolean.toString(browser.javaScriptEnabled()));

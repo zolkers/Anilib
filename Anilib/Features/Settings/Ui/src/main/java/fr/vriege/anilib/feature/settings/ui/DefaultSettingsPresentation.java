@@ -72,6 +72,11 @@ public final class DefaultSettingsPresentation implements SettingsPresentation {
     }
 
     @Override
+    public void setReducedMotion(boolean enabled) {
+        service.replace(service.snapshot().withReducedMotion(enabled));
+    }
+
+    @Override
     public void setNavigationStyle(NavigationStyle navigationStyle) {
         service.replace(service.snapshot().withNavigationStyle(navigationStyle));
     }

@@ -8,6 +8,7 @@ public record SettingsSnapshot(
         ThemeFamily themeFamily,
         AccentColor accentColor,
         TypographyScale typographyScale,
+        boolean reducedMotion,
         NavigationStyle navigationStyle,
         BrowserPolicy browserPolicy,
         StartScreen startScreen,
@@ -33,6 +34,7 @@ public record SettingsSnapshot(
                 ThemeFamily.MATERIAL,
                 AccentColor.DEFAULT,
                 TypographyScale.STANDARD,
+                false,
                 NavigationStyle.ADAPTIVE,
                 BrowserPolicy.defaults(),
                 StartScreen.LIBRARY,
@@ -43,62 +45,79 @@ public record SettingsSnapshot(
     }
 
     public SettingsSnapshot withLanguagePack(LanguagePack value) {
-        return copy(value, themeMode, themeFamily, accentColor, typographyScale, navigationStyle, browserPolicy,
+        return copy(value, themeMode, themeFamily, accentColor, typographyScale, reducedMotion, navigationStyle,
+                browserPolicy,
                 startScreen, showAdultContent, incognitoMode, downloadOnlyOnWifi, updateOnlyOnWifi);
     }
 
     public SettingsSnapshot withThemeMode(ThemeMode value) {
-        return copy(languagePack, value, themeFamily, accentColor, typographyScale, navigationStyle, browserPolicy,
+        return copy(languagePack, value, themeFamily, accentColor, typographyScale, reducedMotion, navigationStyle,
+                browserPolicy,
                 startScreen, showAdultContent, incognitoMode, downloadOnlyOnWifi, updateOnlyOnWifi);
     }
 
     public SettingsSnapshot withThemeFamily(ThemeFamily value) {
-        return copy(languagePack, themeMode, value, accentColor, typographyScale, navigationStyle, browserPolicy,
+        return copy(languagePack, themeMode, value, accentColor, typographyScale, reducedMotion, navigationStyle,
+                browserPolicy,
                 startScreen, showAdultContent, incognitoMode, downloadOnlyOnWifi, updateOnlyOnWifi);
     }
 
     public SettingsSnapshot withAccentColor(AccentColor value) {
-        return copy(languagePack, themeMode, themeFamily, value, typographyScale, navigationStyle, browserPolicy,
+        return copy(languagePack, themeMode, themeFamily, value, typographyScale, reducedMotion, navigationStyle,
+                browserPolicy,
                 startScreen, showAdultContent, incognitoMode, downloadOnlyOnWifi, updateOnlyOnWifi);
     }
 
     public SettingsSnapshot withTypographyScale(TypographyScale value) {
-        return copy(languagePack, themeMode, themeFamily, accentColor, value, navigationStyle, browserPolicy,
+        return copy(languagePack, themeMode, themeFamily, accentColor, value, reducedMotion, navigationStyle,
+                browserPolicy,
                 startScreen, showAdultContent, incognitoMode, downloadOnlyOnWifi, updateOnlyOnWifi);
     }
 
+    public SettingsSnapshot withReducedMotion(boolean value) {
+        return copy(languagePack, themeMode, themeFamily, accentColor, typographyScale, value, navigationStyle,
+                browserPolicy, startScreen, showAdultContent, incognitoMode, downloadOnlyOnWifi, updateOnlyOnWifi);
+    }
+
     public SettingsSnapshot withNavigationStyle(NavigationStyle value) {
-        return copy(languagePack, themeMode, themeFamily, accentColor, typographyScale, value, browserPolicy,
+        return copy(languagePack, themeMode, themeFamily, accentColor, typographyScale, reducedMotion, value,
+                browserPolicy,
                 startScreen, showAdultContent, incognitoMode, downloadOnlyOnWifi, updateOnlyOnWifi);
     }
 
     public SettingsSnapshot withBrowserPolicy(BrowserPolicy value) {
-        return copy(languagePack, themeMode, themeFamily, accentColor, typographyScale, navigationStyle, value,
+        return copy(languagePack, themeMode, themeFamily, accentColor, typographyScale, reducedMotion,
+                navigationStyle, value,
                 startScreen, showAdultContent, incognitoMode, downloadOnlyOnWifi, updateOnlyOnWifi);
     }
 
     public SettingsSnapshot withStartScreen(StartScreen value) {
-        return copy(languagePack, themeMode, themeFamily, accentColor, typographyScale, navigationStyle, browserPolicy,
+        return copy(languagePack, themeMode, themeFamily, accentColor, typographyScale, reducedMotion,
+                navigationStyle, browserPolicy,
                 value, showAdultContent, incognitoMode, downloadOnlyOnWifi, updateOnlyOnWifi);
     }
 
     public SettingsSnapshot withShowAdultContent(boolean value) {
-        return copy(languagePack, themeMode, themeFamily, accentColor, typographyScale, navigationStyle, browserPolicy,
+        return copy(languagePack, themeMode, themeFamily, accentColor, typographyScale, reducedMotion,
+                navigationStyle, browserPolicy,
                 startScreen, value, incognitoMode, downloadOnlyOnWifi, updateOnlyOnWifi);
     }
 
     public SettingsSnapshot withIncognitoMode(boolean value) {
-        return copy(languagePack, themeMode, themeFamily, accentColor, typographyScale, navigationStyle, browserPolicy,
+        return copy(languagePack, themeMode, themeFamily, accentColor, typographyScale, reducedMotion,
+                navigationStyle, browserPolicy,
                 startScreen, showAdultContent, value, downloadOnlyOnWifi, updateOnlyOnWifi);
     }
 
     public SettingsSnapshot withDownloadOnlyOnWifi(boolean value) {
-        return copy(languagePack, themeMode, themeFamily, accentColor, typographyScale, navigationStyle, browserPolicy,
+        return copy(languagePack, themeMode, themeFamily, accentColor, typographyScale, reducedMotion,
+                navigationStyle, browserPolicy,
                 startScreen, showAdultContent, incognitoMode, value, updateOnlyOnWifi);
     }
 
     public SettingsSnapshot withUpdateOnlyOnWifi(boolean value) {
-        return copy(languagePack, themeMode, themeFamily, accentColor, typographyScale, navigationStyle, browserPolicy,
+        return copy(languagePack, themeMode, themeFamily, accentColor, typographyScale, reducedMotion,
+                navigationStyle, browserPolicy,
                 startScreen, showAdultContent, incognitoMode, downloadOnlyOnWifi, value);
     }
 
@@ -108,6 +127,7 @@ public record SettingsSnapshot(
             ThemeFamily themeFamily,
             AccentColor accentColor,
             TypographyScale typographyScale,
+            boolean reducedMotion,
             NavigationStyle navigationStyle,
             BrowserPolicy browserPolicy,
             StartScreen startScreen,
@@ -115,7 +135,7 @@ public record SettingsSnapshot(
             boolean incognitoMode,
             boolean downloadOnlyOnWifi,
             boolean updateOnlyOnWifi) {
-        return new SettingsSnapshot(languagePack, themeMode, themeFamily, accentColor, typographyScale,
+        return new SettingsSnapshot(languagePack, themeMode, themeFamily, accentColor, typographyScale, reducedMotion,
                 navigationStyle, browserPolicy, startScreen, showAdultContent, incognitoMode, downloadOnlyOnWifi,
                 updateOnlyOnWifi);
     }

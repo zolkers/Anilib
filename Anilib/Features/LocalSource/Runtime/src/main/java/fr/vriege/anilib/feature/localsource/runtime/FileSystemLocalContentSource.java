@@ -60,6 +60,7 @@ public final class FileSystemLocalContentSource
             Set.of(SourceContentKind.MANGA, SourceContentKind.ANIME),
             SourceSdk.API_VERSION);
     private static final long MAX_PAGE_BYTES = 64L * 1024L * 1024L;
+    private static final int MAX_ARCHIVE_ENTRIES = 10_000;
     private static final Set<String> IMAGE_EXTENSIONS =
             Set.of("bmp", "gif", "jpeg", "jpg", "png", "webp");
     private static final Set<String> ARCHIVE_EXTENSIONS = Set.of("cbz", "epub", "zip");
@@ -532,6 +533,10 @@ public final class FileSystemLocalContentSource
     private List<LocalPage> archivePages(LocalPublicationId id, Path archive) {
         requireArchive(archive, id);
         try (ZipFile zipFile = new ZipFile(archive.toFile())) {
+            if (zipFile.size() > MAX_ARCHIVE_ENTRIES) {
+                throw new LocalSourceException(
+                        "Local archive contains more than " + MAX_ARCHIVE_ENTRIES + " entries");
+            }
             List<PageCandidate> candidates = zipFile.stream()
                     .filter(Predicate.not(ZipEntry::isDirectory))
                     .filter(entry -> isSafeEntry(entry.getName()))

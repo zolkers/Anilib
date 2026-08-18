@@ -339,6 +339,14 @@ private fun SettingsDetail(
                         }
                     }
                     item {
+                        SettingsSwitchRow(
+                            "Reduce motion",
+                            "Disable reader page transitions and nonessential animation",
+                            settings.reducedMotion(),
+                            presentation::setReducedMotion,
+                        )
+                    }
+                    item {
                         SettingsRow("Navigation", settings.navigationStyle().displayName()) {
                             presentation.setNavigationStyle(settings.navigationStyle().next())
                         }

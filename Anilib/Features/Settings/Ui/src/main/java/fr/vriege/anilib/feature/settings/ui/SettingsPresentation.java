@@ -33,6 +33,8 @@ public interface SettingsPresentation {
 
     void setTypographyScale(TypographyScale typographyScale);
 
+    void setReducedMotion(boolean enabled);
+
     void setNavigationStyle(NavigationStyle navigationStyle);
 
     void setBrowserPolicy(BrowserPolicy browserPolicy);
