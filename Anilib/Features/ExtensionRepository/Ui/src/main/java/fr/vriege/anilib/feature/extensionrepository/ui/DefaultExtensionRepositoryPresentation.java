@@ -4,6 +4,7 @@ import fr.vriege.anilib.feature.extensionrepository.ExtensionInstallationService
 import fr.vriege.anilib.feature.extensionrepository.ExtensionPackageMetadata;
 import fr.vriege.anilib.feature.extensionrepository.ExtensionRepositoryService;
 import fr.vriege.anilib.feature.extensionrepository.ExtensionRepositorySnapshot;
+import fr.vriege.anilib.feature.extensionrepository.ExtensionUpdateService;
 import fr.vriege.anilib.foundation.validation.Preconditions;
 
 import java.net.URI;
@@ -20,18 +21,23 @@ public final class DefaultExtensionRepositoryPresentation
         implements ExtensionRepositoryPresentation, AutoCloseable {
     private final ExtensionRepositoryService service;
     private final ExtensionInstallationService installation;
+    private final ExtensionUpdateService updates;
     private final ExecutorService executor = Executors.newSingleThreadExecutor(runnable -> {
         Thread thread = new Thread(runnable, "anilib-extension-repositories");
         thread.setDaemon(true);
         return thread;
     });
     private final List<Runnable> listeners = new CopyOnWriteArrayList<>();
+    private final AutoCloseable updateObservation;
 
     public DefaultExtensionRepositoryPresentation(
             ExtensionRepositoryService service,
-            ExtensionInstallationService installation) {
+            ExtensionInstallationService installation,
+            ExtensionUpdateService updates) {
         this.service = Preconditions.requireNonNull(service, "service");
         this.installation = Preconditions.requireNonNull(installation, "installation");
+        this.updates = Preconditions.requireNonNull(updates, "updates");
+        updateObservation = updates.observe(this::notifyListeners);
     }
 
     @Override
@@ -55,6 +61,8 @@ public final class DefaultExtensionRepositoryPresentation
                 rows,
                 service.packages(),
                 installation.installed(),
+                updates.availableUpdates(),
+                updates.automaticUpdatesEnabled(),
                 installation.trustedKeyIds());
     }
 
@@ -81,6 +89,17 @@ public final class DefaultExtensionRepositoryPresentation
             notifyListeners();
             return view;
         }, executor);
+    }
+
+    @Override
+    public CompletableFuture<ExtensionRepositoryView> updateAllAvailable() {
+        return lifecycle(updates::updateAllAvailable);
+    }
+
+    @Override
+    public void setAutomaticUpdatesEnabled(boolean enabled) {
+        updates.setAutomaticUpdatesEnabled(enabled);
+        notifyListeners();
     }
 
     @Override
@@ -133,6 +152,11 @@ public final class DefaultExtensionRepositoryPresentation
     @Override
     public void close() {
         listeners.clear();
+        try {
+            updateObservation.close();
+        } catch (Exception exception) {
+            throw new IllegalStateException("Unable to close extension update observation", exception);
+        }
         executor.shutdownNow();
     }
 

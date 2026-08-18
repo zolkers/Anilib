@@ -59,7 +59,7 @@ platform-specific.
 
 - [x] reproducible desktop packages for Windows, Linux, and macOS
 - [x] Android APK using only Android SDK/platform APIs beyond shared Anilib code
-- [ ] extension signing, compatibility metadata, and update channels
+- [x] extension signing, compatibility metadata, and update channels
 - [ ] import compatibility for user-owned Aniyomi backups where legally and
   technically feasible
 
@@ -77,6 +77,8 @@ platform-specific.
 - [x] end-to-end example that packages, signs, installs, restarts, and browses the
   same source through the Android/desktop product graph
 - [x] signed portable Anilib artifacts with trust, install, update, disable, and remove
+- [x] shared manual and opt-in six-hour automatic source update channels, restricted
+  to the installed package identity and Ed25519 publisher key
 - [x] load enabled portable Bundles into the Source registry through an explicit
   restart-isolated module boundary
 - [x] Android-only HTTPS download and user-confirmed PackageInstaller hand-off

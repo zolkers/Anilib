@@ -4,7 +4,9 @@ import fr.vriege.anilib.feature.extensionrepository.ExtensionBundleLoadFailure;
 import fr.vriege.anilib.feature.extensionrepository.ExtensionRepositoryCapabilities;
 import fr.vriege.anilib.feature.extensionrepository.runtime.DefaultExtensionInstallationService;
 import fr.vriege.anilib.feature.extensionrepository.runtime.DefaultExtensionRepositoryService;
+import fr.vriege.anilib.feature.extensionrepository.runtime.DefaultExtensionUpdateService;
 import fr.vriege.anilib.feature.extensionrepository.runtime.FileExtensionRepositoryStore;
+import fr.vriege.anilib.feature.extensionrepository.runtime.FileExtensionUpdatePolicyStore;
 import fr.vriege.anilib.feature.extensionrepository.ui.DefaultExtensionRepositoryPresentation;
 import fr.vriege.anilib.feature.extensionrepository.ui.ExtensionRepositoryUiCapabilities;
 import fr.vriege.anilib.feature.network.NetworkCapabilities;
@@ -28,6 +30,7 @@ public final class ExtensionRepositoryPlugin implements AnilibPlugin {
             .requires(NetworkCapabilities.HTTP_CLIENT)
             .provides(ExtensionRepositoryCapabilities.SERVICE)
             .provides(ExtensionRepositoryCapabilities.INSTALLATION)
+            .provides(ExtensionRepositoryCapabilities.UPDATES)
             .provides(ExtensionRepositoryUiCapabilities.PRESENTATION)
             .build();
 
@@ -62,12 +65,19 @@ public final class ExtensionRepositoryPlugin implements AnilibPlugin {
                 repositoryFile.resolveSibling("extensions"),
                 client,
                 loadFailures);
+        DefaultExtensionUpdateService updates = new DefaultExtensionUpdateService(
+                service,
+                installation,
+                new FileExtensionUpdatePolicyStore(repositoryFile.resolveSibling("extension-updates.properties")));
         DefaultExtensionRepositoryPresentation presentation = new DefaultExtensionRepositoryPresentation(
                 service,
-                installation);
+                installation,
+                updates);
+        context.own(updates);
         context.own(presentation);
         context.publish(ExtensionRepositoryCapabilities.SERVICE, service);
         context.publish(ExtensionRepositoryCapabilities.INSTALLATION, installation);
+        context.publish(ExtensionRepositoryCapabilities.UPDATES, updates);
         context.publish(ExtensionRepositoryUiCapabilities.PRESENTATION, presentation);
     }
 }

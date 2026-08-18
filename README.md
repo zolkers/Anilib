@@ -68,6 +68,10 @@ third-party source catalogue. A pasted GitHub repository URL is resolved through
 its default branch and conventional `repo` publication branch, with dynamic
 `index.min.json` then `index.json` discovery; the same signed portable Bundle is
 installed by Android and desktop.
+Installed portable sources share one update channel: repositories expose newer
+versions to both products, `Update all` reuses the complete verification path,
+and an opt-in six-hour automatic mode accepts only the same package identity and
+Ed25519 publisher key before activation on restart.
 On Android, the same screen inventories installed Aniyomi extension APKs that
 the OS already exposes, including their source entrypoints, Aniyomi library
 generation,

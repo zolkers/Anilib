@@ -134,3 +134,13 @@ or incompatible archive is skipped and exposed through
 or the product from starting. JPMS and the restricted Source context are
 dependency/capability boundaries, not a security sandbox for an untrusted
 publisher.
+
+## Update channel
+
+The shared Android/desktop screen exposes available updates, a verified
+`Update all` action, and an opt-in automatic channel. Automatic checks run every
+six hours and update only when `pkg` is unchanged, the version code increases,
+the artifact is portable, and its Ed25519 `keyId` exactly matches the publisher
+recorded at installation. Every update still revalidates HTTPS redirects,
+SHA-256, signature, Source API compatibility, and the embedded descriptor.
+Updates take effect after restart so the active Kernel graph remains immutable.

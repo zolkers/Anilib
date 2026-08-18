@@ -174,6 +174,7 @@ public final class DefaultExtensionInstallationService implements ExtensionInsta
                 current.format(),
                 enabled ? ExtensionInstallationState.ENABLED : ExtensionInstallationState.DISABLED,
                 current.sha256(),
+                current.signingKeyId(),
                 current.installedAt());
         installed.put(current.packageName(), updated);
         installedStore.save(installed);
@@ -219,6 +220,7 @@ public final class DefaultExtensionInstallationService implements ExtensionInsta
                 ExtensionArtifactFormat.ANILIB_BUNDLE,
                 state,
                 checksum,
+                artifact.signingKeyId(),
                 clock.instant());
         writeArtifact(result, bytes);
         installed.put(result.packageName(), result);

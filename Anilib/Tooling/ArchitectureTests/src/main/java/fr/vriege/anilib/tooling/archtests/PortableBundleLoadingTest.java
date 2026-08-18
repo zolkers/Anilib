@@ -24,6 +24,7 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
 
@@ -197,6 +198,7 @@ final class PortableBundleLoadingTest {
                 ExtensionArtifactFormat.ANILIB_BUNDLE,
                 state,
                 sha256(bundle),
+                Optional.of("example-publisher"),
                 Instant.parse("2026-08-18T12:00:00Z"));
     }
 

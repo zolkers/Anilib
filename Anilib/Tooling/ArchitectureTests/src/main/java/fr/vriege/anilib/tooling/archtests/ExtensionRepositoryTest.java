@@ -6,6 +6,7 @@ import fr.vriege.anilib.feature.extensionrepository.ExtensionContentKind;
 import fr.vriege.anilib.feature.extensionrepository.ExtensionInstallationState;
 import fr.vriege.anilib.feature.extensionrepository.ExtensionPackageMetadata;
 import fr.vriege.anilib.feature.extensionrepository.ExtensionRepositorySnapshot;
+import fr.vriege.anilib.feature.extensionrepository.ExtensionRepositoryService;
 import fr.vriege.anilib.feature.extensionrepository.ExtensionSourceMetadata;
 import fr.vriege.anilib.feature.extensionrepository.InstalledExtensionPackage;
 import fr.vriege.anilib.feature.extensionrepository.runtime.AniyomiRepositoryIndexParser;
@@ -13,9 +14,11 @@ import fr.vriege.anilib.feature.extensionrepository.runtime.AniyomiAnimeSourceAd
 import fr.vriege.anilib.feature.extensionrepository.runtime.AniyomiSourcePreferences;
 import fr.vriege.anilib.feature.extensionrepository.runtime.DefaultExtensionInstallationService;
 import fr.vriege.anilib.feature.extensionrepository.runtime.DefaultExtensionRepositoryService;
+import fr.vriege.anilib.feature.extensionrepository.runtime.DefaultExtensionUpdateService;
 import fr.vriege.anilib.feature.extensionrepository.runtime.FileExtensionTrustStore;
 import fr.vriege.anilib.feature.extensionrepository.runtime.FileExtensionRepositoryStore;
 import fr.vriege.anilib.feature.extensionrepository.runtime.FileInstalledExtensionStore;
+import fr.vriege.anilib.feature.extensionrepository.runtime.FileExtensionUpdatePolicyStore;
 import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionCompatibility;
 import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionPlatforms;
 import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionRuntimeReport;
@@ -78,6 +81,7 @@ final class ExtensionRepositoryTest {
         persistsAndRefreshesUserRepositories(counter);
         resolvesGitHubRepositoriesDynamically(counter);
         installsOnlyTrustedPortableBundles(counter);
+        updatesInstalledPortableSources(counter);
         modelsInstalledApkDiscovery(counter);
         adaptsAbiReadyAnimeSource(counter);
         adaptsModernSuspendAndHosterAnimeSource(counter);
@@ -281,6 +285,45 @@ final class ExtensionRepositoryTest {
                 Clock.fixed(Instant.parse("2026-08-18T12:00:00Z"), ZoneOffset.UTC),
                 new FileInstalledExtensionStore(directory.resolve("installed.tsv")),
                 new FileExtensionTrustStore(directory.resolve("trusted-keys.txt")));
+    }
+
+    private static void updatesInstalledPortableSources(Counter counter) {
+        Path directory = temporaryDirectory();
+        try {
+            KeyPair publisher = keyPair();
+            String packageId = "publisher:catalogue/source";
+            byte[] versionOne = bundle(packageId, 1, "1.4");
+            DefaultExtensionInstallationService initial = installationService(
+                    directory,
+                    new RecordingClient(versionOne));
+            initial.trust(
+                    "example-publisher",
+                    Base64.getEncoder().encodeToString(publisher.getPublic().getEncoded()));
+            initial.install(portablePackage(packageId, versionOne, publisher, 1));
+
+            byte[] versionTwo = bundle(packageId, 2, "1.4");
+            DefaultExtensionInstallationService installation = installationService(
+                    directory,
+                    new RecordingClient(versionTwo));
+            MutableRepositoryService repository = new MutableRepositoryService(
+                    portablePackage(packageId, versionTwo, publisher, 2));
+            Path policyFile = directory.resolve("automatic-updates.properties");
+            try (DefaultExtensionUpdateService updates = new DefaultExtensionUpdateService(
+                    repository,
+                    installation,
+                    new FileExtensionUpdatePolicyStore(policyFile))) {
+                counter.check(updates.availableUpdates().size() == 1
+                                && updates.availableUpdates().getFirst().automaticEligible(),
+                        "a newer Bundle signed by the installed publisher must enter the automatic channel");
+                counter.check(updates.updateAllAvailable().updated().getFirst().versionCode() == 2,
+                        "the shared update channel must verify and install all available updates");
+                updates.setAutomaticUpdatesEnabled(true);
+                counter.check(new FileExtensionUpdatePolicyStore(policyFile).load(),
+                        "automatic source-update opt-in must survive Android and desktop restart");
+            }
+        } finally {
+            deleteDirectory(directory);
+        }
     }
 
     private static void modelsInstalledApkDiscovery(Counter counter) {
@@ -589,6 +632,49 @@ final class ExtensionRepositoryTest {
                 return new HttpResponse(404, Map.of(), new byte[0], false);
             }
             return new HttpResponse(200, Map.of("content-type", List.of("application/json")), index, false);
+        }
+    }
+
+    private static final class MutableRepositoryService implements ExtensionRepositoryService {
+        private final List<ExtensionPackageMetadata> packages;
+
+        private MutableRepositoryService(ExtensionPackageMetadata extensionPackage) {
+            packages = List.of(extensionPackage);
+        }
+
+        @Override
+        public List<URI> repositories() {
+            return List.of(INDEX);
+        }
+
+        @Override
+        public void add(URI indexUri) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public boolean remove(URI indexUri) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<ExtensionRepositorySnapshot> snapshots() {
+            return List.of();
+        }
+
+        @Override
+        public ExtensionRepositorySnapshot refresh(URI indexUri) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<ExtensionRepositorySnapshot> refreshAll() {
+            return List.of();
+        }
+
+        @Override
+        public List<ExtensionPackageMetadata> packages() {
+            return packages;
         }
     }
 

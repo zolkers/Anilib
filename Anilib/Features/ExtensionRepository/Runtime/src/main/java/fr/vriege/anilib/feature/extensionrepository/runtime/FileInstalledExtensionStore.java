@@ -22,7 +22,8 @@ import java.util.Map;
 
 /** Atomic metadata index for verified installed extension artifacts. */
 public final class FileInstalledExtensionStore {
-    private static final int FIELD_COUNT = 8;
+    private static final int LEGACY_FIELD_COUNT = 8;
+    private static final int FIELD_COUNT = 9;
     private static final int MAX_EXTENSIONS = 10_000;
     private final Path file;
 
@@ -41,7 +42,7 @@ public final class FileInstalledExtensionStore {
                     continue;
                 }
                 String[] fields = line.split("\\t", -1);
-                if (fields.length != FIELD_COUNT) {
+                if (fields.length != FIELD_COUNT && fields.length != LEGACY_FIELD_COUNT) {
                     throw new IllegalStateException("Malformed installed-extension entry");
                 }
                 InstalledExtensionPackage extension = decode(fields);
@@ -79,7 +80,10 @@ public final class FileInstalledExtensionStore {
                     ExtensionArtifactFormat.valueOf(fields[4]),
                     ExtensionInstallationState.valueOf(fields[5]),
                     fields[6],
-                    Instant.parse(fields[7]));
+                    fields.length == FIELD_COUNT && !fields[7].isEmpty()
+                            ? java.util.Optional.of(decodeText(fields[7]))
+                            : java.util.Optional.empty(),
+                    Instant.parse(fields[fields.length - 1]));
         } catch (IllegalArgumentException exception) {
             throw new IllegalStateException("Invalid installed-extension entry", exception);
         }
@@ -95,6 +99,7 @@ public final class FileInstalledExtensionStore {
                 extension.format().name(),
                 extension.state().name(),
                 extension.sha256(),
+                extension.signingKeyId().map(FileInstalledExtensionStore::encodeText).orElse(""),
                 extension.installedAt().toString());
     }
 

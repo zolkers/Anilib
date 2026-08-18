@@ -25,6 +25,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -132,6 +133,27 @@ internal fun ExtensionRepositoriesScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Automatic source updates", fontWeight = FontWeight.Medium)
+                        Text(
+                            "Checks every 6 hours; only the same package and signing key update silently.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = view.automaticUpdatesEnabled(),
+                        onCheckedChange = { enabled ->
+                            runCatching { presentation.setAutomaticUpdatesEnabled(enabled) }
+                                .onFailure { error = it.message ?: "Automatic update policy failed." }
+                        },
+                    )
+                }
+            }
             if (loading) {
                 item {
                     Row(
@@ -143,6 +165,21 @@ internal fun ExtensionRepositoriesScreen(
                 }
             }
             error?.let { message -> item { Text(message, color = MaterialTheme.colorScheme.error) } }
+            if (view.updates().isNotEmpty()) {
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        Button(
+                            onClick = { complete(presentation.updateAllAvailable()) },
+                            enabled = !loading,
+                        ) {
+                            Text("Update all (${view.updates().size})")
+                        }
+                    }
+                }
+            }
             if (installedApkExtensions.isNotEmpty()) {
                 item { SectionTitle("Installed APK extensions") }
                 items(installedApkExtensions, key = { it.packageName() }) { extension ->

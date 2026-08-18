@@ -94,6 +94,15 @@ failures are retained by the Extension Repository capability while other valid
 Bundles continue into the immutable Kernel graph. Enable, disable, and update
 therefore take effect on the next restart.
 
+Portable-source updates are a third explicit capability beside discovery and
+installation. Android and desktop compare the same opaque package identity and
+monotonic version code after repository refresh. Manual update-all still runs
+the complete checksum, descriptor, API, trust, and Ed25519 verification path.
+The opt-in automatic channel checks every six hours and silently accepts only a
+newer Bundle signed by the exact publisher key recorded at installation. Older
+store entries without publisher provenance remain manual until their next
+verified update. The running Kernel graph is never mutated.
+
 Discovery is a separate vertical feature over the Source registry and Library
 catalog. Its Java service owns paging, global and per-source search, validated
 filters, durable source preferences, duplicate-safe library admission, and

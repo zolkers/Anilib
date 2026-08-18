@@ -14,6 +14,10 @@ public interface ExtensionRepositoryPresentation {
 
     CompletableFuture<ExtensionRepositoryView> refreshAll();
 
+    CompletableFuture<ExtensionRepositoryView> updateAllAvailable();
+
+    void setAutomaticUpdatesEnabled(boolean enabled);
+
     void trustKey(String keyId, String x509PublicKeyBase64);
 
     boolean forgetTrust(String keyId);
