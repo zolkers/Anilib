@@ -15,6 +15,8 @@ The service provides:
   favourite state, progress, and history.
 - installed anime/manga extension lists with declared permission and exact
   network-origin details.
+- durable per-media language visibility and pinned source ordering shared by
+  Android and desktop.
 
 Discovery does not install or scan extensions. Product configurations still
 select source Bundles explicitly, and the Source registry remains the only

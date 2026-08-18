@@ -20,6 +20,16 @@ import java.util.Optional;
 public interface DiscoveryPresentation {
     List<DiscoverySourceSection> sourceSections(SourceContentKind contentKind);
 
+    List<String> availableSourceLanguages(SourceContentKind contentKind);
+
+    java.util.Set<String> enabledSourceLanguages(SourceContentKind contentKind);
+
+    java.util.Set<SourceId> pinnedSources();
+
+    void setSourceLanguageEnabled(SourceContentKind contentKind, String languageTag, boolean enabled);
+
+    void setSourcePinned(SourceId sourceId, boolean pinned);
+
     List<InstalledSourceExtension> extensions(SourceContentKind contentKind);
 
     boolean supportsLatest(SourceId sourceId);

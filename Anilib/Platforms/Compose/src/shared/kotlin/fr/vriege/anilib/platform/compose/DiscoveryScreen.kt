@@ -30,9 +30,11 @@ import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -104,7 +106,9 @@ internal fun DiscoveryScreen(
     var listing by remember { mutableStateOf(SourceListing.POPULAR) }
     var globalSearch by remember { mutableStateOf(false) }
     var globalQuery by remember { mutableStateOf("") }
-    var pinnedSources by remember { mutableStateOf<Set<SourceId>>(emptySet()) }
+    var sourceBrowseRevision by remember { mutableIntStateOf(0) }
+    var filteringSourceLanguages by remember { mutableStateOf(false) }
+    var browseError by remember { mutableStateOf<String?>(null) }
     var browserPage by remember { mutableStateOf<SourceWebPage?>(null) }
 
     browserPage?.let { page ->
@@ -151,6 +155,11 @@ internal fun DiscoveryScreen(
                     }
                 },
                 actions = {
+                    if (section.sourceTab() && !globalSearch) {
+                        TextButton(onClick = { filteringSourceLanguages = true }) {
+                            Text("Languages")
+                        }
+                    }
                     if (section.searchable() && !globalSearch) {
                         IconButton(onClick = { globalSearch = true }) {
                             Icon(Icons.Default.Search, contentDescription = "Global search")
@@ -174,6 +183,13 @@ internal fun DiscoveryScreen(
                     )
                 }
             }
+            browseError?.let { message ->
+                Text(
+                    message,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                )
+            }
             if (globalSearch && globalQuery.isNotBlank() && section.sourceTab()) {
                 GlobalSearchContent(presentation, section.kind!!, globalQuery)
             } else if (globalSearch && section.extensionTab()) {
@@ -183,14 +199,20 @@ internal fun DiscoveryScreen(
                     BrowseSection.ANIME_SOURCES,
                     BrowseSection.MANGA_SOURCES,
                     -> SourceList(
-                        sections = presentation.sourceSections(section.kind!!),
+                        sections = remember(section, sourceBrowseRevision) {
+                            presentation.sourceSections(section.kind!!)
+                        },
                         supportsLatest = presentation::supportsLatest,
-                        pinnedSources = pinnedSources,
+                        pinnedSources = remember(sourceBrowseRevision) { presentation.pinnedSources() },
                         togglePinned = { sourceId ->
-                            pinnedSources = if (sourceId in pinnedSources) {
-                                pinnedSources - sourceId
-                            } else {
-                                pinnedSources + sourceId
+                            runCatching {
+                                val pinned = sourceId in presentation.pinnedSources()
+                                presentation.setSourcePinned(sourceId, !pinned)
+                            }.onSuccess {
+                                browseError = null
+                                sourceBrowseRevision++
+                            }.onFailure {
+                                browseError = it.message ?: "Source pinning failed."
                             }
                         },
                         open = { descriptor, nextListing ->
@@ -219,6 +241,27 @@ internal fun DiscoveryScreen(
                 }
             }
         }
+    }
+    if (filteringSourceLanguages && section.sourceTab()) {
+        val kind = section.kind!!
+        SourceLanguageDialog(
+            available = remember(kind, sourceBrowseRevision) {
+                presentation.availableSourceLanguages(kind)
+            },
+            enabled = remember(kind, sourceBrowseRevision) {
+                presentation.enabledSourceLanguages(kind)
+            },
+            dismiss = { filteringSourceLanguages = false },
+            toggle = { language, enabled ->
+                runCatching { presentation.setSourceLanguageEnabled(kind, language, enabled) }
+                    .onSuccess {
+                        browseError = null
+                        sourceBrowseRevision++
+                    }.onFailure {
+                        browseError = it.message ?: "Source language selection failed."
+                    }
+            },
+        )
     }
 }
 
@@ -284,6 +327,36 @@ private fun SourceList(
             }
         }
     }
+}
+
+@Composable
+private fun SourceLanguageDialog(
+    available: List<String>,
+    enabled: Set<String>,
+    dismiss: () -> Unit,
+    toggle: (String, Boolean) -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = dismiss,
+        title = { Text("Source languages") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                available.forEach { language ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Checkbox(
+                            checked = language in enabled,
+                            onCheckedChange = { selected -> toggle(language, selected) },
+                        )
+                        Text(languageName(language))
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = dismiss) { Text("Done") } },
+    )
 }
 
 @Composable

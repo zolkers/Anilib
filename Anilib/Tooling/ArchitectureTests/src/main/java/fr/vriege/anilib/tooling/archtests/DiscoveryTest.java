@@ -68,6 +68,7 @@ final class DiscoveryTest {
         try {
             verifiesDiscoveryProduct(counter, directory);
             verifiesPreferenceRestart(counter, directory);
+            verifiesBrowsePreferenceRestart(counter, directory);
         } finally {
             deleteDirectory(directory);
         }
@@ -196,6 +197,34 @@ final class DiscoveryTest {
                     .value();
             counter.check(includeFolders.equals("false"),
                     "source preferences must survive a complete product restart");
+        }
+    }
+
+    private static void verifiesBrowsePreferenceRestart(Counter counter, Path directory) {
+        SourceExtensionPlugin remotePlugin = new SourceExtensionPlugin(
+                ComponentDescriptor.of("test.remote-source", "Remote source", "1.0.0"),
+                new TestCatalogueSource());
+        try (StartedAnilib product = StandardAnilib.start(directory, List.of(remotePlugin))) {
+            DiscoveryPresentation presentation = product.capability(DiscoveryUiCapabilities.PRESENTATION);
+            presentation.setSourcePinned(REMOTE_SOURCE, true);
+            presentation.setSourceLanguageEnabled(SourceContentKind.MANGA, "en", false);
+            counter.check(presentation.pinnedSources().equals(Set.of(REMOTE_SOURCE)),
+                    "pinned sources must be reflected by the shared presentation immediately");
+            counter.check(presentation.sourceSections(SourceContentKind.MANGA).stream()
+                            .flatMap(section -> section.sources().stream())
+                            .noneMatch(source -> source.id().equals(REMOTE_SOURCE)),
+                    "disabled source languages must be removed from Browse immediately");
+        }
+
+        SourceExtensionPlugin reopenedPlugin = new SourceExtensionPlugin(
+                ComponentDescriptor.of("test.remote-source", "Remote source", "1.0.0"),
+                new TestCatalogueSource());
+        try (StartedAnilib product = StandardAnilib.start(directory, List.of(reopenedPlugin))) {
+            DiscoveryPresentation presentation = product.capability(DiscoveryUiCapabilities.PRESENTATION);
+            counter.check(presentation.pinnedSources().equals(Set.of(REMOTE_SOURCE)),
+                    "pinned sources must survive Android and desktop restart");
+            counter.check(!presentation.enabledSourceLanguages(SourceContentKind.MANGA).contains("en"),
+                    "source language choices must survive Android and desktop restart");
         }
     }
 

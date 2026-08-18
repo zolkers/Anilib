@@ -69,6 +69,8 @@ platform-specific.
 - [x] user-managed extension repository URLs using the Aniyomi index shape
 - [x] durable extension language filters and pinned package ordering on Android
   and desktop
+- [x] durable Browse language filters and pinned source ordering on Android and
+  desktop
 - [x] preserve arbitrary printable `pkg` identities without vendor-prefix rules,
   using path-safe hashed artifact storage
 - [x] resolve GitHub repository URLs dynamically through default-branch and

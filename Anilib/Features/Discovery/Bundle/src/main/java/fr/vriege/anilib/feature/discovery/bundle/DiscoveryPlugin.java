@@ -3,6 +3,7 @@ package fr.vriege.anilib.feature.discovery.bundle;
 import fr.vriege.anilib.feature.discovery.DiscoveryCapabilities;
 import fr.vriege.anilib.feature.discovery.runtime.DefaultDiscoveryService;
 import fr.vriege.anilib.feature.discovery.runtime.DiscoveryBackupCodec;
+import fr.vriege.anilib.feature.discovery.runtime.FileDiscoveryBrowsePreferenceStore;
 import fr.vriege.anilib.feature.discovery.runtime.FileSourcePreferenceStore;
 import fr.vriege.anilib.feature.discovery.ui.DefaultDiscoveryPresentation;
 import fr.vriege.anilib.feature.discovery.ui.DiscoveryUiCapabilities;
@@ -49,6 +50,9 @@ public final class DiscoveryPlugin implements AnilibPlugin {
         DefaultDiscoveryService service = new DefaultDiscoveryService(sources, library, preferences);
         context.publish(DiscoveryCapabilities.SERVICE, service);
         context.publish(DiscoveryCapabilities.BACKUP_CODEC, new DiscoveryBackupCodec(preferences));
-        context.publish(DiscoveryUiCapabilities.PRESENTATION, new DefaultDiscoveryPresentation(service));
+        context.publish(DiscoveryUiCapabilities.PRESENTATION, new DefaultDiscoveryPresentation(
+                service,
+                new FileDiscoveryBrowsePreferenceStore(
+                        preferenceFile.resolveSibling("discovery-browse.tsv"))));
     }
 }
