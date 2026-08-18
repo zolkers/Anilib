@@ -537,6 +537,10 @@ private fun AppDestination(
             presentation,
             browserCookies,
             browserRuntimeStatus,
+            manageExtensions = {
+                openSection(AppSection.MORE)
+                openMore(MoreDestination.EXTENSION_REPOSITORIES)
+            },
         )
         AppSection.MORE -> when (moreDestination) {
             MoreDestination.DOWNLOADS -> DownloadsScreen(downloads, closeMore)

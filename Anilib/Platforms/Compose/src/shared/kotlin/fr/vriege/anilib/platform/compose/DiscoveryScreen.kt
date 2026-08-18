@@ -100,6 +100,7 @@ internal fun DiscoveryScreen(
     library: LibraryPresentation,
     browserCookies: HttpCookieJar,
     browserRuntimeStatus: BrowserRuntimeStatus,
+    manageExtensions: () -> Unit,
 ) {
     var section by remember { mutableStateOf(BrowseSection.ANIME_SOURCES) }
     var selectedSource by remember { mutableStateOf<SourceDescriptor?>(null) }
@@ -155,6 +156,11 @@ internal fun DiscoveryScreen(
                     }
                 },
                 actions = {
+                    if (section.extensionTab() && !globalSearch) {
+                        IconButton(onClick = manageExtensions) {
+                            Icon(Icons.Default.Settings, contentDescription = "Manage extension repositories")
+                        }
+                    }
                     if (section.sourceTab() && !globalSearch) {
                         TextButton(onClick = { filteringSourceLanguages = true }) {
                             Text("Languages")

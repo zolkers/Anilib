@@ -16,10 +16,10 @@ explicit so an architectural seam cannot be mistaken for a finished workflow.
 | Anime and manga details | [x] | Partial | Shared facts and reader/player/download/tracking actions are live; add artwork, content-unit lists, related titles, editing, and share/web actions |
 | Updates | [x] | Partial | Scheduling, refresh/cancel, failures, progress, read state, and anime/manga/unread filters are live; add date grouping, selection actions, skipped reasons, and per-item download controls |
 | History | [x] | Partial | Search and detail navigation are live; add date grouping, remove/resume actions, and separate anime/manga presentation |
-| Browse landing and sources | [ ] | Partial | Match the anime/manga source and extension tabs, update badges, source menu actions, and layout density |
-| Source catalogue, search, and filters | [ ] | Partial | Toolbar parity, display modes, source pinning actions, filter sheet behavior, and item menus |
-| Migration | [ ] | Partial | Source selection, per-title result selection, migration options, seasonal anime handling, and progress states |
-| Extensions and repositories | [ ] | Partial | Extension detail screen, source preferences navigation, trust display, install progress, and update/error actions |
+| Browse landing and sources | [x] | Partial | Anime/manga source, extension, and migration tabs plus global search, language filters, pinning, latest, and repository navigation are live; add update badges, richer source menus, and exact density |
+| Source catalogue, search, and filters | [x] | Partial | Popular/latest, paging, search, filters, source preferences, list/grid, web entry, and library admission are live; add item menus and persisted display choice |
+| Migration | [x] | Partial | Source/title selection and migration are live; add batch options, seasonal anime handling, comparison detail, and progress states |
+| Extensions and repositories | [x] | Partial | Repository catalogue, language/pin ordering, trust, install/update/enable/remove, APK hand-off, and source navigation are live; add a dedicated extension detail route and richer progress/error actions |
 | More hub | [x] | Partial | Core ordering and actions are live; add storage and help destinations plus richer download state |
 | Categories | [x] | Partial | The shared screen now shows real counts; add create, rename, reorder, delete, and per-category policies |
 | Statistics | [x] | Partial | The shared screen now shows real library totals; add status, language, source, score, duration, and activity charts |
@@ -45,6 +45,8 @@ explicit so an architectural seam cannot be mistaken for a finished workflow.
 - [x] Added library search, media/favourite/category filters, and deterministic title sorting.
 - [x] Added searchable history plus anime/manga/unread update filters.
 - [x] Added conventional back navigation to title details.
+- [x] Connected Browse extension tabs directly to repository management.
+- [x] Verified catalogue paging, global/per-source search, filters, preferences, WebView entry, and migration routes.
 - [x] Kept every result shared by Android and desktop; no feature behavior was copied into a platform launcher.
 
 The audit is intentionally grouped by user workflow. Aniyomi currently spreads

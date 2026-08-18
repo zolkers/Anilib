@@ -122,7 +122,7 @@ platform-specific.
   - [x] audit the application shell and More hub, replacing inert category,
     statistics, and About rows with working shared screens
   - [x] audit and align the Library, details, Updates, and History baseline
-  - [ ] audit and align Browse, source catalogues, migration, and extensions
+  - [x] audit and align the Browse, source catalogue, migration, and extension baseline
   - [ ] audit and align Reader, Player, Downloads, Backup, Tracking, and WebView
   - [ ] audit and align every Settings destination, About, Help, and app updates
 
