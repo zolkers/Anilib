@@ -51,7 +51,9 @@ public final class ExtensionRepositoryPlugin implements AnilibPlugin {
         DefaultExtensionInstallationService installation = new DefaultExtensionInstallationService(
                 repositoryFile.resolveSibling("extensions"),
                 client);
-        DefaultExtensionRepositoryPresentation presentation = new DefaultExtensionRepositoryPresentation(service);
+        DefaultExtensionRepositoryPresentation presentation = new DefaultExtensionRepositoryPresentation(
+                service,
+                installation);
         context.own(presentation);
         context.publish(ExtensionRepositoryCapabilities.SERVICE, service);
         context.publish(ExtensionRepositoryCapabilities.INSTALLATION, installation);

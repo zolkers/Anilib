@@ -66,7 +66,9 @@ platform-specific.
 ## Phase 6 — bring-your-own sources and complete settings
 
 - [x] user-managed extension repository URLs using the Aniyomi index shape
-- [ ] signed portable Anilib bundles with install, update, disable, and remove
+- [x] signed portable Anilib artifacts with trust, install, update, disable, and remove
+- [ ] load enabled portable Bundles into the Source registry through an explicit
+  restart-isolated module boundary
 - [ ] best-effort Android bridge for user-supplied Aniyomi extension APKs
 - [ ] shared Settings hierarchy with persistent appearance and feature policy
 - [ ] clear HTTP cache, cookies, WebView data, and unused database entries

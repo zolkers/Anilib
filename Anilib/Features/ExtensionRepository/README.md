@@ -40,3 +40,15 @@ The classic `apk` remains Android-only. The `anilib` Bundle is the portable
 artifact used by Android and desktop after checksum, signature, compatibility,
 and installation validation. Repository discovery and artifact installation
 are separate capabilities so merely viewing an index never executes code.
+
+Portable artifacts are accepted only when `sha256`, `signature`, `keyId`, and
+`api` are present, the user has explicitly imported the publisher's X.509
+Ed25519 public key, and the raw archive verifies against both checksum and
+signature. The ZIP/JAR must contain a bounded
+`META-INF/anilib-extension.properties` entry whose `package`, `versionCode`,
+and `api` exactly match the signed repository metadata. Installation state and
+artifacts are written atomically; viewing a catalogue never downloads them.
+
+The current lifecycle stores and manages verified artifacts. Loading enabled
+artifact code into the Source registry is a separate roadmap item because it
+must preserve the single explicit Bundle graph and restart isolation.

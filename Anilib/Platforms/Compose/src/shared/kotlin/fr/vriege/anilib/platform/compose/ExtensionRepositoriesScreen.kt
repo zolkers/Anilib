@@ -40,9 +40,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import fr.vriege.anilib.feature.extensionrepository.ExtensionArtifactFormat
+import fr.vriege.anilib.feature.extensionrepository.ExtensionInstallationState
 import fr.vriege.anilib.feature.extensionrepository.ExtensionPackageMetadata
+import fr.vriege.anilib.feature.extensionrepository.InstalledExtensionPackage
 import fr.vriege.anilib.feature.extensionrepository.ui.ExtensionRepositoryPresentation
 import fr.vriege.anilib.feature.extensionrepository.ui.ExtensionRepositoryRow
+import fr.vriege.anilib.feature.extensionrepository.ui.ExtensionRepositoryView
+import java.util.concurrent.CompletableFuture
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,6 +56,7 @@ internal fun ExtensionRepositoriesScreen(
 ) {
     var view by remember { mutableStateOf(presentation.snapshot()) }
     var adding by remember { mutableStateOf(false) }
+    var trusting by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     DisposableEffect(presentation) {
@@ -59,17 +64,21 @@ internal fun ExtensionRepositoriesScreen(
         onDispose { observation.close() }
     }
 
-    fun refresh() {
+    fun complete(operation: CompletableFuture<ExtensionRepositoryView>) {
         loading = true
         error = null
-        presentation.refreshAll().whenComplete { refreshed, failure ->
+        operation.whenComplete { refreshed, failure ->
             if (failure == null) {
                 view = refreshed
             } else {
-                error = failure.cause?.message ?: failure.message ?: "Repository refresh failed."
+                error = failure.cause?.message ?: failure.message ?: "Extension operation failed."
             }
             loading = false
         }
+    }
+
+    fun refresh() {
+        complete(presentation.refreshAll())
     }
 
     Scaffold(
@@ -82,6 +91,7 @@ internal fun ExtensionRepositoriesScreen(
                     }
                 },
                 actions = {
+                    TextButton(onClick = { trusting = true }) { Text("Trust key") }
                     IconButton(onClick = { refresh() }, enabled = !loading) {
                         Icon(Icons.Default.Refresh, contentDescription = "Refresh repositories")
                     }
@@ -99,7 +109,7 @@ internal fun ExtensionRepositoriesScreen(
             item {
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Anilib ships with no source catalogue. Add only repository URLs you trust.",
+                    "Anilib ships with no source catalogue. Add only repository URLs and publisher keys you trust.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -113,9 +123,17 @@ internal fun ExtensionRepositoriesScreen(
                     }
                 }
             }
-            error?.let { message ->
-                item { Text(message, color = MaterialTheme.colorScheme.error) }
+            error?.let { message -> item { Text(message, color = MaterialTheme.colorScheme.error) } }
+            if (view.trustedKeyIds().isNotEmpty()) {
+                item { SectionTitle("Trusted publishers") }
+                items(view.trustedKeyIds(), key = { it }) { keyId ->
+                    TrustedKeyCard(keyId) {
+                        runCatching { presentation.forgetTrust(keyId) }
+                            .onFailure { error = it.message ?: "Publisher-key removal failed." }
+                    }
+                }
             }
+            item { SectionTitle("Repositories") }
             if (view.repositories().isEmpty()) {
                 item { EmptyPage("No extension repository configured.") }
             } else {
@@ -127,16 +145,37 @@ internal fun ExtensionRepositoriesScreen(
                 }
             }
             if (view.packages().isNotEmpty()) {
-                item {
-                    Text(
-                        "Available extensions",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(top = 12.dp),
+                item { SectionTitle("Available extensions") }
+                items(view.packages(), key = { it.packageName() }) { extension ->
+                    val installed = view.installed().firstOrNull { it.packageName() == extension.packageName() }
+                    ExtensionPackageCard(
+                        extension = extension,
+                        installed = installed,
+                        busy = loading,
+                        install = { complete(presentation.install(extension)) },
+                        update = { complete(presentation.update(extension)) },
+                        toggle = { enabled ->
+                            runCatching { presentation.setEnabled(extension.packageName(), enabled) }
+                                .onFailure { error = it.message ?: "Extension state change failed." }
+                        },
+                        remove = {
+                            runCatching { presentation.removeInstalled(extension.packageName()) }
+                                .onFailure { error = it.message ?: "Extension removal failed." }
+                        },
                     )
                 }
-                items(view.packages(), key = { it.packageName() }) { extension ->
-                    ExtensionPackageCard(extension)
+            }
+            val unavailable = view.installed().filter { installed ->
+                view.packages().none { it.packageName() == installed.packageName() }
+            }
+            if (unavailable.isNotEmpty()) {
+                item { SectionTitle("Installed but unavailable") }
+                items(unavailable, key = { it.packageName() }) { installed ->
+                    InstalledExtensionCard(
+                        installed = installed,
+                        toggle = { enabled -> presentation.setEnabled(installed.packageName(), enabled) },
+                        remove = { presentation.removeInstalled(installed.packageName()) },
+                    )
                 }
             }
             item { Spacer(Modifier.height(20.dp)) }
@@ -155,6 +194,39 @@ internal fun ExtensionRepositoriesScreen(
                     .onFailure { error = it.message ?: "Invalid repository URL." }
             },
         )
+    }
+    if (trusting) {
+        TrustKeyDialog(
+            dismiss = { trusting = false },
+            trust = { keyId, publicKey ->
+                runCatching { presentation.trustKey(keyId, publicKey) }
+                    .onSuccess { trusting = false }
+                    .onFailure { error = it.message ?: "Invalid publisher key." }
+            },
+        )
+    }
+}
+
+@Composable
+private fun SectionTitle(label: String) {
+    Text(
+        label,
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.padding(top = 12.dp),
+    )
+}
+
+@Composable
+private fun TrustedKeyCard(keyId: String, forget: () -> Unit) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(keyId, modifier = Modifier.weight(1f))
+            TextButton(onClick = forget) { Text("Forget") }
+        }
     }
 }
 
@@ -195,7 +267,15 @@ private fun RepositoryCard(repository: ExtensionRepositoryRow, remove: () -> Uni
 }
 
 @Composable
-private fun ExtensionPackageCard(extension: ExtensionPackageMetadata) {
+private fun ExtensionPackageCard(
+    extension: ExtensionPackageMetadata,
+    installed: InstalledExtensionPackage?,
+    busy: Boolean,
+    install: () -> Unit,
+    update: () -> Unit,
+    toggle: (Boolean) -> Unit,
+    remove: () -> Unit,
+) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
             Text(extension.displayName(), fontWeight = FontWeight.Medium)
@@ -215,6 +295,46 @@ private fun ExtensionPackageCard(extension: ExtensionPackageMetadata) {
                     + if (extension.adult()) " · 18+" else "",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            val portable = extension.artifacts().any { it.format() == ExtensionArtifactFormat.ANILIB_BUNDLE }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                when {
+                    installed == null && portable -> Button(onClick = install, enabled = !busy) { Text("Install") }
+                    installed != null -> {
+                        TextButton(onClick = {
+                            toggle(installed.state() == ExtensionInstallationState.DISABLED)
+                        }) {
+                            Text(if (installed.state() == ExtensionInstallationState.ENABLED) "Disable" else "Enable")
+                        }
+                        if (extension.versionCode() > installed.versionCode() && portable) {
+                            Button(onClick = update, enabled = !busy) { Text("Update") }
+                        }
+                        TextButton(onClick = remove) { Text("Remove") }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun InstalledExtensionCard(
+    installed: InstalledExtensionPackage,
+    toggle: (Boolean) -> Unit,
+    remove: () -> Unit,
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+            Text(installed.displayName(), fontWeight = FontWeight.Medium)
+            Text(
+                "v${installed.versionName()} · ${installed.state().name.lowercase()}",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = { toggle(installed.state() == ExtensionInstallationState.DISABLED) }) {
+                    Text(if (installed.state() == ExtensionInstallationState.ENABLED) "Disable" else "Enable")
+                }
+                TextButton(onClick = remove) { Text("Remove") }
+            }
         }
     }
 }
@@ -240,6 +360,45 @@ private fun AddRepositoryDialog(dismiss: () -> Unit, add: (String) -> Unit) {
         },
         confirmButton = {
             Button(onClick = { add(url.trim()) }, enabled = url.isNotBlank()) { Text("Add") }
+        },
+        dismissButton = { TextButton(onClick = dismiss) { Text("Cancel") } },
+    )
+}
+
+@Composable
+private fun TrustKeyDialog(dismiss: () -> Unit, trust: (String, String) -> Unit) {
+    var keyId by remember { mutableStateOf("") }
+    var publicKey by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = dismiss,
+        title = { Text("Trust publisher key") },
+        text = {
+            Column {
+                Text("Only import an Ed25519 key fingerprinted by a publisher you trust.")
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = keyId,
+                    onValueChange = { keyId = it },
+                    label = { Text("Key ID") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = publicKey,
+                    onValueChange = { publicKey = it },
+                    label = { Text("Base64 X.509 public key") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { trust(keyId.trim(), publicKey.trim()) },
+                enabled = keyId.isNotBlank() && publicKey.isNotBlank(),
+            ) {
+                Text("Trust")
+            }
         },
         dismissButton = { TextButton(onClick = dismiss) { Text("Cancel") } },
     )

@@ -16,7 +16,7 @@ workflow or settings depth is not yet complete.
 | Updates | Partial | Scheduled non-overlapping updates, filters, events, notifications | Full update preferences, exception views, skip rules, and platform scheduling controls |
 | Backup | Partial | Versioned Anilib archive, checksums, preview, merge, rollback | Automatic backup policy, storage destinations, sharing, and Aniyomi backup import |
 | Local source | Partial | Local folders and CBZ reading | Full Aniyomi folder conventions, local anime metadata, covers, episode JSON, and rescan actions |
-| Extension repositories | Partial | User-managed HTTPS index URLs, strict Aniyomi metadata parsing, refresh/remove actions, and a shared Android/desktop catalogue | Trust/signatures, download, install, update, disable, remove, and repository language/pinning controls |
+| Extension repositories | Partial | User-managed HTTPS indexes, shared catalogue, Ed25519 publisher trust, SHA-256/signature/API/archive verification, and durable install/update/disable/remove actions | Load enabled portable code into the Source registry, APK bridge, and repository language/pinning controls |
 | Legacy Aniyomi extensions | Missing | No APK discovery or binary compatibility layer | Best-effort Android-only adapter; portable Anilib bundles remain required for desktop |
 | Settings | Missing | Feature-local controls and a non-functional Settings row | Appearance, library, reader, player, downloads, tracking, backup, security/privacy, advanced, and about trees |
 | Network maintenance | Partial | Shared cookies, response cache, rate limits, and clear operations in Java APIs | User actions for clearing cache/cookies, default user agent, proxy/DoH policy, and diagnostics |

@@ -1,5 +1,7 @@
 package fr.vriege.anilib.feature.extensionrepository.ui;
 
+import fr.vriege.anilib.feature.extensionrepository.ExtensionInstallationService;
+import fr.vriege.anilib.feature.extensionrepository.ExtensionPackageMetadata;
 import fr.vriege.anilib.feature.extensionrepository.ExtensionRepositoryService;
 import fr.vriege.anilib.feature.extensionrepository.ExtensionRepositorySnapshot;
 import fr.vriege.anilib.foundation.validation.Preconditions;
@@ -17,6 +19,7 @@ import java.util.concurrent.Executors;
 public final class DefaultExtensionRepositoryPresentation
         implements ExtensionRepositoryPresentation, AutoCloseable {
     private final ExtensionRepositoryService service;
+    private final ExtensionInstallationService installation;
     private final ExecutorService executor = Executors.newSingleThreadExecutor(runnable -> {
         Thread thread = new Thread(runnable, "anilib-extension-repositories");
         thread.setDaemon(true);
@@ -24,8 +27,11 @@ public final class DefaultExtensionRepositoryPresentation
     });
     private final List<Runnable> listeners = new CopyOnWriteArrayList<>();
 
-    public DefaultExtensionRepositoryPresentation(ExtensionRepositoryService service) {
+    public DefaultExtensionRepositoryPresentation(
+            ExtensionRepositoryService service,
+            ExtensionInstallationService installation) {
         this.service = Preconditions.requireNonNull(service, "service");
+        this.installation = Preconditions.requireNonNull(installation, "installation");
     }
 
     @Override
@@ -45,7 +51,11 @@ public final class DefaultExtensionRepositoryPresentation
                             snapshot.packages().size(),
                             snapshot.failure()));
         }
-        return new ExtensionRepositoryView(rows, service.packages());
+        return new ExtensionRepositoryView(
+                rows,
+                service.packages(),
+                installation.installed(),
+                installation.trustedKeyIds());
     }
 
     @Override
@@ -74,6 +84,46 @@ public final class DefaultExtensionRepositoryPresentation
     }
 
     @Override
+    public void trustKey(String keyId, String x509PublicKeyBase64) {
+        installation.trust(keyId, x509PublicKeyBase64);
+        notifyListeners();
+    }
+
+    @Override
+    public boolean forgetTrust(String keyId) {
+        boolean forgotten = installation.forgetTrust(keyId);
+        if (forgotten) {
+            notifyListeners();
+        }
+        return forgotten;
+    }
+
+    @Override
+    public CompletableFuture<ExtensionRepositoryView> install(ExtensionPackageMetadata extensionPackage) {
+        return lifecycle(() -> installation.install(extensionPackage));
+    }
+
+    @Override
+    public CompletableFuture<ExtensionRepositoryView> update(ExtensionPackageMetadata extensionPackage) {
+        return lifecycle(() -> installation.update(extensionPackage));
+    }
+
+    @Override
+    public void setEnabled(String packageName, boolean enabled) {
+        installation.setEnabled(packageName, enabled);
+        notifyListeners();
+    }
+
+    @Override
+    public boolean removeInstalled(String packageName) {
+        boolean removed = installation.remove(packageName);
+        if (removed) {
+            notifyListeners();
+        }
+        return removed;
+    }
+
+    @Override
     public AutoCloseable observe(Runnable listener) {
         Runnable value = Preconditions.requireNonNull(listener, "listener");
         listeners.add(value);
@@ -90,5 +140,14 @@ public final class DefaultExtensionRepositoryPresentation
         for (Runnable listener : listeners) {
             listener.run();
         }
+    }
+
+    private CompletableFuture<ExtensionRepositoryView> lifecycle(Runnable operation) {
+        return CompletableFuture.supplyAsync(() -> {
+            operation.run();
+            ExtensionRepositoryView view = snapshot();
+            notifyListeners();
+            return view;
+        }, executor);
     }
 }
