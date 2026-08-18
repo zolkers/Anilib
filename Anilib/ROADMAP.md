@@ -210,7 +210,7 @@ platform-specific.
   and webtoon spacing controls
 - [x] add color filters, brightness, transitions, orientation policy, and
   per-title overrides
-- [ ] add chapter lists, next/previous chapter navigation, reader menus, and
+- [x] add chapter lists, next/previous chapter navigation, reader menus, and
   download/read-state actions at Aniyomi depth
 
 ### 4. Player

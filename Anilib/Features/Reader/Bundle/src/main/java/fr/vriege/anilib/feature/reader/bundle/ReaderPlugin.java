@@ -7,6 +7,8 @@ import fr.vriege.anilib.feature.reader.ReaderPolicy;
 import fr.vriege.anilib.feature.reader.runtime.DefaultReaderService;
 import fr.vriege.anilib.feature.reader.runtime.FileReaderDisplayPreferenceStore;
 import fr.vriege.anilib.feature.reader.runtime.FileReaderInteractionPreferenceStore;
+import fr.vriege.anilib.feature.reader.runtime.FileReaderReadStateStore;
+import fr.vriege.anilib.feature.reader.runtime.PrivacyAwareReaderReadStateStore;
 import fr.vriege.anilib.feature.reader.ui.DefaultReaderPresentation;
 import fr.vriege.anilib.feature.reader.ui.ReaderUiCapabilities;
 import fr.vriege.anilib.feature.source.SourceCapabilities;
@@ -35,30 +37,38 @@ public final class ReaderPlugin implements AnilibPlugin {
     private final ReaderPolicy policy;
     private final Path interactionPreferences;
     private final Path displayPreferences;
+    private final Path readState;
 
     public ReaderPlugin() {
         this(
                 Path.of("reader-interactions.properties"),
                 Path.of("reader-display.properties"),
+                Path.of("reader-read-state.properties"),
                 ReaderPolicy.standard());
     }
 
     public ReaderPlugin(ReaderPolicy policy) {
-        this(Path.of("reader-interactions.properties"), Path.of("reader-display.properties"), policy);
+        this(
+                Path.of("reader-interactions.properties"),
+                Path.of("reader-display.properties"),
+                Path.of("reader-read-state.properties"),
+                policy);
     }
 
-    public ReaderPlugin(Path interactionPreferences, Path displayPreferences) {
-        this(interactionPreferences, displayPreferences, ReaderPolicy.standard());
+    public ReaderPlugin(Path interactionPreferences, Path displayPreferences, Path readState) {
+        this(interactionPreferences, displayPreferences, readState, ReaderPolicy.standard());
     }
 
     public ReaderPlugin(
             Path interactionPreferences,
             Path displayPreferences,
+            Path readState,
             ReaderPolicy policy) {
         this.interactionPreferences = Objects.requireNonNull(
                 interactionPreferences,
                 "interactionPreferences must not be null");
         this.displayPreferences = Objects.requireNonNull(displayPreferences, "displayPreferences must not be null");
+        this.readState = Objects.requireNonNull(readState, "readState must not be null");
         this.policy = Objects.requireNonNull(policy, "policy must not be null");
     }
 
@@ -82,6 +92,9 @@ public final class ReaderPlugin implements AnilibPlugin {
         context.publish(ReaderUiCapabilities.PRESENTATION, new DefaultReaderPresentation(
                 service,
                 new FileReaderInteractionPreferenceStore(interactionPreferences),
-                new FileReaderDisplayPreferenceStore(displayPreferences)));
+                new FileReaderDisplayPreferenceStore(displayPreferences),
+                new PrivacyAwareReaderReadStateStore(
+                        new FileReaderReadStateStore(readState),
+                        () -> !settings.snapshot().incognitoMode())));
     }
 }

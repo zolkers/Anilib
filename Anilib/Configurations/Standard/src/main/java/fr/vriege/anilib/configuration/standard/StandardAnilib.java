@@ -136,6 +136,7 @@ public final class StandardAnilib {
         Path backups = dataDirectory.toAbsolutePath().normalize().resolve("backups");
         Path readerInteractions = dataDirectory.toAbsolutePath().normalize().resolve("reader-interactions.properties");
         Path readerDisplay = dataDirectory.toAbsolutePath().normalize().resolve("reader-display.properties");
+        Path readerReadState = dataDirectory.toAbsolutePath().normalize().resolve("reader-read-state.properties");
         List<AnilibPlugin> plugins = new ArrayList<>();
         ExtensionBundleSelection extensionSelection = InstalledExtensionBundles.select(extensions);
         plugins.add(new LibraryPlugin(libraryFile));
@@ -145,7 +146,7 @@ public final class StandardAnilib {
         plugins.add(new SettingsPlugin(settings));
         plugins.add(new DiscoveryPlugin(sourcePreferences));
         plugins.add(new ExtensionRepositoryPlugin(extensionRepositories, extensionSelection.failures()));
-        plugins.add(new ReaderPlugin(readerInteractions, readerDisplay));
+        plugins.add(new ReaderPlugin(readerInteractions, readerDisplay, readerReadState));
         plugins.add(new DownloadPlugin(downloads));
         plugins.add(new PlayerPlugin(playbackState, playerBackend));
         plugins.add(new TrackerPlugin(trackingState));

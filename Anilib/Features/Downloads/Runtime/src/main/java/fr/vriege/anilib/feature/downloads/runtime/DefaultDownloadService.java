@@ -16,6 +16,7 @@ import fr.vriege.anilib.feature.source.PagedSource;
 import fr.vriege.anilib.feature.source.Source;
 import fr.vriege.anilib.feature.source.SourceCatalogueItemId;
 import fr.vriege.anilib.feature.source.SourceContentUnit;
+import fr.vriege.anilib.feature.source.SourceContentUnitId;
 import fr.vriege.anilib.feature.source.SourceId;
 import fr.vriege.anilib.feature.source.SourcePageResource;
 import fr.vriege.anilib.feature.source.SourceRegistry;
@@ -135,6 +136,13 @@ public final class DefaultDownloadService
 
     @Override
     public synchronized DownloadId enqueue(LibraryItemId libraryItemId) {
+        return enqueue(libraryItemId, null);
+    }
+
+    @Override
+    public synchronized DownloadId enqueue(
+            LibraryItemId libraryItemId,
+            SourceContentUnitId contentUnitId) {
         Objects.requireNonNull(libraryItemId, "libraryItemId must not be null");
         ensureOpen();
         if (offlineMode) {
@@ -150,7 +158,12 @@ public final class DefaultDownloadService
                 origin.sourceItemKey());
         PagedSource source = pagedSource(itemId.sourceId());
         List<SourceContentUnit> units = validatedUnits(source, itemId);
-        SourceContentUnit unit = selectUnit(item, units);
+        SourceContentUnit unit = contentUnitId == null
+                ? selectUnit(item, units)
+                : units.stream()
+                        .filter(candidate -> candidate.id().equals(contentUnitId))
+                        .findFirst()
+                        .orElseThrow(() -> new DownloadException("Content unit was not found for this title"));
         List<SourcePageResource> pages = validatedPages(source, unit);
         records.values().stream()
                 .filter(record -> record.contentUnit.id().equals(unit.id()))

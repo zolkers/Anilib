@@ -4,6 +4,7 @@ import fr.vriege.anilib.feature.downloads.DownloadId;
 import fr.vriege.anilib.feature.downloads.DownloadQueueSnapshot;
 import fr.vriege.anilib.feature.downloads.DownloadService;
 import fr.vriege.anilib.feature.library.LibraryItemId;
+import fr.vriege.anilib.feature.source.SourceContentUnitId;
 
 import java.util.Objects;
 
@@ -27,6 +28,11 @@ public final class DefaultDownloadPresentation implements DownloadPresentation {
     @Override
     public DownloadId enqueue(LibraryItemId libraryItemId) {
         return downloads.enqueue(libraryItemId);
+    }
+
+    @Override
+    public DownloadId enqueue(LibraryItemId libraryItemId, SourceContentUnitId contentUnitId) {
+        return downloads.enqueue(libraryItemId, contentUnitId);
     }
 
     @Override

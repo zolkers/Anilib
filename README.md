@@ -33,6 +33,8 @@ display controls persist scale and fit policy, border crop, split or dual-page
 layout, rotation, webtoon spacing, color and brightness filters, and page
 transitions across Android and desktop restarts. Titles can override the global
 display profile, while Android also applies the selected screen-orientation policy.
+The in-reader chapter list supports direct and previous/next navigation, durable
+read/unread state, and exact per-chapter download actions without leaving the viewer.
 The shared Library screen persists grid/list density, sorting, and its landing
 category. Its category manager creates, renames, reorders, and deletes durable
 categories while retaining per-category display and update policy.

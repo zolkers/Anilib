@@ -1,6 +1,7 @@
 package fr.vriege.anilib.feature.downloads;
 
 import fr.vriege.anilib.feature.library.LibraryItemId;
+import fr.vriege.anilib.feature.source.SourceContentUnitId;
 
 public interface DownloadService {
     DownloadQueueSnapshot snapshot();
@@ -8,6 +9,8 @@ public interface DownloadService {
     boolean canEnqueue(LibraryItemId libraryItemId);
 
     DownloadId enqueue(LibraryItemId libraryItemId);
+
+    DownloadId enqueue(LibraryItemId libraryItemId, SourceContentUnitId contentUnitId);
 
     void pause(DownloadId id);
 

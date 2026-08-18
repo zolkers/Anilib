@@ -4,6 +4,7 @@ import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.reader.ReaderDisplayPreferenceStore;
 import fr.vriege.anilib.feature.reader.ReaderService;
 import fr.vriege.anilib.feature.reader.ReaderInteractionPreferenceStore;
+import fr.vriege.anilib.feature.reader.ReaderReadStateStore;
 import fr.vriege.anilib.feature.source.SourceContentUnit;
 
 import java.util.List;
@@ -13,14 +14,17 @@ public final class DefaultReaderPresentation implements ReaderPresentation {
     private final ReaderService reader;
     private final ReaderInteractionPreferenceStore interactions;
     private final ReaderDisplayPreferenceStore display;
+    private final ReaderReadStateStore readState;
 
     public DefaultReaderPresentation(
             ReaderService reader,
             ReaderInteractionPreferenceStore interactions,
-            ReaderDisplayPreferenceStore display) {
+            ReaderDisplayPreferenceStore display,
+            ReaderReadStateStore readState) {
         this.reader = Objects.requireNonNull(reader, "reader must not be null");
         this.interactions = Objects.requireNonNull(interactions, "interactions must not be null");
         this.display = Objects.requireNonNull(display, "display must not be null");
+        this.readState = Objects.requireNonNull(readState, "readState must not be null");
     }
 
     @Override
@@ -35,6 +39,6 @@ public final class DefaultReaderPresentation implements ReaderPresentation {
 
     @Override
     public ReaderController open(LibraryItemId libraryItemId) {
-        return new ReaderController(reader.open(libraryItemId), interactions, display);
+        return new ReaderController(reader, libraryItemId, interactions, display, readState);
     }
 }

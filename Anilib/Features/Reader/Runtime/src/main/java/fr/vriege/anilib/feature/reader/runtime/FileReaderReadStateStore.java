@@ -1,0 +1,120 @@
+package fr.vriege.anilib.feature.reader.runtime;
+
+import fr.vriege.anilib.feature.library.LibraryItemId;
+import fr.vriege.anilib.feature.reader.ReaderReadStateStore;
+
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.Base64;
+import java.util.Comparator;
+import java.util.LinkedHashSet;
+import java.util.Objects;
+import java.util.Set;
+
+public final class FileReaderReadStateStore implements ReaderReadStateStore {
+    private final Path file;
+
+    public FileReaderReadStateStore(Path file) {
+        this.file = Objects.requireNonNull(file, "file must not be null").toAbsolutePath().normalize();
+    }
+
+    @Override
+    public synchronized Set<String> readContentIds(LibraryItemId libraryItemId) {
+        Objects.requireNonNull(libraryItemId, "libraryItemId must not be null");
+        return entries().stream()
+                .filter(entry -> entry.libraryItemId().equals(libraryItemId.value()))
+                .map(Entry::contentId)
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+    }
+
+    @Override
+    public synchronized void setRead(LibraryItemId libraryItemId, String contentId, boolean read) {
+        Objects.requireNonNull(libraryItemId, "libraryItemId must not be null");
+        if (contentId == null || contentId.isBlank()) {
+            throw new IllegalArgumentException("contentId must not be blank");
+        }
+        Set<Entry> entries = entries();
+        Entry entry = new Entry(libraryItemId.value(), contentId);
+        if (read) {
+            entries.add(entry);
+        } else {
+            entries.remove(entry);
+        }
+        write(entries);
+    }
+
+    private Set<Entry> entries() {
+        Set<Entry> entries = new LinkedHashSet<>();
+        if (!Files.exists(file)) {
+            return entries;
+        }
+        try {
+            for (String line : Files.readAllLines(file, StandardCharsets.UTF_8)) {
+                String[] columns = line.split("=", -1);
+                Entry entry = columns.length == 2
+                        ? new Entry(decode(columns[0]), decode(columns[1]))
+                        : null;
+                if (entry == null || !entries.add(entry)) {
+                    throw new IllegalStateException("Invalid reader read-state row");
+                }
+            }
+            return entries;
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalStateException("Invalid reader read-state value", exception);
+        } catch (IOException exception) {
+            throw new UncheckedIOException("Unable to read reader read state", exception);
+        }
+    }
+
+    private void write(Set<Entry> entries) {
+        Path temporary = file.resolveSibling(file.getFileName() + ".tmp");
+        try {
+            Files.createDirectories(file.getParent());
+            Files.write(
+                    temporary,
+                    entries.stream()
+                            .sorted(Comparator.comparing(Entry::libraryItemId).thenComparing(Entry::contentId))
+                            .map(entry -> encode(entry.libraryItemId()) + "=" + encode(entry.contentId()))
+                            .toList(),
+                    StandardCharsets.UTF_8);
+            moveAtomically(temporary, file);
+        } catch (IOException exception) {
+            throw new UncheckedIOException("Unable to write reader read state", exception);
+        } finally {
+            try {
+                Files.deleteIfExists(temporary);
+            } catch (IOException ignored) {
+                // The primary operation reports the actionable error.
+            }
+        }
+    }
+
+    private static String encode(String value) {
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(value.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static String decode(String value) {
+        return new String(Base64.getUrlDecoder().decode(value), StandardCharsets.UTF_8);
+    }
+
+    private static void moveAtomically(Path source, Path destination) throws IOException {
+        try {
+            Files.move(source, destination, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+        } catch (AtomicMoveNotSupportedException exception) {
+            Files.move(source, destination, StandardCopyOption.REPLACE_EXISTING);
+        }
+    }
+
+    private record Entry(String libraryItemId, String contentId) {
+        private Entry {
+            if (libraryItemId.isBlank() || contentId.isBlank()) {
+                throw new IllegalArgumentException("reader read-state values must not be blank");
+            }
+        }
+    }
+}

@@ -83,13 +83,19 @@ final class DownloadTest {
                 itemId = item.id();
                 library.save(item);
                 DownloadService downloads = product.capability(DownloadCapabilities.SERVICE);
-                downloadId = downloads.enqueue(item.id());
+                SourceContentUnitId requestedUnit = product.capability(ReaderCapabilities.SERVICE)
+                        .contentUnits(item.id())
+                        .getFirst()
+                        .id();
+                downloadId = downloads.enqueue(item.id(), requestedUnit);
                 DownloadJobSnapshot completed = await(
                         downloads,
                         downloadId,
                         job -> job.status() == DownloadStatus.COMPLETED);
                 counter.check(completed.completedPages() == 2,
                         "download queue must persist every source page");
+                counter.check(completed.contentUnit().id().equals(requestedUnit),
+                        "download queue must target the exact chapter selected by Reader");
                 counter.check(downloads.snapshot().usedStorageBytes() == 7,
                         "download storage usage must equal persisted page bytes");
                 downloads.setOfflineMode(true);

@@ -16,6 +16,7 @@ import fr.vriege.anilib.feature.source.PagedSource;
 import fr.vriege.anilib.feature.source.Source;
 import fr.vriege.anilib.feature.source.SourceCatalogueItemId;
 import fr.vriege.anilib.feature.source.SourceContentUnit;
+import fr.vriege.anilib.feature.source.SourceContentUnitId;
 import fr.vriege.anilib.feature.source.SourceId;
 import fr.vriege.anilib.feature.source.SourcePageResource;
 import fr.vriege.anilib.feature.source.SourceRegistry;
@@ -113,6 +114,21 @@ public final class DefaultReaderService implements ReaderService, ReaderContentR
 
     @Override
     public synchronized ReaderSession open(LibraryItemId libraryItemId) {
+        return openSelected(libraryItemId, null);
+    }
+
+    @Override
+    public synchronized ReaderSession open(
+            LibraryItemId libraryItemId,
+            SourceContentUnitId contentUnitId) {
+        return openSelected(
+                libraryItemId,
+                Objects.requireNonNull(contentUnitId, "contentUnitId must not be null"));
+    }
+
+    private ReaderSession openSelected(
+            LibraryItemId libraryItemId,
+            SourceContentUnitId requestedContentUnitId) {
         Objects.requireNonNull(libraryItemId, "libraryItemId must not be null");
         ensureOpen();
         LibraryItem item = library.find(libraryItemId)
@@ -121,15 +137,21 @@ public final class DefaultReaderService implements ReaderService, ReaderContentR
                 .orElseThrow(() -> new ReaderException("Library item has no source origin"));
         SourceCatalogueItemId sourceItemId = sourceItemId(origin);
         ReaderContentProvider provider = contentProvider;
+        Optional<String> preferredContentId = requestedContentUnitId == null
+                ? item.progress().map(progress -> progress.contentId())
+                : Optional.of(requestedContentUnitId.value());
         Optional<ReaderContent> alternate = provider == null
                 ? Optional.empty()
-                : provider.find(sourceItemId, item.progress().map(progress -> progress.contentId()));
+                : provider.find(sourceItemId, preferredContentId);
         SourceContentUnit unit;
         List<SourcePageResource> pages;
         java.util.function.Function<SourcePageResource, byte[]> pageReader;
         if (alternate.isPresent()) {
             ReaderContent content = alternate.orElseThrow();
             unit = content.contentUnit();
+            if (requestedContentUnitId != null && !unit.id().equals(requestedContentUnitId)) {
+                throw new ReaderException("Requested content unit is not available offline");
+            }
             pages = content.pages();
             pageReader = provider::readPage;
         } else {
@@ -142,7 +164,13 @@ public final class DefaultReaderService implements ReaderService, ReaderContentR
                 throw new ReaderException("Library source does not provide paged content");
             }
             List<SourceContentUnit> units = validatedUnits(pagedSource, sourceItemId);
-            unit = selectUnit(item, units);
+            unit = requestedContentUnitId == null
+                    ? selectUnit(item, units)
+                    : units.stream()
+                            .filter(candidate -> candidate.id().equals(requestedContentUnitId))
+                            .findFirst()
+                            .orElseThrow(() -> new ReaderException(
+                                    "Requested content unit was not found for this title"));
             pages = validatedPages(pagedSource, unit);
             pageReader = pagedSource::readPage;
         }

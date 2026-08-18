@@ -29,12 +29,15 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -60,6 +63,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import fr.vriege.anilib.feature.library.LibraryItemId
 import fr.vriege.anilib.feature.reader.ReadingDirection
 import fr.vriege.anilib.feature.reader.ReaderColorFilter
 import fr.vriege.anilib.feature.reader.ReaderDisplayPreferences
@@ -70,6 +74,8 @@ import fr.vriege.anilib.feature.reader.ReaderPageTransition
 import fr.vriege.anilib.feature.reader.ReaderRotation
 import fr.vriege.anilib.feature.reader.ReaderScaleMode
 import fr.vriege.anilib.feature.reader.ui.ReaderController
+import fr.vriege.anilib.feature.source.SourceContentUnit
+import fr.vriege.anilib.feature.source.SourceContentUnitId
 import kotlin.math.roundToInt
 
 @Composable
@@ -77,17 +83,25 @@ internal fun ReaderScreen(
     controller: ReaderController,
     pageDecoder: (ByteArray) -> ImageBitmap?,
     applyOrientationPolicy: (ReaderOrientationPolicy) -> Unit,
+    downloadContent: (LibraryItemId, SourceContentUnitId) -> Unit,
     closeReader: () -> Unit,
 ) {
     var revision by remember(controller) { mutableIntStateOf(0) }
     var controlsVisible by remember(controller) { mutableStateOf(true) }
     var zoomed by remember(controller) { mutableStateOf(false) }
     var settingsMenu by remember(controller) { mutableStateOf(false) }
+    var chapterMenu by remember(controller) { mutableStateOf(false) }
+    var readerMenu by remember(controller) { mutableStateOf(false) }
+    var actionMessage by remember(controller) { mutableStateOf<String?>(null) }
     var splitSecondHalf by remember(controller) { mutableStateOf(false) }
     var interactions by remember(controller) { mutableStateOf(controller.interactions()) }
     var display by remember(controller) { mutableStateOf(controller.display()) }
     var titleDisplayOverride by remember(controller) { mutableStateOf(controller.hasDisplayOverride()) }
+    var readContentIds by remember(controller) { mutableStateOf(controller.readContentIds()) }
     val snapshot = remember(controller, revision) { controller.snapshot() }
+    val contentUnits = remember(controller, revision) {
+        runCatching { controller.contentUnits() }.getOrDefault(emptyList())
+    }
     val decodedPage = remember(controller, snapshot.currentPageIndex()) {
         runCatching { pageDecoder(controller.currentPage()) }
     }
@@ -141,6 +155,24 @@ internal fun ReaderScreen(
             ReaderInteractionAction.OPEN_MENU -> settingsMenu = true
             ReaderInteractionAction.NONE -> Unit
         }
+    }
+
+    fun openContentUnit(contentUnitId: SourceContentUnitId) {
+        controller.openContentUnit(contentUnitId)
+        splitSecondHalf = false
+        actionMessage = null
+        revision++
+    }
+
+    fun setRead(contentUnitId: SourceContentUnitId, read: Boolean) {
+        controller.setContentRead(contentUnitId, read)
+        readContentIds = controller.readContentIds()
+    }
+
+    fun download(contentUnitId: SourceContentUnitId) {
+        runCatching { downloadContent(snapshot.libraryItemId(), contentUnitId) }
+            .onSuccess { actionMessage = "Download queued." }
+            .onFailure { actionMessage = it.message ?: "The download could not be queued." }
     }
 
     var drag by remember(controller) { mutableStateOf(Offset.Zero) }
@@ -205,6 +237,8 @@ internal fun ReaderScreen(
                 contentUnit = snapshot.contentUnit().title(),
                 closeReader = closeReader,
                 openSettings = { settingsMenu = true },
+                openChapters = { chapterMenu = true },
+                openMenu = { readerMenu = true },
             )
             ReaderBottomBar(
                 pageIndex = snapshot.currentPageIndex(),
@@ -250,6 +284,46 @@ internal fun ReaderScreen(
                     }
                 },
                 close = { settingsMenu = false },
+            )
+        }
+        if (chapterMenu) {
+            ReaderChapterDialog(
+                units = contentUnits,
+                current = snapshot.contentUnit().id(),
+                readContentIds = readContentIds,
+                open = {
+                    openContentUnit(it)
+                    chapterMenu = false
+                },
+                setRead = ::setRead,
+                download = ::download,
+                close = { chapterMenu = false },
+            )
+        }
+        if (readerMenu) {
+            ReaderMenuDialog(
+                current = snapshot.contentUnit(),
+                read = readContentIds.contains(snapshot.contentUnit().id().value()),
+                message = actionMessage,
+                previousChapter = {
+                    if (controller.previousContentUnit()) revision++
+                    readerMenu = false
+                },
+                nextChapter = {
+                    if (controller.nextContentUnit()) revision++
+                    readerMenu = false
+                },
+                setRead = { setRead(snapshot.contentUnit().id(), it) },
+                download = { download(snapshot.contentUnit().id()) },
+                openChapters = {
+                    readerMenu = false
+                    chapterMenu = true
+                },
+                openSettings = {
+                    readerMenu = false
+                    settingsMenu = true
+                },
+                close = { readerMenu = false },
             )
         }
     }
@@ -450,6 +524,8 @@ private fun ReaderTopBar(
     contentUnit: String,
     closeReader: () -> Unit,
     openSettings: () -> Unit,
+    openChapters: () -> Unit,
+    openMenu: () -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -479,6 +555,12 @@ private fun ReaderTopBar(
         IconButton(onClick = openSettings) {
             Icon(Icons.Default.Settings, contentDescription = "Reader settings", tint = Color.White)
         }
+        IconButton(onClick = openChapters) {
+            Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Chapters", tint = Color.White)
+        }
+        IconButton(onClick = openMenu) {
+            Icon(Icons.Default.MoreVert, contentDescription = "Reader menu", tint = Color.White)
+        }
     }
 }
 
@@ -494,6 +576,81 @@ private enum class InteractionSlot(val label: String) {
     SWIPE_DOWN("Swipe down"),
     DOUBLE_TAP("Double tap"),
     LONG_PRESS("Long press"),
+}
+
+@Composable
+private fun ReaderChapterDialog(
+    units: List<SourceContentUnit>,
+    current: SourceContentUnitId,
+    readContentIds: Set<String>,
+    open: (SourceContentUnitId) -> Unit,
+    setRead: (SourceContentUnitId, Boolean) -> Unit,
+    download: (SourceContentUnitId) -> Unit,
+    close: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = close,
+        title = { Text("Chapters") },
+        text = {
+            if (units.isEmpty()) {
+                Text("No chapter list is available.")
+            } else {
+                LazyColumn(modifier = Modifier.heightIn(max = 520.dp)) {
+                    items(units.size) { index ->
+                        val unit = units[index]
+                        val read = readContentIds.contains(unit.id().value())
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            TextButton(onClick = { open(unit.id()) }) {
+                                Text(if (unit.id() == current) "▶ ${unit.title()}" else unit.title())
+                            }
+                            Row {
+                                TextButton(onClick = { setRead(unit.id(), !read) }) {
+                                    Text(if (read) "Mark unread" else "Mark read")
+                                }
+                                TextButton(onClick = { download(unit.id()) }) { Text("Download") }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = close) { Text("Close") } },
+    )
+}
+
+@Composable
+private fun ReaderMenuDialog(
+    current: SourceContentUnit,
+    read: Boolean,
+    message: String?,
+    previousChapter: () -> Unit,
+    nextChapter: () -> Unit,
+    setRead: (Boolean) -> Unit,
+    download: () -> Unit,
+    openChapters: () -> Unit,
+    openSettings: () -> Unit,
+    close: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = close,
+        title = { Text(current.title()) },
+        text = {
+            Column {
+                TextButton(onClick = previousChapter) { Text("Previous chapter") }
+                TextButton(onClick = nextChapter) { Text("Next chapter") }
+                TextButton(onClick = { setRead(!read) }) {
+                    Text(if (read) "Mark chapter unread" else "Mark chapter read")
+                }
+                TextButton(onClick = download) { Text("Download chapter") }
+                TextButton(onClick = openChapters) { Text("All chapters") }
+                TextButton(onClick = openSettings) { Text("Reader settings") }
+                if (!message.isNullOrBlank()) {
+                    Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = close) { Text("Close") } },
+    )
 }
 
 @Composable

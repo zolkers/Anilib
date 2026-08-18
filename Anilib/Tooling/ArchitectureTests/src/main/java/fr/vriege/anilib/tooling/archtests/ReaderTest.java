@@ -24,6 +24,7 @@ import fr.vriege.anilib.feature.reader.ReadingDirection;
 import fr.vriege.anilib.feature.reader.runtime.DefaultReaderService;
 import fr.vriege.anilib.feature.reader.runtime.FileReaderDisplayPreferenceStore;
 import fr.vriege.anilib.feature.reader.runtime.FileReaderInteractionPreferenceStore;
+import fr.vriege.anilib.feature.reader.runtime.FileReaderReadStateStore;
 import fr.vriege.anilib.feature.source.InstalledSourceExtension;
 import fr.vriege.anilib.feature.source.PagedSource;
 import fr.vriege.anilib.feature.source.Source;
@@ -65,7 +66,30 @@ final class ReaderTest {
         suppressesIncognitoPersistence(counter);
         persistsInteractionPreferences(counter);
         persistsDisplayPreferences(counter);
+        persistsReadState(counter);
         return counter.value;
+    }
+
+    private static void persistsReadState(Counter counter) {
+        Path directory = null;
+        try {
+            directory = Files.createTempDirectory("anilib-reader-read-state");
+            Path file = directory.resolve("reader-read-state.properties");
+            LibraryItemId title = new LibraryItemId("reader-read-title");
+            FileReaderReadStateStore store = new FileReaderReadStateStore(file);
+            store.setRead(title, "chapter-2", true);
+            counter.check(new FileReaderReadStateStore(file).readContentIds(title).contains("chapter-2"),
+                    "reader chapter read state must survive Android and desktop restart");
+            store.setRead(title, "chapter-2", false);
+            counter.check(store.readContentIds(title).isEmpty(),
+                    "reader chapters must support a durable mark-unread action");
+        } catch (IOException exception) {
+            throw new AssertionError("Unable to test reader read state", exception);
+        } finally {
+            if (directory != null) {
+                deleteTree(directory);
+            }
+        }
     }
 
     private static void persistsDisplayPreferences(Counter counter) {

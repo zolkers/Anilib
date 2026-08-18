@@ -203,7 +203,12 @@ fun AnilibApp(
                 DisposableEffect(controller) {
                     onDispose { controller.close() }
                 }
-                ReaderScreen(controller, pageDecoder, applyReaderOrientationPolicy) { activeReader = null }
+                ReaderScreen(
+                    controller,
+                    pageDecoder,
+                    applyReaderOrientationPolicy,
+                    downloads::enqueue,
+                ) { activeReader = null }
             } else if (playerTitle != null) {
                 EpisodeScreen(player, playerTitle) { activePlayerTitle = null }
             } else if (trackingTitle != null) {
