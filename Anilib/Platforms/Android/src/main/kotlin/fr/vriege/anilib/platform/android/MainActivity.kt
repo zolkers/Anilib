@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import fr.vriege.anilib.configuration.standard.StandardAnilib
 import fr.vriege.anilib.feature.discovery.ui.DiscoveryUiCapabilities
 import fr.vriege.anilib.feature.extensionrepository.ui.ExtensionRepositoryUiCapabilities
+import fr.vriege.anilib.feature.network.NetworkCapabilities
 import fr.vriege.anilib.feature.library.ui.LibraryUiCapabilities
 import fr.vriege.anilib.feature.reader.ui.ReaderUiCapabilities
 import fr.vriege.anilib.feature.player.ui.PlayerUiCapabilities
@@ -55,12 +56,17 @@ class MainActivity : ComponentActivity() {
         val backup = started.capability(BackupUiCapabilities.PRESENTATION)
         val tracking = started.capability(TrackerUiCapabilities.PRESENTATION)
         val updates = started.capability(UpdateUiCapabilities.PRESENTATION)
+        val legacyExtensionInstaller = AndroidAniyomiApkInstaller(
+            this,
+            started.capability(NetworkCapabilities.HTTP_CLIENT),
+        )
         val componentCount = started.components().size
         setContent {
             AnilibApp(
                 presentation = presentation,
                 discovery = discovery,
                 extensionRepositories = extensionRepositories,
+                legacyExtensionInstaller = legacyExtensionInstaller,
                 reader = reader,
                 player = player,
                 downloads = downloads,

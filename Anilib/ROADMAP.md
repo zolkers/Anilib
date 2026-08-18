@@ -69,7 +69,9 @@ platform-specific.
 - [x] signed portable Anilib artifacts with trust, install, update, disable, and remove
 - [ ] load enabled portable Bundles into the Source registry through an explicit
   restart-isolated module boundary
-- [ ] best-effort Android bridge for user-supplied Aniyomi extension APKs
+- [x] Android-only HTTPS download and user-confirmed PackageInstaller hand-off
+  for user-supplied Aniyomi extension APKs
+- [ ] best-effort Android discovery and Aniyomi extension API compatibility adapter
 - [ ] shared Settings hierarchy with persistent appearance and feature policy
 - [ ] clear HTTP cache, cookies, WebView data, and unused database entries
 - [ ] source and title WebView with shared browser-session cookies

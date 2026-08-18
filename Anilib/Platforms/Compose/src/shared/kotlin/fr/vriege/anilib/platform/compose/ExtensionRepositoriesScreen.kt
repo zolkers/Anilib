@@ -46,12 +46,14 @@ import fr.vriege.anilib.feature.extensionrepository.InstalledExtensionPackage
 import fr.vriege.anilib.feature.extensionrepository.ui.ExtensionRepositoryPresentation
 import fr.vriege.anilib.feature.extensionrepository.ui.ExtensionRepositoryRow
 import fr.vriege.anilib.feature.extensionrepository.ui.ExtensionRepositoryView
+import fr.vriege.anilib.feature.extensionrepository.ui.LegacyExtensionInstaller
 import java.util.concurrent.CompletableFuture
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ExtensionRepositoriesScreen(
     presentation: ExtensionRepositoryPresentation,
+    legacyInstaller: LegacyExtensionInstaller,
     goBack: () -> Unit,
 ) {
     var view by remember { mutableStateOf(presentation.snapshot()) }
@@ -161,6 +163,22 @@ internal fun ExtensionRepositoriesScreen(
                         remove = {
                             runCatching { presentation.removeInstalled(extension.packageName()) }
                                 .onFailure { error = it.message ?: "Extension removal failed." }
+                        },
+                        installLegacy = if (legacyInstaller.available()) {
+                            {
+                                loading = true
+                                error = null
+                                legacyInstaller.install(extension).whenComplete { message, failure ->
+                                    error = if (failure == null) {
+                                        message
+                                    } else {
+                                        failure.cause?.message ?: failure.message ?: "APK hand-off failed."
+                                    }
+                                    loading = false
+                                }
+                            }
+                        } else {
+                            null
                         },
                     )
                 }
@@ -275,6 +293,7 @@ private fun ExtensionPackageCard(
     update: () -> Unit,
     toggle: (Boolean) -> Unit,
     remove: () -> Unit,
+    installLegacy: (() -> Unit)?,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
@@ -310,6 +329,11 @@ private fun ExtensionPackageCard(
                         }
                         TextButton(onClick = remove) { Text("Remove") }
                     }
+                }
+                if (extension.artifacts().any { it.format() == ExtensionArtifactFormat.ANIYOMI_APK }
+                    && installLegacy != null
+                ) {
+                    TextButton(onClick = installLegacy, enabled = !busy) { Text("Install APK") }
                 }
             }
         }

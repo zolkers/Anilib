@@ -61,6 +61,7 @@ import fr.vriege.anilib.feature.backup.ui.BackupPresentation
 import fr.vriege.anilib.feature.discovery.ui.DiscoveryPresentation
 import fr.vriege.anilib.feature.downloads.ui.DownloadPresentation
 import fr.vriege.anilib.feature.extensionrepository.ui.ExtensionRepositoryPresentation
+import fr.vriege.anilib.feature.extensionrepository.ui.LegacyExtensionInstaller
 import fr.vriege.anilib.feature.library.ui.LibraryCard
 import fr.vriege.anilib.feature.library.ui.LibraryDetails
 import fr.vriege.anilib.feature.library.ui.LibraryHistoryRow
@@ -91,6 +92,7 @@ fun AnilibApp(
     presentation: LibraryPresentation,
     discovery: DiscoveryPresentation,
     extensionRepositories: ExtensionRepositoryPresentation,
+    legacyExtensionInstaller: LegacyExtensionInstaller,
     reader: ReaderPresentation,
     player: PlayerPresentation,
     downloads: DownloadPresentation,
@@ -175,6 +177,7 @@ fun AnilibApp(
                             presentation,
                             discovery,
                             extensionRepositories,
+                            legacyExtensionInstaller,
                             reader,
                             player,
                             downloads,
@@ -202,6 +205,7 @@ fun AnilibApp(
                             presentation,
                             discovery,
                             extensionRepositories,
+                            legacyExtensionInstaller,
                             reader,
                             player,
                             downloads,
@@ -236,6 +240,7 @@ private fun ExpandedShell(
     presentation: LibraryPresentation,
     discovery: DiscoveryPresentation,
     extensionRepositories: ExtensionRepositoryPresentation,
+    legacyExtensionInstaller: LegacyExtensionInstaller,
     reader: ReaderPresentation,
     player: PlayerPresentation,
     downloads: DownloadPresentation,
@@ -266,6 +271,7 @@ private fun ExpandedShell(
                 presentation,
                 discovery,
                 extensionRepositories,
+                legacyExtensionInstaller,
                 reader,
                 player,
                 downloads,
@@ -297,6 +303,7 @@ private fun CompactShell(
     presentation: LibraryPresentation,
     discovery: DiscoveryPresentation,
     extensionRepositories: ExtensionRepositoryPresentation,
+    legacyExtensionInstaller: LegacyExtensionInstaller,
     reader: ReaderPresentation,
     player: PlayerPresentation,
     downloads: DownloadPresentation,
@@ -325,6 +332,7 @@ private fun CompactShell(
                 presentation,
                 discovery,
                 extensionRepositories,
+                legacyExtensionInstaller,
                 reader,
                 player,
                 downloads,
@@ -399,6 +407,7 @@ private fun AppDestination(
     presentation: LibraryPresentation,
     discovery: DiscoveryPresentation,
     extensionRepositories: ExtensionRepositoryPresentation,
+    legacyExtensionInstaller: LegacyExtensionInstaller,
     reader: ReaderPresentation,
     player: PlayerPresentation,
     downloads: DownloadPresentation,
@@ -453,6 +462,7 @@ private fun AppDestination(
             MoreDestination.TRACKING -> TrackerAccountsScreen(tracking, closeMore)
             MoreDestination.EXTENSION_REPOSITORIES -> ExtensionRepositoriesScreen(
                 extensionRepositories,
+                legacyExtensionInstaller,
                 closeMore,
             )
             null -> MorePage(

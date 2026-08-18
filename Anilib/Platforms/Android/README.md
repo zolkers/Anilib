@@ -45,3 +45,15 @@ code. CI optionally restores the base64-encoded key from
 `ANILIB_ANDROID_KEYSTORE_BASE64`; the other secret names match the environment
 variables above. The workflow always runs the complete repository gate and
 uploads the APK together with `SHA256SUMS`.
+
+## User-supplied Aniyomi APKs
+
+The shared extension-repository screen exposes `Install APK` only on Android.
+Anilib revalidates HTTPS redirects, downloads through its shared cookie and
+rate-limit stack with a 16 MiB bound, then writes the bytes into an Android
+`PackageInstaller` session. Android's unknown-source permission and final user
+confirmation remain mandatory.
+
+This hand-off installs the user-selected package; it does not claim binary API
+compatibility or make the same APK executable on desktop. Discovery and the
+best-effort Aniyomi API adapter remain a separate roadmap item.

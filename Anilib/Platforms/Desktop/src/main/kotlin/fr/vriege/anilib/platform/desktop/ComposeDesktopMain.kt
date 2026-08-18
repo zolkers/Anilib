@@ -10,6 +10,7 @@ import fr.vriege.anilib.configuration.standard.StandardAnilib
 import fr.vriege.anilib.feature.covercache.bundle.CoverCachePlugin
 import fr.vriege.anilib.feature.discovery.ui.DiscoveryUiCapabilities
 import fr.vriege.anilib.feature.extensionrepository.ui.ExtensionRepositoryUiCapabilities
+import fr.vriege.anilib.feature.extensionrepository.ui.LegacyExtensionInstallers
 import fr.vriege.anilib.feature.library.ui.LibraryUiCapabilities
 import fr.vriege.anilib.feature.reader.ui.ReaderUiCapabilities
 import fr.vriege.anilib.feature.player.ui.PlayerUiCapabilities
@@ -59,6 +60,7 @@ fun main() {
                 presentation = presentation,
                 discovery = discovery,
                 extensionRepositories = extensionRepositories,
+                legacyExtensionInstaller = LegacyExtensionInstallers.unavailable(),
                 reader = reader,
                 player = player,
                 downloads = downloads,
