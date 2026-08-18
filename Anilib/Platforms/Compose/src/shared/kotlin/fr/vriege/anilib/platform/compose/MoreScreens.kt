@@ -23,6 +23,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -33,11 +34,18 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import fr.vriege.anilib.feature.library.MediaKind
+import fr.vriege.anilib.feature.library.PublicationStatus
 import fr.vriege.anilib.feature.library.LibraryCategory
 import fr.vriege.anilib.feature.library.LibraryCategoryUpdatePolicy
-import fr.vriege.anilib.feature.library.ui.LibraryOverview
+import fr.vriege.anilib.feature.discovery.ui.DiscoveryPresentation
 import fr.vriege.anilib.feature.library.ui.LibraryPresentation
+import fr.vriege.anilib.feature.player.ui.PlayerPresentation
+import fr.vriege.anilib.feature.source.SourceId
+import fr.vriege.anilib.feature.tracker.ui.TrackerPresentation
 import fr.vriege.anilib.feature.applicationupdate.ui.ApplicationUpdatePresentation
+import java.time.Duration
+import java.time.Instant
+import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -204,23 +212,220 @@ private fun LibraryCategoryUpdatePolicy.label(): String =
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun StatisticsScreen(overview: LibraryOverview, goBack: () -> Unit) {
-    val anime = overview.titles().count { it.kind() == MediaKind.ANIME }
-    val manga = overview.titles().count { it.kind() == MediaKind.MANGA }
-    val started = overview.titles().count { it.progress().isPresent }
+internal fun StatisticsScreen(
+    library: LibraryPresentation,
+    discovery: DiscoveryPresentation,
+    player: PlayerPresentation,
+    tracking: TrackerPresentation,
+    goBack: () -> Unit,
+) {
+    var snapshot by remember(library, discovery, player, tracking) {
+        mutableStateOf<StatisticsSnapshot?>(null)
+    }
+    var error by remember(library, discovery, player, tracking) { mutableStateOf<String?>(null) }
+    LaunchedEffect(library, discovery, player, tracking) {
+        runCatching {
+            withContext(Dispatchers.IO) {
+                statisticsSnapshot(library, discovery, player, tracking, Instant.now())
+            }
+        }.onSuccess {
+            snapshot = it
+            error = null
+        }.onFailure {
+            error = it.message ?: "Unable to calculate library statistics."
+        }
+    }
     MoreScaffold("Statistics", goBack) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 24.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            item { SummaryCard("Library", "${overview.titles().size} titles") }
-            item { SummaryCard("Anime", "$anime titles") }
-            item { SummaryCard("Manga", "$manga titles") }
-            item { SummaryCard("Favorites", "${overview.favoriteCount()} titles") }
-            item { SummaryCard("Started", "$started titles") }
-            item { SummaryCard("Categories", "${overview.categories().size} custom categories") }
+            error?.let { item { Text(it, color = MaterialTheme.colorScheme.error) } }
+            val value = snapshot
+            if (value == null && error == null) {
+                item { Text("Calculating statistics…") }
+            } else if (value != null) {
+                item { StatisticsHeading("Library") }
+                item { SummaryCard("Titles", "${value.totalTitles} total") }
+                item { SummaryCard("Anime / Manga", "${value.animeTitles} / ${value.mangaTitles}") }
+                item { SummaryCard("Favorites", "${value.favoriteTitles} titles") }
+                item { SummaryCard("Categories", "${value.categoryCount} custom categories") }
+                item { StatisticsHeading("Publication status") }
+                value.statuses.forEach { (label, count) ->
+                    item(key = "status-$label") { SummaryCard(label, "$count titles") }
+                }
+                item { StatisticsHeading("Sources and languages") }
+                value.sources.forEach { (label, count) ->
+                    item(key = "source-$label") { SummaryCard(label, "$count titles") }
+                }
+                value.languages.forEach { (label, count) ->
+                    item(key = "language-$label") { SummaryCard("Language $label", "$count titles") }
+                }
+                item { StatisticsHeading("Scores") }
+                item {
+                    SummaryCard(
+                        "Average tracker score",
+                        value.averageScore?.let { String.format(Locale.ROOT, "%.2f / 10", it) }
+                            ?: "No scored entries",
+                    )
+                }
+                value.scoreBuckets.forEach { (label, count) ->
+                    item(key = "score-$label") { SummaryCard(label, "$count entries") }
+                }
+                item { StatisticsHeading("Duration and progress") }
+                item { SummaryCard("Watched", durationLabel(value.watchedMillis)) }
+                item { SummaryCard("Known episode duration", durationLabel(value.knownDurationMillis)) }
+                item {
+                    SummaryCard(
+                        "Average title progress",
+                        value.averageProgress?.let { "${(it * 100.0).toInt()}%" }
+                            ?: "No measurable progress",
+                    )
+                }
+                item { SummaryCard("Started", "${value.startedTitles} titles") }
+                item { StatisticsHeading("Activity") }
+                item { SummaryCard("Last 7 days", "${value.activity7Days} visits") }
+                item { SummaryCard("Last 30 days", "${value.activity30Days} visits") }
+                item { SummaryCard("Last 365 days", "${value.activity365Days} visits") }
+                if (value.unavailableEpisodeSources > 0) {
+                    item {
+                        Text(
+                            "Duration excludes ${value.unavailableEpisodeSources} unavailable anime sources.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
         }
     }
+}
+
+@Composable
+private fun StatisticsHeading(label: String) {
+    Text(
+        label,
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.padding(top = 8.dp),
+    )
+}
+
+private data class StatisticsSnapshot(
+    val totalTitles: Int,
+    val animeTitles: Int,
+    val mangaTitles: Int,
+    val favoriteTitles: Int,
+    val categoryCount: Int,
+    val statuses: List<Pair<String, Int>>,
+    val sources: List<Pair<String, Int>>,
+    val languages: List<Pair<String, Int>>,
+    val averageScore: Double?,
+    val scoreBuckets: List<Pair<String, Int>>,
+    val watchedMillis: Long,
+    val knownDurationMillis: Long,
+    val averageProgress: Double?,
+    val startedTitles: Int,
+    val activity7Days: Int,
+    val activity30Days: Int,
+    val activity365Days: Int,
+    val unavailableEpisodeSources: Int,
+)
+
+private fun statisticsSnapshot(
+    library: LibraryPresentation,
+    discovery: DiscoveryPresentation,
+    player: PlayerPresentation,
+    tracking: TrackerPresentation,
+    now: Instant,
+): StatisticsSnapshot {
+    val overview = library.library()
+    val details = overview.titles().mapNotNull { library.details(it.id()).orElse(null) }
+    val descriptors = details.mapNotNull { detail -> detail.origin().orElse(null)?.sourceId() }
+        .distinct()
+        .associateWith { sourceId ->
+            runCatching { discovery.source(SourceId.of(sourceId)).orElse(null) }.getOrNull()
+        }
+    val sources = details.groupingBy { detail ->
+        detail.origin().map { origin ->
+            descriptors[origin.sourceId()]?.displayName() ?: origin.sourceId()
+        }.orElse("Local")
+    }.eachCount().sortedCounts()
+    val languages = details.groupingBy { detail ->
+        detail.origin().map { origin ->
+            descriptors[origin.sourceId()]?.languageTag() ?: "Unknown"
+        }.orElse("Local")
+    }.eachCount().sortedCounts()
+    val statuses = PublicationStatus.entries.mapNotNull { status ->
+        details.count { it.publicationStatus() == status }
+            .takeIf { it > 0 }
+            ?.let { status.name.lowercase().replaceFirstChar(Char::uppercase) to it }
+    }
+    val scores = details.flatMap { detail ->
+        runCatching { tracking.entries(detail.id()) }.getOrDefault(emptyList())
+    }.map { entry -> entry.score().orElse(Double.NaN) }.filter(Double::isFinite)
+    val scoreBuckets = listOf(
+        "Score 0–3" to scores.count { it < 4.0 },
+        "Score 4–6" to scores.count { it >= 4.0 && it < 7.0 },
+        "Score 7–8" to scores.count { it >= 7.0 && it < 9.0 },
+        "Score 9–10" to scores.count { it >= 9.0 },
+    ).filter { it.second > 0 }
+    var watchedMillis = 0L
+    var knownDurationMillis = 0L
+    var unavailableEpisodeSources = 0
+    details.filter { it.kind() == MediaKind.ANIME }.forEach { detail ->
+        runCatching { player.episodes(detail.id()) }
+            .onSuccess { episodes ->
+                episodes.mapNotNull { it.playback().orElse(null) }.forEach { playback ->
+                    watchedMillis = saturatedAdd(watchedMillis, playback.positionMillis())
+                    if (playback.durationMillis() >= 0) {
+                        knownDurationMillis = saturatedAdd(
+                            knownDurationMillis,
+                            playback.durationMillis(),
+                        )
+                    }
+                }
+            }
+            .onFailure { unavailableEpisodeSources++ }
+    }
+    val progress = details.mapNotNull { detail ->
+        detail.progress().orElse(null)?.completion()?.orElse(Double.NaN)
+            ?.takeIf(Double::isFinite)
+    }
+    val history = library.history().entries()
+    return StatisticsSnapshot(
+        totalTitles = details.size,
+        animeTitles = details.count { it.kind() == MediaKind.ANIME },
+        mangaTitles = details.count { it.kind() == MediaKind.MANGA },
+        favoriteTitles = overview.favoriteCount(),
+        categoryCount = overview.categories().size,
+        statuses = statuses,
+        sources = sources,
+        languages = languages,
+        averageScore = scores.takeIf { it.isNotEmpty() }?.average(),
+        scoreBuckets = scoreBuckets,
+        watchedMillis = watchedMillis,
+        knownDurationMillis = knownDurationMillis,
+        averageProgress = progress.takeIf { it.isNotEmpty() }?.average(),
+        startedTitles = details.count { it.progress().isPresent },
+        activity7Days = history.count { !it.openedAt().isBefore(now.minus(Duration.ofDays(7))) },
+        activity30Days = history.count { !it.openedAt().isBefore(now.minus(Duration.ofDays(30))) },
+        activity365Days = history.count { !it.openedAt().isBefore(now.minus(Duration.ofDays(365))) },
+        unavailableEpisodeSources = unavailableEpisodeSources,
+    )
+}
+
+private fun Map<String, Int>.sortedCounts(): List<Pair<String, Int>> = entries
+    .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
+    .map { it.key to it.value }
+
+private fun saturatedAdd(left: Long, right: Long): Long =
+    if (Long.MAX_VALUE - left < right) Long.MAX_VALUE else left + right
+
+private fun durationLabel(milliseconds: Long): String {
+    val minutes = milliseconds / 60_000L
+    val hours = minutes / 60L
+    val remaining = minutes % 60L
+    return if (hours > 0) "$hours h $remaining min" else "$remaining min"
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

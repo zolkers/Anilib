@@ -65,6 +65,11 @@ public final class DefaultDiscoveryPresentation implements DiscoveryPresentation
     }
 
     @Override
+    public Optional<SourceDescriptor> source(SourceId sourceId) {
+        return service.source(sourceId);
+    }
+
+    @Override
     public List<String> availableSourceLanguages(SourceContentKind contentKind) {
         return service.sources(contentKind).stream()
                 .map(SourceDescriptor::languageTag)

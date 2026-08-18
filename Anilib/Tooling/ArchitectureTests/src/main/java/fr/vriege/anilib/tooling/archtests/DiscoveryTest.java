@@ -91,6 +91,10 @@ final class DiscoveryTest {
                     "catalogue sources must be grouped in deterministic language order");
             counter.check(presentation.sourceSections(SourceContentKind.MANGA).size() == 2,
                     "the shared presentation must expose language sections");
+            counter.check(discovery.source(REMOTE_SOURCE).orElseThrow().languageTag().equals("en")
+                            && presentation.source(REMOTE_SOURCE).orElseThrow()
+                                    .displayName().equals("Remote catalogue"),
+                    "source identity and language must remain available outside browse filters");
             counter.check(presentation.extensions(SourceContentKind.MANGA).size() == 1
                             && presentation.extensions(SourceContentKind.MANGA)
                                     .getFirst().source().id().equals(REMOTE_SOURCE),

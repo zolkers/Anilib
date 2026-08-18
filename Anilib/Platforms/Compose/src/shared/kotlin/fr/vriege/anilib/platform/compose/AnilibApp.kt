@@ -618,7 +618,13 @@ private fun AppDestination(
             MoreDestination.BACKUP -> BackupScreen(backup, backupImportPicker, closeMore)
             MoreDestination.TRACKING -> TrackerAccountsScreen(tracking, closeMore)
             MoreDestination.CATEGORIES -> CategoriesScreen(presentation, closeMore)
-            MoreDestination.STATISTICS -> StatisticsScreen(presentation.library(), closeMore)
+            MoreDestination.STATISTICS -> StatisticsScreen(
+                presentation,
+                discovery,
+                player,
+                tracking,
+                closeMore,
+            )
             MoreDestination.EXTENSION_REPOSITORIES -> ExtensionRepositoriesScreen(
                 extensionRepositories,
                 apkExtensionPlatform,

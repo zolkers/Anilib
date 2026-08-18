@@ -5,6 +5,7 @@ import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.source.SourceCatalogueItem;
 import fr.vriege.anilib.feature.source.SourceCatalogueItemId;
 import fr.vriege.anilib.feature.source.SourceContentKind;
+import fr.vriege.anilib.feature.source.SourceDescriptor;
 import fr.vriege.anilib.feature.source.InstalledSourceExtension;
 import fr.vriege.anilib.feature.source.SourceFilterDefinition;
 import fr.vriege.anilib.feature.source.SourceFilterValue;
@@ -19,6 +20,8 @@ import java.util.Optional;
 
 public interface DiscoveryPresentation {
     List<DiscoverySourceSection> sourceSections(SourceContentKind contentKind);
+
+    Optional<SourceDescriptor> source(SourceId sourceId);
 
     List<String> availableSourceLanguages(SourceContentKind contentKind);
 

@@ -188,7 +188,7 @@ platform-specific.
   titles, share, open-in-WebView, and source actions
 - [x] add history date grouping, resume/remove actions, and distinct anime/manga
   presentation
-- [ ] expand statistics by status, source, language, score, duration, progress,
+- [x] expand statistics by status, source, language, score, duration, progress,
   and activity period
 
 ### 2. Browse, sources, extensions, and migration

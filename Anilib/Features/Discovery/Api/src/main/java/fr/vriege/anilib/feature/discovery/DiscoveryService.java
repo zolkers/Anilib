@@ -20,6 +20,8 @@ import java.util.Optional;
 public interface DiscoveryService {
     List<SourceDescriptor> sources(SourceContentKind contentKind);
 
+    Optional<SourceDescriptor> source(SourceId sourceId);
+
     List<InstalledSourceExtension> extensions(SourceContentKind contentKind);
 
     boolean supportsLatest(SourceId sourceId);

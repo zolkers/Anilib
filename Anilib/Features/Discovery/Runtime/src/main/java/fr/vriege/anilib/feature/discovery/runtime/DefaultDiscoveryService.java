@@ -11,6 +11,7 @@ import fr.vriege.anilib.feature.library.MediaKind;
 import fr.vriege.anilib.feature.library.PublicationStatus;
 import fr.vriege.anilib.feature.source.CatalogueSource;
 import fr.vriege.anilib.feature.source.InstalledSourceExtension;
+import fr.vriege.anilib.feature.source.Source;
 import fr.vriege.anilib.feature.source.SourceBrowseRequest;
 import fr.vriege.anilib.feature.source.SourceCatalogueItem;
 import fr.vriege.anilib.feature.source.SourceCatalogueItemId;
@@ -68,6 +69,12 @@ public final class DefaultDiscoveryService implements DiscoveryService {
                         .thenComparing(SourceDescriptor::displayName, String.CASE_INSENSITIVE_ORDER)
                         .thenComparing(SourceDescriptor::id))
                 .toList();
+    }
+
+    @Override
+    public Optional<SourceDescriptor> source(SourceId sourceId) {
+        Objects.requireNonNull(sourceId, "sourceId must not be null");
+        return registry.find(sourceId).map(Source::descriptor);
     }
 
     @Override
