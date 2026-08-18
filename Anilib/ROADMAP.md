@@ -44,7 +44,7 @@ modularity behind the UI; Aniyomi remains the product reference.
 
 ## Phase 4 — video and tracking
 
-- [ ] episode model, stream selection, subtitles, and playback state
+- [x] episode model, stream selection, subtitles, and playback state
 - [ ] platform media backends behind a narrow player capability
 - [ ] tracker SDK and opt-in tracker bundles
 - [ ] background library updates and notifications

@@ -8,7 +8,9 @@ that implements only `Source`. API version `1.2` adds capability-limited source
 factories, exact network-origin grants, and observable installed-extension
 metadata. API version `1.3` adds the optional `PagedSource` contract used by
 the Reader for ordered content units, opaque page resources, and source-owned
-page bytes.
+page bytes. API version `1.4` adds the optional `StreamingSource` contract for
+ordered episodes, stream candidates, request headers, formats, and subtitle
+tracks.
 
 ## Extension shape
 
@@ -74,3 +76,12 @@ and pages retain the source-scoped catalogue identity, page indexes are
 contiguous, and resource values remain opaque to the Reader. The source owns
 all I/O; the Reader validates sequences, enforces configured byte limits,
 defensively copies returned bytes, and keeps only a bounded per-session cache.
+
+## Streaming content shape
+
+An anime-capable source may additionally implement `StreamingSource`. Episodes
+retain the source-scoped catalogue identity and streams expose absolute media
+locations, transport format, request headers, quality labels, and immutable
+subtitle tracks. The Player validates ownership and duplicate identities before
+publishing any selection to a platform adapter. Sources still own discovery and
+resolution; inward Player code never imports a platform media SDK.

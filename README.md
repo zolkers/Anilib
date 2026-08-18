@@ -33,7 +33,11 @@ pause/cancel/resume controls, restart-safe partial downloads, storage quotas,
 and offline reading through the same Reader on Android and desktop.
 The removable Backup Bundle creates checksum-verified local archives from
 feature-owned versioned codecs, previews their contents, and restores Library
-and source preferences with merge semantics and cross-section rollback.
+source preferences, and playback state with merge semantics and cross-section
+rollback.
+The removable Player Bundle consumes Source API 1.4 streaming extensions,
+exposes episodes, qualities, formats, request metadata, and subtitles, and
+persists per-episode resume and watched state across Android and desktop.
 The repository also contains the dependency-free
 `AnilibJava` quality checker. Kotlin and audited UI dependencies are confined
 to outer platform renderers; shared contracts and behavior remain Java 21.

@@ -128,6 +128,18 @@ unsupported known sections fail before mutation. One shared screen on Android
 and desktop provides local creation, preview, confirmed restore, and confirmed
 deletion.
 
+Player is a removable vertical over Library and Source. Source API 1.4 owns the
+optional `StreamingSource` extension contract and immutable episode, stream,
+format, request-header, and subtitle models. The Player Bundle resolves only
+anime library origins, validates source ownership and duplicate identities,
+selects stream and subtitle candidates, and stores per-episode millisecond
+resume state through atomic replacement. Opening and progress updates mirror
+history and latest progress into Library without moving Player state ownership
+there. Player also publishes its own versioned backup codec; Standard passes
+that codec capability explicitly to Backup. Android and desktop render the same
+episode and selection screens. No media engine is selected yet: native playback
+remains behind the next platform capability milestone.
+
 HTTP is split at the platform boundary. Framework contracts own immutable
 requests and responses plus cookie, cache, rate-limit, and low-level transport
 ports. One shared policy engine applies those contracts. Desktop injects the
