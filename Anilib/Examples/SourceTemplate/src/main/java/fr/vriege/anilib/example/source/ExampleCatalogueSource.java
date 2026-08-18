@@ -20,9 +20,9 @@ import java.util.Set;
 final class ExampleCatalogueSource implements CatalogueSource {
     private static final SourceId ID = SourceId.of("example.catalogue");
     private static final List<SourceCatalogueItem> ITEMS = List.of(
-            item("architecture", "Modular Adventures", "A manga about removable feature Bundles."),
-            item("desktop", "Desktop Days", "The same source rendered in the desktop application."),
-            item("android", "Android Nights", "The same source rendered in the Android application."));
+            item("test1", "Test n1", "aaaaaaaaaaaaaaaaaaaaaaa"),
+            item("test2", "Test n2", "bbbbbbbbbbbbbbbbbbbbbbb"),
+            item("test3", "Test n3", "Tcccccccccccccccccccccc"));
 
     @Override
     public SourceDescriptor descriptor() {
