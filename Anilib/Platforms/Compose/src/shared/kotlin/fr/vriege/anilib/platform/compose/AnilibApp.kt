@@ -60,6 +60,7 @@ import fr.vriege.anilib.feature.library.LibraryItemId
 import fr.vriege.anilib.feature.backup.ui.BackupPresentation
 import fr.vriege.anilib.feature.discovery.ui.DiscoveryPresentation
 import fr.vriege.anilib.feature.downloads.ui.DownloadPresentation
+import fr.vriege.anilib.feature.downloads.DownloadStatus
 import fr.vriege.anilib.feature.extensionrepository.ui.ExtensionRepositoryPresentation
 import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionPlatform
 import fr.vriege.anilib.feature.library.ui.LibraryCard
@@ -534,6 +535,8 @@ private fun AppDestination(
             MoreDestination.DOWNLOADS -> DownloadsScreen(downloads, closeMore)
             MoreDestination.BACKUP -> BackupScreen(backup, backupImportPicker, closeMore)
             MoreDestination.TRACKING -> TrackerAccountsScreen(tracking, closeMore)
+            MoreDestination.CATEGORIES -> CategoriesScreen(presentation.library(), closeMore)
+            MoreDestination.STATISTICS -> StatisticsScreen(presentation.library(), closeMore)
             MoreDestination.EXTENSION_REPOSITORIES -> ExtensionRepositoriesScreen(
                 extensionRepositories,
                 apkExtensionPlatform,
@@ -546,13 +549,20 @@ private fun AppDestination(
                 browserDataController,
                 closeMore,
             )
+            MoreDestination.ABOUT -> AboutScreen(componentCount, closeMore)
             null -> MorePage(
                 componentCount,
+                settings,
+                settingsPresentation::setIncognitoMode,
+                downloads,
                 { openMore(MoreDestination.DOWNLOADS) },
                 { openMore(MoreDestination.BACKUP) },
                 { openMore(MoreDestination.TRACKING) },
+                { openMore(MoreDestination.CATEGORIES) },
+                { openMore(MoreDestination.STATISTICS) },
                 { openMore(MoreDestination.EXTENSION_REPOSITORIES) },
                 { openMore(MoreDestination.SETTINGS) },
+                { openMore(MoreDestination.ABOUT) },
             )
         }
     }
@@ -840,15 +850,54 @@ private fun PlaceholderPage(title: String, message: String) {
 @Composable
 private fun MorePage(
     componentCount: Int,
+    settings: SettingsSnapshot,
+    setIncognitoMode: (Boolean) -> Unit,
+    downloads: DownloadPresentation,
     openDownloads: () -> Unit,
     openBackup: () -> Unit,
     openTracking: () -> Unit,
+    openCategories: () -> Unit,
+    openStatistics: () -> Unit,
     openExtensionRepositories: () -> Unit,
     openSettings: () -> Unit,
+    openAbout: () -> Unit,
 ) {
+    var queue by remember(downloads) { mutableStateOf(downloads.queue()) }
+    DisposableEffect(downloads) {
+        val observation = downloads.observe { queue = downloads.queue() }
+        onDispose { observation.close() }
+    }
+    val pendingDownloads = queue.jobs().count {
+        it.status() != DownloadStatus.COMPLETED && it.status() != DownloadStatus.CANCELLED
+    }
     Scaffold(topBar = { TopAppBar(title = { Text("More") }) }) { padding ->
         LazyColumn(modifier = Modifier.fillMaxSize().padding(padding)) {
-            item { MoreRow("Download queue", "Manage current and completed downloads", openDownloads) }
+            item {
+                MoreSwitchRow(
+                    "Downloaded only",
+                    "Use downloaded content without the online fallback",
+                    queue.offlineMode(),
+                    downloads::setOfflineMode,
+                )
+            }
+            item {
+                MoreSwitchRow(
+                    "Incognito mode",
+                    "Pause reading and watching history",
+                    settings.incognitoMode(),
+                    setIncognitoMode,
+                )
+            }
+            item { HorizontalDivider() }
+            item {
+                MoreRow(
+                    "Download queue",
+                    if (pendingDownloads == 0) "No pending downloads" else "$pendingDownloads pending downloads",
+                    openDownloads,
+                )
+            }
+            item { MoreRow("Categories", "Organize anime and manga in your library", openCategories) }
+            item { MoreRow("Statistics", "Library and reading activity", openStatistics) }
             item { MoreRow("Backup and restore", "Create or restore a local backup", openBackup) }
             item { MoreRow("Tracking", "Manage external tracking accounts", openTracking) }
             item {
@@ -858,11 +907,33 @@ private fun MorePage(
                     openExtensionRepositories,
                 )
             }
-            item { MoreRow("Categories", "Organize anime and manga in your library") }
-            item { MoreRow("Statistics", "Library and reading activity") }
+            item { HorizontalDivider() }
             item { MoreRow("Settings", "Appearance, library, reader, player, and tracking", openSettings) }
-            item { MoreRow("About", "$componentCount feature bundles active") }
+            item { MoreRow("About", "$componentCount feature bundles active", openAbout) }
         }
+    }
+}
+
+@Composable
+private fun MoreSwitchRow(
+    title: String,
+    summary: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onCheckedChange(!checked) }
+            .padding(horizontal = 24.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
+            Text(title, fontWeight = FontWeight.Medium)
+            Spacer(Modifier.height(3.dp))
+            Text(summary, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        androidx.compose.material3.Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 
@@ -929,8 +1000,11 @@ private enum class MoreDestination {
     DOWNLOADS,
     BACKUP,
     TRACKING,
+    CATEGORIES,
+    STATISTICS,
     EXTENSION_REPOSITORIES,
     SETTINGS,
+    ABOUT,
 }
 
 private fun AppSection.icon(): ImageVector = when (this) {

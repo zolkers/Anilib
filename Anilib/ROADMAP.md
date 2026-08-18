@@ -118,6 +118,13 @@ platform-specific.
 - [x] source and title WebView with shared browser-session cookies
 - [x] source-declared WebView headers, User-Agent, and challenge-cookie completion
 - [ ] per-screen parity audit against the current Aniyomi information architecture
+  - [x] pin the reference revision and inventory every user-facing screen group
+  - [x] audit the application shell and More hub, replacing inert category,
+    statistics, and About rows with working shared screens
+  - [ ] audit and align Library, details, Updates, and History
+  - [ ] audit and align Browse, source catalogues, migration, and extensions
+  - [ ] audit and align Reader, Player, Downloads, Backup, Tracking, and WebView
+  - [ ] audit and align every Settings destination, About, Help, and app updates
 
 Each checkbox should land through a Bundle that can be removed from the
 Standard configuration without changing unrelated features.
