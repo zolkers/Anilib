@@ -90,6 +90,7 @@ fun main() {
                 httpClient = started.capability(NetworkCapabilities.HTTP_CLIENT),
                 shareController = DesktopShareController(),
                 pageDecoder = ::decodePage,
+                applyReaderOrientationPolicy = {},
                 componentCount = started.components().size,
                 darkTheme = desktopDarkTheme(),
             )

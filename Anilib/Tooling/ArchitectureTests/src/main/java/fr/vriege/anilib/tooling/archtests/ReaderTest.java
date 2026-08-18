@@ -8,11 +8,14 @@ import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.library.LibraryOrigin;
 import fr.vriege.anilib.feature.library.MediaKind;
 import fr.vriege.anilib.feature.reader.ReaderCapabilities;
+import fr.vriege.anilib.feature.reader.ReaderColorFilter;
 import fr.vriege.anilib.feature.reader.ReaderDisplayPreferences;
 import fr.vriege.anilib.feature.reader.ReaderInteractionAction;
 import fr.vriege.anilib.feature.reader.ReaderInteractionPreferences;
 import fr.vriege.anilib.feature.reader.ReaderException;
 import fr.vriege.anilib.feature.reader.ReaderPolicy;
+import fr.vriege.anilib.feature.reader.ReaderOrientationPolicy;
+import fr.vriege.anilib.feature.reader.ReaderPageTransition;
 import fr.vriege.anilib.feature.reader.ReaderService;
 import fr.vriege.anilib.feature.reader.ReaderSession;
 import fr.vriege.anilib.feature.reader.ReaderRotation;
@@ -76,11 +79,26 @@ final class ReaderTest {
                     false,
                     ReaderRotation.CLOCKWISE_90,
                     true,
-                    24);
-            new FileReaderDisplayPreferenceStore(file).save(customized);
+                    24,
+                    ReaderColorFilter.SEPIA,
+                    125,
+                    ReaderPageTransition.SLIDE,
+                    ReaderOrientationPolicy.LANDSCAPE);
+            FileReaderDisplayPreferenceStore store = new FileReaderDisplayPreferenceStore(file);
+            store.save(customized);
             ReaderDisplayPreferences reopened = new FileReaderDisplayPreferenceStore(file).snapshot();
             counter.check(reopened.equals(customized),
                     "reader display preferences must survive Android and desktop restart");
+            LibraryItemId overriddenTitle = new LibraryItemId("reader-title-override");
+            ReaderDisplayPreferences override = ReaderDisplayPreferences.defaults();
+            store.saveOverride(overriddenTitle, override);
+            counter.check(store.hasOverride(overriddenTitle) && store.snapshot(overriddenTitle).equals(override),
+                    "reader display preferences must support durable per-title overrides");
+            counter.check(store.snapshot(new LibraryItemId("reader-other-title")).equals(customized),
+                    "reader titles without overrides must inherit global display preferences");
+            store.clearOverride(overriddenTitle);
+            counter.check(!store.hasOverride(overriddenTitle) && store.snapshot(overriddenTitle).equals(customized),
+                    "clearing a reader title override must restore the global preferences");
         } catch (IOException exception) {
             throw new AssertionError("Unable to test reader display preferences", exception);
         } finally {

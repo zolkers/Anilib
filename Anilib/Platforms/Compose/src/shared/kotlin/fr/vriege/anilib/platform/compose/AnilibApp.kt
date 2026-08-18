@@ -102,6 +102,7 @@ import fr.vriege.anilib.feature.source.SourceContentUnit
 import fr.vriege.anilib.feature.source.SourceId
 import fr.vriege.anilib.feature.reader.ui.ReaderController
 import fr.vriege.anilib.feature.reader.ui.ReaderPresentation
+import fr.vriege.anilib.feature.reader.ReaderOrientationPolicy
 import fr.vriege.anilib.feature.player.ui.PlayerPresentation
 import fr.vriege.anilib.feature.tracker.ui.TrackerPresentation
 import fr.vriege.anilib.feature.updates.ui.UpdatePresentation
@@ -156,6 +157,7 @@ fun AnilibApp(
     httpClient: AnilibHttpClient,
     shareController: ShareController,
     pageDecoder: (ByteArray) -> ImageBitmap?,
+    applyReaderOrientationPolicy: (ReaderOrientationPolicy) -> Unit,
     componentCount: Int,
     darkTheme: Boolean = isSystemInDarkTheme(),
 ) {
@@ -201,7 +203,7 @@ fun AnilibApp(
                 DisposableEffect(controller) {
                     onDispose { controller.close() }
                 }
-                ReaderScreen(controller, pageDecoder) { activeReader = null }
+                ReaderScreen(controller, pageDecoder, applyReaderOrientationPolicy) { activeReader = null }
             } else if (playerTitle != null) {
                 EpisodeScreen(player, playerTitle) { activePlayerTitle = null }
             } else if (trackingTitle != null) {

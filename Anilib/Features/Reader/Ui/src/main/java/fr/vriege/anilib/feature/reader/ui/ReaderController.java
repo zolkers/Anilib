@@ -61,11 +61,23 @@ public final class ReaderController implements AutoCloseable {
     }
 
     public ReaderDisplayPreferences display() {
-        return display.snapshot();
+        return display.snapshot(session.snapshot().libraryItemId());
     }
 
-    public void setDisplay(ReaderDisplayPreferences preferences) {
-        display.save(preferences);
+    public boolean hasDisplayOverride() {
+        return display.hasOverride(session.snapshot().libraryItemId());
+    }
+
+    public void setDisplay(ReaderDisplayPreferences preferences, boolean titleOverride) {
+        if (titleOverride) {
+            display.saveOverride(session.snapshot().libraryItemId(), preferences);
+        } else {
+            display.save(preferences);
+        }
+    }
+
+    public void clearDisplayOverride() {
+        display.clearOverride(session.snapshot().libraryItemId());
     }
 
     @Override

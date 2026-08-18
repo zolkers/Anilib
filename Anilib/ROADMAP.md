@@ -208,7 +208,7 @@ platform-specific.
 - [x] add complete gesture and tap-zone customization
 - [x] add scaling, fit policy, crop borders, split pages, rotation, dual-page,
   and webtoon spacing controls
-- [ ] add color filters, brightness, transitions, orientation policy, and
+- [x] add color filters, brightness, transitions, orientation policy, and
   per-title overrides
 - [ ] add chapter lists, next/previous chapter navigation, reader menus, and
   download/read-state actions at Aniyomi depth
