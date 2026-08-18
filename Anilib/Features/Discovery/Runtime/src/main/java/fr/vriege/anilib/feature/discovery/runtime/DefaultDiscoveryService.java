@@ -13,6 +13,7 @@ import fr.vriege.anilib.feature.source.CatalogueSource;
 import fr.vriege.anilib.feature.source.InstalledSourceExtension;
 import fr.vriege.anilib.feature.source.SourceBrowseRequest;
 import fr.vriege.anilib.feature.source.SourceCatalogueItem;
+import fr.vriege.anilib.feature.source.SourceCatalogueItemId;
 import fr.vriege.anilib.feature.source.SourceContentKind;
 import fr.vriege.anilib.feature.source.SourceDescriptor;
 import fr.vriege.anilib.feature.source.SourceFilterDefinition;
@@ -25,7 +26,9 @@ import fr.vriege.anilib.feature.source.SourcePreferenceDefinition;
 import fr.vriege.anilib.feature.source.SourcePreferenceType;
 import fr.vriege.anilib.feature.source.SourceRegistry;
 import fr.vriege.anilib.feature.source.SourceSearchRequest;
+import fr.vriege.anilib.feature.source.WebSource;
 
+import java.net.URI;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -34,6 +37,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 /** Default cross-source discovery behavior shared by every platform. */
 public final class DefaultDiscoveryService implements DiscoveryService {
@@ -84,6 +88,19 @@ public final class DefaultDiscoveryService implements DiscoveryService {
     @Override
     public boolean supportsLatest(SourceId sourceId) {
         return catalogue(sourceId).supportsLatest();
+    }
+
+    @Override
+    public Optional<URI> sourceWebPage(SourceId sourceId) {
+        return webSource(sourceId).map(WebSource::homePage).map(DefaultDiscoveryService::webUri);
+    }
+
+    @Override
+    public Optional<URI> titleWebPage(SourceCatalogueItemId itemId) {
+        Objects.requireNonNull(itemId, "itemId must not be null");
+        return webSource(itemId.sourceId())
+                .flatMap(source -> source.titlePage(itemId))
+                .map(DefaultDiscoveryService::webUri);
     }
 
     @Override
@@ -275,6 +292,22 @@ public final class DefaultDiscoveryService implements DiscoveryService {
                 .filter(CatalogueSource.class::isInstance)
                 .map(CatalogueSource.class::cast)
                 .orElseThrow(() -> new IllegalArgumentException("Source is not browseable: " + sourceId));
+    }
+
+    private Optional<WebSource> webSource(SourceId sourceId) {
+        return registry.find(Objects.requireNonNull(sourceId, "sourceId must not be null"))
+                .filter(WebSource.class::isInstance)
+                .map(WebSource.class::cast);
+    }
+
+    private static URI webUri(URI value) {
+        URI uri = Objects.requireNonNull(value, "web URI must not be null").normalize();
+        String scheme = uri.getScheme();
+        if (!uri.isAbsolute() || uri.getHost() == null || uri.getUserInfo() != null
+                || !(scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https"))) {
+            throw new IllegalArgumentException("Source web pages must be absolute HTTP(S) URIs without user info");
+        }
+        return uri;
     }
 
     private static void requireUnique(List<String> values, String label) {

@@ -79,6 +79,7 @@ import fr.vriege.anilib.feature.reader.ui.ReaderPresentation
 import fr.vriege.anilib.feature.player.ui.PlayerPresentation
 import fr.vriege.anilib.feature.tracker.ui.TrackerPresentation
 import fr.vriege.anilib.feature.updates.ui.UpdatePresentation
+import fr.vriege.anilib.framework.http.HttpCookieJar
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -98,6 +99,8 @@ fun AnilibApp(
     extensionRepositories: ExtensionRepositoryPresentation,
     legacyExtensionInstaller: LegacyExtensionInstaller,
     networkMaintenance: NetworkMaintenance,
+    browserCookies: HttpCookieJar,
+    browserRuntimeStatus: BrowserRuntimeStatus,
     settingsPresentation: SettingsPresentation,
     reader: ReaderPresentation,
     player: PlayerPresentation,
@@ -195,6 +198,8 @@ fun AnilibApp(
                             extensionRepositories,
                             legacyExtensionInstaller,
                             networkMaintenance,
+                            browserCookies,
+                            browserRuntimeStatus,
                             settingsPresentation,
                             settings,
                             reader,
@@ -226,6 +231,8 @@ fun AnilibApp(
                             extensionRepositories,
                             legacyExtensionInstaller,
                             networkMaintenance,
+                            browserCookies,
+                            browserRuntimeStatus,
                             settingsPresentation,
                             settings,
                             reader,
@@ -264,6 +271,8 @@ private fun ExpandedShell(
     extensionRepositories: ExtensionRepositoryPresentation,
     legacyExtensionInstaller: LegacyExtensionInstaller,
     networkMaintenance: NetworkMaintenance,
+    browserCookies: HttpCookieJar,
+    browserRuntimeStatus: BrowserRuntimeStatus,
     settingsPresentation: SettingsPresentation,
     settings: SettingsSnapshot,
     reader: ReaderPresentation,
@@ -298,6 +307,8 @@ private fun ExpandedShell(
                 extensionRepositories,
                 legacyExtensionInstaller,
                 networkMaintenance,
+                browserCookies,
+                browserRuntimeStatus,
                 settingsPresentation,
                 settings,
                 reader,
@@ -333,6 +344,8 @@ private fun CompactShell(
     extensionRepositories: ExtensionRepositoryPresentation,
     legacyExtensionInstaller: LegacyExtensionInstaller,
     networkMaintenance: NetworkMaintenance,
+    browserCookies: HttpCookieJar,
+    browserRuntimeStatus: BrowserRuntimeStatus,
     settingsPresentation: SettingsPresentation,
     settings: SettingsSnapshot,
     reader: ReaderPresentation,
@@ -365,6 +378,8 @@ private fun CompactShell(
                 extensionRepositories,
                 legacyExtensionInstaller,
                 networkMaintenance,
+                browserCookies,
+                browserRuntimeStatus,
                 settingsPresentation,
                 settings,
                 reader,
@@ -443,6 +458,8 @@ private fun AppDestination(
     extensionRepositories: ExtensionRepositoryPresentation,
     legacyExtensionInstaller: LegacyExtensionInstaller,
     networkMaintenance: NetworkMaintenance,
+    browserCookies: HttpCookieJar,
+    browserRuntimeStatus: BrowserRuntimeStatus,
     settingsPresentation: SettingsPresentation,
     settings: SettingsSnapshot,
     reader: ReaderPresentation,
@@ -492,7 +509,12 @@ private fun AppDestination(
             navigate(transition)
             openSection(AppSection.LIBRARY)
         }
-        AppSection.BROWSE -> DiscoveryScreen(discovery, presentation)
+        AppSection.BROWSE -> DiscoveryScreen(
+            discovery,
+            presentation,
+            browserCookies,
+            browserRuntimeStatus,
+        )
         AppSection.MORE -> when (moreDestination) {
             MoreDestination.DOWNLOADS -> DownloadsScreen(downloads, closeMore)
             MoreDestination.BACKUP -> BackupScreen(backup, closeMore)

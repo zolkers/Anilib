@@ -11,6 +11,7 @@ adapters and are enforced by `AnilibJava`.
 | Kotlin JVM, Multiplatform, and Compose compiler plugins | 2.4.10 | Compile platform renderers | Apache-2.0 |
 | Compose Multiplatform | 1.11.1 | Shared adaptive UI, Desktop runtime, Material 3, and icons | Apache-2.0 |
 | ComposeMediaPlayer | 0.11.4 | Shared video surface over platform-native media engines | Apache-2.0 |
+| Compose WebView Multiplatform | 2.0.3 | Android System WebView and desktop KCEF browser surface | Apache-2.0 |
 
 ## Android application
 
@@ -25,6 +26,7 @@ Primary projects:
 - <https://github.com/JetBrains/kotlin>
 - <https://github.com/JetBrains/compose-multiplatform>
 - <https://github.com/kdroidFilter/ComposeMediaPlayer>
+- <https://github.com/KevinnZou/compose-webview-multiplatform>
 - <https://android.googlesource.com/platform/tools/base>
 - <https://android.googlesource.com/platform/frameworks/support>
 

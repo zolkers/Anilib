@@ -65,8 +65,11 @@ with no third-party source catalogue.
 The removable Settings Bundle atomically persists shared appearance and policy
 preferences. System, light, and dark themes apply live on Android and desktop;
 the shared Aniyomi-style hierarchy also provides confirmed actions for clearing
-the common HTTP cookie jar and response cache. Policy enforcement and deeper
-rows remain tracked explicitly in the parity matrix.
+the common HTTP cookie jar, embedded-browser cookies, and response cache. Source
+API 1.5 optionally exposes source and title web pages through the shared Browse
+surface; Android renders them with System WebView and desktop with KCEF while
+both exchange session cookies with the platform-neutral HTTP jar. Policy
+enforcement and deeper rows remain tracked explicitly in the parity matrix.
 The repository also contains the dependency-free
 `AnilibJava` quality checker. Kotlin and audited UI dependencies are confined
 to outer platform renderers; shared contracts and behavior remain Java 21.

@@ -25,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
@@ -33,6 +34,8 @@ import androidx.compose.ui.unit.dp
 import fr.vriege.anilib.feature.network.NetworkMaintenance
 import fr.vriege.anilib.feature.settings.SettingsSnapshot
 import fr.vriege.anilib.feature.settings.ui.SettingsPresentation
+import com.multiplatform.webview.cookie.WebViewCookieManager
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,6 +47,8 @@ internal fun SettingsScreen(
 ) {
     var confirmation by remember { mutableStateOf<MaintenanceAction?>(null) }
     var result by remember { mutableStateOf<String?>(null) }
+    val browserCookies = remember { WebViewCookieManager() }
+    val scope = rememberCoroutineScope()
     Scaffold(
         topBar = {
             TopAppBar(
@@ -134,10 +139,22 @@ internal fun SettingsScreen(
             confirmButton = {
                 TextButton(onClick = {
                     when (action) {
-                        MaintenanceAction.COOKIES -> maintenance.clearCookies()
-                        MaintenanceAction.CACHE -> maintenance.clearResponseCache()
+                        MaintenanceAction.COOKIES -> scope.launch {
+                            val browserCleared = runCatching {
+                                browserCookies.removeAllCookies()
+                            }.isSuccess
+                            maintenance.clearCookies()
+                            result = if (browserCleared) {
+                                action.result
+                            } else {
+                                "HTTP cookies cleared; WebView cookies were unavailable."
+                            }
+                        }
+                        MaintenanceAction.CACHE -> {
+                            maintenance.clearResponseCache()
+                            result = action.result
+                        }
                     }
-                    result = action.result
                     confirmation = null
                 }) {
                     Text("Clear")
@@ -205,7 +222,7 @@ private enum class MaintenanceAction(val title: String, val warning: String, val
     COOKIES(
         "Clear cookies?",
         "Source websites may sign you out. This cannot be undone.",
-        "HTTP cookies cleared.",
+        "HTTP and WebView cookies cleared.",
     ),
     CACHE(
         "Clear network cache?",

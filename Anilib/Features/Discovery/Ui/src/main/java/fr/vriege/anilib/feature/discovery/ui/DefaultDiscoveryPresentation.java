@@ -4,6 +4,7 @@ import fr.vriege.anilib.feature.discovery.DiscoveryService;
 import fr.vriege.anilib.feature.discovery.SourcePreferenceSnapshot;
 import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.source.SourceCatalogueItem;
+import fr.vriege.anilib.feature.source.SourceCatalogueItemId;
 import fr.vriege.anilib.feature.source.SourceContentKind;
 import fr.vriege.anilib.feature.source.InstalledSourceExtension;
 import fr.vriege.anilib.feature.source.SourceFilterDefinition;
@@ -17,6 +18,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.net.URI;
+import java.util.Optional;
 
 /** Deterministic presentation adapter over the Discovery service. */
 public final class DefaultDiscoveryPresentation implements DiscoveryPresentation {
@@ -44,6 +47,16 @@ public final class DefaultDiscoveryPresentation implements DiscoveryPresentation
     @Override
     public boolean supportsLatest(SourceId sourceId) {
         return service.supportsLatest(sourceId);
+    }
+
+    @Override
+    public Optional<URI> sourceWebPage(SourceId sourceId) {
+        return service.sourceWebPage(sourceId);
+    }
+
+    @Override
+    public Optional<URI> titleWebPage(SourceCatalogueItemId itemId) {
+        return service.titleWebPage(itemId);
     }
 
     @Override

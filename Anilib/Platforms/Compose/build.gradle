@@ -8,6 +8,7 @@ plugins {
 repositories {
     google()
     mavenCentral()
+    maven { url = uri('https://jogamp.org/deployment/maven') }
 }
 
 kotlin {
@@ -53,10 +54,12 @@ kotlin {
                 implementation project(':Anilib:Features:Updates:Api')
                 implementation project(':Anilib:Features:Updates:Ui')
                 implementation project(':Anilib:Framework:Http:Runtime')
+                implementation project(':Anilib:Framework:Http:Api')
                 implementation compose.foundation
                 implementation compose.material3
                 implementation compose.materialIconsExtended
                 implementation 'io.github.kdroidfilter:composemediaplayer:0.11.4'
+                implementation 'io.github.kevinnzou:compose-webview-multiplatform:2.0.3'
             }
         }
         androidMain {
@@ -85,10 +88,12 @@ kotlin {
                 implementation project(':Anilib:Features:Updates:Api')
                 implementation project(':Anilib:Features:Updates:Ui')
                 implementation project(':Anilib:Framework:Http:Runtime')
+                implementation project(':Anilib:Framework:Http:Api')
                 implementation compose.foundation
                 implementation compose.material3
                 implementation compose.materialIconsExtended
                 implementation 'io.github.kdroidfilter:composemediaplayer:0.11.4'
+                implementation 'io.github.kevinnzou:compose-webview-multiplatform:2.0.3'
                 implementation 'androidx.media3:media3-exoplayer-hls:1.10.1'
             }
         }

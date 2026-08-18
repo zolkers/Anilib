@@ -75,9 +75,9 @@ platform-specific.
 - [x] shared Settings Bundle with durable appearance and feature-policy preferences
 - [x] live Android and desktop theme selection from shared settings
 - [ ] enforce Wi-Fi, incognito, and adult-content policies in their owning Bundles
-- [x] user-confirmed clear actions for shared HTTP cache and cookies
-- [ ] clear WebView data and unused database entries
-- [ ] source and title WebView with shared browser-session cookies
+- [x] user-confirmed clear actions for shared HTTP cache, HTTP cookies, and WebView cookies
+- [ ] clear remaining WebView cache/storage and unused database entries
+- [x] source and title WebView with shared browser-session cookies
 - [ ] per-screen parity audit against the current Aniyomi information architecture
 
 Each checkbox should land through a Bundle that can be removed from the

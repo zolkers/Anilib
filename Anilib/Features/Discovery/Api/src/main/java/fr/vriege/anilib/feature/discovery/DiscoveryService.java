@@ -2,6 +2,7 @@ package fr.vriege.anilib.feature.discovery;
 
 import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.source.SourceCatalogueItem;
+import fr.vriege.anilib.feature.source.SourceCatalogueItemId;
 import fr.vriege.anilib.feature.source.SourceContentKind;
 import fr.vriege.anilib.feature.source.SourceDescriptor;
 import fr.vriege.anilib.feature.source.InstalledSourceExtension;
@@ -13,6 +14,8 @@ import fr.vriege.anilib.feature.source.SourcePage;
 
 import java.util.List;
 import java.util.Map;
+import java.net.URI;
+import java.util.Optional;
 
 /** Cross-source discovery, preferences, library admission, and migration boundary. */
 public interface DiscoveryService {
@@ -21,6 +24,10 @@ public interface DiscoveryService {
     List<InstalledSourceExtension> extensions(SourceContentKind contentKind);
 
     boolean supportsLatest(SourceId sourceId);
+
+    Optional<URI> sourceWebPage(SourceId sourceId);
+
+    Optional<URI> titleWebPage(SourceCatalogueItemId itemId);
 
     SourcePage browse(
             SourceId sourceId,

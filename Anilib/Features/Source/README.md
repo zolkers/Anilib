@@ -10,7 +10,8 @@ metadata. API version `1.3` adds the optional `PagedSource` contract used by
 the Reader for ordered content units, opaque page resources, and source-owned
 page bytes. API version `1.4` adds the optional `StreamingSource` contract for
 ordered episodes, stream candidates, request headers, formats, and subtitle
-tracks.
+tracks. API version `1.5` adds the optional `WebSource` contract for source and
+title browser entry points without exposing a platform WebView type.
 
 ## Extension shape
 

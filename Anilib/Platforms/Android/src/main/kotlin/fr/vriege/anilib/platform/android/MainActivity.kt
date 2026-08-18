@@ -25,6 +25,7 @@ import fr.vriege.anilib.feature.updates.ui.UpdateUiCapabilities
 import fr.vriege.anilib.framework.http.runtime.UrlConnectionHttpTransport
 import fr.vriege.anilib.platform.compose.AnilibApp
 import fr.vriege.anilib.platform.compose.ComposePlayerBackend
+import fr.vriege.anilib.platform.compose.BrowserRuntimeStatus
 
 /** Android launcher for the shared Anilib product and adaptive Compose shell. */
 class MainActivity : ComponentActivity() {
@@ -69,6 +70,8 @@ class MainActivity : ComponentActivity() {
                 extensionRepositories = extensionRepositories,
                 legacyExtensionInstaller = legacyExtensionInstaller,
                 networkMaintenance = started.capability(NetworkCapabilities.MAINTENANCE),
+                browserCookies = started.capability(NetworkCapabilities.COOKIES),
+                browserRuntimeStatus = BrowserRuntimeStatus.ready(),
                 settingsPresentation = started.capability(SettingsUiCapabilities.PRESENTATION),
                 reader = reader,
                 player = player,

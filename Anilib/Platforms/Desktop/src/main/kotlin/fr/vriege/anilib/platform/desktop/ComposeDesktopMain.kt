@@ -24,6 +24,7 @@ import fr.vriege.anilib.framework.http.jdk.JdkHttpTransport
 import fr.vriege.anilib.kernel.StartedAnilib
 import fr.vriege.anilib.platform.compose.AnilibApp
 import fr.vriege.anilib.platform.compose.ComposePlayerBackend
+import fr.vriege.anilib.platform.compose.DesktopBrowserRuntime
 import java.awt.GraphicsEnvironment
 import org.jetbrains.skia.Image
 
@@ -41,6 +42,7 @@ fun main() {
         started.close()
         return
     }
+    val browserRuntimeStatus = DesktopBrowserRuntime.initialize(dataDirectory)
     val presentation = started.capability(LibraryUiCapabilities.PRESENTATION)
     val discovery = started.capability(DiscoveryUiCapabilities.PRESENTATION)
     val extensionRepositories = started.capability(ExtensionRepositoryUiCapabilities.PRESENTATION)
@@ -53,8 +55,15 @@ fun main() {
     application {
         Window(
             onCloseRequest = {
-                started.close()
-                exitApplication()
+                try {
+                    DesktopBrowserRuntime.dispose()
+                } finally {
+                    try {
+                        started.close()
+                    } finally {
+                        exitApplication()
+                    }
+                }
             },
             title = "Anilib",
         ) {
@@ -64,6 +73,8 @@ fun main() {
                 extensionRepositories = extensionRepositories,
                 legacyExtensionInstaller = LegacyExtensionInstallers.unavailable(),
                 networkMaintenance = started.capability(NetworkCapabilities.MAINTENANCE),
+                browserCookies = started.capability(NetworkCapabilities.COOKIES),
+                browserRuntimeStatus = browserRuntimeStatus,
                 settingsPresentation = started.capability(SettingsUiCapabilities.PRESENTATION),
                 reader = reader,
                 player = player,

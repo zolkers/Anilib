@@ -9,6 +9,7 @@ plugins {
 repositories {
     google()
     mavenCentral()
+    maven { url = uri('https://jogamp.org/deployment/maven') }
 }
 
 dependencies {
@@ -44,6 +45,10 @@ if (!(packageVersionValue ==~ /[0-9]+\.[0-9]+\.[0-9]+/)) {
 compose.desktop {
     application {
         mainClass = 'fr.vriege.anilib.platform.desktop.ComposeDesktopMainKt'
+        jvmArgs.addAll([
+                '--add-opens=java.desktop/sun.awt=ALL-UNNAMED',
+                '--add-opens=java.desktop/java.awt.peer=ALL-UNNAMED'
+        ])
         nativeDistributions {
             packageName = 'Anilib'
             packageVersion = packageVersionValue

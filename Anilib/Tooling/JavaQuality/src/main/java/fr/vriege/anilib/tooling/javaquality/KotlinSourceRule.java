@@ -18,7 +18,10 @@ public final class KotlinSourceRule implements AnilibJavaRule {
             "platform.android", Set.of("android.", "androidx.activity.", "androidx.compose."),
             "platform.compose", Set.of(
                     "androidx.compose.",
-                    "io.github.kdroidfilter.composemediaplayer."),
+                    "com.multiplatform.webview.",
+                    "dev.datlag.kcef.",
+                    "io.github.kdroidfilter.composemediaplayer.",
+                    "kotlinx.coroutines."),
             "platform.desktop", Set.of("androidx.compose.", "org.jetbrains.compose.", "org.jetbrains.skia."));
 
     public KotlinSourceRule() {

@@ -3,6 +3,7 @@ package fr.vriege.anilib.feature.discovery.ui;
 import fr.vriege.anilib.feature.discovery.SourcePreferenceSnapshot;
 import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.source.SourceCatalogueItem;
+import fr.vriege.anilib.feature.source.SourceCatalogueItemId;
 import fr.vriege.anilib.feature.source.SourceContentKind;
 import fr.vriege.anilib.feature.source.InstalledSourceExtension;
 import fr.vriege.anilib.feature.source.SourceFilterDefinition;
@@ -13,6 +14,8 @@ import fr.vriege.anilib.feature.source.SourcePage;
 
 import java.util.List;
 import java.util.Map;
+import java.net.URI;
+import java.util.Optional;
 
 /** Platform-neutral snapshots and actions for the shared Browse experience. */
 public interface DiscoveryPresentation {
@@ -21,6 +24,10 @@ public interface DiscoveryPresentation {
     List<InstalledSourceExtension> extensions(SourceContentKind contentKind);
 
     boolean supportsLatest(SourceId sourceId);
+
+    Optional<URI> sourceWebPage(SourceId sourceId);
+
+    Optional<URI> titleWebPage(SourceCatalogueItemId itemId);
 
     SourcePage browse(
             SourceId sourceId,

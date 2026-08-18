@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tune
@@ -77,6 +78,8 @@ import fr.vriege.anilib.feature.source.SourcePage
 import fr.vriege.anilib.feature.source.SourcePermission
 import fr.vriege.anilib.feature.source.SourcePreferenceType
 import fr.vriege.anilib.feature.source.SourceId
+import fr.vriege.anilib.framework.http.HttpCookieJar
+import java.net.URI
 import java.util.Locale
 
 private enum class BrowseSection(val label: String, val kind: SourceContentKind?) {
@@ -93,6 +96,8 @@ private enum class BrowseSection(val label: String, val kind: SourceContentKind?
 internal fun DiscoveryScreen(
     presentation: DiscoveryPresentation,
     library: LibraryPresentation,
+    browserCookies: HttpCookieJar,
+    browserRuntimeStatus: BrowserRuntimeStatus,
 ) {
     var section by remember { mutableStateOf(BrowseSection.ANIME_SOURCES) }
     var selectedSource by remember { mutableStateOf<SourceDescriptor?>(null) }
@@ -100,6 +105,12 @@ internal fun DiscoveryScreen(
     var globalSearch by remember { mutableStateOf(false) }
     var globalQuery by remember { mutableStateOf("") }
     var pinnedSources by remember { mutableStateOf<Set<SourceId>>(emptySet()) }
+    var browserPage by remember { mutableStateOf<URI?>(null) }
+
+    browserPage?.let { page ->
+        BrowserScreen(page, browserCookies, browserRuntimeStatus) { browserPage = null }
+        return
+    }
 
     val source = selectedSource
     if (source != null) {
@@ -107,6 +118,7 @@ internal fun DiscoveryScreen(
             source = source,
             listing = listing,
             presentation = presentation,
+            openWebPage = { browserPage = it },
             navigateUp = { selectedSource = null },
         )
         return
@@ -297,6 +309,7 @@ private fun SourceCatalogueScreen(
     source: SourceDescriptor,
     listing: SourceListing,
     presentation: DiscoveryPresentation,
+    openWebPage: (URI) -> Unit,
     navigateUp: () -> Unit,
 ) {
     var query by remember(source.id()) { mutableStateOf("") }
@@ -312,6 +325,7 @@ private fun SourceCatalogueScreen(
     val preferenceDefinitions = remember(source.id(), preferenceRevision) {
         presentation.preferences(source.id())
     }
+    val sourceWebPage = remember(source.id()) { presentation.sourceWebPage(source.id()).orElse(null) }
     val result = remember(source.id(), listing, query, page, filterValues, preferenceRevision) {
         runCatching {
             val filters = filterValues.map { SourceFilterValue(it.key, it.value) }
@@ -362,6 +376,11 @@ private fun SourceCatalogueScreen(
                     }
                 },
                 actions = {
+                    if (sourceWebPage != null) {
+                        IconButton(onClick = { openWebPage(sourceWebPage) }) {
+                            Icon(Icons.Default.Public, contentDescription = "Open source website")
+                        }
+                    }
                     if (!searchActive) {
                         IconButton(onClick = { searchActive = true }) {
                             Icon(Icons.Default.Search, contentDescription = "Search")
@@ -412,10 +431,16 @@ private fun SourceCatalogueScreen(
             if (sourcePage == null) {
                 EmptyDiscovery(result.exceptionOrNull()?.message ?: "Unable to load this source")
             } else {
-                CatalogueContent(sourcePage, grid) { item ->
-                    presentation.addToLibrary(item)
-                    notice = "${item.title()} added to Library"
-                }
+                CatalogueContent(
+                    page = sourcePage,
+                    grid = grid,
+                    add = { item ->
+                        presentation.addToLibrary(item)
+                        notice = "${item.title()} added to Library"
+                    },
+                    webPage = { item -> presentation.titleWebPage(item.id()).orElse(null) },
+                    openWebPage = openWebPage,
+                )
                 Pagination(page, sourcePage.hasNextPage()) { next -> page = next }
             }
         }
@@ -427,6 +452,8 @@ private fun ColumnScope.CatalogueContent(
     page: SourcePage,
     grid: Boolean,
     add: (SourceCatalogueItem) -> Unit,
+    webPage: (SourceCatalogueItem) -> URI?,
+    openWebPage: (URI) -> Unit,
 ) {
     if (page.items().isEmpty()) {
         EmptyDiscovery("No results found")
@@ -441,20 +468,25 @@ private fun ColumnScope.CatalogueContent(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             items(page.items(), key = { it.id().toString() }) { item ->
-                CatalogueCard(item, add)
+                CatalogueCard(item, add, webPage(item), openWebPage)
             }
         }
     } else {
         LazyColumn(modifier = Modifier.weight(1f)) {
             items(page.items(), key = { it.id().toString() }) { item ->
-                CatalogueRow(item, add)
+                CatalogueRow(item, add, webPage(item), openWebPage)
             }
         }
     }
 }
 
 @Composable
-private fun CatalogueCard(item: SourceCatalogueItem, add: (SourceCatalogueItem) -> Unit) {
+private fun CatalogueCard(
+    item: SourceCatalogueItem,
+    add: (SourceCatalogueItem) -> Unit,
+    webPage: URI?,
+    openWebPage: (URI) -> Unit,
+) {
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
         Column(modifier = Modifier.fillMaxWidth().padding(14.dp)) {
             Text(item.title(), fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -471,12 +503,24 @@ private fun CatalogueCard(item: SourceCatalogueItem, add: (SourceCatalogueItem) 
                 Spacer(Modifier.width(6.dp))
                 Text("Library")
             }
+            if (webPage != null) {
+                TextButton(onClick = { openWebPage(webPage) }) {
+                    Icon(Icons.Default.Public, contentDescription = null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("WebView")
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun CatalogueRow(item: SourceCatalogueItem, add: (SourceCatalogueItem) -> Unit) {
+private fun CatalogueRow(
+    item: SourceCatalogueItem,
+    add: (SourceCatalogueItem) -> Unit,
+    webPage: URI?,
+    openWebPage: (URI) -> Unit,
+) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -487,6 +531,11 @@ private fun CatalogueRow(item: SourceCatalogueItem, add: (SourceCatalogueItem) -
         }
         IconButton(onClick = { add(item) }) {
             Icon(Icons.Default.Add, contentDescription = "Add to Library")
+        }
+        if (webPage != null) {
+            IconButton(onClick = { openWebPage(webPage) }) {
+                Icon(Icons.Default.Public, contentDescription = "Open title in WebView")
+            }
         }
     }
     HorizontalDivider(modifier = Modifier.padding(start = 20.dp))
@@ -645,7 +694,12 @@ private fun GlobalSearchContent(
                     )
                 }
                 items(page.items(), key = { it.id().toString() }) { item ->
-                    CatalogueRow(item) { presentation.addToLibrary(it) }
+                    CatalogueRow(
+                        item = item,
+                        add = { presentation.addToLibrary(it) },
+                        webPage = null,
+                        openWebPage = {},
+                    )
                 }
             }
         }

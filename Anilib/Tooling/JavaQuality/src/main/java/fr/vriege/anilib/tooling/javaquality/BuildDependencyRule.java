@@ -18,7 +18,8 @@ public final class BuildDependencyRule implements AnilibJavaRule {
             "^\\s*(?:api|implementation|compileOnly|runtimeOnly|testImplementation|testRuntimeOnly)\\s+(.+)$");
     private static final Pattern PLUGIN = Pattern.compile(
             "^\\s*id\\s+['\"]([^'\"]+)['\"](?:\\s+version\\s+['\"]([^'\"]+)['\"])?(?:\\s+apply\\s+false)?\\s*$");
-    private static final Pattern REPOSITORY = Pattern.compile("^\\s*(google|mavenCentral)\\(\\)\\s*$");
+    private static final Pattern REPOSITORY = Pattern.compile(
+            "^\\s*(google\\(\\)|mavenCentral\\(\\)|maven \\{ url = uri\\('([^']+)'\\) })\\s*$");
     private static final Set<String> ALLOWED_PLUGINS = Set.of("application", "base", "java", "java-library");
     private static final String ANDROID_BUILD = "Anilib/Platforms/Android/build.gradle";
     private static final String COMPOSE_BUILD = "Anilib/Platforms/Compose/build.gradle";
@@ -35,6 +36,7 @@ public final class BuildDependencyRule implements AnilibJavaRule {
                             "compose.material3",
                             "compose.materialIconsExtended",
                             "'androidx.media3:media3-exoplayer-hls:1.10.1'",
+                            "'io.github.kevinnzou:compose-webview-multiplatform:2.0.3'",
                             "'io.github.kdroidfilter:composemediaplayer:0.11.4'")),
             Map.entry(
                     DESKTOP_BUILD,
@@ -121,9 +123,16 @@ public final class BuildDependencyRule implements AnilibJavaRule {
             }
         }
         Matcher repository = REPOSITORY.matcher(line);
-        if (repository.matches() && !ALLOWED_REPOSITORY_BUILDS.contains(normalizedPath)) {
-            diagnostics.add(new Diagnostic(name(), path, lineNumber,
-                    "Dependency repositories are restricted to allowlisted platform UI builds"));
+        if (repository.matches()) {
+            boolean allowedBuild = ALLOWED_REPOSITORY_BUILDS.contains(normalizedPath);
+            String externalUrl = repository.group(2);
+            boolean allowedExternal = externalUrl == null
+                    || ((normalizedPath.equals(COMPOSE_BUILD) || normalizedPath.equals(DESKTOP_BUILD))
+                    && externalUrl.equals("https://jogamp.org/deployment/maven"));
+            if (!allowedBuild || !allowedExternal) {
+                diagnostics.add(new Diagnostic(name(), path, lineNumber,
+                        "Dependency repository is not in the exact platform UI allowlist"));
+            }
         }
     }
 

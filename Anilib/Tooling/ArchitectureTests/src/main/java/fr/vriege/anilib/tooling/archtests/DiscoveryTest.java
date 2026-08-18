@@ -24,10 +24,12 @@ import fr.vriege.anilib.feature.source.SourceListing;
 import fr.vriege.anilib.feature.source.SourcePage;
 import fr.vriege.anilib.feature.source.SourceSdk;
 import fr.vriege.anilib.feature.source.SourceSearchRequest;
+import fr.vriege.anilib.feature.source.WebSource;
 import fr.vriege.anilib.foundation.component.ComponentDescriptor;
 import fr.vriege.anilib.kernel.StartedAnilib;
 
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -93,6 +95,14 @@ final class DiscoveryTest {
                     "the shared presentation must expose selected extension Bundles but not built-ins");
             counter.check(discovery.supportsLatest(LOCAL_SOURCE),
                     "local catalogue must expose its latest listing");
+            counter.check(presentation.sourceWebPage(REMOTE_SOURCE)
+                            .orElseThrow().equals(URI.create("https://catalogue.example.test/")),
+                    "the shared presentation must expose optional source browser entry points");
+            counter.check(presentation.titleWebPage(REMOTE_ITEM.id()).orElseThrow().equals(
+                            URI.create("https://catalogue.example.test/title/alpha-hero-reborn")),
+                    "the shared presentation must expose optional title browser entry points");
+            counter.check(presentation.sourceWebPage(LOCAL_SOURCE).isEmpty(),
+                    "sources without a web contract must not expose a browser action");
 
             SourcePage firstPage = discovery.browse(
                     LOCAL_SOURCE,
@@ -192,7 +202,7 @@ final class DiscoveryTest {
         }
     }
 
-    private static final class TestCatalogueSource implements CatalogueSource {
+    private static final class TestCatalogueSource implements CatalogueSource, WebSource {
         private static final SourceDescriptor DESCRIPTOR = new SourceDescriptor(
                 REMOTE_SOURCE,
                 "Remote catalogue",
@@ -226,6 +236,16 @@ final class DiscoveryTest {
             String query = request.query().toLowerCase(Locale.ROOT);
             boolean matches = REMOTE_ITEM.title().toLowerCase(Locale.ROOT).contains(query);
             return new SourcePage(matches ? List.of(REMOTE_ITEM) : List.of(), false);
+        }
+
+        @Override
+        public URI homePage() {
+            return URI.create("https://catalogue.example.test/");
+        }
+
+        @Override
+        public Optional<URI> titlePage(SourceCatalogueItemId itemId) {
+            return Optional.of(URI.create("https://catalogue.example.test/title/" + itemId.value()));
         }
     }
 
