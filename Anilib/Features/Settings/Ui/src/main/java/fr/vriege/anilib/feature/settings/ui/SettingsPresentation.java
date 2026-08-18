@@ -1,6 +1,7 @@
 package fr.vriege.anilib.feature.settings.ui;
 
 import fr.vriege.anilib.feature.settings.SettingsSnapshot;
+import fr.vriege.anilib.feature.settings.StartScreen;
 import fr.vriege.anilib.feature.settings.ThemeMode;
 import fr.vriege.anilib.feature.settings.UnusedDataCleanupResult;
 
@@ -12,6 +13,8 @@ public interface SettingsPresentation {
     AutoCloseable observe(Consumer<SettingsSnapshot> observer);
 
     void setThemeMode(ThemeMode themeMode);
+
+    void setStartScreen(StartScreen startScreen);
 
     void setShowAdultContent(boolean enabled);
 

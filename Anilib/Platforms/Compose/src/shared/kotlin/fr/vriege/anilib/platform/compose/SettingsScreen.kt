@@ -28,14 +28,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.multiplatform.webview.cookie.WebViewCookieManager
 import fr.vriege.anilib.feature.network.NetworkMaintenance
 import fr.vriege.anilib.feature.settings.SettingsSnapshot
+import fr.vriege.anilib.feature.settings.ThemeMode
 import fr.vriege.anilib.feature.settings.ui.SettingsPresentation
-import com.multiplatform.webview.cookie.WebViewCookieManager
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -48,25 +49,108 @@ internal fun SettingsScreen(
     openExtensionRepositories: () -> Unit,
     openTracking: () -> Unit,
     openBackup: () -> Unit,
+    openDownloads: () -> Unit,
     openAbout: () -> Unit,
     goBack: () -> Unit,
 ) {
+    var destination by remember { mutableStateOf<SettingsDestination?>(null) }
     var confirmation by remember { mutableStateOf<MaintenanceAction?>(null) }
     var result by remember { mutableStateOf<String?>(null) }
-    var query by remember { mutableStateOf("") }
     val browserCookies = remember { WebViewCookieManager() }
     val scope = rememberCoroutineScope()
+
+    val runMaintenance: (MaintenanceAction) -> Unit = { action ->
+        when (action) {
+            MaintenanceAction.COOKIES -> scope.launch {
+                val browserCleared = runCatching { browserCookies.removeAllCookies() }.isSuccess
+                maintenance.clearCookies()
+                result = if (browserCleared) {
+                    action.result
+                } else {
+                    "HTTP cookies cleared; WebView cookies were unavailable."
+                }
+            }
+            MaintenanceAction.CACHE -> {
+                maintenance.clearResponseCache()
+                result = action.result
+            }
+            MaintenanceAction.BROWSER_DATA -> scope.launch {
+                val browserCookiesCleared = runCatching { browserCookies.removeAllCookies() }.isSuccess
+                maintenance.clearCookies()
+                val browserData = browserDataController.clearData()
+                result = when {
+                    !browserData.successful -> "HTTP cookies cleared. ${browserData.message}"
+                    !browserCookiesCleared ->
+                        "HTTP cookies cleared. ${browserData.message} WebView cookies were unavailable."
+                    else -> "HTTP and WebView cookies cleared. ${browserData.message}"
+                }
+            }
+            MaintenanceAction.UNUSED_DATA -> {
+                val cleanup = presentation.cleanUnusedData()
+                result = if (cleanup.totalRemoved() == 0) {
+                    "Database is already clean."
+                } else {
+                    "Removed ${cleanup.totalRemoved()} unused database entries."
+                }
+            }
+        }
+    }
+
+    val selected = destination
+    if (selected == null) {
+        SettingsHome(
+            openDestination = { destination = it },
+            openExtensionRepositories = openExtensionRepositories,
+            openTracking = openTracking,
+            openBackup = openBackup,
+            openAbout = openAbout,
+            goBack = goBack,
+        )
+    } else {
+        SettingsDetail(
+            destination = selected,
+            presentation = presentation,
+            settings = settings,
+            result = result,
+            openDownloads = openDownloads,
+            openBackup = openBackup,
+            openAbout = openAbout,
+            requestMaintenance = { confirmation = it },
+            goBack = { destination = null },
+        )
+    }
+
+    confirmation?.let { action ->
+        AlertDialog(
+            onDismissRequest = { confirmation = null },
+            title = { Text(action.title) },
+            text = { Text(action.warning) },
+            confirmButton = {
+                TextButton(onClick = {
+                    runMaintenance(action)
+                    confirmation = null
+                }) {
+                    Text("Clear")
+                }
+            },
+            dismissButton = { TextButton(onClick = { confirmation = null }) { Text("Cancel") } },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SettingsHome(
+    openDestination: (SettingsDestination) -> Unit,
+    openExtensionRepositories: () -> Unit,
+    openTracking: () -> Unit,
+    openBackup: () -> Unit,
+    openAbout: () -> Unit,
+    goBack: () -> Unit,
+) {
+    var query by remember { mutableStateOf("") }
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Settings") },
-                navigationIcon = {
-                    IconButton(onClick = goBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-            )
-        },
+        topBar = { SettingsTopBar("Settings", goBack) },
     ) { padding ->
         LazyColumn(modifier = Modifier.fillMaxSize().padding(padding)) {
             item {
@@ -78,161 +162,205 @@ internal fun SettingsScreen(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 10.dp),
                 )
             }
-            item { SettingsSection("Appearance") }
-            if (settingMatches(query, "Theme", "System light dark appearance")) item {
-                SettingsRow("Theme", themeLabel(settings)) {
-                    presentation.setThemeMode(settings.themeMode().next())
+            item { SettingsSection("General") }
+            settingRow(query, "General", "Language start screen navigation") {
+                SettingsRow("General", "Language and start screen") {
+                    openDestination(SettingsDestination.GENERAL)
                 }
             }
-            if (settingMatches(query, "Language and start screen", "System language Library")) item {
-                SettingsRow("Language and start screen", "System language and Library")
+            settingRow(query, "Appearance", "Theme colors typography navigation") {
+                SettingsRow("Appearance", "Theme and visual preferences") {
+                    openDestination(SettingsDestination.APPEARANCE)
+                }
             }
-            item { SettingsSection("Content and privacy") }
-            if (settingMatches(query, "Show adult content", "sources titles mature")) item {
-                SettingsSwitchRow(
-                    "Show adult content",
-                    "Allow sources and titles marked as adult",
-                    settings.showAdultContent(),
-                    presentation::setShowAdultContent,
-                )
+            settingRow(query, "Content and privacy", "Adult incognito history") {
+                SettingsRow("Content and privacy", "Adult content and incognito mode") {
+                    openDestination(SettingsDestination.PRIVACY)
+                }
             }
-            if (settingMatches(query, "Incognito mode", "history privacy")) item {
-                SettingsSwitchRow(
-                    "Incognito mode",
-                    "Do not add newly opened titles to history",
-                    settings.incognitoMode(),
-                    presentation::setIncognitoMode,
-                )
+            item { SettingsSection("Library and media") }
+            settingRow(query, "Library and updates", "Categories refresh Wi-Fi duplicate") {
+                SettingsRow("Library and updates", "Refresh and content policies") {
+                    openDestination(SettingsDestination.LIBRARY)
+                }
             }
-            item { SettingsSection("Features") }
-            if (settingMatches(query, "Sources and repositories", "extensions Git repositories")) item {
+            settingRow(query, "Reader", "Reading mode controls display navigation") {
+                SettingsRow("Reader", "Reading behavior and per-title controls") {
+                    openDestination(SettingsDestination.READER)
+                }
+            }
+            settingRow(query, "Player", "Playback decoder audio subtitles gestures") {
+                SettingsRow("Player", "Playback behavior and per-episode controls") {
+                    openDestination(SettingsDestination.PLAYER)
+                }
+            }
+            settingRow(query, "Downloads", "Wi-Fi queue storage offline") {
+                SettingsRow("Downloads", "Network policy and download queue") {
+                    openDestination(SettingsDestination.DOWNLOADS)
+                }
+            }
+            item { SettingsSection("Services") }
+            settingRow(query, "Sources and repositories", "Extensions Git trust languages") {
                 SettingsRow(
                     "Sources and repositories",
                     "Languages, installed sources, trust, and repository URLs",
                     openExtensionRepositories,
                 )
             }
-            if (settingMatches(query, "Library", "Categories display update duplicate")) item {
-                SettingsRow("Library", "Categories, display, update, and duplicate policy")
-            }
-            if (settingMatches(query, "Reader", "Reading mode controls display navigation")) item {
-                SettingsRow("Reader", "Reading mode, controls, display, and navigation")
-            }
-            if (settingMatches(query, "Player", "Playback decoder audio subtitles gestures")) item {
-                SettingsRow("Player", "Playback, decoder, audio, subtitles, and gestures")
-            }
-            if (settingMatches(query, "Wi-Fi only downloads", "network metered")) item {
-                SettingsSwitchRow(
-                    "Wi-Fi only downloads",
-                    "Keep automatic and queued downloads off metered connections",
-                    settings.downloadOnlyOnWifi(),
-                    presentation::setDownloadOnlyOnWifi,
-                )
-            }
-            if (settingMatches(query, "Wi-Fi only updates", "library network")) item {
-                SettingsSwitchRow(
-                    "Wi-Fi only updates",
-                    "Refresh the library automatically only on Wi-Fi",
-                    settings.updateOnlyOnWifi(),
-                    presentation::setUpdateOnlyOnWifi,
-                )
-            }
-            if (settingMatches(query, "Tracking", "Accounts sync score privacy")) item {
+            settingRow(query, "Tracking", "Accounts sync score privacy") {
                 SettingsRow("Tracking", "Accounts, sync, score, and privacy", openTracking)
             }
-            if (settingMatches(query, "Backup", "Automatic restore storage import")) item {
+            settingRow(query, "Backup", "Automatic restore storage import") {
                 SettingsRow("Backup", "Backups, restore, imports, and storage", openBackup)
             }
             item { SettingsSection("Advanced") }
-            if (settingMatches(query, "Clear cookies", "browser source sessions")) item {
-                SettingsRow("Clear cookies", "Sign out browser sessions for every source") {
-                    confirmation = MaintenanceAction.COOKIES
+            settingRow(query, "Data and storage", "Cookies cache WebView database cleanup") {
+                SettingsRow("Data and storage", "Network, browser, and unused data") {
+                    openDestination(SettingsDestination.ADVANCED)
                 }
             }
-            if (settingMatches(query, "Clear network cache", "HTTP responses")) item {
-                SettingsRow("Clear network cache", "Remove cached HTTP responses") {
-                    confirmation = MaintenanceAction.CACHE
-                }
-            }
-            if (settingMatches(query, "Clear WebView data", "browser cache site storage")) item {
-                SettingsRow("Clear WebView data", "Remove browser cookies, cache, and site storage") {
-                    confirmation = MaintenanceAction.BROWSER_DATA
-                }
-            }
-            if (settingMatches(query, "Clean database", "unused orphaned feature data")) item {
-                SettingsRow("Clean database", "Remove feature data for titles no longer in the library") {
-                    confirmation = MaintenanceAction.UNUSED_DATA
-                }
-            }
-            result?.let { message ->
-                item {
-                    Text(
-                        message,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
-                    )
-                }
-            }
-            if (settingMatches(query, "About", "Version licences diagnostics update channel")) item {
-                SettingsRow("About", "Version, runtime, formats, and platforms", openAbout)
+            settingRow(query, "About", "Version licences diagnostics update channel") {
+                SettingsRow("About", "Version, updates, project, and help", openAbout)
             }
         }
     }
-    confirmation?.let { action ->
-        AlertDialog(
-            onDismissRequest = { confirmation = null },
-            title = { Text(action.title) },
-            text = { Text(action.warning) },
-            confirmButton = {
-                TextButton(onClick = {
-                    when (action) {
-                        MaintenanceAction.COOKIES -> scope.launch {
-                            val browserCleared = runCatching {
-                                browserCookies.removeAllCookies()
-                            }.isSuccess
-                            maintenance.clearCookies()
-                            result = if (browserCleared) {
-                                action.result
-                            } else {
-                                "HTTP cookies cleared; WebView cookies were unavailable."
-                            }
-                        }
-                        MaintenanceAction.CACHE -> {
-                            maintenance.clearResponseCache()
-                            result = action.result
-                        }
-                        MaintenanceAction.BROWSER_DATA -> scope.launch {
-                            val browserCookiesCleared = runCatching {
-                                browserCookies.removeAllCookies()
-                            }.isSuccess
-                            maintenance.clearCookies()
-                            val browserData = browserDataController.clearData()
-                            result = when {
-                                !browserData.successful ->
-                                    "HTTP cookies cleared. ${browserData.message}"
-                                !browserCookiesCleared ->
-                                    "HTTP cookies cleared. ${browserData.message} " +
-                                        "WebView cookies were unavailable."
-                                else -> "HTTP and WebView cookies cleared. ${browserData.message}"
-                            }
-                        }
-                        MaintenanceAction.UNUSED_DATA -> {
-                            val cleanup = presentation.cleanUnusedData()
-                            result = if (cleanup.totalRemoved() == 0) {
-                                "Database is already clean."
-                            } else {
-                                "Removed ${cleanup.totalRemoved()} unused database entries."
-                            }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SettingsDetail(
+    destination: SettingsDestination,
+    presentation: SettingsPresentation,
+    settings: SettingsSnapshot,
+    result: String?,
+    openDownloads: () -> Unit,
+    openBackup: () -> Unit,
+    openAbout: () -> Unit,
+    requestMaintenance: (MaintenanceAction) -> Unit,
+    goBack: () -> Unit,
+) {
+    Scaffold(topBar = { SettingsTopBar(destination.title, goBack) }) { padding ->
+        LazyColumn(modifier = Modifier.fillMaxSize().padding(padding)) {
+            when (destination) {
+                SettingsDestination.GENERAL -> {
+                    item { SettingsSection("Navigation") }
+                    item {
+                        SettingsRow("Start screen", settings.startScreen().displayName()) {
+                            presentation.setStartScreen(settings.startScreen().next())
                         }
                     }
-                    confirmation = null
-                }) {
-                    Text("Clear")
+                    item { SettingsRow("Language", "System language") }
+                    item { SettingsHint("Start screen changes apply the next time Anilib opens.") }
                 }
-            },
-            dismissButton = { TextButton(onClick = { confirmation = null }) { Text("Cancel") } },
-        )
+                SettingsDestination.APPEARANCE -> {
+                    item { SettingsSection("Theme") }
+                    item {
+                        SettingsRow("Theme", themeLabel(settings)) {
+                            presentation.setThemeMode(settings.themeMode().next())
+                        }
+                    }
+                    item { SettingsHint("The shared theme applies immediately on Android and desktop.") }
+                }
+                SettingsDestination.PRIVACY -> {
+                    item { SettingsSection("Content") }
+                    item {
+                        SettingsSwitchRow(
+                            "Show adult content",
+                            "Allow sources and titles marked as adult",
+                            settings.showAdultContent(),
+                            presentation::setShowAdultContent,
+                        )
+                    }
+                    item { SettingsSection("Privacy") }
+                    item {
+                        SettingsSwitchRow(
+                            "Incognito mode",
+                            "Do not write new reader or player history and progress",
+                            settings.incognitoMode(),
+                            presentation::setIncognitoMode,
+                        )
+                    }
+                }
+                SettingsDestination.LIBRARY -> {
+                    item { SettingsSection("Library updates") }
+                    item {
+                        SettingsSwitchRow(
+                            "Wi-Fi only updates",
+                            "Refresh the library automatically only on Wi-Fi",
+                            settings.updateOnlyOnWifi(),
+                            presentation::setUpdateOnlyOnWifi,
+                        )
+                    }
+                    item { SettingsHint("Schedule and skip controls remain available on the Updates screen.") }
+                }
+                SettingsDestination.READER -> {
+                    item { SettingsSection("Reader behavior") }
+                    item { SettingsRow("Reading direction", "Choose LTR, RTL, vertical, or webtoon in Reader") }
+                    item { SettingsRow("Prefetch and retry", "Managed by the shared Reader pipeline") }
+                    item { SettingsHint("Direction and position are retained per title.") }
+                }
+                SettingsDestination.PLAYER -> {
+                    item { SettingsSection("Player behavior") }
+                    item { SettingsRow("Quality and subtitles", "Choose them from the episode screen") }
+                    item { SettingsRow("Resume", "Playback position is retained per episode") }
+                    item { SettingsHint("Android and desktop use the same stream and subtitle policy.") }
+                }
+                SettingsDestination.DOWNLOADS -> {
+                    item { SettingsSection("Network") }
+                    item {
+                        SettingsSwitchRow(
+                            "Wi-Fi only downloads",
+                            "Keep queued downloads off metered connections",
+                            settings.downloadOnlyOnWifi(),
+                            presentation::setDownloadOnlyOnWifi,
+                        )
+                    }
+                    item { SettingsSection("Queue and storage") }
+                    item { SettingsRow("Manage downloads", "Queue, offline mode, and storage usage", openDownloads) }
+                }
+                SettingsDestination.ADVANCED -> {
+                    item { SettingsSection("Network and browser") }
+                    item {
+                        SettingsRow("Clear cookies", "Sign out browser sessions for every source") {
+                            requestMaintenance(MaintenanceAction.COOKIES)
+                        }
+                    }
+                    item {
+                        SettingsRow("Clear network cache", "Remove cached HTTP responses") {
+                            requestMaintenance(MaintenanceAction.CACHE)
+                        }
+                    }
+                    item {
+                        SettingsRow("Clear WebView data", "Remove browser cookies, cache, and site storage") {
+                            requestMaintenance(MaintenanceAction.BROWSER_DATA)
+                        }
+                    }
+                    item { SettingsSection("Application data") }
+                    item {
+                        SettingsRow("Clean database", "Remove records for titles no longer in the library") {
+                            requestMaintenance(MaintenanceAction.UNUSED_DATA)
+                        }
+                    }
+                    item { SettingsRow("Backup and restore", "Protect or import your library", openBackup) }
+                    item { SettingsRow("About Anilib", "Version, updates, project, and help", openAbout) }
+                    result?.let { message -> item { SettingsResult(message) } }
+                }
+            }
+        }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SettingsTopBar(title: String, goBack: () -> Unit) {
+    TopAppBar(
+        title = { Text(title) },
+        navigationIcon = {
+            IconButton(onClick = goBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+            }
+        },
+    )
 }
 
 @Composable
@@ -282,14 +410,59 @@ private fun SettingsSwitchRow(
     }
 }
 
-private fun themeLabel(settings: SettingsSnapshot): String = when (settings.themeMode()) {
-    fr.vriege.anilib.feature.settings.ThemeMode.SYSTEM -> "Follow the system theme"
-    fr.vriege.anilib.feature.settings.ThemeMode.LIGHT -> "Light"
-    fr.vriege.anilib.feature.settings.ThemeMode.DARK -> "Dark"
+@Composable
+private fun SettingsHint(message: String) {
+    Text(
+        message,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+    )
 }
+
+@Composable
+private fun SettingsResult(message: String) {
+    Text(
+        message,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+    )
+}
+
+private fun themeLabel(settings: SettingsSnapshot): String = when (settings.themeMode()) {
+    ThemeMode.SYSTEM -> "Follow the system theme"
+    ThemeMode.LIGHT -> "Light"
+    ThemeMode.DARK -> "Dark"
+}
+
+private fun Enum<*>.displayName(): String = name
+    .lowercase()
+    .replace('_', ' ')
+    .replaceFirstChar(Char::uppercase)
 
 private fun settingMatches(query: String, title: String, keywords: String): Boolean =
     query.isBlank() || title.contains(query, ignoreCase = true) || keywords.contains(query, ignoreCase = true)
+
+private fun androidx.compose.foundation.lazy.LazyListScope.settingRow(
+    query: String,
+    title: String,
+    keywords: String,
+    content: @Composable androidx.compose.foundation.lazy.LazyItemScope.() -> Unit,
+) {
+    if (settingMatches(query, title, keywords)) {
+        item(content = content)
+    }
+}
+
+private enum class SettingsDestination(val title: String) {
+    GENERAL("General"),
+    APPEARANCE("Appearance"),
+    PRIVACY("Content and privacy"),
+    LIBRARY("Library and updates"),
+    READER("Reader"),
+    PLAYER("Player"),
+    DOWNLOADS("Downloads"),
+    ADVANCED("Data and storage"),
+}
 
 private enum class MaintenanceAction(val title: String, val warning: String, val result: String) {
     COOKIES(

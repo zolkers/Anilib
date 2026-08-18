@@ -2,6 +2,7 @@ package fr.vriege.anilib.feature.settings.ui;
 
 import fr.vriege.anilib.feature.settings.SettingsService;
 import fr.vriege.anilib.feature.settings.SettingsSnapshot;
+import fr.vriege.anilib.feature.settings.StartScreen;
 import fr.vriege.anilib.feature.settings.ThemeMode;
 import fr.vriege.anilib.feature.settings.UnusedDataCleanupResult;
 import fr.vriege.anilib.feature.settings.UnusedDataMaintenance;
@@ -35,6 +36,11 @@ public final class DefaultSettingsPresentation implements SettingsPresentation {
     @Override
     public void setThemeMode(ThemeMode themeMode) {
         service.replace(service.snapshot().withThemeMode(themeMode));
+    }
+
+    @Override
+    public void setStartScreen(StartScreen startScreen) {
+        service.replace(service.snapshot().withStartScreen(startScreen));
     }
 
     @Override

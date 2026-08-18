@@ -123,6 +123,9 @@ See [THIRD_PARTY.md](THIRD_PARTY.md) for the exact audited coordinates.
 
 See [ARCHITECTURE.md](Anilib/ARCHITECTURE.md) and
 [ROADMAP.md](Anilib/ROADMAP.md) for the dependency contract and parity plan.
+The roadmap is also the newcomer hand-off: it contains the project vision,
+repository map, source compatibility policy, delivery procedure, verification
+commands, completed foundation, and complete remaining product backlog.
 Desktop packaging and the three-host release matrix are documented in
 [Desktop release](Anilib/Platforms/Desktop/README.md).
 Android APK packaging, local optional signing, and required production release

@@ -1,10 +1,10 @@
 # Aniyomi parity matrix
 
 This document separates implemented user behavior from architectural seams.
-`ROADMAP.md` tracks large delivery milestones; [`UI_AUDIT.md`](UI_AUDIT.md)
-records the pinned screen-by-screen comparison; this matrix is the product-level
-truth. “Partial” means usable behavior exists but the corresponding Aniyomi
-workflow or settings depth is not yet complete.
+`ROADMAP.md` is the authoritative forward work queue and newcomer hand-off;
+[`UI_AUDIT.md`](UI_AUDIT.md) records the pinned screen-by-screen comparison;
+this matrix is the current product-level truth. `Partial` means usable behavior
+exists but the corresponding Aniyomi workflow or settings depth is incomplete.
 
 | Area | State | Current Anilib behavior | Remaining parity work |
 | --- | --- | --- | --- |
@@ -18,8 +18,8 @@ workflow or settings depth is not yet complete.
 | Backup | Partial | Versioned Anilib archive plus native Android/desktop selection, bounded protobuf/gzip Aniyomi import, previews, source-aware merge, checksums, and rollback | Automatic backup policy, configurable storage destinations, and sharing |
 | Local source | Partial | Local folders and CBZ reading | Full Aniyomi folder conventions, local anime metadata, covers, episode JSON, and rescan actions |
 | Extension repositories | Partial | User-managed HTTPS indexes or GitHub repository URLs, dynamic default-branch JSON discovery, shared catalogue, durable language filters and pinned ordering, Ed25519 publisher trust, SHA-256/signature/API/archive verification, durable lifecycle actions, and restart-isolated JPMS loading into the Android/desktop Source registry | Full per-source management parity |
-| APK extensions (Android) | Partial | HTTPS APK download, PackageInstaller hand-off, anime/manga package discovery, certificate trust, content-specific host-ABI preflight, anime catalogue/stream adaptation, and manga catalogue/chapter/page adaptation into Source Bundles | Supply the complete external host ABI required by current extension bytecode; portable Anilib bundles remain the active Android/desktop format |
-| Settings | Partial | Removable Settings Bundle, atomic persistence, observable snapshots, live system/light/dark theme, enforced adult/incognito/Wi-Fi policies, shared hierarchy, working network actions, and live More switches for incognito/downloaded-only | Connect every remaining row and finish the screen audit |
+| APK extensions (Android) | Partial | HTTPS APK hand-off, package discovery, certificate trust, host-ABI preflight, and isolated best-effort anime/manga adapters | Bytecode requiring unavailable Aniyomi host classes is intentionally rejected; portable Anilib Bundles are the active Android/desktop source format |
+| Settings | Partial | Removable Settings Bundle, atomic persistence, dedicated shared destinations, theme and start-screen selection, enforced adult/incognito/Wi-Fi policies, and confirmed maintenance actions | Complete the deeper option sets listed in the UI audit |
 | Network maintenance | Partial | Shared cookies/cache/rate limits plus confirmed Android/desktop actions to clear HTTP cookies, HTTP cache, WebView cookies, browser cache, site storage, and orphaned feature records | Default user agent, proxy/DoH policy, and diagnostics |
 | WebView | Partial | Source API 1.6 source/title entry points, Android System WebView, desktop KCEF, navigation controls, bidirectional shared-cookie handoff, per-source headers/User-Agent, challenge-cookie verification, and confirmed data clearing | Automatic provider-specific challenge retry, file chooser/pop-up/download handling, and browser settings |
 | Release products | Partial | MSI/DEB/DMG and Android APK publish atomically from version tags; production requires Android signing, Windows Authenticode, macOS signing/notarization, SHA-256 verification, and signed provenance; the app checks the stable GitHub channel | Automatic in-application download and installation |

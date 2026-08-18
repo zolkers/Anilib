@@ -80,6 +80,7 @@ import fr.vriege.anilib.feature.library.ui.LibraryPage
 import fr.vriege.anilib.feature.library.ui.LibraryPresentation
 import fr.vriege.anilib.feature.network.NetworkMaintenance
 import fr.vriege.anilib.feature.settings.SettingsSnapshot
+import fr.vriege.anilib.feature.settings.StartScreen
 import fr.vriege.anilib.feature.settings.ThemeMode
 import fr.vriege.anilib.feature.settings.ui.SettingsPresentation
 import fr.vriege.anilib.feature.reader.ui.ReaderController
@@ -124,8 +125,9 @@ fun AnilibApp(
     darkTheme: Boolean = isSystemInDarkTheme(),
 ) {
     val navigator = remember { LibraryNavigator() }
+    val initialSettings = remember(settingsPresentation) { settingsPresentation.snapshot() }
     var destination by remember { mutableStateOf(navigator.state()) }
-    var section by remember { mutableStateOf(AppSection.LIBRARY) }
+    var section by remember { mutableStateOf(initialSettings.startScreen().appSection()) }
     var activeReader by remember { mutableStateOf<ReaderController?>(null) }
     var activePlayerTitle by remember { mutableStateOf<LibraryItemId?>(null) }
     var activeTrackingTitle by remember { mutableStateOf<LibraryItemId?>(null) }
@@ -133,7 +135,7 @@ fun AnilibApp(
     var playerError by remember { mutableStateOf<String?>(null) }
     var downloadError by remember { mutableStateOf<String?>(null) }
     var moreDestination by remember { mutableStateOf<MoreDestination?>(null) }
-    var settings by remember(settingsPresentation) { mutableStateOf(settingsPresentation.snapshot()) }
+    var settings by remember(settingsPresentation) { mutableStateOf(initialSettings) }
     DisposableEffect(settingsPresentation) {
         val observation = settingsPresentation.observe { settings = it }
         onDispose { observation.close() }
@@ -570,6 +572,7 @@ private fun AppDestination(
                 { openMore(MoreDestination.EXTENSION_REPOSITORIES) },
                 { openMore(MoreDestination.TRACKING) },
                 { openMore(MoreDestination.BACKUP) },
+                { openMore(MoreDestination.DOWNLOADS) },
                 { openMore(MoreDestination.ABOUT) },
                 closeMore,
             )
@@ -1123,6 +1126,14 @@ private enum class AppSection(val label: String) {
     HISTORY("History"),
     BROWSE("Browse"),
     MORE("More"),
+}
+
+private fun StartScreen.appSection(): AppSection = when (this) {
+    StartScreen.LIBRARY -> AppSection.LIBRARY
+    StartScreen.UPDATES -> AppSection.UPDATES
+    StartScreen.HISTORY -> AppSection.HISTORY
+    StartScreen.BROWSE -> AppSection.BROWSE
+    StartScreen.MORE -> AppSection.MORE
 }
 
 private enum class MoreDestination {

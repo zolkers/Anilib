@@ -240,8 +240,10 @@ Settings is a removable vertical rather than platform-owned preferences. Its
 Java service atomically stores immutable snapshots and publishes observations
 through a narrow capability. One platform-neutral presentation owns mutation
 actions; the shared Compose shell observes it to apply system, light, or dark
-appearance immediately on Android and desktop. Feature policy values remain
-owned here as user choices. Downloads and library updates combine their Wi-Fi
+appearance immediately and select the persisted initial destination on Android
+and desktop. The searchable Settings home routes into dedicated shared pages;
+platform launchers still own no preference behavior. Feature policy values
+remain owned here as user choices. Downloads and library updates combine their Wi-Fi
 preferences with a platform-supplied network status; Reader and Player suppress
 history and progress writes in incognito mode; and Extension Repository hides,
 rejects, and skips adult packages unless enabled. Desktop treats its ordinary
@@ -328,6 +330,12 @@ the installed signer against current trust before invoking APK code. The app
 still needs a complete, compatible host ABI before a real installed APK can
 reach that path, so portable Anilib Bundles remain the executable cross-platform
 format.
+
+Anilib deliberately does not synthesize `eu.kanade.*` host classes or copy the
+Aniyomi dependency graph merely to make arbitrary APK bytecode link. APKs whose
+preflight finds a missing host ABI remain disabled with a visible report. This
+keeps Android compatibility optional and prevents it from becoming a hidden
+dependency of the portable Source SDK used by both products.
 
 ## External dependency policy
 

@@ -26,12 +26,12 @@ explicit so an architectural seam cannot be mistaken for a finished workflow.
 | Downloads | [x] | Partial | Durable queue, storage usage, offline mode, pause/resume/cancel/remove, errors, and status filters are live; add grouping, reorder, storage location, delete-all, and speed/ETA states |
 | Backup and restore | [x] | Partial | Creation, inspection, confirmed restore/delete, rollback, and Anilib/Aniyomi import are live; add automatic scheduling, destinations, content selection, and sharing |
 | Tracking | [x] | Partial | Account authentication seam, search/bind/edit/refresh/remove, progress, score, dates, and privacy are live; add first-party provider bundles, icons, richer dialogs, and automatic sync preferences |
-| Settings home | [x] | Partial | Search plus live Sources, Tracking, Backup, About, theme, policy, and maintenance actions are available; add dedicated pages for the remaining categories |
-| Appearance settings | [x] | Partial | Live system/light/dark selection is available; add language, start screen, theme families, colors, typography, and navigation style |
+| Settings home | [x] | Partial | Search and dedicated General, Appearance, Privacy, Library, Reader, Player, Downloads, Services, Data/storage, and About routes are live; add exact Aniyomi icons and summary density |
+| Appearance settings | [x] | Partial | Live system/light/dark selection and a persistent Library/Updates/History/Browse/More start screen are available; add language packs, theme families, colors, typography, and navigation style |
 | Library and update settings | [x] | Partial | Wi-Fi policies and the complete update schedule/skip controls are live; add category defaults, exceptions, and automatic-download depth |
 | Reader settings and reader | [x] | Partial | Immersive pages, resume, tap zones, slider, LTR/RTL/vertical/webtoon, prefetch, and retry are live; add scaling, crop/split, rotation, color filters, transitions, and per-title overrides |
 | Player settings and player | [x] | Partial | Searchable/unwatched episode list, qualities, subtitles, resume, protected media relay, and native Android/desktop playback are live; add complete controls, gestures, decoder/audio policy, PiP, and custom buttons |
-| Data, storage, and advanced settings | [x] | Partial | Confirmed cookie/cache/WebView/database cleanup and backup storage are live; add storage inspection, user agent, proxy/DoH, diagnostics, and crash logs |
+| Data, storage, and advanced settings | [x] | Partial | A dedicated page owns confirmed cookie/cache/WebView/database cleanup plus backup and About routes; add storage inspection, user agent, proxy/DoH, diagnostics, and crash logs |
 | WebView | [x] | Partial | Navigation, reload, progress, source headers/User-Agent, cookie transfer, challenge completion, and platform cleanup are live; add automatic challenge retry, file chooser, pop-ups, downloads, and browser settings |
 | About, help, and application updates | [x] | Partial | Version, platform, stable-channel check, release-page hand-off, project, and issue links are live; add licences, changelog, automatic installation, and channel choice |
 
@@ -51,6 +51,7 @@ explicit so an architectural seam cannot be mistaken for a finished workflow.
 - [x] Verified backup inspection/rollback/import, tracking edit flows, and browser cookie/challenge handling.
 - [x] Added settings search and connected Sources, Tracking, Backup, and About to their working screens.
 - [x] Added one shared stable application-update check with version comparison and release-page hand-off.
+- [x] Split Settings into searchable dedicated destinations and added a durable start-screen choice.
 - [x] Kept every result shared by Android and desktop; no feature behavior was copied into a platform launcher.
 
 The audit is intentionally grouped by user workflow. Aniyomi currently spreads

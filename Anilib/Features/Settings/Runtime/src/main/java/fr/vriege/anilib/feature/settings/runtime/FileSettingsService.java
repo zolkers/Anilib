@@ -2,6 +2,7 @@ package fr.vriege.anilib.feature.settings.runtime;
 
 import fr.vriege.anilib.feature.settings.SettingsService;
 import fr.vriege.anilib.feature.settings.SettingsSnapshot;
+import fr.vriege.anilib.feature.settings.StartScreen;
 import fr.vriege.anilib.feature.settings.ThemeMode;
 
 import java.io.BufferedReader;
@@ -24,6 +25,7 @@ import java.util.function.Consumer;
 
 public final class FileSettingsService implements SettingsService {
     private static final String THEME = "appearance.theme";
+    private static final String START_SCREEN = "appearance.start-screen";
     private static final String ADULT_CONTENT = "content.show-adult";
     private static final String INCOGNITO = "privacy.incognito";
     private static final String DOWNLOAD_WIFI = "downloads.wifi-only";
@@ -80,6 +82,7 @@ public final class FileSettingsService implements SettingsService {
         }
         return new SettingsSnapshot(
                 theme(values.getProperty(THEME), defaults.themeMode()),
+                startScreen(values.getProperty(START_SCREEN), defaults.startScreen()),
                 flag(values, ADULT_CONTENT, defaults.showAdultContent()),
                 flag(values, INCOGNITO, defaults.incognitoMode()),
                 flag(values, DOWNLOAD_WIFI, defaults.downloadOnlyOnWifi()),
@@ -89,6 +92,7 @@ public final class FileSettingsService implements SettingsService {
     private void persist(SettingsSnapshot settings) {
         Properties values = new Properties();
         values.setProperty(THEME, settings.themeMode().name().toLowerCase(Locale.ROOT));
+        values.setProperty(START_SCREEN, settings.startScreen().name().toLowerCase(Locale.ROOT));
         values.setProperty(ADULT_CONTENT, Boolean.toString(settings.showAdultContent()));
         values.setProperty(INCOGNITO, Boolean.toString(settings.incognitoMode()));
         values.setProperty(DOWNLOAD_WIFI, Boolean.toString(settings.downloadOnlyOnWifi()));
@@ -121,6 +125,17 @@ public final class FileSettingsService implements SettingsService {
         }
         try {
             return ThemeMode.valueOf(value.strip().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException exception) {
+            return fallback;
+        }
+    }
+
+    private static StartScreen startScreen(String value, StartScreen fallback) {
+        if (value == null) {
+            return fallback;
+        }
+        try {
+            return StartScreen.valueOf(value.strip().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException exception) {
             return fallback;
         }

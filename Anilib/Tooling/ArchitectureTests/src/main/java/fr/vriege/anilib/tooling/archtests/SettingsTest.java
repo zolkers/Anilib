@@ -1,6 +1,7 @@
 package fr.vriege.anilib.tooling.archtests;
 
 import fr.vriege.anilib.feature.settings.SettingsSnapshot;
+import fr.vriege.anilib.feature.settings.StartScreen;
 import fr.vriege.anilib.feature.settings.ThemeMode;
 import fr.vriege.anilib.feature.settings.runtime.FileSettingsService;
 import fr.vriege.anilib.feature.settings.runtime.DefaultUnusedDataMaintenance;
@@ -34,22 +35,24 @@ final class SettingsTest {
                     "settings observers must receive the current snapshot immediately");
 
             presentation.setThemeMode(ThemeMode.DARK);
+            presentation.setStartScreen(StartScreen.BROWSE);
             presentation.setShowAdultContent(true);
             presentation.setIncognitoMode(true);
             presentation.setDownloadOnlyOnWifi(false);
             presentation.setUpdateOnlyOnWifi(false);
-            counter.check(observations.get() == 6,
+            counter.check(observations.get() == 7,
                     "every settings change must publish one immutable snapshot");
             close(observation);
 
-            SettingsSnapshot expected = new SettingsSnapshot(ThemeMode.DARK, true, true, false, false);
+            SettingsSnapshot expected = new SettingsSnapshot(
+                    ThemeMode.DARK, StartScreen.BROWSE, true, true, false, false);
             counter.check(service.snapshot().equals(expected),
                     "settings actions must update the in-memory snapshot");
             counter.check(new FileSettingsService(file).snapshot().equals(expected),
                     "settings must survive a service restart");
 
             presentation.setThemeMode(ThemeMode.LIGHT);
-            counter.check(observations.get() == 6,
+            counter.check(observations.get() == 7,
                     "closed settings observations must stop receiving changes");
             return counter.value;
         } finally {
