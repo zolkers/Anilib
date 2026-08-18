@@ -3,10 +3,7 @@ package fr.vriege.anilib.feature.settings;
 public enum LanguagePack {
     SYSTEM,
     ENGLISH,
-    FRENCH,
-    GERMAN,
-    SPANISH,
-    JAPANESE;
+    FRENCH;
 
     public LanguagePack next() {
         LanguagePack[] packs = values();

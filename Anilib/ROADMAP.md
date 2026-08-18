@@ -295,10 +295,10 @@ platform-specific.
     download budgets
 - [x] perform a security review of extension trust, archive parsing, WebView,
   loopback media relay, backup import, updater, and release supply chain
-- [ ] complete user-facing localization and legal/licence notices
+- [x] complete user-facing localization and legal/licence notices
   - [x] expose project licence, third-party inventory, privacy notice, changelog,
     and release-specific licence from the scrollable About route
-  - [ ] translate every remaining user-facing string in each advertised language
+  - [x] translate every remaining user-facing string in each advertised language
 
 ## Definition of product parity
 

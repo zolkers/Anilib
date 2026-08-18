@@ -70,6 +70,7 @@ public final class ArchitectureTestMain {
         assertions += AndroidReleaseRuleTest.run();
         assertions += ApplicationReleaseRuleTest.run();
         assertions += SecurityBoundaryRuleTest.run();
+        assertions += LocalizationRuleTest.run();
         assertions += ExtensionRepositoryTest.run();
         assertions += SourcePublisherTest.run();
         assertions += PortableBundleLoadingTest.run();

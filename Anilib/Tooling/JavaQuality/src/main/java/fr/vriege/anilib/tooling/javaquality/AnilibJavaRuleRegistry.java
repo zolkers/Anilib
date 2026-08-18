@@ -16,6 +16,7 @@ public final class AnilibJavaRuleRegistry {
                 new AndroidReleaseRule(),
                 new ApplicationReleaseRule(),
                 new SecurityBoundaryRule(),
+                new LocalizationRule(),
                 new ExtensionIsolationRule(),
                 new KotlinSourceRule(),
                 new SourceFormatRule());

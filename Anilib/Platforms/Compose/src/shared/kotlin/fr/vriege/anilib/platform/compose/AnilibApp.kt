@@ -39,7 +39,6 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -48,7 +47,6 @@ import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.VerticalDivider
@@ -222,6 +220,7 @@ fun AnilibApp(
         LocalBrowserPlatformController provides browserPlatformController,
         LocalApplicationUpdatePlatformController provides applicationUpdatePlatformController,
         LocalReducedMotion provides settings.reducedMotion(),
+        LocalLanguagePack provides settings.languagePack(),
     ) {
         MaterialTheme(colorScheme = appColorScheme(settings, useDarkTheme)) {
             Surface(modifier = Modifier.fillMaxSize()) {
@@ -1951,9 +1950,6 @@ private fun AppSection.label(language: LanguagePack): String {
     val selected = if (language == LanguagePack.SYSTEM) {
         when (Locale.getDefault().language.lowercase(Locale.ROOT)) {
             "fr" -> LanguagePack.FRENCH
-            "de" -> LanguagePack.GERMAN
-            "es" -> LanguagePack.SPANISH
-            "ja" -> LanguagePack.JAPANESE
             else -> LanguagePack.ENGLISH
         }
     } else {
@@ -1966,27 +1962,6 @@ private fun AppSection.label(language: LanguagePack): String {
             AppSection.HISTORY -> "Historique"
             AppSection.BROWSE -> "Parcourir"
             AppSection.MORE -> "Plus"
-        }
-        LanguagePack.GERMAN -> when (this) {
-            AppSection.LIBRARY -> "Bibliothek"
-            AppSection.UPDATES -> "Updates"
-            AppSection.HISTORY -> "Verlauf"
-            AppSection.BROWSE -> "Entdecken"
-            AppSection.MORE -> "Mehr"
-        }
-        LanguagePack.SPANISH -> when (this) {
-            AppSection.LIBRARY -> "Biblioteca"
-            AppSection.UPDATES -> "Novedades"
-            AppSection.HISTORY -> "Historial"
-            AppSection.BROWSE -> "Explorar"
-            AppSection.MORE -> "Más"
-        }
-        LanguagePack.JAPANESE -> when (this) {
-            AppSection.LIBRARY -> "ライブラリ"
-            AppSection.UPDATES -> "更新"
-            AppSection.HISTORY -> "履歴"
-            AppSection.BROWSE -> "探す"
-            AppSection.MORE -> "その他"
         }
         LanguagePack.SYSTEM, LanguagePack.ENGLISH -> when (this) {
             AppSection.LIBRARY -> "Library"

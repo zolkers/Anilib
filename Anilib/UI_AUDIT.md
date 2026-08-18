@@ -28,7 +28,7 @@ explicit so an architectural seam cannot be mistaken for a finished workflow.
 | Backup and restore | [x] | Complete | Creation, daily/weekly scheduling, selected content, retention, configurable folders, inspection, confirmed restore/delete, rollback, Anilib/Aniyomi import, Android SAF/desktop export, and file sharing are live |
 | Tracking | [x] | Complete | Opt-in AniList and Kitsu authentication, branded provider icons, confirmed search/bind/remove, validated editing, progress/score/dates/privacy, automatic/manual bidirectional sync, durable preferences, and explicit conflict resolution are live |
 | Settings home | [x] | Partial | Search and dedicated General, Appearance, Privacy, Library, Reader, Player, Downloads, Services, Data/storage, and About routes are live; add exact Aniyomi icons and summary density |
-| Appearance settings | [x] | Complete | Persistent language packs, theme mode/family/accent palettes, typography scale, adaptive/bottom/rail navigation, and start-screen selection apply live |
+| Appearance settings | [x] | Complete | Persistent complete English/French language packs, theme mode/family/accent palettes, typography scale, adaptive/bottom/rail navigation, and start-screen selection apply live |
 | Library and update settings | [x] | Complete | Wi-Fi policies, category defaults and per-category display/update policies, automatic download rules, full update scheduling, skip controls, and per-title exceptions are live |
 | Reader settings and reader | [x] | Complete | Immersive pages, resume, slider, navigation modes, persisted gestures/display profiles, filters, transitions, Android orientation, chapter lists and navigation, durable read state, exact downloads, and complete menus are live |
 | Player settings and player | [x] | Complete | Searchable episodes, protected native playback, complete controls and gestures, persistent policies, intro/outro skipping, Android PiP/background audio, and capability-negotiated desktop controls are live |
@@ -68,6 +68,7 @@ explicit so an architectural seam cannot be mistaken for a finished workflow.
 - [x] Added settings search and connected Sources, Tracking, Backup, and About to their working screens.
 - [x] Added stable/beta application-update checks, signed downloads, changelog/licence presentation, and platform-owned installation.
 - [x] Split Settings into searchable dedicated destinations and added a durable start-screen choice.
+- [x] Localized every shared UI label and icon description in the advertised English/French packs and added a repository gate against untranslated additions.
 - [x] Kept every result shared by Android and desktop; no feature behavior was copied into a platform launcher.
 
 The audit is intentionally grouped by user workflow. Aniyomi currently spreads
