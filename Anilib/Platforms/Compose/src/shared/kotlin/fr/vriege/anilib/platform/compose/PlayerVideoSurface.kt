@@ -68,6 +68,7 @@ internal fun PlayerVideoSurface(
         return
     }
     val player = rememberVideoPlayerState()
+    val preferences = controller.preferences()
     var controlsVisible by remember(bridge) { mutableStateOf(true) }
     var locked by remember(bridge) { mutableStateOf(false) }
     var brightness by remember(bridge) { mutableFloatStateOf(1f) }
@@ -256,6 +257,28 @@ internal fun PlayerVideoSurface(
                             color = Color.White,
                             style = MaterialTheme.typography.bodySmall,
                         )
+                        if (
+                            preferences.introEndMillis() > 0L &&
+                            bridge.snapshot().positionMillis() < preferences.introEndMillis()
+                        ) {
+                            TextButton(onClick = { controller.seekTo(preferences.introEndMillis()) }) {
+                                Text("Skip intro", color = Color.White)
+                            }
+                        }
+                        val playbackState = bridge.snapshot()
+                        if (
+                            preferences.outroDurationMillis() > 0L &&
+                            playbackState.durationMillis() > 0L &&
+                            playbackState.positionMillis() >=
+                            playbackState.durationMillis() - preferences.outroDurationMillis()
+                        ) {
+                            TextButton(onClick = {
+                                controller.seekTo(playbackState.durationMillis())
+                                controller.markCompleted()
+                            }) {
+                                Text("Skip outro", color = Color.White)
+                            }
+                        }
                         TextButton(onClick = { execute(leftAction) }) {
                             Text("L: ${leftAction.label}", color = Color.White)
                         }

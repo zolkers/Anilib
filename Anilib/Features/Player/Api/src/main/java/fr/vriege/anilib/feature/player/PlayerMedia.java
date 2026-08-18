@@ -9,7 +9,23 @@ public record PlayerMedia(
         String title,
         SourceVideoStream stream,
         Optional<String> subtitleId,
-        long startPositionMillis) {
+        long startPositionMillis,
+        PlayerDecoderPolicy decoderPolicy,
+        Optional<String> preferredAudioLanguage) {
+    public PlayerMedia(
+            String title,
+            SourceVideoStream stream,
+            Optional<String> subtitleId,
+            long startPositionMillis) {
+        this(
+                title,
+                stream,
+                subtitleId,
+                startPositionMillis,
+                PlayerDecoderPolicy.AUTOMATIC,
+                Optional.empty());
+    }
+
     public PlayerMedia {
         if (Objects.requireNonNull(title, "title must not be null").isBlank()) {
             throw new IllegalArgumentException("title must not be blank");
@@ -26,5 +42,11 @@ public record PlayerMedia(
         if (startPositionMillis < 0) {
             throw new IllegalArgumentException("startPositionMillis must not be negative");
         }
+        Objects.requireNonNull(decoderPolicy, "decoderPolicy must not be null");
+        preferredAudioLanguage = Objects.requireNonNull(
+                preferredAudioLanguage,
+                "preferredAudioLanguage must not be null")
+                .map(String::strip)
+                .filter(value -> !value.isEmpty());
     }
 }

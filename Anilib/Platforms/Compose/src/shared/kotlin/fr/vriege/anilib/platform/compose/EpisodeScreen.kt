@@ -1,6 +1,8 @@
 package fr.vriege.anilib.platform.compose
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -42,6 +45,10 @@ import fr.vriege.anilib.feature.library.LibraryItemId
 import fr.vriege.anilib.feature.player.EpisodeSnapshot
 import fr.vriege.anilib.feature.player.PlaybackState
 import fr.vriege.anilib.feature.player.PlayerOrientationPolicy
+import fr.vriege.anilib.feature.player.PlayerDecoderPolicy
+import fr.vriege.anilib.feature.player.PlayerPreferences
+import fr.vriege.anilib.feature.player.PlayerQualityPolicy
+import fr.vriege.anilib.feature.player.PlayerSubtitlePolicy
 import fr.vriege.anilib.feature.player.ui.PlayerController
 import fr.vriege.anilib.feature.player.ui.PlayerPresentation
 import java.util.Optional
@@ -187,6 +194,7 @@ private fun PlayerSelectionScreen(
 ) {
     var revision by remember(controller) { mutableIntStateOf(0) }
     var commandError by remember(controller) { mutableStateOf<String?>(null) }
+    var preferenceDialog by remember(controller) { mutableStateOf(false) }
     DisposableEffect(controller) {
         onDispose { controller.close() }
     }
@@ -232,6 +240,12 @@ private fun PlayerSelectionScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 commandError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                TextButton(onClick = { preferenceDialog = true }) {
+                    Text(
+                        if (controller.hasPreferenceOverride()) "Player preferences · This title"
+                        else "Player preferences · Global",
+                    )
+                }
             }
             item { Text("Video quality", fontWeight = FontWeight.SemiBold) }
             items(snapshot.streams(), key = { it.id() }) { stream ->
@@ -291,7 +305,139 @@ private fun PlayerSelectionScreen(
             }
         }
     }
+    if (preferenceDialog) {
+        PlayerPreferenceDialog(
+            controller = controller,
+            qualities = snapshot.streams().map { it.quality() },
+            save = { preferences, titleOverride ->
+                command { controller.setPreferences(preferences, titleOverride) }
+                preferenceDialog = false
+            },
+            clearOverride = {
+                command(controller::clearPreferenceOverride)
+                preferenceDialog = false
+            },
+            close = { preferenceDialog = false },
+        )
+    }
 }
+
+@Composable
+private fun PlayerPreferenceDialog(
+    controller: PlayerController,
+    qualities: List<String>,
+    save: (PlayerPreferences, Boolean) -> Unit,
+    clearOverride: () -> Unit,
+    close: () -> Unit,
+) {
+    val initial = remember(controller) { controller.preferences() }
+    var decoder by remember(controller) { mutableStateOf(initial.decoderPolicy()) }
+    var audioLanguage by remember(controller) {
+        mutableStateOf(initial.preferredAudioLanguage().orElse(""))
+    }
+    var subtitlePolicy by remember(controller) { mutableStateOf(initial.subtitlePolicy()) }
+    var subtitleLanguage by remember(controller) {
+        mutableStateOf(initial.preferredSubtitleLanguage().orElse(""))
+    }
+    var qualityPolicy by remember(controller) { mutableStateOf(initial.qualityPolicy()) }
+    var preferredQuality by remember(controller) {
+        mutableStateOf(initial.preferredQuality().orElse(qualities.firstOrNull().orEmpty()))
+    }
+    var introSeconds by remember(controller) { mutableStateOf((initial.introEndMillis() / 1000L).toString()) }
+    var outroSeconds by remember(controller) {
+        mutableStateOf((initial.outroDurationMillis() / 1000L).toString())
+    }
+    var titleOverride by remember(controller) { mutableStateOf(controller.hasPreferenceOverride()) }
+    AlertDialog(
+        onDismissRequest = close,
+        title = { Text("Player preferences") },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                TextButton(onClick = { decoder = nextValue(decoder, PlayerDecoderPolicy.entries) }) {
+                    Text("Decoder: ${decoder.name.lowercase().replaceFirstChar(Char::uppercase)}")
+                }
+                OutlinedTextField(
+                    value = audioLanguage,
+                    onValueChange = { audioLanguage = it },
+                    label = { Text("Preferred audio language") },
+                    singleLine = true,
+                )
+                TextButton(onClick = {
+                    subtitlePolicy = nextValue(subtitlePolicy, PlayerSubtitlePolicy.entries)
+                }) {
+                    Text("Subtitles: ${subtitlePolicy.name.lowercase().replace('_', ' ')}")
+                }
+                OutlinedTextField(
+                    value = subtitleLanguage,
+                    onValueChange = { subtitleLanguage = it },
+                    label = { Text("Preferred subtitle language") },
+                    singleLine = true,
+                )
+                TextButton(onClick = {
+                    qualityPolicy = nextValue(qualityPolicy, PlayerQualityPolicy.entries)
+                }) {
+                    Text("Quality: ${qualityPolicy.name.lowercase()}")
+                }
+                if (qualityPolicy == PlayerQualityPolicy.PREFERRED) {
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        items(qualities.distinct()) { quality ->
+                            FilterChip(
+                                selected = preferredQuality == quality,
+                                onClick = { preferredQuality = quality },
+                                label = { Text(quality) },
+                            )
+                        }
+                    }
+                }
+                OutlinedTextField(
+                    value = introSeconds,
+                    onValueChange = { introSeconds = it.filter(Char::isDigit).take(4) },
+                    label = { Text("Intro ends after (seconds)") },
+                    singleLine = true,
+                )
+                OutlinedTextField(
+                    value = outroSeconds,
+                    onValueChange = { outroSeconds = it.filter(Char::isDigit).take(4) },
+                    label = { Text("Outro duration (seconds)") },
+                    singleLine = true,
+                )
+                FilterChip(
+                    selected = titleOverride,
+                    onClick = { titleOverride = !titleOverride },
+                    label = { Text("Use only for this title") },
+                )
+                if (controller.hasPreferenceOverride()) {
+                    TextButton(onClick = clearOverride) { Text("Clear title override") }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                val quality = Optional.ofNullable(preferredQuality.takeIf { it.isNotBlank() })
+                save(
+                    PlayerPreferences(
+                        decoder,
+                        Optional.ofNullable(audioLanguage.trim().takeIf { it.isNotEmpty() }),
+                        subtitlePolicy,
+                        Optional.ofNullable(subtitleLanguage.trim().takeIf { it.isNotEmpty() }),
+                        qualityPolicy,
+                        quality,
+                        introSeconds.toLongOrNull()?.coerceIn(0L, 1800L)?.times(1000L) ?: 0L,
+                        outroSeconds.toLongOrNull()?.coerceIn(0L, 1800L)?.times(1000L) ?: 0L,
+                    ),
+                    titleOverride,
+                )
+            }) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = close) { Text("Cancel") } },
+    )
+}
+
+private fun <T> nextValue(value: T, values: List<T>): T =
+    values[(values.indexOf(value) + 1) % values.size]
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

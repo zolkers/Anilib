@@ -11,6 +11,8 @@ public interface PlayerSession extends AutoCloseable {
 
     void selectSubtitle(Optional<String> subtitleId);
 
+    void setMediaPolicy(PlayerDecoderPolicy decoderPolicy, Optional<String> preferredAudioLanguage);
+
     void play();
 
     void pause();

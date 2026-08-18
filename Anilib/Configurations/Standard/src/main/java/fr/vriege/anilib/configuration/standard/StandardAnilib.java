@@ -131,6 +131,7 @@ public final class StandardAnilib {
         Path extensions = dataDirectory.toAbsolutePath().normalize().resolve("extensions");
         Path downloads = dataDirectory.toAbsolutePath().normalize().resolve("downloads");
         Path playbackState = dataDirectory.toAbsolutePath().normalize().resolve("playback-state.anilib");
+        Path playerPreferences = dataDirectory.toAbsolutePath().normalize().resolve("player-preferences.properties");
         Path trackingState = dataDirectory.toAbsolutePath().normalize().resolve("tracking.anilib");
         Path updateState = dataDirectory.toAbsolutePath().normalize().resolve("library-updates.anilib");
         Path backups = dataDirectory.toAbsolutePath().normalize().resolve("backups");
@@ -148,7 +149,7 @@ public final class StandardAnilib {
         plugins.add(new ExtensionRepositoryPlugin(extensionRepositories, extensionSelection.failures()));
         plugins.add(new ReaderPlugin(readerInteractions, readerDisplay, readerReadState));
         plugins.add(new DownloadPlugin(downloads));
-        plugins.add(new PlayerPlugin(playbackState, playerBackend));
+        plugins.add(new PlayerPlugin(playbackState, playerPreferences, playerBackend));
         plugins.add(new TrackerPlugin(trackingState));
         plugins.add(new UpdatePlugin(updateState, updateNotifier));
         plugins.add(ApplicationUpdatePlugin.currentRuntime());

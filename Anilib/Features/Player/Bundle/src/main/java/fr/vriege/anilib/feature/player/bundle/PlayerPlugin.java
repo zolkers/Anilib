@@ -6,6 +6,7 @@ import fr.vriege.anilib.feature.player.PlayerCapabilities;
 import fr.vriege.anilib.feature.player.PlayerBackend;
 import fr.vriege.anilib.feature.player.PlayerBackends;
 import fr.vriege.anilib.feature.player.runtime.DefaultPlayerService;
+import fr.vriege.anilib.feature.player.runtime.FilePlayerPreferenceStore;
 import fr.vriege.anilib.feature.player.runtime.PlayerBackupCodec;
 import fr.vriege.anilib.feature.player.ui.DefaultPlayerPresentation;
 import fr.vriege.anilib.feature.player.ui.PlayerUiCapabilities;
@@ -35,16 +36,24 @@ public final class PlayerPlugin implements AnilibPlugin {
             .provides(PlayerUiCapabilities.PRESENTATION)
             .build();
     private final Path stateFile;
+    private final Path preferenceFile;
     private final PlayerBackend backend;
 
     public PlayerPlugin(Path stateFile) {
-        this(stateFile, PlayerBackends.unavailable());
+        this(stateFile, Path.of("player-preferences.properties"), PlayerBackends.unavailable());
     }
 
     public PlayerPlugin(Path stateFile, PlayerBackend backend) {
+        this(stateFile, Path.of("player-preferences.properties"), backend);
+    }
+
+    public PlayerPlugin(Path stateFile, Path preferenceFile, PlayerBackend backend) {
         this.stateFile = Objects.requireNonNull(
                 stateFile,
                 "stateFile must not be null").toAbsolutePath().normalize();
+        this.preferenceFile = Objects.requireNonNull(
+                preferenceFile,
+                "preferenceFile must not be null").toAbsolutePath().normalize();
         this.backend = Objects.requireNonNull(backend, "backend must not be null");
     }
 
@@ -69,6 +78,8 @@ public final class PlayerPlugin implements AnilibPlugin {
         context.publish(PlayerCapabilities.SERVICE, service);
         context.publish(PlayerCapabilities.BACKEND, backend);
         context.publish(PlayerCapabilities.BACKUP_CODEC, new PlayerBackupCodec(service));
-        context.publish(PlayerUiCapabilities.PRESENTATION, new DefaultPlayerPresentation(service));
+        context.publish(PlayerUiCapabilities.PRESENTATION, new DefaultPlayerPresentation(
+                service,
+                new FilePlayerPreferenceStore(preferenceFile)));
     }
 }

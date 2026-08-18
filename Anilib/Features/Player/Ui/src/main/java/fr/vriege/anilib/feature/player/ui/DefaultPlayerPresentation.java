@@ -2,6 +2,7 @@ package fr.vriege.anilib.feature.player.ui;
 
 import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.player.EpisodeSnapshot;
+import fr.vriege.anilib.feature.player.PlayerPreferenceStore;
 import fr.vriege.anilib.feature.player.PlayerService;
 import fr.vriege.anilib.feature.source.SourceEpisodeId;
 
@@ -10,9 +11,11 @@ import java.util.Objects;
 
 public final class DefaultPlayerPresentation implements PlayerPresentation {
     private final PlayerService player;
+    private final PlayerPreferenceStore preferences;
 
-    public DefaultPlayerPresentation(PlayerService player) {
+    public DefaultPlayerPresentation(PlayerService player, PlayerPreferenceStore preferences) {
         this.player = Objects.requireNonNull(player, "player must not be null");
+        this.preferences = Objects.requireNonNull(preferences, "preferences must not be null");
     }
 
     @Override
@@ -27,7 +30,7 @@ public final class DefaultPlayerPresentation implements PlayerPresentation {
 
     @Override
     public PlayerController open(LibraryItemId libraryItemId, SourceEpisodeId episodeId) {
-        return new PlayerController(player.open(libraryItemId, episodeId));
+        return new PlayerController(player.open(libraryItemId, episodeId), preferences);
     }
 
     @Override

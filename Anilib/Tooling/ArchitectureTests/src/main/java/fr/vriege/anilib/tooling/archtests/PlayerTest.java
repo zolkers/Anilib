@@ -13,12 +13,17 @@ import fr.vriege.anilib.feature.player.EpisodeSnapshot;
 import fr.vriege.anilib.feature.player.PlayerBackend;
 import fr.vriege.anilib.feature.player.PlayerCapabilities;
 import fr.vriege.anilib.feature.player.PlayerException;
+import fr.vriege.anilib.feature.player.PlayerDecoderPolicy;
 import fr.vriege.anilib.feature.player.PlayerMedia;
 import fr.vriege.anilib.feature.player.PlayerPlayback;
 import fr.vriege.anilib.feature.player.PlayerPlaybackSnapshot;
 import fr.vriege.anilib.feature.player.PlayerPlaybackStatus;
+import fr.vriege.anilib.feature.player.PlayerPreferences;
+import fr.vriege.anilib.feature.player.PlayerQualityPolicy;
 import fr.vriege.anilib.feature.player.PlayerService;
 import fr.vriege.anilib.feature.player.PlayerSession;
+import fr.vriege.anilib.feature.player.PlayerSubtitlePolicy;
+import fr.vriege.anilib.feature.player.ui.PlayerController;
 import fr.vriege.anilib.feature.player.ui.PlayerPresentation;
 import fr.vriege.anilib.feature.player.ui.PlayerUiCapabilities;
 import fr.vriege.anilib.feature.source.SourceCatalogueItemId;
@@ -76,11 +81,62 @@ final class PlayerTest {
     static int run() {
         Counter counter = new Counter();
         verifiesSelectionAndPersistence(counter);
+        verifiesPreferencePolicies(counter);
         verifiesPlaybackBackup(counter);
         suppressesIncognitoPersistence(counter);
         cleansOrphanedPlaybackState(counter);
         rejectsInvalidSourceResults(counter);
         return counter.value;
+    }
+
+    private static void verifiesPreferencePolicies(Counter counter) {
+        Path directory = temporaryDirectory("anilib-player-preferences");
+        RecordingBackend backend = new RecordingBackend();
+        try (StartedAnilib application = StandardAnilib.start(
+                directory,
+                new UrlConnectionHttpTransport(),
+                backend,
+                List.of(sourcePlugin(new TestStreamingSource(false))))) {
+            LibraryItem item = animeItem("player-preferences");
+            application.capability(LibraryCapabilities.CATALOG).save(item);
+            PlayerPresentation presentation = application.capability(PlayerUiCapabilities.PRESENTATION);
+            PlayerPreferences preferences = new PlayerPreferences(
+                    PlayerDecoderPolicy.SOFTWARE,
+                    Optional.of("ja"),
+                    PlayerSubtitlePolicy.MATCH_LANGUAGE,
+                    Optional.of("en"),
+                    PlayerQualityPolicy.HIGHEST,
+                    Optional.empty(),
+                    90_000L,
+                    60_000L);
+            try (PlayerController controller = presentation.open(item.id(), FIRST_EPISODE.id())) {
+                controller.setPreferences(preferences, true);
+                counter.check(controller.hasPreferenceOverride(),
+                        "Player preferences must support per-title overrides");
+                counter.check(controller.preferences().equals(preferences),
+                        "Player preferences must expose the effective title policy");
+                counter.check(controller.snapshot().selectedStreamId().equals("hls-1080"),
+                        "highest-quality policy must select the highest numeric quality");
+                counter.check(controller.snapshot().selectedSubtitleId().orElseThrow().equals("sub-en"),
+                        "subtitle-language policy must select the matching track");
+                PlayerMedia media = backend.opened.getLast().media;
+                counter.check(media.decoderPolicy() == PlayerDecoderPolicy.SOFTWARE
+                                && media.preferredAudioLanguage().orElseThrow().equals("ja"),
+                        "decoder and audio policy must reach the platform backend");
+            }
+            try (PlayerController reopened = presentation.open(item.id(), FIRST_EPISODE.id())) {
+                counter.check(reopened.preferences().equals(preferences),
+                        "per-title Player preferences must survive a new session");
+                reopened.clearPreferenceOverride();
+                counter.check(!reopened.hasPreferenceOverride()
+                                && reopened.preferences().equals(PlayerPreferences.defaults()),
+                        "clearing a title override must restore global Player defaults");
+            }
+            counter.check(Files.isRegularFile(directory.resolve("player-preferences.properties")),
+                    "Player preferences must persist in their owned file");
+        } finally {
+            deleteDirectory(directory);
+        }
     }
 
     private static void verifiesSelectionAndPersistence(Counter counter) {

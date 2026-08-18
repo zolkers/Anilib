@@ -2,6 +2,7 @@ package fr.vriege.anilib.feature.player.runtime;
 
 import fr.vriege.anilib.feature.player.PlaybackState;
 import fr.vriege.anilib.feature.player.PlayerBackend;
+import fr.vriege.anilib.feature.player.PlayerDecoderPolicy;
 import fr.vriege.anilib.feature.player.PlayerException;
 import fr.vriege.anilib.feature.player.PlayerMedia;
 import fr.vriege.anilib.feature.player.PlayerPlayback;
@@ -22,6 +23,8 @@ final class DefaultPlayerSession implements PlayerSession {
     private Optional<String> selectedSubtitleId;
     private PlaybackState playback;
     private PlayerPlayback mediaPlayback;
+    private PlayerDecoderPolicy decoderPolicy = PlayerDecoderPolicy.AUTOMATIC;
+    private Optional<String> preferredAudioLanguage = Optional.empty();
     private boolean closed;
 
     DefaultPlayerSession(
@@ -99,6 +102,37 @@ final class DefaultPlayerSession implements PlayerSession {
     }
 
     @Override
+    public synchronized void setMediaPolicy(
+            PlayerDecoderPolicy requestedDecoderPolicy,
+            Optional<String> requestedAudioLanguage) {
+        ensureOpen();
+        PlayerDecoderPolicy decoder = Objects.requireNonNull(
+                requestedDecoderPolicy,
+                "decoderPolicy must not be null");
+        Optional<String> audioLanguage = Objects.requireNonNull(
+                requestedAudioLanguage,
+                "preferredAudioLanguage must not be null")
+                .map(String::strip)
+                .filter(value -> !value.isEmpty());
+        if (decoder == decoderPolicy && audioLanguage.equals(preferredAudioLanguage)) {
+            return;
+        }
+        PlayerDecoderPolicy previousDecoder = decoderPolicy;
+        Optional<String> previousAudioLanguage = preferredAudioLanguage;
+        decoderPolicy = decoder;
+        preferredAudioLanguage = audioLanguage;
+        PlayerPlayback replacement;
+        try {
+            replacement = openPlayback(stream(selectedStreamId), selectedSubtitleId);
+        } catch (RuntimeException failure) {
+            decoderPolicy = previousDecoder;
+            preferredAudioLanguage = previousAudioLanguage;
+            throw failure;
+        }
+        replacePlayback(replacement);
+    }
+
+    @Override
     public synchronized void play() {
         ensureOpen();
         mediaPlayback.play();
@@ -158,10 +192,26 @@ final class DefaultPlayerSession implements PlayerSession {
                 initial.title() + " - " + initial.episode().title(),
                 stream,
                 subtitleId,
-                playback.positionMillis());
+                playback.positionMillis(),
+                decoderPolicy,
+                preferredAudioLanguage);
         return Objects.requireNonNull(
                 backend.open(media),
                 "player backend returned null playback");
+    }
+
+    private void replacePlayback(PlayerPlayback replacement) {
+        try {
+            mediaPlayback.close();
+        } catch (RuntimeException failure) {
+            try {
+                replacement.close();
+            } catch (RuntimeException cleanupFailure) {
+                failure.addSuppressed(cleanupFailure);
+            }
+            throw failure;
+        }
+        mediaPlayback = replacement;
     }
 
     private void ensureOpen() {

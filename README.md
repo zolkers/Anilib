@@ -38,6 +38,8 @@ read/unread state, and exact per-chapter download actions without leaving the vi
 The native Player surface adds transport and seek controls, double-tap and drag
 gestures, speed, brightness and volume adjustment, orientation, fullscreen,
 control locking, and two reconfigurable action buttons on Android and desktop.
+Its persistent global or per-title profile selects decoder and audio hints,
+quality and subtitle behavior, and configurable intro/outro skip boundaries.
 The shared Library screen persists grid/list density, sorting, and its landing
 category. Its category manager creates, renames, reorders, and deletes durable
 categories while retaining per-category display and update policy.

@@ -217,7 +217,7 @@ platform-specific.
 
 - [x] complete transport controls, gestures, seeking, speed, orientation,
   brightness, volume, lock, and custom-button behavior
-- [ ] add decoder, audio, subtitle, quality, skip-intro/outro, and per-title
+- [x] add decoder, audio, subtitle, quality, skip-intro/outro, and per-title
   preference policies
 - [ ] add Android picture-in-picture and background/audio behavior
 - [ ] add desktop advanced controls and mpv-compatible policy where the selected
