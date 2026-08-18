@@ -66,7 +66,7 @@ internal fun ReaderScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Fit,
             )
-        } ?: ReaderPageError(decodedPage.exceptionOrNull()?.message)
+        } ?: ReaderPageError(decodedPage.exceptionOrNull()?.message) { revision++ }
 
         ReaderTapZones(
             direction = snapshot.direction(),
@@ -219,7 +219,7 @@ private fun DirectionButton(
 }
 
 @Composable
-private fun ReaderPageError(message: String?) {
+private fun ReaderPageError(message: String?, retry: () -> Unit) {
     Column(
         modifier = Modifier.fillMaxSize().padding(32.dp),
         verticalArrangement = Arrangement.Center,
@@ -230,5 +230,7 @@ private fun ReaderPageError(message: String?) {
             Spacer(Modifier.height(8.dp))
             Text(message, color = Color.White.copy(alpha = 0.68f))
         }
+        Spacer(Modifier.height(10.dp))
+        TextButton(onClick = retry) { Text("Retry", color = Color.White) }
     }
 }

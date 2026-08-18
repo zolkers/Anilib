@@ -22,6 +22,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -57,6 +58,8 @@ internal fun EpisodeScreen(
         mutableStateOf<PlayerController?>(null)
     }
     var error by remember(presentation, libraryItemId) { mutableStateOf<String?>(null) }
+    var query by remember(libraryItemId) { mutableStateOf("") }
+    var unwatchedOnly by remember(libraryItemId) { mutableStateOf(false) }
     DisposableEffect(presentation, libraryItemId) {
         val registration = presentation.observe { revision++ }
         onDispose {
@@ -73,6 +76,10 @@ internal fun EpisodeScreen(
         runCatching { presentation.episodes(libraryItemId) }
     }
     val episodes = episodesResult.getOrDefault(emptyList())
+    val visibleEpisodes = episodes.filter { episode ->
+        (query.isBlank() || episode.episode().title().contains(query, ignoreCase = true)) &&
+            (!unwatchedOnly || !episode.playback().map { it.completed() }.orElse(false))
+    }
     val loadError = episodesResult.exceptionOrNull()?.message
 
     Scaffold(
@@ -93,12 +100,27 @@ internal fun EpisodeScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(vertical = 10.dp),
             )
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                label = { Text("Search episodes") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            FilterChip(
+                selected = unwatchedOnly,
+                onClick = { unwatchedOnly = !unwatchedOnly },
+                label = { Text("Unwatched") },
+                modifier = Modifier.padding(vertical = 6.dp),
+            )
             (error ?: loadError)?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             if (episodes.isEmpty() && loadError == null) {
                 EmptyPage("No episodes are available from this source.")
+            } else if (visibleEpisodes.isEmpty() && loadError == null) {
+                EmptyPage("No episodes match the active filters.")
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    items(episodes, key = { it.episode().id().toString() }) { episode ->
+                    items(visibleEpisodes, key = { it.episode().id().toString() }) { episode ->
                         EpisodeCard(episode) {
                             runCatching {
                                 presentation.open(libraryItemId, episode.episode().id())

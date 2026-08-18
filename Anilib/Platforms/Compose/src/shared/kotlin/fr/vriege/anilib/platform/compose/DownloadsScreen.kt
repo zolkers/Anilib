@@ -1,5 +1,6 @@
 package fr.vriege.anilib.platform.compose
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Cancel
@@ -19,6 +21,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -49,11 +52,13 @@ import java.util.Locale
 internal fun DownloadsScreen(presentation: DownloadPresentation, goBack: () -> Unit) {
     var revision by remember(presentation) { mutableIntStateOf(0) }
     var commandError by remember(presentation) { mutableStateOf<String?>(null) }
+    var filter by remember(presentation) { mutableStateOf(DownloadFilter.ALL) }
     DisposableEffect(presentation) {
         val registration = presentation.observe { revision++ }
         onDispose { runCatching { registration.close() } }
     }
     val queue = remember(presentation, revision) { presentation.queue() }
+    val jobs = queue.jobs().filter(filter::accepts)
     val command: (() -> Unit) -> Unit = { action ->
         runCatching(action)
             .onSuccess { commandError = null }
@@ -92,13 +97,27 @@ internal fun DownloadsScreen(presentation: DownloadPresentation, goBack: () -> U
                 },
                 modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
             )
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                DownloadFilter.entries.forEach { value ->
+                    FilterChip(
+                        selected = filter == value,
+                        onClick = { filter = value },
+                        label = { Text(value.label) },
+                    )
+                }
+            }
             commandError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             Spacer(Modifier.height(8.dp))
             if (queue.jobs().isEmpty()) {
                 EmptyPage("Your download queue is empty.")
+            } else if (jobs.isEmpty()) {
+                EmptyPage("No downloads match the active filter.")
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    items(queue.jobs(), key = { it.id().toString() }) { job ->
+                    items(jobs, key = { it.id().toString() }) { job ->
                         DownloadJobCard(
                             job = job,
                             offlineMode = queue.offlineMode(),
@@ -215,4 +234,26 @@ private fun formatBytes(bytes: Long): String = when {
     bytes >= 1024L * 1024L -> String.format(Locale.ROOT, "%.1f MB", bytes / 1048576.0)
     bytes >= 1024L -> String.format(Locale.ROOT, "%.1f KB", bytes / 1024.0)
     else -> "$bytes B"
+}
+
+private enum class DownloadFilter(val label: String) {
+    ALL("All") {
+        override fun accepts(job: DownloadJobSnapshot): Boolean = true
+    },
+    ACTIVE("Active") {
+        override fun accepts(job: DownloadJobSnapshot): Boolean = job.status() in setOf(
+            DownloadStatus.QUEUED,
+            DownloadStatus.DOWNLOADING,
+            DownloadStatus.PAUSED,
+        )
+    },
+    COMPLETED("Completed") {
+        override fun accepts(job: DownloadJobSnapshot): Boolean = job.status() == DownloadStatus.COMPLETED
+    },
+    FAILED("Failed") {
+        override fun accepts(job: DownloadJobSnapshot): Boolean = job.status() == DownloadStatus.FAILED
+    },
+    ;
+
+    abstract fun accepts(job: DownloadJobSnapshot): Boolean
 }

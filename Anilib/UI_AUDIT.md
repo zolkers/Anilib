@@ -23,16 +23,16 @@ explicit so an architectural seam cannot be mistaken for a finished workflow.
 | More hub | [x] | Partial | Core ordering and actions are live; add storage and help destinations plus richer download state |
 | Categories | [x] | Partial | The shared screen now shows real counts; add create, rename, reorder, delete, and per-category policies |
 | Statistics | [x] | Partial | The shared screen now shows real library totals; add status, language, source, score, duration, and activity charts |
-| Downloads | [ ] | Partial | Per-title grouping, reorder, retry, storage location, delete-all, and detailed speed/ETA states |
-| Backup and restore | [ ] | Partial | Automatic scheduling, destination management, content selection, sharing, and restore result detail |
-| Tracking | [ ] | Partial | Provider login flows, account tokens, provider icons, score/date dialogs, and automatic sync preferences |
+| Downloads | [x] | Partial | Durable queue, storage usage, offline mode, pause/resume/cancel/remove, errors, and status filters are live; add grouping, reorder, storage location, delete-all, and speed/ETA states |
+| Backup and restore | [x] | Partial | Creation, inspection, confirmed restore/delete, rollback, and Anilib/Aniyomi import are live; add automatic scheduling, destinations, content selection, and sharing |
+| Tracking | [x] | Partial | Account authentication seam, search/bind/edit/refresh/remove, progress, score, dates, and privacy are live; add first-party provider bundles, icons, richer dialogs, and automatic sync preferences |
 | Settings home | [ ] | Partial | Search and live destinations for every settings category |
 | Appearance settings | [ ] | Partial | Language, start screen, theme families, colors, typography, navigation style, and screen-specific display choices |
 | Library and update settings | [ ] | Partial | Category defaults, update restrictions, skip rules, automatic downloads, and exception handling |
-| Reader settings and reader | [ ] | Partial | Gestures, tap zones, scaling, crop/split, rotation, color filters, transitions, and per-title overrides |
-| Player settings and player | [ ] | Partial | Complete control surface, gestures, decoder/audio/subtitle policy, PiP, custom buttons, and advanced desktop controls |
+| Reader settings and reader | [x] | Partial | Immersive pages, resume, tap zones, slider, LTR/RTL/vertical/webtoon, prefetch, and retry are live; add scaling, crop/split, rotation, color filters, transitions, and per-title overrides |
+| Player settings and player | [x] | Partial | Searchable/unwatched episode list, qualities, subtitles, resume, protected media relay, and native Android/desktop playback are live; add complete controls, gestures, decoder/audio policy, PiP, and custom buttons |
 | Data, storage, and advanced settings | [ ] | Partial | Storage inspection, default user agent, proxy/DoH, diagnostics, crash logs, and granular cleanup |
-| WebView | [ ] | Partial | Challenge retry, file chooser, pop-ups, downloads, browser settings, and provider-specific behavior |
+| WebView | [x] | Partial | Navigation, reload, progress, source headers/User-Agent, cookie transfer, challenge completion, and platform cleanup are live; add automatic challenge retry, file chooser, pop-ups, downloads, and browser settings |
 | About, help, and application updates | [ ] | Partial | Version/build metadata, licences, changelog, help links, update check, and release channel |
 
 ## Completed in the first pass
@@ -47,6 +47,8 @@ explicit so an architectural seam cannot be mistaken for a finished workflow.
 - [x] Added conventional back navigation to title details.
 - [x] Connected Browse extension tabs directly to repository management.
 - [x] Verified catalogue paging, global/per-source search, filters, preferences, WebView entry, and migration routes.
+- [x] Added episode search/unwatched filtering, download status filtering, and reader page retry.
+- [x] Verified backup inspection/rollback/import, tracking edit flows, and browser cookie/challenge handling.
 - [x] Kept every result shared by Android and desktop; no feature behavior was copied into a platform launcher.
 
 The audit is intentionally grouped by user workflow. Aniyomi currently spreads
