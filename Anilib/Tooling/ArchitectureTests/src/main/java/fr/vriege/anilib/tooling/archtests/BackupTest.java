@@ -5,6 +5,8 @@ import fr.vriege.anilib.feature.backup.BackupCapabilities;
 import fr.vriege.anilib.feature.backup.BackupException;
 import fr.vriege.anilib.feature.backup.BackupFileSnapshot;
 import fr.vriege.anilib.feature.backup.BackupInspection;
+import fr.vriege.anilib.feature.backup.BackupPolicy;
+import fr.vriege.anilib.feature.backup.BackupSchedule;
 import fr.vriege.anilib.feature.backup.BackupRestoreResult;
 import fr.vriege.anilib.feature.backup.BackupService;
 import fr.vriege.anilib.feature.backup.AniyomiBackupImportResult;
@@ -57,10 +59,55 @@ final class BackupTest {
         Counter counter = new Counter();
         verifiesStandardRoundTrip(counter);
         verifiesFeatureOwnedCodecs(counter);
+        verifiesAutomaticPolicyAndExport(counter);
         verifiesAniyomiBackupImport(counter);
         verifiesCorruptionIsRejected(counter);
         verifiesFailedRestoreRollsBack(counter);
         return counter.value;
+    }
+
+    private static void verifiesAutomaticPolicyAndExport(Counter counter) {
+        Path directory = temporaryDirectory("anilib-backup-policy");
+        Path managed = directory.resolve("managed");
+        Path selected = directory.resolve("selected-destination");
+        Path exported = directory.resolve("exports");
+        try {
+            FileLibraryCatalog library = new FileLibraryCatalog(directory.resolve("library.anilib"));
+            library.save(enrichedItem("policy-title", "Policy title"));
+            BackupSectionCodec codec = new LibraryBackupCodec(library);
+            try (DefaultBackupService backups = new DefaultBackupService(
+                    managed,
+                    List.of(codec),
+                    Clock.fixed(BACKUP_TIME, ZoneOffset.UTC))) {
+                BackupPolicy policy = new BackupPolicy(
+                        BackupSchedule.DAILY,
+                        2,
+                        Set.of(codec.sectionId()),
+                        selected);
+                backups.savePolicy(policy);
+                counter.check(backups.backups().size() == 1
+                                && backups.backups().getFirst().sectionCount() == 1,
+                        "enabling a due schedule must create only the selected content in its destination");
+                backups.createBackup();
+                backups.createBackup();
+                counter.check(backups.backups().size() == 2,
+                        "backup retention must delete archives older than the configured count");
+                Path copy = backups.export(backups.backups().getFirst().path(), exported);
+                counter.check(Files.isRegularFile(copy) && copy.getParent().equals(exported),
+                        "backup export must copy a managed archive to a user-selected native directory");
+            }
+            try (DefaultBackupService restarted = new DefaultBackupService(
+                    managed,
+                    List.of(codec),
+                    Clock.fixed(BACKUP_TIME, ZoneOffset.UTC))) {
+                counter.check(restarted.policy().destination().equals(selected)
+                                && restarted.policy().retentionCount() == 2
+                                && restarted.runAutomaticBackupIfDue().isEmpty(),
+                        "backup schedule, destination, content, retention, and last run must survive restart");
+            }
+        } finally {
+            deleteDirectory(directory);
+        }
     }
 
     private static void verifiesAniyomiBackupImport(Counter counter) {

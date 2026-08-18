@@ -164,6 +164,13 @@ future sections remain inspectable and are skipped, while malformed or
 unsupported known sections fail before mutation. One shared screen on Android
 and desktop provides local creation, preview, confirmed restore, and confirmed
 deletion.
+Backup also owns an atomically persisted daily/weekly policy: installed codecs
+define selectable content, the destination is a validated non-root directory,
+and retention removes only older managed archives after successful creation.
+A daemon coordinator retries due work hourly and records completion only after
+the archive commits. Shared UI delegates export to native desktop dialogs or
+Android's Storage Access Framework; Android shares managed files through a
+read-only, normalized application content provider.
 
 The same Backup Bundle can inspect and import a user-selected Aniyomi protobuf
 backup, compressed or uncompressed, without linking its serializer runtime.

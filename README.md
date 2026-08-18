@@ -65,6 +65,9 @@ Their validated storage location can be migrated safely, repaired from the
 managed files, and controlled title by title. Persistent automatic rules run
 after successful library updates with category-specific episode/chapter limits,
 favourite filtering, and explicit retention or read-content cleanup.
+Backups support daily or weekly runs, selectable feature sections, bounded
+retention, configurable native folders, Android SAF/desktop export, and file
+sharing in addition to transactional restore and Aniyomi import.
 Browse shows live source-extension update badges and actions, compact fixed-density
 rows, richer overflow menus, and asynchronous loading, retry, and error states.
 Source catalogues retain their grid/list choice independently and expose item

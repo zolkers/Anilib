@@ -70,3 +70,9 @@ streaming Sources; manga packages become catalogue and paged Reader Sources with
 bounded image reads through the extension's own HTTP client. Failures remain
 attached to one package. Current APKs stay blocked until Anilib supplies their
 complete external host ABI.
+
+## Backup files
+
+Backup export uses the Storage Access Framework document picker. Managed
+archives are shared through a read-only application content provider that
+normalizes every path and grants access only for the selected share intent.

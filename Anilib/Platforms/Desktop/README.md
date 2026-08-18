@@ -51,3 +51,7 @@ signs the application, notarizes the DMG, staples the ticket, and verifies the
 result. Temporary certificates and keychains are removed even after failure.
 The final publication job verifies all platform checksums and adds a signed
 GitHub/Sigstore provenance attestation before creating one GitHub Release.
+
+Backup import and export use native AWT file dialogs. Sharing puts the selected
+archive on the operating-system file clipboard without changing the managed
+backup copy.

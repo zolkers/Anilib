@@ -2,6 +2,7 @@ package fr.vriege.anilib.platform.android
 
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
+import android.content.Intent
 import fr.vriege.anilib.platform.compose.BackupImportPicker
 import java.io.IOException
 import java.nio.file.Files
@@ -11,6 +12,9 @@ internal class AndroidBackupImportPicker(private val activity: ComponentActivity
     private val importDirectory = activity.cacheDir.toPath().resolve("aniyomi-imports").normalize()
     private var selectedCallback: ((Path) -> Unit)? = null
     private var failureCallback: ((String) -> Unit)? = null
+    private var exportPath: Path? = null
+    private var exportCallback: ((String) -> Unit)? = null
+    private var exportFailure: ((String) -> Unit)? = null
     private val launcher = activity.registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         val selected = selectedCallback
         val failure = failureCallback
@@ -24,6 +28,28 @@ internal class AndroidBackupImportPicker(private val activity: ComponentActivity
             .onFailure { error ->
                 failure(error.message ?: "The selected backup could not be read.")
             }
+    }
+    private val exportLauncher = activity.registerForActivityResult(
+        ActivityResultContracts.CreateDocument("application/octet-stream"),
+    ) { uri ->
+        val source = exportPath
+        val exported = exportCallback
+        val failure = exportFailure
+        exportPath = null
+        exportCallback = null
+        exportFailure = null
+        if (uri == null || source == null || exported == null || failure == null) {
+            return@registerForActivityResult
+        }
+        runCatching {
+            activity.contentResolver.openOutputStream(uri, "w").use { output ->
+                requireNotNull(output) { "The selected destination cannot be opened." }
+                Files.newInputStream(source).use { input -> input.copyTo(output) }
+            }
+            uri.toString()
+        }.onSuccess(exported).onFailure { error ->
+            failure(error.message ?: "The backup could not be exported.")
+        }
     }
 
     override fun choose(onSelected: (Path) -> Unit, onFailure: (String) -> Unit) {
@@ -50,6 +76,36 @@ internal class AndroidBackupImportPicker(private val activity: ComponentActivity
             if (!Files.isSymbolicLink(normalized)) {
                 Files.deleteIfExists(normalized)
             }
+        }
+    }
+
+    override fun export(path: Path, onExported: (String) -> Unit, onFailure: (String) -> Unit) {
+        if (exportPath != null) {
+            onFailure("A backup export destination is already open.")
+            return
+        }
+        exportPath = path
+        exportCallback = onExported
+        exportFailure = onFailure
+        runCatching { exportLauncher.launch(path.fileName.toString()) }.onFailure { error ->
+            exportPath = null
+            exportCallback = null
+            exportFailure = null
+            onFailure(error.message ?: "The Android document picker could not be opened.")
+        }
+    }
+
+    override fun share(path: Path, onFailure: (String) -> Unit) {
+        runCatching {
+            val uri = AndroidBackupFileProvider.uriFor(activity, path)
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "application/octet-stream"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            activity.startActivity(Intent.createChooser(intent, "Share Anilib backup"))
+        }.onFailure { error ->
+            onFailure(error.message ?: "The backup could not be shared.")
         }
     }
 

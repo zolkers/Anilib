@@ -24,9 +24,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -41,12 +43,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import fr.vriege.anilib.feature.backup.BackupFileSnapshot
 import fr.vriege.anilib.feature.backup.BackupInspection
+import fr.vriege.anilib.feature.backup.BackupContentOption
+import fr.vriege.anilib.feature.backup.BackupPolicy
+import fr.vriege.anilib.feature.backup.BackupSchedule
 import fr.vriege.anilib.feature.backup.AniyomiBackupInspection
 import fr.vriege.anilib.feature.backup.ui.BackupPresentation
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
+import java.nio.file.Path
 
 private val backupDateFormatter = DateTimeFormatter
     .ofLocalizedDateTime(FormatStyle.MEDIUM)
@@ -66,6 +72,7 @@ internal fun BackupScreen(
     var pendingRestore by remember(presentation) { mutableStateOf<BackupInspection?>(null) }
     var pendingAniyomiImport by remember(presentation) { mutableStateOf<AniyomiBackupInspection?>(null) }
     var pendingDelete by remember(presentation) { mutableStateOf<BackupFileSnapshot?>(null) }
+    var editingPolicy by remember(presentation) { mutableStateOf(false) }
     DisposableEffect(presentation) {
         val registration = presentation.observe { revision++ }
         onDispose { runCatching { registration.close() } }
@@ -75,6 +82,8 @@ internal fun BackupScreen(
         onDispose { pendingAniyomiPath?.let(importPicker::release) }
     }
     val backups = remember(presentation, revision) { presentation.backups() }
+    val policy = remember(presentation, revision) { presentation.policy() }
+    val contentOptions = remember(presentation, revision) { presentation.contentOptions() }
 
     val createBackup = {
         runCatching { presentation.createBackup() }
@@ -141,6 +150,9 @@ internal fun BackupScreen(
             Button(onClick = createBackup, modifier = Modifier.fillMaxWidth()) {
                 Text("Create backup")
             }
+            TextButton(onClick = { editingPolicy = true }, modifier = Modifier.fillMaxWidth()) {
+                Text("Backup schedule, content, retention, and destination")
+            }
             Spacer(Modifier.height(12.dp))
             OutlinedButton(
                 onClick = chooseAniyomiBackup,
@@ -167,6 +179,19 @@ internal fun BackupScreen(
                             backup = backup,
                             restore = { requestRestore(backup) },
                             delete = { pendingDelete = backup },
+                            export = {
+                                importPicker.export(
+                                    backup.path(),
+                                    { destination ->
+                                        message = "Backup exported: $destination"
+                                        error = null
+                                    },
+                                    { failure -> error = failure },
+                                )
+                            },
+                            share = {
+                                importPicker.share(backup.path()) { failure -> error = failure }
+                            },
                         )
                     }
                 }
@@ -190,6 +215,22 @@ internal fun BackupScreen(
                         message = null
                     }
                 pendingRestore = null
+            },
+        )
+    }
+    if (editingPolicy) {
+        BackupPolicyDialog(
+            policy = policy,
+            options = contentOptions,
+            dismiss = { editingPolicy = false },
+            save = { replacement ->
+                runCatching { presentation.savePolicy(replacement) }
+                    .onSuccess {
+                        message = "Backup policy saved."
+                        error = null
+                        editingPolicy = false
+                    }
+                    .onFailure { error = it.message ?: "Unable to save backup policy." }
             },
         )
     }
@@ -242,6 +283,8 @@ private fun BackupCard(
     backup: BackupFileSnapshot,
     restore: () -> Unit,
     delete: () -> Unit,
+    export: () -> Unit,
+    share: () -> Unit,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -263,6 +306,8 @@ private fun BackupCard(
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                TextButton(onClick = export) { Text("Export") }
+                TextButton(onClick = share) { Text("Share") }
                 OutlinedButton(onClick = restore) {
                     Icon(Icons.Default.Restore, contentDescription = null)
                     Text("Restore", modifier = Modifier.padding(start = 6.dp))
@@ -274,6 +319,88 @@ private fun BackupCard(
         }
     }
 }
+
+@Composable
+private fun BackupPolicyDialog(
+    policy: BackupPolicy,
+    options: List<BackupContentOption>,
+    dismiss: () -> Unit,
+    save: (BackupPolicy) -> Unit,
+) {
+    var schedule by remember(policy) { mutableStateOf(policy.schedule()) }
+    var retention by remember(policy) { mutableStateOf(policy.retentionCount().toString()) }
+    var destination by remember(policy) { mutableStateOf(policy.destination().toString()) }
+    var selected by remember(policy) { mutableStateOf(policy.includedSections().toSet()) }
+    var validationError by remember(policy) { mutableStateOf<String?>(null) }
+    AlertDialog(
+        onDismissRequest = dismiss,
+        title = { Text("Backup policy") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Schedule", fontWeight = FontWeight.Medium)
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    BackupSchedule.entries.forEach { value ->
+                        TextButton(onClick = { schedule = value }) {
+                            Text(if (schedule == value) "• ${backupScheduleName(value)}" else backupScheduleName(value))
+                        }
+                    }
+                }
+                OutlinedTextField(
+                    value = retention,
+                    onValueChange = { retention = it },
+                    label = { Text("Backups to keep (1–100)") },
+                    singleLine = true,
+                )
+                Text("Included content", fontWeight = FontWeight.Medium)
+                options.forEach { option ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(option.displayName())
+                            Text(
+                                "${option.entryCount()} entries",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Switch(
+                            checked = selected.contains(option.id()),
+                            onCheckedChange = { checked ->
+                                selected = if (checked) selected + option.id() else selected - option.id()
+                            },
+                        )
+                    }
+                }
+                OutlinedTextField(
+                    value = destination,
+                    onValueChange = { destination = it },
+                    label = { Text("Automatic backup folder") },
+                    singleLine = true,
+                )
+                Text(
+                    "Export uses the native document picker (including Android SAF).",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                validationError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                runCatching {
+                    BackupPolicy(schedule, retention.toInt(), selected, Path.of(destination))
+                }.onSuccess {
+                    validationError = null
+                    save(it)
+                }.onFailure {
+                    validationError = it.message ?: "Invalid backup policy."
+                }
+            }) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = dismiss) { Text("Cancel") } },
+    )
+}
+
+private fun backupScheduleName(schedule: BackupSchedule): String = schedule.name
+    .lowercase()
+    .replaceFirstChar(Char::uppercase)
 
 @Composable
 private fun RestoreDialog(

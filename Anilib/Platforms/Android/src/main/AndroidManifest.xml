@@ -29,6 +29,11 @@
             android:name=".AndroidBackgroundPlaybackService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
+        <provider
+            android:name=".AndroidBackupFileProvider"
+            android:authorities="${applicationId}.backup-files"
+            android:exported="false"
+            android:grantUriPermissions="true" />
         <receiver
             android:name=".AnilibApkInstallReceiver"
             android:exported="false" />

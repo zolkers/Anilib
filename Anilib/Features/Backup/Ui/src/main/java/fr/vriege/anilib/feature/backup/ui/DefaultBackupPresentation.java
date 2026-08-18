@@ -2,6 +2,8 @@ package fr.vriege.anilib.feature.backup.ui;
 
 import fr.vriege.anilib.feature.backup.BackupFileSnapshot;
 import fr.vriege.anilib.feature.backup.BackupInspection;
+import fr.vriege.anilib.feature.backup.BackupContentOption;
+import fr.vriege.anilib.feature.backup.BackupPolicy;
 import fr.vriege.anilib.feature.backup.BackupRestoreResult;
 import fr.vriege.anilib.feature.backup.BackupService;
 import fr.vriege.anilib.feature.backup.AniyomiBackupImportResult;
@@ -10,6 +12,7 @@ import fr.vriege.anilib.feature.backup.AniyomiBackupInspection;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 public final class DefaultBackupPresentation implements BackupPresentation {
     private final BackupService service;
@@ -31,6 +34,31 @@ public final class DefaultBackupPresentation implements BackupPresentation {
     @Override
     public BackupFileSnapshot createBackup() {
         return service.createBackup();
+    }
+
+    @Override
+    public List<BackupContentOption> contentOptions() {
+        return service.contentOptions();
+    }
+
+    @Override
+    public BackupPolicy policy() {
+        return service.policy();
+    }
+
+    @Override
+    public void savePolicy(BackupPolicy policy) {
+        service.savePolicy(policy);
+    }
+
+    @Override
+    public Optional<BackupFileSnapshot> runAutomaticBackupIfDue() {
+        return service.runAutomaticBackupIfDue();
+    }
+
+    @Override
+    public Path export(Path backup, Path destinationDirectory) {
+        return service.export(backup, destinationDirectory);
     }
 
     @Override

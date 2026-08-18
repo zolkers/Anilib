@@ -240,7 +240,7 @@ platform-specific.
   for the selected services
 - [x] add provider icons, richer search/edit dialogs, automatic synchronization,
   conflict handling, and sync preferences
-- [ ] add automatic backup schedules, retention, content selection, configurable
+- [x] add automatic backup schedules, retention, content selection, configurable
   destinations, SAF/native folder integration, and sharing/export
 
 ### 7. Settings, network, WebView, and diagnostics
