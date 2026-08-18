@@ -1,7 +1,25 @@
+import java.security.MessageDigest
+
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.plugin.compose'
 }
+
+def androidVersionName = providers.gradleProperty('anilibAndroidVersionName').orElse('0.1.0').get()
+if (!(androidVersionName ==~ /[0-9]+\.[0-9]+\.[0-9]+/)) {
+    throw new GradleException('anilibAndroidVersionName must use numeric MAJOR.MINOR.PATCH form')
+}
+def androidVersionCodeText = providers.gradleProperty('anilibAndroidVersionCode').orElse('1').get()
+if (!(androidVersionCodeText ==~ /[1-9][0-9]*/)) {
+    throw new GradleException('anilibAndroidVersionCode must be a positive integer')
+}
+def releaseSigning = [
+        storeFile: providers.environmentVariable('ANILIB_ANDROID_KEYSTORE').orNull,
+        storePassword: providers.environmentVariable('ANILIB_ANDROID_KEYSTORE_PASSWORD').orNull,
+        keyAlias: providers.environmentVariable('ANILIB_ANDROID_KEY_ALIAS').orNull,
+        keyPassword: providers.environmentVariable('ANILIB_ANDROID_KEY_PASSWORD').orNull
+]
+def releaseSigningAvailable = releaseSigning.values().every { value -> value != null && !value.isBlank() }
 
 repositories {
     google()
@@ -16,8 +34,28 @@ android {
         applicationId = 'fr.vriege.anilib'
         minSdk = 26
         targetSdk = 37
-        versionCode = 1
-        versionName = '0.1.0'
+        versionCode = androidVersionCodeText.toInteger()
+        versionName = androidVersionName
+    }
+
+    signingConfigs {
+        if (releaseSigningAvailable) {
+            release {
+                storeFile = file(releaseSigning.storeFile)
+                storePassword = releaseSigning.storePassword
+                keyAlias = releaseSigning.keyAlias
+                keyPassword = releaseSigning.keyPassword
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled = false
+            if (releaseSigningAvailable) {
+                signingConfig = signingConfigs.release
+            }
+        }
     }
 
     compileOptions {
@@ -44,4 +82,32 @@ dependencies {
     implementation project(':Anilib:Features:Updates:Ui')
     implementation project(':Anilib:Platforms:Compose')
     implementation 'androidx.activity:activity-compose:1.13.0'
+}
+
+def androidReleaseDirectory = layout.buildDirectory.dir('outputs/apk/release')
+def androidChecksumFile = layout.buildDirectory.file('release/SHA256SUMS')
+
+tasks.register('writeAndroidReleaseChecksums') {
+    group = 'distribution'
+    description = 'Builds the Android release APK and writes its SHA-256 manifest.'
+    dependsOn tasks.named('assembleRelease')
+    inputs.files(fileTree(androidReleaseDirectory) {
+        include '*.apk'
+    })
+    outputs.file(androidChecksumFile)
+    doLast { task ->
+        List<File> packages = task.inputs.files.files
+                .findAll { file -> file.isFile() }
+                .sort { left, right -> left.name <=> right.name }
+        if (packages.isEmpty()) {
+            throw new GradleException('Android release produced no APK')
+        }
+        File output = task.outputs.files.singleFile
+        output.parentFile.mkdirs()
+        output.setText(packages.collect { packageFile ->
+            byte[] digest = MessageDigest.getInstance('SHA-256').digest(packageFile.bytes)
+            String checksum = digest.collect { value -> String.format('%02x', value & 0xff) }.join()
+            "${checksum}  ${packageFile.name}"
+        }.join(System.lineSeparator()) + System.lineSeparator(), 'UTF-8')
+    }
 }

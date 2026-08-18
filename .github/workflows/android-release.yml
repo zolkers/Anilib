@@ -1,0 +1,66 @@
+name: Android release APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Numeric package version (MAJOR.MINOR.PATCH)
+        required: true
+        default: 0.1.0
+      version-code:
+        description: Positive Android version code
+        required: true
+        default: "1"
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    env:
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANILIB_ANDROID_KEYSTORE_BASE64 }}
+      ANILIB_ANDROID_KEYSTORE: ${{ github.workspace }}/.release/anilib-release.jks
+      ANILIB_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANILIB_ANDROID_KEYSTORE_PASSWORD }}
+      ANILIB_ANDROID_KEY_ALIAS: ${{ secrets.ANILIB_ANDROID_KEY_ALIAS }}
+      ANILIB_ANDROID_KEY_PASSWORD: ${{ secrets.ANILIB_ANDROID_KEY_PASSWORD }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6.0.2
+      - name: Install pinned Java
+        uses: actions/setup-java@v5.6.0
+        with:
+          distribution: microsoft
+          java-version: 21.0.10
+          cache: gradle
+      - name: Install pinned Android platform
+        run: sdkmanager --install "platforms;android-37"
+      - name: Restore optional release key
+        if: env.ANDROID_KEYSTORE_BASE64 != ''
+        shell: bash
+        run: |
+          mkdir -p .release
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$ANILIB_ANDROID_KEYSTORE"
+      - name: Validate and package
+        shell: bash
+        env:
+          REQUESTED_VERSION: ${{ inputs.version || github.ref_name }}
+          REQUESTED_VERSION_CODE: ${{ inputs['version-code'] || github.run_number }}
+        run: |
+          VERSION="${REQUESTED_VERSION#v}"
+          ./gradlew --no-daemon --console=plain check \
+            :Anilib:Platforms:Android:writeAndroidReleaseChecksums \
+            -PanilibVersion="$VERSION" \
+            -PanilibAndroidVersionName="$VERSION" \
+            -PanilibAndroidVersionCode="$REQUESTED_VERSION_CODE"
+      - name: Upload APK and checksums
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: anilib-android
+          if-no-files-found: error
+          path: |
+            Anilib/Platforms/Android/build/outputs/apk/release/*.apk
+            Anilib/Platforms/Android/build/release/SHA256SUMS
