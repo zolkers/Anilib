@@ -13,7 +13,7 @@ explicit so an architectural seam cannot be mistaken for a finished workflow.
 | --- | --- | --- | --- |
 | Application shell and primary navigation | [x] | Partial | Add update/source badges, configurable start screen, and tab reselection behavior |
 | Library | [x] | Partial | Search, filters, persisted display choices, multi-selection, and bulk category/favourite/download/migrate/delete actions are live |
-| Anime and manga details | [x] | Partial | Shared facts and reader/player/download/tracking actions are live; add artwork, content-unit lists, related titles, editing, and share/web actions |
+| Anime and manga details | [x] | Complete | Shared artwork, facts, editable metadata, chapter/episode lists, related titles, reader/player/download/tracking actions, sharing, and title/source WebView entry points are live |
 | Updates | [x] | Partial | Scheduling, refresh/cancel, failures, progress, read state, and anime/manga/unread filters are live; add date grouping, selection actions, skipped reasons, and per-item download controls |
 | History | [x] | Partial | Search and detail navigation are live; add date grouping, remove/resume actions, and separate anime/manga presentation |
 | Browse landing and sources | [x] | Partial | Anime/manga source, extension, and migration tabs plus global search, language filters, pinning, latest, and repository navigation are live; add update badges, richer source menus, and exact density |

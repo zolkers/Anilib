@@ -1,6 +1,7 @@
 package fr.vriege.anilib.platform.compose
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -63,15 +64,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.vriege.anilib.feature.library.LibraryProgress
+import fr.vriege.anilib.feature.library.LibraryTitleMetadata
 import fr.vriege.anilib.feature.library.LibraryDisplayDensity
 import fr.vriege.anilib.feature.library.LibraryDisplayMode
 import fr.vriege.anilib.feature.library.LibraryItemId
 import fr.vriege.anilib.feature.library.LibrarySort
+import fr.vriege.anilib.feature.library.PublicationStatus
 import fr.vriege.anilib.feature.library.MediaKind
 import fr.vriege.anilib.feature.backup.ui.BackupPresentation
 import fr.vriege.anilib.feature.discovery.ui.DiscoveryPresentation
@@ -94,6 +98,7 @@ import fr.vriege.anilib.feature.settings.ThemeMode
 import fr.vriege.anilib.feature.settings.ui.SettingsPresentation
 import fr.vriege.anilib.feature.source.SourceContentKind
 import fr.vriege.anilib.feature.source.SourceCatalogueItem
+import fr.vriege.anilib.feature.source.SourceContentUnit
 import fr.vriege.anilib.feature.source.SourceId
 import fr.vriege.anilib.feature.reader.ui.ReaderController
 import fr.vriege.anilib.feature.reader.ui.ReaderPresentation
@@ -102,6 +107,12 @@ import fr.vriege.anilib.feature.tracker.ui.TrackerPresentation
 import fr.vriege.anilib.feature.updates.ui.UpdatePresentation
 import fr.vriege.anilib.feature.applicationupdate.ui.ApplicationUpdatePresentation
 import fr.vriege.anilib.framework.http.HttpCookieJar
+import fr.vriege.anilib.framework.http.AnilibHttpClient
+import fr.vriege.anilib.framework.http.HttpCachePolicy
+import fr.vriege.anilib.framework.http.HttpRequest
+import fr.vriege.anilib.feature.player.EpisodeSnapshot
+import java.net.URI
+import java.time.Duration
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -115,6 +126,12 @@ private val dateTimeFormatter = DateTimeFormatter
     .ofLocalizedDateTime(FormatStyle.MEDIUM)
     .withLocale(Locale.getDefault())
     .withZone(ZoneId.systemDefault())
+
+private data class DetailPlatform(
+    val httpClient: AnilibHttpClient,
+    val shareController: ShareController,
+    val pageDecoder: (ByteArray) -> ImageBitmap?,
+)
 
 @Composable
 fun AnilibApp(
@@ -135,10 +152,15 @@ fun AnilibApp(
     tracking: TrackerPresentation,
     updates: UpdatePresentation,
     applicationUpdates: ApplicationUpdatePresentation,
+    httpClient: AnilibHttpClient,
+    shareController: ShareController,
     pageDecoder: (ByteArray) -> ImageBitmap?,
     componentCount: Int,
     darkTheme: Boolean = isSystemInDarkTheme(),
 ) {
+    val detailPlatform = remember(httpClient, shareController, pageDecoder) {
+        DetailPlatform(httpClient, shareController, pageDecoder)
+    }
     val navigator = remember { LibraryNavigator() }
     val initialSettings = remember(settingsPresentation) { settingsPresentation.snapshot() }
     var destination by remember { mutableStateOf(navigator.state()) }
@@ -239,6 +261,7 @@ fun AnilibApp(
                             tracking,
                             updates,
                             applicationUpdates,
+                            detailPlatform,
                             destination,
                             section,
                             componentCount,
@@ -275,6 +298,7 @@ fun AnilibApp(
                             tracking,
                             updates,
                             applicationUpdates,
+                            detailPlatform,
                             destination,
                             section,
                             componentCount,
@@ -318,6 +342,7 @@ private fun ExpandedShell(
     tracking: TrackerPresentation,
     updates: UpdatePresentation,
     applicationUpdates: ApplicationUpdatePresentation,
+    detailPlatform: DetailPlatform,
     destination: LibraryNavigationState,
     section: AppSection,
     componentCount: Int,
@@ -357,6 +382,7 @@ private fun ExpandedShell(
                 tracking,
                 updates,
                 applicationUpdates,
+                detailPlatform,
                 destination,
                 section,
                 componentCount,
@@ -397,6 +423,7 @@ private fun CompactShell(
     tracking: TrackerPresentation,
     updates: UpdatePresentation,
     applicationUpdates: ApplicationUpdatePresentation,
+    detailPlatform: DetailPlatform,
     destination: LibraryNavigationState,
     section: AppSection,
     componentCount: Int,
@@ -434,6 +461,7 @@ private fun CompactShell(
                 tracking,
                 updates,
                 applicationUpdates,
+                detailPlatform,
                 destination,
                 section,
                 componentCount,
@@ -517,6 +545,7 @@ private fun AppDestination(
     tracking: TrackerPresentation,
     updates: UpdatePresentation,
     applicationUpdates: ApplicationUpdatePresentation,
+    detailPlatform: DetailPlatform,
     destination: LibraryNavigationState,
     section: AppSection,
     componentCount: Int,
@@ -537,6 +566,10 @@ private fun AppDestination(
         AppSection.LIBRARY -> when (destination.page()) {
             LibraryPage.DETAILS -> DetailsDestination(
                 presentation,
+                discovery,
+                browserCookies,
+                browserRuntimeStatus,
+                detailPlatform,
                 reader,
                 player,
                 downloads,
@@ -1189,6 +1222,10 @@ private fun HistoryCard(row: LibraryHistoryRow, openDetails: () -> Unit) {
 @Composable
 private fun DetailsDestination(
     presentation: LibraryPresentation,
+    discovery: DiscoveryPresentation,
+    browserCookies: HttpCookieJar,
+    browserRuntimeStatus: BrowserRuntimeStatus,
+    detailPlatform: DetailPlatform,
     reader: ReaderPresentation,
     player: PlayerPresentation,
     downloads: DownloadPresentation,
@@ -1204,12 +1241,59 @@ private fun DetailsDestination(
     openTracking: (LibraryItemId) -> Unit,
 ) {
     val id = destination.selectedTitle().orElse(null)
-    val details = id?.let { presentation.details(it).orElse(null) }
+    var revision by remember(id) { mutableStateOf(0) }
+    var browserPage by remember(id) {
+        mutableStateOf<fr.vriege.anilib.feature.source.SourceWebPage?>(null)
+    }
+    var chapters by remember(id) { mutableStateOf(listOf<SourceContentUnit>()) }
+    var episodes by remember(id) { mutableStateOf(listOf<EpisodeSnapshot>()) }
+    var unitError by remember(id) { mutableStateOf<String?>(null) }
+    val details = remember(id, revision) { id?.let { presentation.details(it).orElse(null) } }
+    if (browserPage != null) {
+        BrowserScreen(
+            browserPage!!,
+            browserCookies,
+            browserRuntimeStatus,
+            close = { browserPage = null },
+        )
+        return
+    }
     if (details == null) {
         MissingDetails { navigate(LibraryNavigator::openLibrary) }
     } else {
+        androidx.compose.runtime.LaunchedEffect(details.id(), revision) {
+            unitError = null
+            if (details.kind() == MediaKind.ANIME) {
+                runCatching { withContext(Dispatchers.IO) { player.episodes(details.id()) } }
+                    .onSuccess { episodes = it }
+                    .onFailure { unitError = it.message ?: "Unable to load episodes." }
+            } else {
+                runCatching { withContext(Dispatchers.IO) { reader.contentUnits(details.id()) } }
+                    .onSuccess { chapters = it }
+                    .onFailure { unitError = it.message ?: "Unable to load chapters." }
+            }
+        }
+        val titlePage = details.origin().flatMap { origin ->
+            runCatching {
+                discovery.titleWebPage(
+                    fr.vriege.anilib.feature.source.SourceCatalogueItemId(
+                        SourceId.of(origin.sourceId()),
+                        origin.sourceItemKey(),
+                    ),
+                )
+            }.getOrDefault(java.util.Optional.empty())
+        }.orElse(null)
+        val sourcePage = details.origin().flatMap { origin ->
+            runCatching { discovery.sourceWebPage(SourceId.of(origin.sourceId())) }
+                .getOrDefault(java.util.Optional.empty())
+        }.orElse(null)
         DetailsPage(
             details = details,
+            artwork = { Artwork(details, detailPlatform) },
+            chapters = chapters,
+            episodes = episodes,
+            unitError = unitError,
+            related = presentation.relatedTitles(details.id()),
             canRead = runCatching { reader.canOpen(details.id()) }.getOrDefault(false),
             canWatch = runCatching { player.canOpen(details.id()) }.getOrDefault(false),
             canDownload = runCatching { downloads.canEnqueue(details.id()) }.getOrDefault(false),
@@ -1221,6 +1305,19 @@ private fun DetailsDestination(
             watch = { openPlayer(details.id()) },
             download = { enqueueDownload(details.id()) },
             track = { openTracking(details.id()) },
+            edit = { title, metadata ->
+                presentation.editTitle(details.id(), title, metadata)
+                revision++
+            },
+            openTitleWeb = titlePage?.let { page -> ({ browserPage = page }) },
+            openSourceWeb = sourcePage?.let { page -> ({ browserPage = page }) },
+            share = {
+                detailPlatform.shareController.share(
+                    details.title(),
+                    titlePage?.location()?.toString() ?: details.title(),
+                )
+            },
+            openRelated = { relatedId -> navigate { it.openDetails(relatedId) } },
             goBack = { navigate(LibraryNavigator::back) },
         )
     }
@@ -1230,6 +1327,11 @@ private fun DetailsDestination(
 @Composable
 private fun DetailsPage(
     details: LibraryDetails,
+    artwork: @Composable () -> Unit,
+    chapters: List<SourceContentUnit>,
+    episodes: List<EpisodeSnapshot>,
+    unitError: String?,
+    related: List<LibraryCard>,
     canRead: Boolean,
     canWatch: Boolean,
     canDownload: Boolean,
@@ -1241,8 +1343,14 @@ private fun DetailsPage(
     watch: () -> Unit,
     download: () -> Unit,
     track: () -> Unit,
+    edit: (String, LibraryTitleMetadata) -> Unit,
+    openTitleWeb: (() -> Unit)?,
+    openSourceWeb: (() -> Unit)?,
+    share: () -> Unit,
+    openRelated: (LibraryItemId) -> Unit,
     goBack: () -> Unit,
 ) {
+    var editing by remember(details.id()) { mutableStateOf(false) }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -1259,6 +1367,7 @@ private fun DetailsPage(
             modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 24.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
+            item { artwork() }
             item { Text(formatEnum(details.kind()), color = MaterialTheme.colorScheme.primary) }
             item { DetailsFacts(details) }
             item {
@@ -1277,6 +1386,24 @@ private fun DetailsPage(
             }
             if (!downloadError.isNullOrBlank()) {
                 item { Text(downloadError, color = MaterialTheme.colorScheme.error) }
+            }
+            if (!unitError.isNullOrBlank()) {
+                item { Text(unitError, color = MaterialTheme.colorScheme.error) }
+            }
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Button(onClick = { editing = true }) { Text("Edit") }
+                    Button(onClick = share) { Text("Share") }
+                    openTitleWeb?.let { action ->
+                        Button(onClick = action) { Text("Open title web") }
+                    }
+                    openSourceWeb?.let { action ->
+                        Button(onClick = action) { Text("Open source web") }
+                    }
+                }
             }
             if (canTrack) {
                 item { Button(onClick = track) { Text("Tracking") } }
@@ -1297,9 +1424,179 @@ private fun DetailsPage(
                     }
                 }
             }
+            if (chapters.isNotEmpty()) {
+                item { Text("Chapters", fontWeight = FontWeight.SemiBold, fontSize = 18.sp) }
+                items(chapters, key = { it.id().value() }) { chapter ->
+                    ContentUnitCard(
+                        chapter.title(),
+                        chapter.publishedAt().map(dateTimeFormatter::format).orElse("Unknown date"),
+                        read,
+                    )
+                }
+            }
+            if (episodes.isNotEmpty()) {
+                item { Text("Episodes", fontWeight = FontWeight.SemiBold, fontSize = 18.sp) }
+                items(episodes, key = { it.episode().id().value() }) { episode ->
+                    val playback = episode.playback().orElse(null)
+                    ContentUnitCard(
+                        episode.episode().title(),
+                        playback?.let { "${it.positionMillis()} ms watched" } ?: "Unwatched",
+                        watch,
+                    )
+                }
+            }
+            if (related.isNotEmpty()) {
+                item { Text("Related titles", fontWeight = FontWeight.SemiBold, fontSize = 18.sp) }
+                items(related, key = { it.id().value() }) { card ->
+                    LibraryTitleCard(card, false, false, {}, { openRelated(card.id()) })
+                }
+            }
+        }
+    }
+    if (editing) {
+        EditLibraryTitleDialog(
+            details,
+            dismiss = { editing = false },
+            save = { title, metadata ->
+                edit(title, metadata)
+                editing = false
+            },
+        )
+    }
+}
+
+@Composable
+private fun ContentUnitCard(title: String, summary: String, open: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = open),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+            Text(title, fontWeight = FontWeight.Medium)
+            Text(summary, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
+
+@Composable
+private fun Artwork(details: LibraryDetails, platform: DetailPlatform) {
+    val location = details.artwork().orElse(null)
+    var image by remember(location) { mutableStateOf<ImageBitmap?>(null) }
+    var failed by remember(location) { mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(location) {
+        image = null
+        failed = false
+        if (location == null || !(location.scheme.equals("http", true)
+                    || location.scheme.equals("https", true))) {
+            failed = location != null
+            return@LaunchedEffect
+        }
+        runCatching {
+            withContext(Dispatchers.IO) {
+                val response = platform.httpClient.execute(
+                    HttpRequest.builder(location)
+                        .cache(HttpCachePolicy.preferCache(Duration.ofDays(7)))
+                        .build(),
+                )
+                check(response.statusCode() in 200..299) {
+                    "Artwork request failed with HTTP ${response.statusCode()}"
+                }
+                platform.pageDecoder(response.body())
+                    ?: error("Artwork format is not supported")
+            }
+        }.onSuccess { image = it }.onFailure { failed = true }
+    }
+    when {
+        image != null -> Image(
+            image!!,
+            contentDescription = "${details.title()} artwork",
+            modifier = Modifier.fillMaxWidth().height(280.dp),
+            contentScale = ContentScale.Fit,
+        )
+        location == null -> ArtworkPlaceholder("No artwork")
+        failed -> ArtworkPlaceholder("Artwork unavailable")
+        else -> ArtworkPlaceholder("Loading artwork…")
+    }
+}
+
+@Composable
+private fun ArtworkPlaceholder(label: String) {
+    Box(
+        modifier = Modifier.fillMaxWidth().height(180.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun EditLibraryTitleDialog(
+    details: LibraryDetails,
+    dismiss: () -> Unit,
+    save: (String, LibraryTitleMetadata) -> Unit,
+) {
+    var title by remember(details.id()) { mutableStateOf(details.title()) }
+    var description by remember(details.id()) { mutableStateOf(details.description()) }
+    var authors by remember(details.id()) { mutableStateOf(details.authors().joinToString(", ")) }
+    var artists by remember(details.id()) { mutableStateOf(details.artists().joinToString(", ")) }
+    var genres by remember(details.id()) { mutableStateOf(details.genres().joinToString(", ")) }
+    var artwork by remember(details.id()) {
+        mutableStateOf(details.artwork().map(URI::toString).orElse(""))
+    }
+    var status by remember(details.id()) { mutableStateOf(details.publicationStatus()) }
+    var error by remember(details.id()) { mutableStateOf<String?>(null) }
+    AlertDialog(
+        onDismissRequest = dismiss,
+        title = { Text("Edit title") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(title, { title = it }, label = { Text("Title") })
+                OutlinedTextField(description, { description = it }, label = { Text("Description") })
+                OutlinedTextField(authors, { authors = it }, label = { Text("Authors") })
+                OutlinedTextField(artists, { artists = it }, label = { Text("Artists") })
+                OutlinedTextField(genres, { genres = it }, label = { Text("Genres") })
+                OutlinedTextField(artwork, { artwork = it }, label = { Text("Artwork URL") })
+                androidx.compose.material3.TextButton(onClick = { status = status.next() }) {
+                    Text("Status: ${formatEnum(status)}")
+                }
+                error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(
+                enabled = title.isNotBlank(),
+                onClick = {
+                    runCatching {
+                        val metadata = LibraryTitleMetadata(
+                            description,
+                            commaSeparated(authors),
+                            commaSeparated(artists),
+                            status,
+                            artwork.trim().takeIf(String::isNotEmpty)
+                                ?.let { java.util.Optional.of(URI.create(it)) }
+                                ?: java.util.Optional.empty(),
+                            commaSeparated(genres),
+                        )
+                        save(title.trim(), metadata)
+                    }.onFailure { failure ->
+                        error = failure.message ?: "Unable to edit this title."
+                    }
+                },
+            ) { Text("Save") }
+        },
+        dismissButton = {
+            androidx.compose.material3.TextButton(onClick = dismiss) { Text("Cancel") }
+        },
+    )
+}
+
+private fun commaSeparated(value: String): List<String> = value.split(',')
+    .map(String::trim)
+    .filter(String::isNotEmpty)
+    .distinct()
+
+private fun PublicationStatus.next(): PublicationStatus =
+    PublicationStatus.entries[(ordinal + 1) % PublicationStatus.entries.size]
 
 @Composable
 private fun DetailsFacts(details: LibraryDetails) {
@@ -1317,6 +1614,8 @@ private fun DetailsFacts(details: LibraryDetails) {
             Fact("Categories", joined(details.categories()))
             Fact("Authors", joined(details.authors()))
             Fact("Artists", joined(details.artists()))
+            Fact("Genres", joined(details.genres()))
+            Fact("Source", details.origin().map { it.sourceId() }.orElse("Local"))
             Fact("Progress", details.progress().map(::progress).orElse("Not started"))
             Fact("History", "${details.historyEntryCount()} entries")
         }

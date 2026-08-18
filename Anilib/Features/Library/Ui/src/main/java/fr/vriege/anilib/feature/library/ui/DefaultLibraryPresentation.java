@@ -246,6 +246,32 @@ public final class DefaultLibraryPresentation implements LibraryPresentation {
                 .toList());
     }
 
+    @Override
+    public synchronized void editTitle(
+            LibraryItemId id,
+            String title,
+            LibraryTitleMetadata metadata) {
+        Objects.requireNonNull(id, "id must not be null");
+        Objects.requireNonNull(metadata, "metadata must not be null");
+        LibraryItem item = catalog.find(id)
+                .orElseThrow(() -> new IllegalArgumentException("Unknown library title: " + id));
+        catalog.save(item.withTitleAndMetadata(title, metadata));
+    }
+
+    @Override
+    public synchronized List<LibraryCard> relatedTitles(LibraryItemId id) {
+        Objects.requireNonNull(id, "id must not be null");
+        LibraryItem selected = catalog.find(id)
+                .orElseThrow(() -> new IllegalArgumentException("Unknown library title: " + id));
+        return catalog.snapshot().stream()
+                .filter(item -> !item.id().equals(id))
+                .filter(item -> related(selected, item))
+                .map(DefaultLibraryPresentation::card)
+                .sorted(cardOrder(LibrarySort.TITLE_ASCENDING))
+                .limit(20)
+                .toList();
+    }
+
     private void replaceSelected(
             Set<LibraryItemId> ids,
             java.util.function.UnaryOperator<LibraryItem> operation) {
@@ -464,7 +490,25 @@ public final class DefaultLibraryPresentation implements LibraryPresentation {
                 metadata.authors(),
                 metadata.artists(),
                 metadata.publicationStatus(),
+                metadata.artwork(),
+                metadata.genres(),
+                item.origin(),
                 item.history().size());
+    }
+
+    private static boolean related(LibraryItem selected, LibraryItem candidate) {
+        boolean sameSource = selected.origin().isPresent()
+                && candidate.origin().isPresent()
+                && selected.origin().orElseThrow().sourceId()
+                .equals(candidate.origin().orElseThrow().sourceId());
+        boolean sharedCategory = !java.util.Collections.disjoint(
+                selected.categories(),
+                candidate.categories());
+        boolean sharedGenre = !java.util.Collections.disjoint(
+                selected.metadata().genres(),
+                candidate.metadata().genres());
+        return selected.kind() == candidate.kind()
+                && (sameSource || sharedCategory || sharedGenre);
     }
 
     private static LibraryHistoryRow historyRow(

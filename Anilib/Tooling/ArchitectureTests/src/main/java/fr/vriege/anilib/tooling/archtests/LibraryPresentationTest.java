@@ -61,6 +61,9 @@ final class LibraryPresentationTest {
         counter.check(overview.categoryConfigurations().getFirst().updatePolicy()
                         == LibraryCategoryUpdatePolicy.EXCLUDE,
                 "category update policy must be editable");
+        counter.check(presentation.relatedTitles(new LibraryItemId("zulu")).stream()
+                        .anyMatch(card -> card.id().equals(new LibraryItemId("beta"))),
+                "related titles must include same-kind category matches");
 
         presentation.createCategory("Archive");
         presentation.moveCategory("Archive", 0);
@@ -104,6 +107,9 @@ final class LibraryPresentationTest {
                 "details must expose publication status");
         counter.check(details.historyEntryCount() == 2,
                 "details must expose title history count");
+        counter.check(details.artwork().orElseThrow().getHost().equals("images.example")
+                        && details.genres().equals(List.of("Action")),
+                "details must expose artwork and genres");
         counter.check(presentation.details(new LibraryItemId("missing")).isEmpty(),
                 "missing details must remain explicit");
 
@@ -113,6 +119,18 @@ final class LibraryPresentationTest {
                 "global history must be reverse chronological across titles");
         counter.check(presentation.history().entries().getFirst().title().equals("Zulu"),
                 "history rows must retain their owning title");
+        LibraryTitleMetadata edited = new LibraryTitleMetadata(
+                "Edited description",
+                List.of("Editor"),
+                List.of(),
+                PublicationStatus.COMPLETED,
+                java.util.Optional.empty(),
+                List.of("Drama"));
+        presentation.editTitle(zuluId, "Edited Zulu", edited);
+        counter.check(presentation.details(zuluId).orElseThrow().title().equals("Edited Zulu")
+                        && presentation.details(zuluId).orElseThrow().description()
+                        .equals("Edited description"),
+                "detail editing must durably replace title metadata");
 
         verifyNavigation(counter, zuluId);
         return counter.value;
@@ -144,7 +162,10 @@ final class LibraryPresentationTest {
                         "A complete presentation title.",
                         List.of("Author One"),
                         List.of("Artist One"),
-                        PublicationStatus.ONGOING));
+                        PublicationStatus.ONGOING,
+                        java.util.Optional.of(java.net.URI.create(
+                                "https://images.example/zulu.jpg")),
+                        List.of("Action")));
         LibraryItem alpha = new LibraryItem(
                 new LibraryItemId("alpha"),
                 "Alpha",
@@ -158,7 +179,7 @@ final class LibraryPresentationTest {
         LibraryItem beta = new LibraryItem(
                 new LibraryItemId("beta"),
                 "beta",
-                MediaKind.NOVEL,
+                MediaKind.ANIME,
                 Instant.parse("2026-08-03T10:00:00Z"),
                 Set.of("Anime"));
         catalog.save(beta);

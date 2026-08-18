@@ -6,6 +6,7 @@ import fr.vriege.anilib.feature.library.LibraryDisplayDensity;
 import fr.vriege.anilib.feature.library.LibraryDisplayMode;
 import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.library.LibrarySort;
+import fr.vriege.anilib.feature.library.LibraryTitleMetadata;
 
 import java.util.Optional;
 import java.util.Set;
@@ -44,4 +45,8 @@ public interface LibraryPresentation {
     void removeFromCategory(Set<LibraryItemId> ids, String category);
 
     void deleteTitles(Set<LibraryItemId> ids);
+
+    void editTitle(LibraryItemId id, String title, LibraryTitleMetadata metadata);
+
+    java.util.List<LibraryCard> relatedTitles(LibraryItemId id);
 }

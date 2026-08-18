@@ -184,7 +184,7 @@ platform-specific.
   delete actions
 - [x] add category create, rename, reorder, delete, per-category display, and
   update policies
-- [ ] add complete anime/manga detail units, artwork, metadata editing, related
+- [x] add complete anime/manga detail units, artwork, metadata editing, related
   titles, share, open-in-WebView, and source actions
 - [ ] add history date grouping, resume/remove actions, and distinct anime/manga
   presentation

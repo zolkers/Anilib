@@ -328,6 +328,8 @@ public final class DefaultDiscoveryService implements DiscoveryService {
                 item.description(),
                 List.of(),
                 List.of(),
-                PublicationStatus.UNKNOWN);
+                PublicationStatus.UNKNOWN,
+                item.thumbnail(),
+                List.of());
     }
 }

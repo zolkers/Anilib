@@ -95,6 +95,23 @@ public final class DefaultReaderService implements ReaderService, ReaderContentR
     }
 
     @Override
+    public synchronized List<SourceContentUnit> contentUnits(LibraryItemId libraryItemId) {
+        Objects.requireNonNull(libraryItemId, "libraryItemId must not be null");
+        ensureOpen();
+        LibraryItem item = library.find(libraryItemId)
+                .orElseThrow(() -> new ReaderException("Library item was not found"));
+        LibraryOrigin origin = item.origin()
+                .orElseThrow(() -> new ReaderException("Library item has no source origin"));
+        SourceCatalogueItemId itemId = sourceItemId(origin);
+        Source source = sources.find(itemId.sourceId())
+                .orElseThrow(() -> new ReaderException("Library source is not installed"));
+        if (!(source instanceof PagedSource pagedSource)) {
+            throw new ReaderException("Library source does not provide paged content");
+        }
+        return validatedUnits(pagedSource, itemId);
+    }
+
+    @Override
     public synchronized ReaderSession open(LibraryItemId libraryItemId) {
         Objects.requireNonNull(libraryItemId, "libraryItemId must not be null");
         ensureOpen();

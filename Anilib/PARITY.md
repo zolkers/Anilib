@@ -8,7 +8,7 @@ exists but the corresponding Aniyomi workflow or settings depth is incomplete.
 
 | Area | State | Current Anilib behavior | Remaining parity work |
 | --- | --- | --- | --- |
-| Library | Partial | Durable anime/manga titles, category CRUD and policies, favourites, history, progress, filters, persisted display choices, multi-selection and bulk category/favourite/download/migrate/delete actions | Complete statistics depth and metadata editing |
+| Library | Partial | Durable anime/manga titles, category CRUD and policies, favourites, history, progress, filters, persisted display choices, multi-selection and bulk actions, plus artwork, editable metadata, content units, related titles, sharing, and title/source WebView actions | Complete statistics depth and history presentation/actions |
 | Browse and sources | Partial | Popular/latest, paging, search, filters, preferences, migration, installed-extension metadata, durable language filters, and pinned sources/extensions | Remaining per-source management and Browse actions |
 | Reader | Partial | LTR, RTL, vertical, webtoon, resume, prefetch, local/remote pages | Full viewer gestures, tap zones, scaling, crop/split, rotation, color, transitions, and per-title overrides |
 | Player | Partial | Episodes, qualities, subtitles, resume, protected streams, Android/desktop playback | Full Aniyomi control surface, gestures, decoder/audio/subtitle policy, PiP, custom buttons, and mpv-compatible advanced controls |

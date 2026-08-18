@@ -87,6 +87,8 @@ fun main() {
                 tracking = tracking,
                 updates = updates,
                 applicationUpdates = started.capability(ApplicationUpdateUiCapabilities.PRESENTATION),
+                httpClient = started.capability(NetworkCapabilities.HTTP_CLIENT),
+                shareController = DesktopShareController(),
                 pageDecoder = ::decodePage,
                 componentCount = started.components().size,
                 darkTheme = desktopDarkTheme(),

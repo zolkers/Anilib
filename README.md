@@ -31,6 +31,9 @@ vertical, and webtoon navigation, plus one immersive shared reader screen.
 The shared Library screen persists grid/list density, sorting, and its landing
 category. Its category manager creates, renames, reorders, and deletes durable
 categories while retaining per-category display and update policy.
+Anime and manga details retain artwork and genres, expose chapter or episode
+lists and related titles, edit durable metadata, share through the host, and
+open both title and source pages in the shared WebView workflow.
 Multi-selection exposes bulk category, favourite, download, guided migration,
 and confirmed deletion actions from the same shared Android/desktop screen.
 The removable Downloads Bundle adds a durable queue, bounded concurrent jobs,

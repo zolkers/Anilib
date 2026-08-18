@@ -89,6 +89,8 @@ class MainActivity : ComponentActivity() {
                 tracking = tracking,
                 updates = updates,
                 applicationUpdates = started.capability(ApplicationUpdateUiCapabilities.PRESENTATION),
+                httpClient = started.capability(NetworkCapabilities.HTTP_CLIENT),
+                shareController = AndroidShareController(this),
                 pageDecoder = ::decodePage,
                 componentCount = componentCount,
             )

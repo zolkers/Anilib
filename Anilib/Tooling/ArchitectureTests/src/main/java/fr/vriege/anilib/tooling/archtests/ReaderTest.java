@@ -125,6 +125,8 @@ final class ReaderTest {
                 library,
                 new ReaderPolicy(1, 4, 3));
         ReaderSession session = reader.open(item.id());
+        counter.check(reader.contentUnits(item.id()).equals(List.of(unit)),
+                "reader details must expose the validated chapter list");
         byte[] returned = session.currentPage();
         returned[0] = 99;
         counter.check(session.currentPage()[0] == FIRST_PAGE[0],

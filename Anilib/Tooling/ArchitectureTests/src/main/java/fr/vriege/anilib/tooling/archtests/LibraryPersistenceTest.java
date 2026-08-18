@@ -30,7 +30,7 @@ import java.util.stream.Stream;
 
 final class LibraryPersistenceTest {
     private static final int MAGIC = 0x414E494C;
-    private static final int CURRENT_VERSION = 3;
+    private static final int CURRENT_VERSION = 4;
 
     private LibraryPersistenceTest() {
     }
@@ -43,6 +43,7 @@ final class LibraryPersistenceTest {
             migratesVersionZero(counter);
             migratesVersionOne(counter);
             migratesVersionTwo(counter);
+            migratesVersionThree(counter);
         } catch (IOException exception) {
             throw new AssertionError("Library persistence test failed", exception);
         }
@@ -105,7 +106,9 @@ final class LibraryPersistenceTest {
                             "A persistence test title.",
                             List.of("Test Author"),
                             List.of("Test Artist"),
-                            PublicationStatus.ONGOING))
+                            PublicationStatus.ONGOING,
+                            java.util.Optional.of(java.net.URI.create("https://images.example/cover.jpg")),
+                            List.of("Action", "Drama")))
                     .withOrigin(new LibraryOrigin("test.source", "remote-title-7"));
             counter.check(item.favorite(), "favourite state must be expressible");
             counter.check(item.progress().orElseThrow().completion().orElseThrow() > 0.68,
@@ -113,6 +116,9 @@ final class LibraryPersistenceTest {
             counter.check(item.history().size() == 2, "history must retain chronological visits");
             counter.check(item.metadata().publicationStatus() == PublicationStatus.ONGOING,
                     "per-title publication metadata must be typed");
+            counter.check(item.metadata().artwork().orElseThrow().getHost().equals("images.example")
+                            && item.metadata().genres().equals(List.of("Action", "Drama")),
+                    "title artwork and genres must be expressible");
             counter.check(item.origin().orElseThrow().sourceId().equals("test.source"),
                     "source origin must be expressible");
             FileLibraryCatalog catalog = new FileLibraryCatalog(file);
@@ -160,7 +166,7 @@ final class LibraryPersistenceTest {
                     "version one categories must survive migration");
             checkEnrichedDefaults(counter, item, "version one");
             counter.check(readVersion(file) == CURRENT_VERSION,
-                    "opening a version one catalog must rewrite version three");
+                    "opening a version one catalog must rewrite the current version");
         } finally {
             deleteDirectory(directory);
         }
@@ -176,7 +182,26 @@ final class LibraryPersistenceTest {
             counter.check(item.favorite(), "version two favourite state must survive migration");
             counter.check(item.origin().isEmpty(), "version two migration must initialize source origin");
             counter.check(readVersion(file) == CURRENT_VERSION,
-                    "opening a version two catalog must rewrite version three");
+                    "opening a version two catalog must rewrite the current version");
+        } finally {
+            deleteDirectory(directory);
+        }
+    }
+
+    private static void migratesVersionThree(Counter counter) throws IOException {
+        Path directory = Files.createTempDirectory("anilib-library-v3-migration");
+        Path file = directory.resolve("library.anilib");
+        LibraryItemId id = new LibraryItemId("version-three-item");
+        try {
+            writeVersionThree(file, id);
+            LibraryItem item = new FileLibraryCatalog(file).find(id).orElseThrow();
+            counter.check(item.origin().orElseThrow().sourceId().equals("legacy.source"),
+                    "version three source origin must survive migration");
+            counter.check(item.metadata().artwork().isEmpty()
+                            && item.metadata().genres().isEmpty(),
+                    "version three migration must initialize artwork and genres");
+            counter.check(readVersion(file) == CURRENT_VERSION,
+                    "opening a version three catalog must rewrite the current version");
         } finally {
             deleteDirectory(directory);
         }
@@ -233,6 +258,32 @@ final class LibraryPersistenceTest {
             output.writeInt(0);
             output.writeInt(0);
             output.writeUTF(PublicationStatus.COMPLETED.name());
+        }
+    }
+
+    private static void writeVersionThree(Path file, LibraryItemId id) throws IOException {
+        Instant addedAt = Instant.parse("2026-03-04T05:06:07Z");
+        try (DataOutputStream output = new DataOutputStream(
+                new BufferedOutputStream(Files.newOutputStream(file)))) {
+            output.writeInt(MAGIC);
+            output.writeInt(3);
+            output.writeInt(1);
+            output.writeUTF(id.value());
+            output.writeUTF("Version three title");
+            output.writeUTF(MediaKind.MANGA.name());
+            output.writeLong(addedAt.getEpochSecond());
+            output.writeInt(addedAt.getNano());
+            output.writeInt(0);
+            output.writeBoolean(false);
+            output.writeBoolean(false);
+            output.writeInt(0);
+            output.writeUTF("Version three metadata");
+            output.writeInt(0);
+            output.writeInt(0);
+            output.writeUTF(PublicationStatus.ONGOING.name());
+            output.writeBoolean(true);
+            output.writeUTF("legacy.source");
+            output.writeUTF("legacy-title");
         }
     }
 

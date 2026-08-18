@@ -97,6 +97,22 @@ public record LibraryItem(
         return copy(categories, favorite, progress, history, nextMetadata);
     }
 
+    public LibraryItem withTitleAndMetadata(
+            String nextTitle,
+            LibraryTitleMetadata nextMetadata) {
+        return new LibraryItem(
+                id,
+                Preconditions.requireNonBlank(nextTitle, "nextTitle"),
+                kind,
+                addedAt,
+                categories,
+                favorite,
+                progress,
+                history,
+                Preconditions.requireNonNull(nextMetadata, "nextMetadata"),
+                origin);
+    }
+
     public LibraryItem migratedTo(
             String nextTitle,
             LibraryOrigin nextOrigin,
