@@ -1,0 +1,7 @@
+dependencies {
+    implementation project(':Anilib:Foundation')
+    implementation project(':Anilib:Kernel:Api')
+    implementation project(':Anilib:Features:Settings:Api')
+    implementation project(':Anilib:Features:Settings:Runtime')
+    implementation project(':Anilib:Features:Settings:Ui')
+}

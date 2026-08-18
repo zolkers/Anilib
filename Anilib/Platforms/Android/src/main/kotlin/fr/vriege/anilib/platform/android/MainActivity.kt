@@ -16,6 +16,7 @@ import fr.vriege.anilib.feature.extensionrepository.ui.ExtensionRepositoryUiCapa
 import fr.vriege.anilib.feature.network.NetworkCapabilities
 import fr.vriege.anilib.feature.library.ui.LibraryUiCapabilities
 import fr.vriege.anilib.feature.reader.ui.ReaderUiCapabilities
+import fr.vriege.anilib.feature.settings.ui.SettingsUiCapabilities
 import fr.vriege.anilib.feature.player.ui.PlayerUiCapabilities
 import fr.vriege.anilib.feature.downloads.ui.DownloadUiCapabilities
 import fr.vriege.anilib.feature.backup.ui.BackupUiCapabilities
@@ -68,6 +69,7 @@ class MainActivity : ComponentActivity() {
                 extensionRepositories = extensionRepositories,
                 legacyExtensionInstaller = legacyExtensionInstaller,
                 networkMaintenance = started.capability(NetworkCapabilities.MAINTENANCE),
+                settingsPresentation = started.capability(SettingsUiCapabilities.PRESENTATION),
                 reader = reader,
                 player = player,
                 downloads = downloads,

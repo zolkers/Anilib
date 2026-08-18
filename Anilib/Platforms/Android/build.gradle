@@ -76,6 +76,7 @@ dependencies {
     implementation project(':Anilib:Features:ExtensionRepository:Ui')
     implementation project(':Anilib:Features:ExtensionRepository:Api')
     implementation project(':Anilib:Features:Network:Api')
+    implementation project(':Anilib:Features:Settings:Ui')
     implementation project(':Anilib:Features:Library:Ui')
     implementation project(':Anilib:Features:Reader:Ui')
     implementation project(':Anilib:Features:Player:Ui')

@@ -184,6 +184,14 @@ The Network Bundle publishes the resulting capabilities, so source code never
 imports either platform mechanism and configurations still select one explicit
 composition unit.
 
+Settings is a removable vertical rather than platform-owned preferences. Its
+Java service atomically stores immutable snapshots and publishes observations
+through a narrow capability. One platform-neutral presentation owns mutation
+actions; the shared Compose shell observes it to apply system, light, or dark
+appearance immediately on Android and desktop. Feature policy values remain
+owned here only as user choices until their corresponding feature Bundles
+explicitly consume and enforce them.
+
 ## Product lifecycle
 
 1. A configuration selects feature Bundles.

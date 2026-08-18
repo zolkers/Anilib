@@ -71,6 +71,9 @@ import fr.vriege.anilib.feature.library.ui.LibraryOverview
 import fr.vriege.anilib.feature.library.ui.LibraryPage
 import fr.vriege.anilib.feature.library.ui.LibraryPresentation
 import fr.vriege.anilib.feature.network.NetworkMaintenance
+import fr.vriege.anilib.feature.settings.SettingsSnapshot
+import fr.vriege.anilib.feature.settings.ThemeMode
+import fr.vriege.anilib.feature.settings.ui.SettingsPresentation
 import fr.vriege.anilib.feature.reader.ui.ReaderController
 import fr.vriege.anilib.feature.reader.ui.ReaderPresentation
 import fr.vriege.anilib.feature.player.ui.PlayerPresentation
@@ -95,6 +98,7 @@ fun AnilibApp(
     extensionRepositories: ExtensionRepositoryPresentation,
     legacyExtensionInstaller: LegacyExtensionInstaller,
     networkMaintenance: NetworkMaintenance,
+    settingsPresentation: SettingsPresentation,
     reader: ReaderPresentation,
     player: PlayerPresentation,
     downloads: DownloadPresentation,
@@ -115,6 +119,11 @@ fun AnilibApp(
     var playerError by remember { mutableStateOf<String?>(null) }
     var downloadError by remember { mutableStateOf<String?>(null) }
     var moreDestination by remember { mutableStateOf<MoreDestination?>(null) }
+    var settings by remember(settingsPresentation) { mutableStateOf(settingsPresentation.snapshot()) }
+    DisposableEffect(settingsPresentation) {
+        val observation = settingsPresentation.observe { settings = it }
+        onDispose { observation.close() }
+    }
     val navigate: ((LibraryNavigator) -> Unit) -> Unit = { transition ->
         transition(navigator)
         destination = navigator.state()
@@ -124,7 +133,12 @@ fun AnilibApp(
         if (next != AppSection.MORE) moreDestination = null
     }
 
-    MaterialTheme(colorScheme = if (darkTheme) darkColorScheme() else lightColorScheme()) {
+    val useDarkTheme = when (settings.themeMode()) {
+        ThemeMode.SYSTEM -> darkTheme
+        ThemeMode.LIGHT -> false
+        ThemeMode.DARK -> true
+    }
+    MaterialTheme(colorScheme = if (useDarkTheme) darkColorScheme() else lightColorScheme()) {
         Surface(modifier = Modifier.fillMaxSize()) {
             val controller = activeReader
             val playerTitle = activePlayerTitle
@@ -181,6 +195,8 @@ fun AnilibApp(
                             extensionRepositories,
                             legacyExtensionInstaller,
                             networkMaintenance,
+                            settingsPresentation,
+                            settings,
                             reader,
                             player,
                             downloads,
@@ -210,6 +226,8 @@ fun AnilibApp(
                             extensionRepositories,
                             legacyExtensionInstaller,
                             networkMaintenance,
+                            settingsPresentation,
+                            settings,
                             reader,
                             player,
                             downloads,
@@ -246,6 +264,8 @@ private fun ExpandedShell(
     extensionRepositories: ExtensionRepositoryPresentation,
     legacyExtensionInstaller: LegacyExtensionInstaller,
     networkMaintenance: NetworkMaintenance,
+    settingsPresentation: SettingsPresentation,
+    settings: SettingsSnapshot,
     reader: ReaderPresentation,
     player: PlayerPresentation,
     downloads: DownloadPresentation,
@@ -278,6 +298,8 @@ private fun ExpandedShell(
                 extensionRepositories,
                 legacyExtensionInstaller,
                 networkMaintenance,
+                settingsPresentation,
+                settings,
                 reader,
                 player,
                 downloads,
@@ -311,6 +333,8 @@ private fun CompactShell(
     extensionRepositories: ExtensionRepositoryPresentation,
     legacyExtensionInstaller: LegacyExtensionInstaller,
     networkMaintenance: NetworkMaintenance,
+    settingsPresentation: SettingsPresentation,
+    settings: SettingsSnapshot,
     reader: ReaderPresentation,
     player: PlayerPresentation,
     downloads: DownloadPresentation,
@@ -341,6 +365,8 @@ private fun CompactShell(
                 extensionRepositories,
                 legacyExtensionInstaller,
                 networkMaintenance,
+                settingsPresentation,
+                settings,
                 reader,
                 player,
                 downloads,
@@ -417,6 +443,8 @@ private fun AppDestination(
     extensionRepositories: ExtensionRepositoryPresentation,
     legacyExtensionInstaller: LegacyExtensionInstaller,
     networkMaintenance: NetworkMaintenance,
+    settingsPresentation: SettingsPresentation,
+    settings: SettingsSnapshot,
     reader: ReaderPresentation,
     player: PlayerPresentation,
     downloads: DownloadPresentation,
@@ -474,7 +502,12 @@ private fun AppDestination(
                 legacyExtensionInstaller,
                 closeMore,
             )
-            MoreDestination.SETTINGS -> SettingsScreen(networkMaintenance, closeMore)
+            MoreDestination.SETTINGS -> SettingsScreen(
+                settingsPresentation,
+                settings,
+                networkMaintenance,
+                closeMore,
+            )
             null -> MorePage(
                 componentCount,
                 { openMore(MoreDestination.DOWNLOADS) },

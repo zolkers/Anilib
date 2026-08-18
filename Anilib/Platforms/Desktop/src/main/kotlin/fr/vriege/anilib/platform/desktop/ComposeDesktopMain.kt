@@ -14,6 +14,7 @@ import fr.vriege.anilib.feature.extensionrepository.ui.LegacyExtensionInstallers
 import fr.vriege.anilib.feature.library.ui.LibraryUiCapabilities
 import fr.vriege.anilib.feature.network.NetworkCapabilities
 import fr.vriege.anilib.feature.reader.ui.ReaderUiCapabilities
+import fr.vriege.anilib.feature.settings.ui.SettingsUiCapabilities
 import fr.vriege.anilib.feature.player.ui.PlayerUiCapabilities
 import fr.vriege.anilib.feature.downloads.ui.DownloadUiCapabilities
 import fr.vriege.anilib.feature.backup.ui.BackupUiCapabilities
@@ -63,6 +64,7 @@ fun main() {
                 extensionRepositories = extensionRepositories,
                 legacyExtensionInstaller = LegacyExtensionInstallers.unavailable(),
                 networkMaintenance = started.capability(NetworkCapabilities.MAINTENANCE),
+                settingsPresentation = started.capability(SettingsUiCapabilities.PRESENTATION),
                 reader = reader,
                 player = player,
                 downloads = downloads,

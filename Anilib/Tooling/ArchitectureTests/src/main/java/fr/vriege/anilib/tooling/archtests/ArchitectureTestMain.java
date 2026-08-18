@@ -10,6 +10,8 @@ import fr.vriege.anilib.feature.localsource.LocalSourceCapabilities;
 import fr.vriege.anilib.feature.network.NetworkCapabilities;
 import fr.vriege.anilib.feature.reader.ReaderCapabilities;
 import fr.vriege.anilib.feature.reader.ui.ReaderUiCapabilities;
+import fr.vriege.anilib.feature.settings.SettingsCapabilities;
+import fr.vriege.anilib.feature.settings.ui.SettingsUiCapabilities;
 import fr.vriege.anilib.feature.player.PlayerCapabilities;
 import fr.vriege.anilib.feature.player.ui.PlayerUiCapabilities;
 import fr.vriege.anilib.feature.tracker.TrackerCapabilities;
@@ -74,6 +76,7 @@ public final class ArchitectureTestMain {
         assertions += UpdateTest.run();
         assertions += DownloadTest.run();
         assertions += BackupTest.run();
+        assertions += SettingsTest.run();
         System.out.println("Architecture tests: " + assertions + " assertions passed.");
     }
 
@@ -89,7 +92,7 @@ public final class ArchitectureTestMain {
             LibraryItem item = LibraryItem.create("A test title", MediaKind.MANGA);
             catalog.save(item);
             check(catalog.find(item.id()).orElseThrow().equals(item), "library must return saved item");
-            check(application.components().size() == 12, "standard product must install twelve bootstrap bundles");
+            check(application.components().size() == 13, "standard product must install thirteen bootstrap bundles");
             check(application.capability(ExtensionRepositoryCapabilities.SERVICE).repositories().isEmpty(),
                     "standard product must ship without a third-party extension repository");
             check(application.capability(ExtensionRepositoryCapabilities.INSTALLATION).installed().isEmpty(),
@@ -107,6 +110,10 @@ public final class ArchitectureTestMain {
                     "standard product must publish the HTTP client capability");
             check(application.capability(NetworkCapabilities.MAINTENANCE) != null,
                     "standard product must publish user-facing network maintenance");
+            check(application.capability(SettingsCapabilities.SERVICE) != null,
+                    "Settings Bundle must publish durable application preferences");
+            check(application.capability(SettingsUiCapabilities.PRESENTATION) != null,
+                    "Settings Bundle must publish its shared presentation");
             check(application.capability(LibraryUiCapabilities.PRESENTATION).library().titles().size() == 1,
                     "Library Bundle must publish its presentation capability");
             check(application.capability(LibraryCapabilities.BACKUP_CODEC) != null,
