@@ -38,6 +38,7 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BooleanSupplier;
 
 public final class DefaultExtensionInstallationService implements ExtensionInstallationService {
     private static final int MAX_ARTIFACT_BYTES = 16 * 1024 * 1024;
@@ -53,6 +54,7 @@ public final class DefaultExtensionInstallationService implements ExtensionInsta
     private final Map<String, InstalledExtensionPackage> installed;
     private final Map<String, PublicKey> trustedKeys;
     private final List<ExtensionBundleLoadFailure> loadFailures;
+    private final BooleanSupplier adultContentAllowed;
 
     public DefaultExtensionInstallationService(
             Path installationDirectory,
@@ -64,13 +66,22 @@ public final class DefaultExtensionInstallationService implements ExtensionInsta
             Path installationDirectory,
             AnilibHttpClient client,
             List<ExtensionBundleLoadFailure> loadFailures) {
+        this(installationDirectory, client, loadFailures, () -> true);
+    }
+
+    public DefaultExtensionInstallationService(
+            Path installationDirectory,
+            AnilibHttpClient client,
+            List<ExtensionBundleLoadFailure> loadFailures,
+            BooleanSupplier adultContentAllowed) {
         this(
                 installationDirectory,
                 client,
                 Clock.systemUTC(),
                 new FileInstalledExtensionStore(installationDirectory.resolve("installed.tsv")),
                 new FileExtensionTrustStore(installationDirectory.resolve("trusted-keys.txt")),
-                loadFailures);
+                loadFailures,
+                adultContentAllowed);
     }
 
     public DefaultExtensionInstallationService(
@@ -79,7 +90,7 @@ public final class DefaultExtensionInstallationService implements ExtensionInsta
             Clock clock,
             FileInstalledExtensionStore installedStore,
             FileExtensionTrustStore trustStore) {
-        this(installationDirectory, client, clock, installedStore, trustStore, List.of());
+        this(installationDirectory, client, clock, installedStore, trustStore, List.of(), () -> true);
     }
 
     public DefaultExtensionInstallationService(
@@ -89,6 +100,17 @@ public final class DefaultExtensionInstallationService implements ExtensionInsta
             FileInstalledExtensionStore installedStore,
             FileExtensionTrustStore trustStore,
             List<ExtensionBundleLoadFailure> loadFailures) {
+        this(installationDirectory, client, clock, installedStore, trustStore, loadFailures, () -> true);
+    }
+
+    public DefaultExtensionInstallationService(
+            Path installationDirectory,
+            AnilibHttpClient client,
+            Clock clock,
+            FileInstalledExtensionStore installedStore,
+            FileExtensionTrustStore trustStore,
+            List<ExtensionBundleLoadFailure> loadFailures,
+            BooleanSupplier adultContentAllowed) {
         Path root = Preconditions.requireNonNull(installationDirectory, "installationDirectory")
                 .toAbsolutePath()
                 .normalize();
@@ -100,6 +122,7 @@ public final class DefaultExtensionInstallationService implements ExtensionInsta
         installed = new LinkedHashMap<>(installedStore.load());
         trustedKeys = new LinkedHashMap<>(trustStore.load());
         this.loadFailures = List.copyOf(Preconditions.requireNonNull(loadFailures, "loadFailures"));
+        this.adultContentAllowed = Preconditions.requireNonNull(adultContentAllowed, "adultContentAllowed");
     }
 
     @Override
@@ -141,6 +164,7 @@ public final class DefaultExtensionInstallationService implements ExtensionInsta
     @Override
     public synchronized InstalledExtensionPackage install(ExtensionPackageMetadata extensionPackage) {
         ExtensionPackageMetadata metadata = Preconditions.requireNonNull(extensionPackage, "extensionPackage");
+        ensureAllowed(metadata);
         if (installed.containsKey(metadata.packageName())) {
             throw new IllegalStateException("Extension is already installed: " + metadata.packageName());
         }
@@ -150,6 +174,7 @@ public final class DefaultExtensionInstallationService implements ExtensionInsta
     @Override
     public synchronized InstalledExtensionPackage update(ExtensionPackageMetadata extensionPackage) {
         ExtensionPackageMetadata metadata = Preconditions.requireNonNull(extensionPackage, "extensionPackage");
+        ensureAllowed(metadata);
         InstalledExtensionPackage current = installed.get(metadata.packageName());
         if (current == null) {
             throw new IllegalStateException("Extension is not installed: " + metadata.packageName());
@@ -160,6 +185,12 @@ public final class DefaultExtensionInstallationService implements ExtensionInsta
         InstalledExtensionPackage updated = verifiedInstall(metadata, current.state());
         deleteArtifact(current);
         return updated;
+    }
+
+    private void ensureAllowed(ExtensionPackageMetadata metadata) {
+        if (metadata.adult() && !adultContentAllowed.getAsBoolean()) {
+            throw new SecurityException("Adult source packages are disabled in Settings");
+        }
     }
 
     @Override

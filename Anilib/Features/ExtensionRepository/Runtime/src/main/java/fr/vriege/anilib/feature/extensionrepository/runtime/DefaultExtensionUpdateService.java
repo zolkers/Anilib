@@ -22,6 +22,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
 
 public final class DefaultExtensionUpdateService implements ExtensionUpdateService, AutoCloseable {
     private static final Duration INITIAL_DELAY = Duration.ofMinutes(1);
@@ -33,14 +34,24 @@ public final class DefaultExtensionUpdateService implements ExtensionUpdateServi
     private final ScheduledExecutorService executor;
     private final List<Runnable> listeners = new CopyOnWriteArrayList<>();
     private volatile boolean automaticUpdatesEnabled;
+    private final BooleanSupplier adultContentAllowed;
 
     public DefaultExtensionUpdateService(
             ExtensionRepositoryService repositories,
             ExtensionInstallationService installation,
             FileExtensionUpdatePolicyStore policyStore) {
+        this(repositories, installation, policyStore, () -> true);
+    }
+
+    public DefaultExtensionUpdateService(
+            ExtensionRepositoryService repositories,
+            ExtensionInstallationService installation,
+            FileExtensionUpdatePolicyStore policyStore,
+            BooleanSupplier adultContentAllowed) {
         this.repositories = Preconditions.requireNonNull(repositories, "repositories");
         this.installation = Preconditions.requireNonNull(installation, "installation");
         this.policyStore = Preconditions.requireNonNull(policyStore, "policyStore");
+        this.adultContentAllowed = Preconditions.requireNonNull(adultContentAllowed, "adultContentAllowed");
         automaticUpdatesEnabled = policyStore.load();
         executor = Executors.newSingleThreadScheduledExecutor(runnable -> {
             Thread thread = new Thread(runnable, "anilib-extension-updates");
@@ -58,6 +69,9 @@ public final class DefaultExtensionUpdateService implements ExtensionUpdateServi
     public synchronized List<ExtensionUpdateCandidate> availableUpdates() {
         Map<String, ExtensionPackageMetadata> available = new LinkedHashMap<>();
         for (ExtensionPackageMetadata extensionPackage : repositories.packages()) {
+            if (extensionPackage.adult() && !adultContentAllowed.getAsBoolean()) {
+                continue;
+            }
             available.put(extensionPackage.packageName(), extensionPackage);
         }
         List<ExtensionUpdateCandidate> candidates = new ArrayList<>();

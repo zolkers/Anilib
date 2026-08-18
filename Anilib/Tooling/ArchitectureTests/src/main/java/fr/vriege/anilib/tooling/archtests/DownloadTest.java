@@ -61,6 +61,7 @@ final class DownloadTest {
         verifiesStandardOfflineReading(counter);
         verifiesResumableQueue(counter);
         verifiesStorageLimit(counter);
+        enforcesLargeTransferPolicy(counter);
         return counter.value;
     }
 
@@ -194,6 +195,33 @@ final class DownloadTest {
             }
         } catch (IOException exception) {
             throw new AssertionError("Unable to prepare download limit test", exception);
+        } finally {
+            deleteTree(root);
+        }
+    }
+
+    private static void enforcesLargeTransferPolicy(Counter counter) {
+        Path root = null;
+        try {
+            root = Files.createTempDirectory("anilib-download-network-policy");
+            MemoryLibraryCatalog library = new MemoryLibraryCatalog();
+            LibraryItem item = LibraryItem.create("Wi-Fi policy", MediaKind.MANGA)
+                    .withOrigin(new LibraryOrigin("test.download", "title"));
+            library.save(item);
+            try (DefaultDownloadService downloads = new DefaultDownloadService(
+                    new SingleSourceRegistry(new BlockingPagedSource(false)),
+                    library,
+                    root,
+                    DownloadStoragePolicy.standard(),
+                    () -> false)) {
+                counter.check(!downloads.canEnqueue(item.id()),
+                        "download eligibility must honor the current large-transfer network policy");
+                counter.expectDownloadFailure(
+                        () -> downloads.enqueue(item.id()),
+                        "download enqueue must reject a disallowed network connection");
+            }
+        } catch (IOException exception) {
+            throw new AssertionError("Unable to prepare download network policy test", exception);
         } finally {
             deleteTree(root);
         }

@@ -6,6 +6,7 @@ module fr.vriege.anilib.configuration.standard {
     requires fr.vriege.anilib.feature.library.bundle;
     requires fr.vriege.anilib.feature.source.bundle;
     requires fr.vriege.anilib.feature.localsource.bundle;
+    requires transitive fr.vriege.anilib.feature.network.api;
     requires fr.vriege.anilib.feature.network.bundle;
     requires fr.vriege.anilib.feature.settings.bundle;
     requires fr.vriege.anilib.feature.discovery.bundle;

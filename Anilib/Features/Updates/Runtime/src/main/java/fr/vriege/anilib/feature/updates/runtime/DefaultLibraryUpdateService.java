@@ -50,6 +50,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BooleanSupplier;
 
 public final class DefaultLibraryUpdateService implements LibraryUpdateService, AutoCloseable {
     private static final int SOURCE_LANES = 5;
@@ -67,6 +68,7 @@ public final class DefaultLibraryUpdateService implements LibraryUpdateService, 
     private final ExecutorService coordinator;
     private final ExecutorService workers;
     private final ScheduledExecutorService scheduler;
+    private final BooleanSupplier largeTransfersAllowed;
     private final CopyOnWriteArrayList<Runnable> listeners = new CopyOnWriteArrayList<>();
     private final AtomicBoolean cancellation = new AtomicBoolean();
     private volatile LibraryUpdateStatus status = LibraryUpdateStatus.IDLE;
@@ -85,7 +87,7 @@ public final class DefaultLibraryUpdateService implements LibraryUpdateService, 
             SourceRegistry sources,
             LibraryUpdateNotifier notifier,
             Path stateFile) {
-        this(library, sources, notifier, stateFile, Clock.systemUTC());
+        this(library, sources, notifier, stateFile, Clock.systemUTC(), () -> true);
     }
 
     public DefaultLibraryUpdateService(
@@ -93,11 +95,24 @@ public final class DefaultLibraryUpdateService implements LibraryUpdateService, 
             SourceRegistry sources,
             LibraryUpdateNotifier notifier,
             Path stateFile,
-            Clock clock) {
+            BooleanSupplier largeTransfersAllowed) {
+        this(library, sources, notifier, stateFile, Clock.systemUTC(), largeTransfersAllowed);
+    }
+
+    public DefaultLibraryUpdateService(
+            LibraryCatalog library,
+            SourceRegistry sources,
+            LibraryUpdateNotifier notifier,
+            Path stateFile,
+            Clock clock,
+            BooleanSupplier largeTransfersAllowed) {
         this.library = Objects.requireNonNull(library, "library must not be null");
         this.sources = Objects.requireNonNull(sources, "sources must not be null");
         this.notifier = Objects.requireNonNull(notifier, "notifier must not be null");
         this.clock = Objects.requireNonNull(clock, "clock must not be null");
+        this.largeTransfersAllowed = Objects.requireNonNull(
+                largeTransfersAllowed,
+                "largeTransfersAllowed must not be null");
         store = new LibraryUpdateStore(stateFile);
         coordinator = Executors.newSingleThreadExecutor(task -> daemon(task, "anilib-library-update"));
         workers = Executors.newFixedThreadPool(
@@ -129,6 +144,10 @@ public final class DefaultLibraryUpdateService implements LibraryUpdateService, 
     @Override
     public synchronized CompletableFuture<LibraryUpdateSnapshot> runNow() {
         ensureOpen();
+        if (!largeTransfersAllowed.getAsBoolean()) {
+            return CompletableFuture.failedFuture(new LibraryUpdateException(
+                    "Library updates are waiting for an allowed network connection"));
+        }
         if (running != null && !running.isDone()) {
             return running;
         }

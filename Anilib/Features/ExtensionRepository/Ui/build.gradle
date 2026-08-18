@@ -2,4 +2,5 @@ dependencies {
     implementation project(':Anilib:Foundation')
     api project(':Anilib:Kernel:Api')
     api project(':Anilib:Features:ExtensionRepository:Api')
+    api project(':Anilib:Features:Settings:Api')
 }

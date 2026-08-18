@@ -33,6 +33,8 @@ import fr.vriege.anilib.feature.source.SourceSubtitleTrack;
 import fr.vriege.anilib.feature.source.SourceVideoStream;
 import fr.vriege.anilib.feature.source.StreamingSource;
 import fr.vriege.anilib.feature.source.SourceExtensionPlugin;
+import fr.vriege.anilib.feature.settings.SettingsCapabilities;
+import fr.vriege.anilib.feature.settings.SettingsService;
 import fr.vriege.anilib.foundation.component.ComponentDescriptor;
 import fr.vriege.anilib.framework.http.runtime.UrlConnectionHttpTransport;
 import fr.vriege.anilib.kernel.AnilibPlugin;
@@ -74,6 +76,7 @@ final class PlayerTest {
         Counter counter = new Counter();
         verifiesSelectionAndPersistence(counter);
         verifiesPlaybackBackup(counter);
+        suppressesIncognitoPersistence(counter);
         rejectsInvalidSourceResults(counter);
         return counter.value;
     }
@@ -216,6 +219,34 @@ final class PlayerTest {
         } finally {
             deleteDirectory(sourceDirectory);
             deleteDirectory(targetDirectory);
+        }
+    }
+
+    private static void suppressesIncognitoPersistence(Counter counter) {
+        Path directory = temporaryDirectory("anilib-player-incognito");
+        try (StartedAnilib application = StandardAnilib.start(
+                directory,
+                List.of(sourcePlugin(new TestStreamingSource(false))))) {
+            LibraryCatalog library = application.capability(LibraryCapabilities.CATALOG);
+            LibraryItem item = animeItem("player-incognito");
+            library.save(item);
+            SettingsService settings = application.capability(SettingsCapabilities.SERVICE);
+            settings.replace(settings.snapshot().withIncognitoMode(true));
+            PlayerService player = application.capability(PlayerCapabilities.SERVICE);
+            try (PlayerSession session = player.open(item.id(), FIRST_EPISODE.id())) {
+                session.updatePlayback(30_000L, 120_000L);
+            }
+            LibraryItem unchanged = library.find(item.id()).orElseThrow();
+            counter.check(unchanged.history().isEmpty(),
+                    "incognito Player sessions must not append library history");
+            counter.check(unchanged.progress().isEmpty(),
+                    "incognito Player sessions must not persist playback progress");
+            counter.check(player.episodes(item.id()).stream()
+                            .filter(episode -> episode.episode().id().equals(FIRST_EPISODE.id()))
+                            .findFirst().orElseThrow().playback().isEmpty(),
+                    "incognito Player sessions must not write Player-owned resume state");
+        } finally {
+            deleteDirectory(directory);
         }
     }
 

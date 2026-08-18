@@ -9,6 +9,8 @@ import fr.vriege.anilib.feature.reader.ui.DefaultReaderPresentation;
 import fr.vriege.anilib.feature.reader.ui.ReaderUiCapabilities;
 import fr.vriege.anilib.feature.source.SourceCapabilities;
 import fr.vriege.anilib.feature.source.SourceRegistry;
+import fr.vriege.anilib.feature.settings.SettingsCapabilities;
+import fr.vriege.anilib.feature.settings.SettingsService;
 import fr.vriege.anilib.foundation.component.ComponentDescriptor;
 import fr.vriege.anilib.kernel.AnilibPlugin;
 import fr.vriege.anilib.kernel.PluginInstallationContext;
@@ -21,6 +23,7 @@ public final class ReaderPlugin implements AnilibPlugin {
                     ComponentDescriptor.of("feature.reader", "Reader", "0.1.0"))
             .requires(SourceCapabilities.REGISTRY)
             .requires(LibraryCapabilities.CATALOG)
+            .requires(SettingsCapabilities.SERVICE)
             .provides(ReaderCapabilities.SERVICE)
             .provides(ReaderCapabilities.CONTENT_REGISTRAR)
             .provides(ReaderUiCapabilities.PRESENTATION)
@@ -45,7 +48,12 @@ public final class ReaderPlugin implements AnilibPlugin {
     public void install(PluginInstallationContext context) {
         SourceRegistry sources = context.require(SourceCapabilities.REGISTRY);
         LibraryCatalog library = context.require(LibraryCapabilities.CATALOG);
-        DefaultReaderService service = context.own(new DefaultReaderService(sources, library, policy));
+        SettingsService settings = context.require(SettingsCapabilities.SERVICE);
+        DefaultReaderService service = context.own(new DefaultReaderService(
+                sources,
+                library,
+                policy,
+                () -> !settings.snapshot().incognitoMode()));
         context.publish(ReaderCapabilities.SERVICE, service);
         context.publish(ReaderCapabilities.CONTENT_REGISTRAR, service);
         context.publish(ReaderUiCapabilities.PRESENTATION, new DefaultReaderPresentation(service));

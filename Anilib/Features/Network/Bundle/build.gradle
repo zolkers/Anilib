@@ -3,5 +3,5 @@ dependencies {
     api project(':Anilib:Framework:Http:Api')
     implementation project(':Anilib:Framework:Http:Runtime')
     implementation project(':Anilib:Kernel:Api')
-    implementation project(':Anilib:Features:Network:Api')
+    api project(':Anilib:Features:Network:Api')
 }

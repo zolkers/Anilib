@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BooleanSupplier;
 
 public final class DefaultPlayerService implements PlayerService, AutoCloseable {
     private static final int MAXIMUM_EPISODES = 100_000;
@@ -40,6 +41,7 @@ public final class DefaultPlayerService implements PlayerService, AutoCloseable 
     private final PlaybackStateStore states;
     private final PlayerBackend backend;
     private final Clock clock;
+    private final BooleanSupplier persistenceAllowed;
     private final Set<DefaultPlayerSession> sessions = new HashSet<>();
     private final Set<Runnable> listeners = new HashSet<>();
     private boolean closed;
@@ -56,7 +58,22 @@ public final class DefaultPlayerService implements PlayerService, AutoCloseable 
             LibraryCatalog library,
             Path stateFile,
             PlayerBackend backend) {
-        this(sources, library, new PlaybackStateStore(stateFile), Clock.systemUTC(), backend);
+        this(sources, library, stateFile, backend, () -> true);
+    }
+
+    public DefaultPlayerService(
+            SourceRegistry sources,
+            LibraryCatalog library,
+            Path stateFile,
+            PlayerBackend backend,
+            BooleanSupplier persistenceAllowed) {
+        this(
+                sources,
+                library,
+                new PlaybackStateStore(stateFile),
+                Clock.systemUTC(),
+                backend,
+                persistenceAllowed);
     }
 
     DefaultPlayerService(
@@ -64,12 +81,16 @@ public final class DefaultPlayerService implements PlayerService, AutoCloseable 
             LibraryCatalog library,
             PlaybackStateStore states,
             Clock clock,
-            PlayerBackend backend) {
+            PlayerBackend backend,
+            BooleanSupplier persistenceAllowed) {
         this.sources = Objects.requireNonNull(sources, "sources must not be null");
         this.library = Objects.requireNonNull(library, "library must not be null");
         this.states = Objects.requireNonNull(states, "states must not be null");
         this.clock = Objects.requireNonNull(clock, "clock must not be null");
         this.backend = Objects.requireNonNull(backend, "backend must not be null");
+        this.persistenceAllowed = Objects.requireNonNull(
+                persistenceAllowed,
+                "persistenceAllowed must not be null");
     }
 
     @Override
@@ -119,10 +140,12 @@ public final class DefaultPlayerService implements PlayerService, AutoCloseable 
                 false,
                 clock.instant()));
         LibraryItem item = resolved.item();
-        library.save(item.recordHistory(new LibraryHistoryEntry(
-                episodeId.value(),
-                clock.instant(),
-                playback.positionMillis())));
+        if (persistenceAllowed.getAsBoolean()) {
+            library.save(item.recordHistory(new LibraryHistoryEntry(
+                    episodeId.value(),
+                    clock.instant(),
+                    playback.positionMillis())));
+        }
         PlayerSessionSnapshot snapshot = new PlayerSessionSnapshot(
                 libraryItemId,
                 item.title(),
@@ -160,6 +183,10 @@ public final class DefaultPlayerService implements PlayerService, AutoCloseable 
                 durationMillis,
                 finalCompleted,
                 clock.instant());
+        if (!persistenceAllowed.getAsBoolean()) {
+            notifyListeners();
+            return replacement;
+        }
         Optional<PlaybackState> storedBefore = states.find(
                 replacement.libraryItemId(),
                 replacement.episodeId());

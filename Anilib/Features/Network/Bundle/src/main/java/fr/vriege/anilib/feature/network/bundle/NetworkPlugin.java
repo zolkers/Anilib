@@ -1,6 +1,8 @@
 package fr.vriege.anilib.feature.network.bundle;
 
 import fr.vriege.anilib.feature.network.NetworkCapabilities;
+import fr.vriege.anilib.feature.network.NetworkStatus;
+import fr.vriege.anilib.feature.network.NetworkStatuses;
 import fr.vriege.anilib.framework.http.HttpCookieJar;
 import fr.vriege.anilib.framework.http.HttpRateLimiter;
 import fr.vriege.anilib.framework.http.HttpResponseCache;
@@ -26,20 +28,27 @@ public final class NetworkPlugin implements AnilibPlugin {
             .provides(NetworkCapabilities.RATE_LIMITER)
             .provides(NetworkCapabilities.RESPONSE_CACHE)
             .provides(NetworkCapabilities.MAINTENANCE)
+            .provides(NetworkCapabilities.STATUS)
             .build();
 
     private final Path cacheDirectory;
     private final HttpTransport transport;
+    private final NetworkStatus status;
 
     public NetworkPlugin(Path cacheDirectory) {
-        this(cacheDirectory, new UrlConnectionHttpTransport());
+        this(cacheDirectory, new UrlConnectionHttpTransport(), NetworkStatuses.unmetered());
     }
 
     public NetworkPlugin(Path cacheDirectory, HttpTransport transport) {
+        this(cacheDirectory, transport, NetworkStatuses.unmetered());
+    }
+
+    public NetworkPlugin(Path cacheDirectory, HttpTransport transport, NetworkStatus status) {
         this.cacheDirectory = Objects.requireNonNull(cacheDirectory, "cacheDirectory must not be null")
                 .toAbsolutePath()
                 .normalize();
         this.transport = Objects.requireNonNull(transport, "transport must not be null");
+        this.status = Objects.requireNonNull(status, "status must not be null");
     }
 
     @Override
@@ -56,6 +65,7 @@ public final class NetworkPlugin implements AnilibPlugin {
         context.publish(NetworkCapabilities.RESPONSE_CACHE, cache);
         context.publish(NetworkCapabilities.RATE_LIMITER, rateLimiter);
         context.publish(NetworkCapabilities.MAINTENANCE, new DefaultNetworkMaintenance(cookies, cache));
+        context.publish(NetworkCapabilities.STATUS, status);
         context.publish(
                 NetworkCapabilities.HTTP_CLIENT,
                 new DefaultAnilibHttpClient(transport, cookies, cache, rateLimiter));

@@ -223,8 +223,12 @@ Java service atomically stores immutable snapshots and publishes observations
 through a narrow capability. One platform-neutral presentation owns mutation
 actions; the shared Compose shell observes it to apply system, light, or dark
 appearance immediately on Android and desktop. Feature policy values remain
-owned here only as user choices until their corresponding feature Bundles
-explicitly consume and enforce them.
+owned here as user choices. Downloads and library updates combine their Wi-Fi
+preferences with a platform-supplied network status; Reader and Player suppress
+history and progress writes in incognito mode; and Extension Repository hides,
+rejects, and skips adult packages unless enabled. Desktop treats its ordinary
+host connection as suitable for large transfers, while Android admits validated
+Wi-Fi and Ethernet transports.
 
 ## Product lifecycle
 

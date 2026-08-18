@@ -8,6 +8,7 @@ import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.library.LibraryOrigin;
 import fr.vriege.anilib.feature.library.MediaKind;
 import fr.vriege.anilib.feature.player.PlayerBackends;
+import fr.vriege.anilib.feature.network.NetworkStatus;
 import fr.vriege.anilib.feature.source.SourceCatalogueItemId;
 import fr.vriege.anilib.feature.source.SourceContentKind;
 import fr.vriege.anilib.feature.source.SourceDescriptor;
@@ -53,6 +54,7 @@ final class UpdateTest {
 
     static int run() {
         Counter counter = new Counter();
+        enforcesNetworkPolicy(counter);
         Path sourceDirectory = temporaryDirectory("anilib-updates-source");
         Path targetDirectory = temporaryDirectory("anilib-updates-target");
         MutableStreamingSource source = new MutableStreamingSource(List.of(episode("episode-1", 1.0d)));
@@ -130,15 +132,49 @@ final class UpdateTest {
         return counter.value;
     }
 
+    private static void enforcesNetworkPolicy(Counter counter) {
+        Path directory = temporaryDirectory("anilib-updates-network-policy");
+        MutableStreamingSource source = new MutableStreamingSource(List.of(episode("episode-1", 1.0d)));
+        try (StartedAnilib application = start(directory, source, new RecordingNotifier(), () -> false)) {
+            LibraryItem item = new LibraryItem(
+                    new LibraryItemId("updates-network-policy"),
+                    "Network policy",
+                    MediaKind.ANIME,
+                    Instant.parse("2026-08-01T00:00:00Z"),
+                    Set.of())
+                    .withFavorite(true)
+                    .withOrigin(new LibraryOrigin(SOURCE_ID.toString(), SOURCE_ITEM_ID.value()));
+            application.capability(LibraryCapabilities.CATALOG).save(item);
+            try {
+                application.capability(UpdateCapabilities.SERVICE).runNow().join();
+                throw new AssertionError("library update must reject a disallowed network connection");
+            } catch (java.util.concurrent.CompletionException expected) {
+                counter.check(expected.getCause() instanceof fr.vriege.anilib.feature.updates.LibraryUpdateException,
+                        "library update network policy must report a feature-owned failure");
+            }
+        } finally {
+            deleteDirectory(directory);
+        }
+    }
+
     private static StartedAnilib start(
             Path directory,
             MutableStreamingSource source,
             LibraryUpdateNotifier notifier) {
+        return start(directory, source, notifier, () -> true);
+    }
+
+    private static StartedAnilib start(
+            Path directory,
+            MutableStreamingSource source,
+            LibraryUpdateNotifier notifier,
+            NetworkStatus networkStatus) {
         return StandardAnilib.start(
                 directory,
                 new UrlConnectionHttpTransport(),
                 PlayerBackends.unavailable(),
                 notifier,
+                networkStatus,
                 List.of(new SourceExtensionPlugin(
                         ComponentDescriptor.of("extension.test-updates", "Test updates", "1.0.0"),
                         source)));

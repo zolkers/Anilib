@@ -80,6 +80,7 @@ final class ExtensionRepositoryTest {
         persistsAndRefreshesUserRepositories(counter);
         resolvesGitHubRepositoriesDynamically(counter);
         installsOnlyTrustedPortableBundles(counter);
+        rejectsAdultSourcesWhenDisabled(counter);
         updatesInstalledPortableSources(counter);
         modelsInstalledApkDiscovery(counter);
         adaptsAbiReadyAnimeSource(counter);
@@ -284,6 +285,38 @@ final class ExtensionRepositoryTest {
                 Clock.fixed(Instant.parse("2026-08-18T12:00:00Z"), ZoneOffset.UTC),
                 new FileInstalledExtensionStore(directory.resolve("installed.tsv")),
                 new FileExtensionTrustStore(directory.resolve("trusted-keys.txt")));
+    }
+
+    private static void rejectsAdultSourcesWhenDisabled(Counter counter) {
+        Path directory = temporaryDirectory();
+        try {
+            KeyPair publisher = keyPair();
+            byte[] archive = bundle("publisher:adult/source", 1, "1.4");
+            ExtensionPackageMetadata base = portablePackage("publisher:adult/source", archive, publisher, 1);
+            ExtensionPackageMetadata adult = new ExtensionPackageMetadata(
+                    base.displayName(),
+                    base.packageName(),
+                    base.languageTag(),
+                    base.versionCode(),
+                    base.versionName(),
+                    true,
+                    base.contentKind(),
+                    base.sources(),
+                    base.artifacts());
+            DefaultExtensionInstallationService service = new DefaultExtensionInstallationService(
+                    directory,
+                    new RecordingClient(archive),
+                    Clock.fixed(Instant.parse("2026-08-18T12:00:00Z"), ZoneOffset.UTC),
+                    new FileInstalledExtensionStore(directory.resolve("installed.tsv")),
+                    new FileExtensionTrustStore(directory.resolve("trusted-keys.txt")),
+                    List.of(),
+                    () -> false);
+            counter.expectSecurity(
+                    () -> service.install(adult),
+                    "adult source packages must remain unavailable while their Settings policy is disabled");
+        } finally {
+            deleteDirectory(directory);
+        }
     }
 
     private static void updatesInstalledPortableSources(Counter counter) {

@@ -2,6 +2,10 @@ package fr.vriege.anilib.feature.updates.bundle;
 
 import fr.vriege.anilib.feature.library.LibraryCapabilities;
 import fr.vriege.anilib.feature.library.LibraryCatalog;
+import fr.vriege.anilib.feature.network.NetworkCapabilities;
+import fr.vriege.anilib.feature.network.NetworkStatus;
+import fr.vriege.anilib.feature.settings.SettingsCapabilities;
+import fr.vriege.anilib.feature.settings.SettingsService;
 import fr.vriege.anilib.feature.source.SourceCapabilities;
 import fr.vriege.anilib.feature.source.SourceRegistry;
 import fr.vriege.anilib.feature.updates.LibraryUpdateNotifier;
@@ -23,6 +27,8 @@ public final class UpdatePlugin implements AnilibPlugin {
                     ComponentDescriptor.of("feature.updates", "Library updates", "0.1.0"))
             .requires(LibraryCapabilities.CATALOG)
             .requires(SourceCapabilities.REGISTRY)
+            .requires(NetworkCapabilities.STATUS)
+            .requires(SettingsCapabilities.SERVICE)
             .provides(UpdateCapabilities.SERVICE)
             .provides(UpdateCapabilities.NOTIFIER)
             .provides(UpdateCapabilities.BACKUP_CODEC)
@@ -47,11 +53,14 @@ public final class UpdatePlugin implements AnilibPlugin {
     public void install(PluginInstallationContext context) {
         LibraryCatalog library = context.require(LibraryCapabilities.CATALOG);
         SourceRegistry sources = context.require(SourceCapabilities.REGISTRY);
+        NetworkStatus network = context.require(NetworkCapabilities.STATUS);
+        SettingsService settings = context.require(SettingsCapabilities.SERVICE);
         DefaultLibraryUpdateService service = context.own(new DefaultLibraryUpdateService(
                 library,
                 sources,
                 notifier,
-                stateFile));
+                stateFile,
+                () -> !settings.snapshot().updateOnlyOnWifi() || network.allowsLargeTransfers()));
         context.publish(UpdateCapabilities.SERVICE, service);
         context.publish(UpdateCapabilities.NOTIFIER, notifier);
         context.publish(UpdateCapabilities.BACKUP_CODEC, new UpdateBackupCodec(service));

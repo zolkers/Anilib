@@ -46,6 +46,7 @@ class MainActivity : ComponentActivity() {
             UrlConnectionHttpTransport(),
             ComposePlayerBackend(),
             AndroidLibraryUpdateNotifier(this),
+            AndroidNetworkStatus(this),
             apkActivation.bundles,
         )
         product = started

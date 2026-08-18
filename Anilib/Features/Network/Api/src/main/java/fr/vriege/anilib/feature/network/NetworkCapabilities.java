@@ -17,6 +17,8 @@ public final class NetworkCapabilities {
             CapabilityKey.of("feature.network.response-cache", HttpResponseCache.class);
     public static final CapabilityKey<NetworkMaintenance> MAINTENANCE =
             CapabilityKey.of("feature.network.maintenance", NetworkMaintenance.class);
+    public static final CapabilityKey<NetworkStatus> STATUS =
+            CapabilityKey.of("feature.network.status", NetworkStatus.class);
 
     private NetworkCapabilities() {
     }

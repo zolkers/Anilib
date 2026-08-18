@@ -39,6 +39,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
 
 public final class DefaultDownloadService
         implements DownloadService, ReaderContentProvider, AutoCloseable {
@@ -54,6 +55,7 @@ public final class DefaultDownloadService
     private final Clock clock;
     private final FileDownloadQueueStore store;
     private final ExecutorService workers;
+    private final BooleanSupplier largeTransfersAllowed;
     private final Map<DownloadId, DownloadRecord> records = new LinkedHashMap<>();
     private final Set<DownloadId> scheduled = new HashSet<>();
     private final Set<Runnable> listeners = new HashSet<>();
@@ -66,13 +68,23 @@ public final class DefaultDownloadService
             LibraryCatalog library,
             Path root,
             DownloadStoragePolicy policy) {
+        this(sources, library, root, policy, () -> true);
+    }
+
+    public DefaultDownloadService(
+            SourceRegistry sources,
+            LibraryCatalog library,
+            Path root,
+            DownloadStoragePolicy policy,
+            BooleanSupplier largeTransfersAllowed) {
         this(
                 sources,
                 library,
                 root,
                 policy,
                 Clock.systemUTC(),
-                Executors.newFixedThreadPool(policy.concurrentJobs()));
+                Executors.newFixedThreadPool(policy.concurrentJobs()),
+                largeTransfersAllowed);
     }
 
     DefaultDownloadService(
@@ -81,7 +93,8 @@ public final class DefaultDownloadService
             Path root,
             DownloadStoragePolicy policy,
             Clock clock,
-            ExecutorService workers) {
+            ExecutorService workers,
+            BooleanSupplier largeTransfersAllowed) {
         this.sources = Objects.requireNonNull(sources, "sources must not be null");
         this.library = Objects.requireNonNull(library, "library must not be null");
         Path normalizedRoot = Objects.requireNonNull(root, "root must not be null").toAbsolutePath().normalize();
@@ -89,6 +102,9 @@ public final class DefaultDownloadService
         this.policy = Objects.requireNonNull(policy, "policy must not be null");
         this.clock = Objects.requireNonNull(clock, "clock must not be null");
         this.workers = Objects.requireNonNull(workers, "workers must not be null");
+        this.largeTransfersAllowed = Objects.requireNonNull(
+                largeTransfersAllowed,
+                "largeTransfersAllowed must not be null");
         this.store = new FileDownloadQueueStore(normalizedRoot.resolve("queue.anilib"));
         load();
     }
@@ -107,7 +123,7 @@ public final class DefaultDownloadService
     public synchronized boolean canEnqueue(LibraryItemId libraryItemId) {
         Objects.requireNonNull(libraryItemId, "libraryItemId must not be null");
         ensureOpen();
-        if (offlineMode) {
+        if (offlineMode || !largeTransfersAllowed.getAsBoolean()) {
             return false;
         }
         return library.find(libraryItemId)
@@ -124,6 +140,7 @@ public final class DefaultDownloadService
         if (offlineMode) {
             throw new DownloadException("Downloads cannot be queued while offline mode is enabled");
         }
+        ensureLargeTransfersAllowed();
         LibraryItem item = library.find(libraryItemId)
                 .orElseThrow(() -> new DownloadException("Library item was not found"));
         LibraryOrigin origin = item.origin()
@@ -332,7 +349,8 @@ public final class DefaultDownloadService
             DownloadRecord record;
             synchronized (this) {
                 record = records.get(id);
-                if (closed || offlineMode || record == null || record.status != DownloadStatus.QUEUED) {
+                if (closed || offlineMode || !largeTransfersAllowed.getAsBoolean()
+                        || record == null || record.status != DownloadStatus.QUEUED) {
                     return;
                 }
                 transition(record, DownloadStatus.DOWNLOADING, null);
@@ -368,6 +386,10 @@ public final class DefaultDownloadService
             if (closed || offlineMode || record.status != DownloadStatus.DOWNLOADING) {
                 return false;
             }
+            if (!largeTransfersAllowed.getAsBoolean()) {
+                transition(record, DownloadStatus.PAUSED, null);
+                return false;
+            }
             if (record.completedPages == record.pages.size()) {
                 transition(record, DownloadStatus.COMPLETED, null);
                 return false;
@@ -380,6 +402,10 @@ public final class DefaultDownloadService
         byte[] bytes = Objects.requireNonNull(source.readPage(page), "paged source returned null page bytes");
         synchronized (this) {
             if (closed || offlineMode || record.status != DownloadStatus.DOWNLOADING) {
+                return false;
+            }
+            if (!largeTransfersAllowed.getAsBoolean()) {
+                transition(record, DownloadStatus.PAUSED, null);
                 return false;
             }
             if (bytes.length > policy.maximumPageBytes()) {
@@ -403,7 +429,8 @@ public final class DefaultDownloadService
     }
 
     private void schedule(DownloadRecord record) {
-        if (!closed && !offlineMode && record.status == DownloadStatus.QUEUED && scheduled.add(record.id)) {
+        if (!closed && !offlineMode && largeTransfersAllowed.getAsBoolean()
+                && record.status == DownloadStatus.QUEUED && scheduled.add(record.id)) {
             workers.execute(() -> run(record.id));
         }
     }
@@ -583,6 +610,13 @@ public final class DefaultDownloadService
     private void ensureOnline() {
         if (offlineMode) {
             throw new DownloadException("Downloads cannot resume while offline mode is enabled");
+        }
+        ensureLargeTransfersAllowed();
+    }
+
+    private void ensureLargeTransfersAllowed() {
+        if (!largeTransfersAllowed.getAsBoolean()) {
+            throw new DownloadException("Downloads are waiting for an allowed network connection");
         }
     }
 

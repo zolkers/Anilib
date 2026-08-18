@@ -10,6 +10,8 @@ import fr.vriege.anilib.feature.extensionrepository.runtime.FileExtensionUpdateP
 import fr.vriege.anilib.feature.extensionrepository.ui.DefaultExtensionRepositoryPresentation;
 import fr.vriege.anilib.feature.extensionrepository.ui.ExtensionRepositoryUiCapabilities;
 import fr.vriege.anilib.feature.network.NetworkCapabilities;
+import fr.vriege.anilib.feature.settings.SettingsCapabilities;
+import fr.vriege.anilib.feature.settings.SettingsService;
 import fr.vriege.anilib.framework.http.AnilibHttpClient;
 import fr.vriege.anilib.foundation.component.ComponentDescriptor;
 import fr.vriege.anilib.kernel.AnilibPlugin;
@@ -27,6 +29,7 @@ public final class ExtensionRepositoryPlugin implements AnilibPlugin {
                             "Extension repositories",
                             "1.0.0"))
             .requires(NetworkCapabilities.HTTP_CLIENT)
+            .requires(SettingsCapabilities.SERVICE)
             .provides(ExtensionRepositoryCapabilities.SERVICE)
             .provides(ExtensionRepositoryCapabilities.INSTALLATION)
             .provides(ExtensionRepositoryCapabilities.UPDATES)
@@ -57,21 +60,25 @@ public final class ExtensionRepositoryPlugin implements AnilibPlugin {
     @Override
     public void install(PluginInstallationContext context) {
         AnilibHttpClient client = context.require(NetworkCapabilities.HTTP_CLIENT);
+        SettingsService settings = context.require(SettingsCapabilities.SERVICE);
         DefaultExtensionRepositoryService service = new DefaultExtensionRepositoryService(
                 new FileExtensionRepositoryStore(repositoryFile),
                 client);
         DefaultExtensionInstallationService installation = new DefaultExtensionInstallationService(
                 repositoryFile.resolveSibling("extensions"),
                 client,
-                loadFailures);
+                loadFailures,
+                () -> settings.snapshot().showAdultContent());
         DefaultExtensionUpdateService updates = new DefaultExtensionUpdateService(
                 service,
                 installation,
-                new FileExtensionUpdatePolicyStore(repositoryFile.resolveSibling("extension-updates.properties")));
+                new FileExtensionUpdatePolicyStore(repositoryFile.resolveSibling("extension-updates.properties")),
+                () -> settings.snapshot().showAdultContent());
         DefaultExtensionRepositoryPresentation presentation = new DefaultExtensionRepositoryPresentation(
                 service,
                 installation,
-                updates);
+                updates,
+                settings);
         context.own(updates);
         context.own(presentation);
         context.publish(ExtensionRepositoryCapabilities.SERVICE, service);

@@ -6,6 +6,7 @@ import fr.vriege.anilib.feature.extensionrepository.ExtensionRepositoryService;
 import fr.vriege.anilib.feature.extensionrepository.ExtensionRepositorySnapshot;
 import fr.vriege.anilib.feature.extensionrepository.ExtensionUpdateService;
 import fr.vriege.anilib.foundation.validation.Preconditions;
+import fr.vriege.anilib.feature.settings.SettingsService;
 
 import java.net.URI;
 import java.util.ArrayList;
@@ -28,15 +29,20 @@ public final class DefaultExtensionRepositoryPresentation
     });
     private final List<Runnable> listeners = new CopyOnWriteArrayList<>();
     private final AutoCloseable updateObservation;
+    private final AutoCloseable settingsObservation;
+    private final SettingsService settings;
 
     public DefaultExtensionRepositoryPresentation(
             ExtensionRepositoryService service,
             ExtensionInstallationService installation,
-            ExtensionUpdateService updates) {
+            ExtensionUpdateService updates,
+            SettingsService settings) {
         this.service = Preconditions.requireNonNull(service, "service");
         this.installation = Preconditions.requireNonNull(installation, "installation");
         this.updates = Preconditions.requireNonNull(updates, "updates");
+        this.settings = Preconditions.requireNonNull(settings, "settings");
         updateObservation = updates.observe(this::notifyListeners);
+        settingsObservation = settings.observe(ignored -> notifyListeners());
     }
 
     @Override
@@ -53,12 +59,12 @@ public final class DefaultExtensionRepositoryPresentation
                     : new ExtensionRepositoryRow(
                             repository,
                             java.util.Optional.of(snapshot.fetchedAt()),
-                            snapshot.packages().size(),
+                            (int) snapshot.packages().stream().filter(this::visible).count(),
                             snapshot.failure()));
         }
         return new ExtensionRepositoryView(
                 rows,
-                service.packages(),
+                service.packages().stream().filter(this::visible).toList(),
                 installation.installed(),
                 updates.availableUpdates(),
                 updates.automaticUpdatesEnabled(),
@@ -153,10 +159,15 @@ public final class DefaultExtensionRepositoryPresentation
         listeners.clear();
         try {
             updateObservation.close();
+            settingsObservation.close();
         } catch (Exception exception) {
             throw new IllegalStateException("Unable to close extension update observation", exception);
         }
         executor.shutdownNow();
+    }
+
+    private boolean visible(ExtensionPackageMetadata extensionPackage) {
+        return !extensionPackage.adult() || settings.snapshot().showAdultContent();
     }
 
     private void notifyListeners() {

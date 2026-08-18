@@ -11,6 +11,8 @@ import fr.vriege.anilib.feature.player.ui.DefaultPlayerPresentation;
 import fr.vriege.anilib.feature.player.ui.PlayerUiCapabilities;
 import fr.vriege.anilib.feature.source.SourceCapabilities;
 import fr.vriege.anilib.feature.source.SourceRegistry;
+import fr.vriege.anilib.feature.settings.SettingsCapabilities;
+import fr.vriege.anilib.feature.settings.SettingsService;
 import fr.vriege.anilib.foundation.component.ComponentDescriptor;
 import fr.vriege.anilib.kernel.AnilibPlugin;
 import fr.vriege.anilib.kernel.PluginInstallationContext;
@@ -24,6 +26,7 @@ public final class PlayerPlugin implements AnilibPlugin {
                     ComponentDescriptor.of("feature.player", "Player", "0.1.0"))
             .requires(SourceCapabilities.REGISTRY)
             .requires(LibraryCapabilities.CATALOG)
+            .requires(SettingsCapabilities.SERVICE)
             .provides(PlayerCapabilities.SERVICE)
             .provides(PlayerCapabilities.BACKEND)
             .provides(PlayerCapabilities.BACKUP_CODEC)
@@ -52,11 +55,13 @@ public final class PlayerPlugin implements AnilibPlugin {
     public void install(PluginInstallationContext context) {
         SourceRegistry sources = context.require(SourceCapabilities.REGISTRY);
         LibraryCatalog library = context.require(LibraryCapabilities.CATALOG);
+        SettingsService settings = context.require(SettingsCapabilities.SERVICE);
         DefaultPlayerService service = context.own(new DefaultPlayerService(
                 sources,
                 library,
                 stateFile,
-                backend));
+                backend,
+                () -> !settings.snapshot().incognitoMode()));
         context.publish(PlayerCapabilities.SERVICE, service);
         context.publish(PlayerCapabilities.BACKEND, backend);
         context.publish(PlayerCapabilities.BACKUP_CODEC, new PlayerBackupCodec(service));

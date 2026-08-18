@@ -8,6 +8,7 @@ import android.content.Intent
 import android.os.SystemClock
 import fr.vriege.anilib.configuration.standard.StandardAnilib
 import fr.vriege.anilib.feature.updates.UpdateCapabilities
+import fr.vriege.anilib.feature.player.PlayerBackends
 import fr.vriege.anilib.feature.updates.UpdateInterval
 import fr.vriege.anilib.framework.http.runtime.UrlConnectionHttpTransport
 import java.time.Instant
@@ -28,7 +29,9 @@ class LibraryUpdateReceiver : BroadcastReceiver() {
         StandardAnilib.start(
             context.filesDir.toPath(),
             UrlConnectionHttpTransport(),
+            PlayerBackends.unavailable(),
             AndroidLibraryUpdateNotifier(context),
+            AndroidNetworkStatus(context),
             emptyList(),
         ).use { product ->
             val updates = product.capability(UpdateCapabilities.SERVICE)

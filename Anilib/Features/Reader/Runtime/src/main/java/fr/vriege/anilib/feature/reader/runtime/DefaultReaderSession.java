@@ -13,6 +13,7 @@ import fr.vriege.anilib.feature.source.SourceContentUnit;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Objects;
+import java.util.function.BooleanSupplier;
 
 final class DefaultReaderSession implements ReaderSession {
     private final LibraryCatalog library;
@@ -23,6 +24,7 @@ final class DefaultReaderSession implements ReaderSession {
     private final ReaderPagePipeline pipeline;
     private final Clock clock;
     private final Runnable onClose;
+    private final BooleanSupplier persistenceAllowed;
     private int currentPageIndex;
     private ReadingDirection direction = ReadingDirection.LEFT_TO_RIGHT;
     private boolean closed;
@@ -36,6 +38,7 @@ final class DefaultReaderSession implements ReaderSession {
             int currentPageIndex,
             ReaderPagePipeline pipeline,
             Clock clock,
+            BooleanSupplier persistenceAllowed,
             Runnable onClose) {
         this.library = Objects.requireNonNull(library, "library must not be null");
         this.libraryItemId = Objects.requireNonNull(libraryItemId, "libraryItemId must not be null");
@@ -45,6 +48,9 @@ final class DefaultReaderSession implements ReaderSession {
         this.currentPageIndex = currentPageIndex;
         this.pipeline = Objects.requireNonNull(pipeline, "pipeline must not be null");
         this.clock = Objects.requireNonNull(clock, "clock must not be null");
+        this.persistenceAllowed = Objects.requireNonNull(
+                persistenceAllowed,
+                "persistenceAllowed must not be null");
         this.onClose = Objects.requireNonNull(onClose, "onClose must not be null");
     }
 
@@ -119,6 +125,9 @@ final class DefaultReaderSession implements ReaderSession {
     }
 
     private void persistProgress() {
+        if (!persistenceAllowed.getAsBoolean()) {
+            return;
+        }
         LibraryItem current = library.find(libraryItemId)
                 .orElseThrow(() -> new ReaderException("Library item disappeared while reading"));
         Instant now = clock.instant();

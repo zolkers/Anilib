@@ -29,6 +29,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.function.BooleanSupplier;
 
 public final class DefaultReaderService implements ReaderService, ReaderContentRegistrar, AutoCloseable {
     private final SourceRegistry sources;
@@ -36,12 +37,27 @@ public final class DefaultReaderService implements ReaderService, ReaderContentR
     private final ReaderPolicy policy;
     private final Clock clock;
     private final ExecutorService pageExecutor;
+    private final BooleanSupplier persistenceAllowed;
     private final Set<DefaultReaderSession> sessions = new HashSet<>();
     private ReaderContentProvider contentProvider;
     private boolean closed;
 
     public DefaultReaderService(SourceRegistry sources, LibraryCatalog library, ReaderPolicy policy) {
-        this(sources, library, policy, Clock.systemUTC(), Executors.newFixedThreadPool(2));
+        this(sources, library, policy, () -> true);
+    }
+
+    public DefaultReaderService(
+            SourceRegistry sources,
+            LibraryCatalog library,
+            ReaderPolicy policy,
+            BooleanSupplier persistenceAllowed) {
+        this(
+                sources,
+                library,
+                policy,
+                Clock.systemUTC(),
+                Executors.newFixedThreadPool(2),
+                persistenceAllowed);
     }
 
     DefaultReaderService(
@@ -49,12 +65,16 @@ public final class DefaultReaderService implements ReaderService, ReaderContentR
             LibraryCatalog library,
             ReaderPolicy policy,
             Clock clock,
-            ExecutorService pageExecutor) {
+            ExecutorService pageExecutor,
+            BooleanSupplier persistenceAllowed) {
         this.sources = Objects.requireNonNull(sources, "sources must not be null");
         this.library = Objects.requireNonNull(library, "library must not be null");
         this.policy = Objects.requireNonNull(policy, "policy must not be null");
         this.clock = Objects.requireNonNull(clock, "clock must not be null");
         this.pageExecutor = Objects.requireNonNull(pageExecutor, "pageExecutor must not be null");
+        this.persistenceAllowed = Objects.requireNonNull(
+                persistenceAllowed,
+                "persistenceAllowed must not be null");
     }
 
     @Override
@@ -114,10 +134,12 @@ public final class DefaultReaderService implements ReaderService, ReaderContentR
                 .map(progress -> (int) Math.min(progress.position(), pages.size() - 1L))
                 .orElse(0);
 
-        library.save(item.recordHistory(new LibraryHistoryEntry(
-                unit.id().value(),
-                clock.instant(),
-                initialPage)));
+        if (persistenceAllowed.getAsBoolean()) {
+            library.save(item.recordHistory(new LibraryHistoryEntry(
+                    unit.id().value(),
+                    clock.instant(),
+                    initialPage)));
+        }
         ReaderPagePipeline pipeline = new ReaderPagePipeline(pageReader, pages, policy, pageExecutor);
         DefaultReaderSession[] holder = new DefaultReaderSession[1];
         DefaultReaderSession session = new DefaultReaderSession(
@@ -129,6 +151,7 @@ public final class DefaultReaderService implements ReaderService, ReaderContentR
                 initialPage,
                 pipeline,
                 clock,
+                persistenceAllowed,
                 () -> removeSession(holder[0]));
         holder[0] = session;
         sessions.add(session);

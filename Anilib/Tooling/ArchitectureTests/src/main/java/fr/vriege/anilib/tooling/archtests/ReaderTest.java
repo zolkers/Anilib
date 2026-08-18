@@ -52,6 +52,7 @@ final class ReaderTest {
         Counter counter = new Counter();
         verifiesStandardLocalReader(counter);
         verifiesBoundedPipeline(counter);
+        suppressesIncognitoPersistence(counter);
         return counter.value;
     }
 
@@ -142,6 +143,31 @@ final class ReaderTest {
         reader.close();
         counter.expectReaderFailure(() -> reader.canOpen(item.id()),
                 "closed reader services must reject further access");
+    }
+
+    private static void suppressesIncognitoPersistence(Counter counter) {
+        SourceCatalogueItemId sourceItemId = new SourceCatalogueItemId(SourceId.of("test.reader"), "title");
+        SourceContentUnit unit = new SourceContentUnit(
+                new SourceContentUnitId(sourceItemId, "chapter-1"),
+                "Chapter 1",
+                Optional.of(Instant.EPOCH));
+        MemoryLibraryCatalog library = new MemoryLibraryCatalog();
+        LibraryItem item = LibraryItem.create("Incognito", MediaKind.MANGA)
+                .withOrigin(new LibraryOrigin("test.reader", "title"));
+        library.save(item);
+        try (DefaultReaderService reader = new DefaultReaderService(
+                new SingleSourceRegistry(new TestPagedSource(unit, new AtomicInteger())),
+                library,
+                ReaderPolicy.standard(),
+                () -> false);
+                ReaderSession session = reader.open(item.id())) {
+            session.nextPage();
+            LibraryItem unchanged = library.find(item.id()).orElseThrow();
+            counter.check(unchanged.history().isEmpty(),
+                    "incognito Reader sessions must not append library history");
+            counter.check(unchanged.progress().isEmpty(),
+                    "incognito Reader sessions must not persist page progress");
+        }
     }
 
     private static void awaitPrefetch(AtomicInteger reads) {

@@ -3,6 +3,8 @@ module fr.vriege.anilib.feature.updates.bundle {
     requires fr.vriege.anilib.framework.backup.api;
     requires transitive fr.vriege.anilib.kernel.api;
     requires fr.vriege.anilib.feature.library.api;
+    requires fr.vriege.anilib.feature.network.api;
+    requires fr.vriege.anilib.feature.settings.api;
     requires fr.vriege.anilib.feature.source.api;
     requires transitive fr.vriege.anilib.feature.updates.api;
     requires fr.vriege.anilib.feature.updates.runtime;

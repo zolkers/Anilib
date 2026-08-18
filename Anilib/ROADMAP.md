@@ -104,7 +104,7 @@ platform-specific.
   - [ ] add the equivalent trusted APK bridge for manga extensions
 - [x] shared Settings Bundle with durable appearance and feature-policy preferences
 - [x] live Android and desktop theme selection from shared settings
-- [ ] enforce Wi-Fi, incognito, and adult-content policies in their owning Bundles
+- [x] enforce Wi-Fi, incognito, and adult-content policies in their owning Bundles
 - [x] user-confirmed clear actions for shared HTTP cache, HTTP cookies, and WebView cookies
 - [x] clear WebView cache/storage immediately on Android and before the next KCEF startup
 - [ ] clean unused application database entries

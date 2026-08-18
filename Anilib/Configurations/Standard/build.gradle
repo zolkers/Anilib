@@ -6,6 +6,7 @@ dependencies {
     implementation project(':Anilib:Features:Library:Bundle')
     implementation project(':Anilib:Features:Source:Bundle')
     implementation project(':Anilib:Features:LocalSource:Bundle')
+    api project(':Anilib:Features:Network:Api')
     implementation project(':Anilib:Features:Network:Bundle')
     implementation project(':Anilib:Features:Settings:Bundle')
     implementation project(':Anilib:Features:Discovery:Bundle')
