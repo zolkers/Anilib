@@ -71,6 +71,7 @@ import fr.vriege.anilib.feature.library.ui.LibraryPresentation
 import fr.vriege.anilib.feature.reader.ui.ReaderController
 import fr.vriege.anilib.feature.reader.ui.ReaderPresentation
 import fr.vriege.anilib.feature.player.ui.PlayerPresentation
+import fr.vriege.anilib.feature.tracker.ui.TrackerPresentation
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -91,6 +92,7 @@ fun AnilibApp(
     player: PlayerPresentation,
     downloads: DownloadPresentation,
     backup: BackupPresentation,
+    tracking: TrackerPresentation,
     pageDecoder: (ByteArray) -> ImageBitmap?,
     componentCount: Int,
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -100,6 +102,7 @@ fun AnilibApp(
     var section by remember { mutableStateOf(AppSection.LIBRARY) }
     var activeReader by remember { mutableStateOf<ReaderController?>(null) }
     var activePlayerTitle by remember { mutableStateOf<LibraryItemId?>(null) }
+    var activeTrackingTitle by remember { mutableStateOf<LibraryItemId?>(null) }
     var readerError by remember { mutableStateOf<String?>(null) }
     var playerError by remember { mutableStateOf<String?>(null) }
     var downloadError by remember { mutableStateOf<String?>(null) }
@@ -117,6 +120,7 @@ fun AnilibApp(
         Surface(modifier = Modifier.fillMaxSize()) {
             val controller = activeReader
             val playerTitle = activePlayerTitle
+            val trackingTitle = activeTrackingTitle
             if (controller != null) {
                 DisposableEffect(controller) {
                     onDispose { controller.close() }
@@ -124,6 +128,19 @@ fun AnilibApp(
                 ReaderScreen(controller, pageDecoder) { activeReader = null }
             } else if (playerTitle != null) {
                 EpisodeScreen(player, playerTitle) { activePlayerTitle = null }
+            } else if (trackingTitle != null) {
+                val details = presentation.details(trackingTitle).orElse(null)
+                if (details == null) {
+                    activeTrackingTitle = null
+                } else {
+                    TitleTrackingScreen(
+                        presentation = tracking,
+                        itemId = trackingTitle,
+                        title = details.title(),
+                        kind = details.kind(),
+                        goBack = { activeTrackingTitle = null },
+                    )
+                }
             } else {
                 val openReader: (LibraryItemId) -> Unit = { id ->
                     runCatching { reader.open(id) }
@@ -157,6 +174,7 @@ fun AnilibApp(
                             player,
                             downloads,
                             backup,
+                            tracking,
                             destination,
                             section,
                             componentCount,
@@ -168,6 +186,7 @@ fun AnilibApp(
                             playerError,
                             enqueueDownload,
                             downloadError,
+                            { activeTrackingTitle = it },
                             moreDestination,
                             { moreDestination = it },
                             { moreDestination = null },
@@ -180,6 +199,7 @@ fun AnilibApp(
                             player,
                             downloads,
                             backup,
+                            tracking,
                             destination,
                             section,
                             componentCount,
@@ -191,6 +211,7 @@ fun AnilibApp(
                             playerError,
                             enqueueDownload,
                             downloadError,
+                            { activeTrackingTitle = it },
                             moreDestination,
                             { moreDestination = it },
                             { moreDestination = null },
@@ -210,6 +231,7 @@ private fun ExpandedShell(
     player: PlayerPresentation,
     downloads: DownloadPresentation,
     backup: BackupPresentation,
+    tracking: TrackerPresentation,
     destination: LibraryNavigationState,
     section: AppSection,
     componentCount: Int,
@@ -221,6 +243,7 @@ private fun ExpandedShell(
     playerError: String?,
     enqueueDownload: (LibraryItemId) -> Unit,
     downloadError: String?,
+    openTracking: (LibraryItemId) -> Unit,
     moreDestination: MoreDestination?,
     openMore: (MoreDestination) -> Unit,
     closeMore: () -> Unit,
@@ -236,6 +259,7 @@ private fun ExpandedShell(
                 player,
                 downloads,
                 backup,
+                tracking,
                 destination,
                 section,
                 componentCount,
@@ -247,6 +271,7 @@ private fun ExpandedShell(
                 playerError,
                 enqueueDownload,
                 downloadError,
+                openTracking,
                 moreDestination,
                 openMore,
                 closeMore,
@@ -263,6 +288,7 @@ private fun CompactShell(
     player: PlayerPresentation,
     downloads: DownloadPresentation,
     backup: BackupPresentation,
+    tracking: TrackerPresentation,
     destination: LibraryNavigationState,
     section: AppSection,
     componentCount: Int,
@@ -274,6 +300,7 @@ private fun CompactShell(
     playerError: String?,
     enqueueDownload: (LibraryItemId) -> Unit,
     downloadError: String?,
+    openTracking: (LibraryItemId) -> Unit,
     moreDestination: MoreDestination?,
     openMore: (MoreDestination) -> Unit,
     closeMore: () -> Unit,
@@ -287,6 +314,7 @@ private fun CompactShell(
                 player,
                 downloads,
                 backup,
+                tracking,
                 destination,
                 section,
                 componentCount,
@@ -298,6 +326,7 @@ private fun CompactShell(
                 playerError,
                 enqueueDownload,
                 downloadError,
+                openTracking,
                 moreDestination,
                 openMore,
                 closeMore,
@@ -357,6 +386,7 @@ private fun AppDestination(
     player: PlayerPresentation,
     downloads: DownloadPresentation,
     backup: BackupPresentation,
+    tracking: TrackerPresentation,
     destination: LibraryNavigationState,
     section: AppSection,
     componentCount: Int,
@@ -368,6 +398,7 @@ private fun AppDestination(
     playerError: String?,
     enqueueDownload: (LibraryItemId) -> Unit,
     downloadError: String?,
+    openTracking: (LibraryItemId) -> Unit,
     moreDestination: MoreDestination?,
     openMore: (MoreDestination) -> Unit,
     closeMore: () -> Unit,
@@ -379,6 +410,7 @@ private fun AppDestination(
                 reader,
                 player,
                 downloads,
+                tracking,
                 destination,
                 navigate,
                 openReader,
@@ -387,6 +419,7 @@ private fun AppDestination(
                 playerError,
                 enqueueDownload,
                 downloadError,
+                openTracking,
             )
             else -> LibraryPageContent(presentation.library(), componentCount, navigate)
         }
@@ -399,10 +432,12 @@ private fun AppDestination(
         AppSection.MORE -> when (moreDestination) {
             MoreDestination.DOWNLOADS -> DownloadsScreen(downloads, closeMore)
             MoreDestination.BACKUP -> BackupScreen(backup, closeMore)
+            MoreDestination.TRACKING -> TrackerAccountsScreen(tracking, closeMore)
             null -> MorePage(
                 componentCount,
                 { openMore(MoreDestination.DOWNLOADS) },
                 { openMore(MoreDestination.BACKUP) },
+                { openMore(MoreDestination.TRACKING) },
             )
         }
     }
@@ -535,6 +570,7 @@ private fun DetailsDestination(
     reader: ReaderPresentation,
     player: PlayerPresentation,
     downloads: DownloadPresentation,
+    tracking: TrackerPresentation,
     destination: LibraryNavigationState,
     navigate: ((LibraryNavigator) -> Unit) -> Unit,
     openReader: (LibraryItemId) -> Unit,
@@ -543,6 +579,7 @@ private fun DetailsDestination(
     playerError: String?,
     enqueueDownload: (LibraryItemId) -> Unit,
     downloadError: String?,
+    openTracking: (LibraryItemId) -> Unit,
 ) {
     val id = destination.selectedTitle().orElse(null)
     val details = id?.let { presentation.details(it).orElse(null) }
@@ -554,12 +591,14 @@ private fun DetailsDestination(
             canRead = runCatching { reader.canOpen(details.id()) }.getOrDefault(false),
             canWatch = runCatching { player.canOpen(details.id()) }.getOrDefault(false),
             canDownload = runCatching { downloads.canEnqueue(details.id()) }.getOrDefault(false),
+            canTrack = tracking.accounts().any { it.descriptor().supportedKinds().contains(details.kind()) },
             readerError = readerError,
             playerError = playerError,
             downloadError = downloadError,
             read = { openReader(details.id()) },
             watch = { openPlayer(details.id()) },
             download = { enqueueDownload(details.id()) },
+            track = { openTracking(details.id()) },
             goBack = { navigate(LibraryNavigator::back) },
         )
     }
@@ -572,12 +611,14 @@ private fun DetailsPage(
     canRead: Boolean,
     canWatch: Boolean,
     canDownload: Boolean,
+    canTrack: Boolean,
     readerError: String?,
     playerError: String?,
     downloadError: String?,
     read: () -> Unit,
     watch: () -> Unit,
     download: () -> Unit,
+    track: () -> Unit,
     goBack: () -> Unit,
 ) {
     Scaffold(topBar = { TopAppBar(title = { Text(details.title()) }) }) { padding ->
@@ -603,6 +644,9 @@ private fun DetailsPage(
             }
             if (!downloadError.isNullOrBlank()) {
                 item { Text(downloadError, color = MaterialTheme.colorScheme.error) }
+            }
+            if (canTrack) {
+                item { Button(onClick = track) { Text("Tracking") } }
             }
             item {
                 Row(
@@ -683,11 +727,13 @@ private fun MorePage(
     componentCount: Int,
     openDownloads: () -> Unit,
     openBackup: () -> Unit,
+    openTracking: () -> Unit,
 ) {
     Scaffold(topBar = { TopAppBar(title = { Text("More") }) }) { padding ->
         LazyColumn(modifier = Modifier.fillMaxSize().padding(padding)) {
             item { MoreRow("Download queue", "Manage current and completed downloads", openDownloads) }
             item { MoreRow("Backup and restore", "Create or restore a local backup", openBackup) }
+            item { MoreRow("Tracking", "Manage external tracking accounts", openTracking) }
             item { MoreRow("Categories", "Organize anime and manga in your library") }
             item { MoreRow("Statistics", "Library and reading activity") }
             item { MoreRow("Settings", "Appearance, library, reader, player, and tracking") }
@@ -758,6 +804,7 @@ private enum class AppSection(val label: String) {
 private enum class MoreDestination {
     DOWNLOADS,
     BACKUP,
+    TRACKING,
 }
 
 private fun AppSection.icon(): ImageVector = when (this) {

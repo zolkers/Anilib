@@ -19,6 +19,7 @@ dependencies {
     implementation project(':Anilib:Features:Player:Ui')
     implementation project(':Anilib:Features:Downloads:Ui')
     implementation project(':Anilib:Features:Backup:Ui')
+    implementation project(':Anilib:Features:Tracker:Ui')
     implementation project(':Anilib:Kernel:Api')
     implementation project(':Anilib:Platforms:Compose')
     implementation compose.desktop.currentOs

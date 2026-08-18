@@ -14,6 +14,7 @@ import fr.vriege.anilib.feature.reader.ui.ReaderUiCapabilities
 import fr.vriege.anilib.feature.player.ui.PlayerUiCapabilities
 import fr.vriege.anilib.feature.downloads.ui.DownloadUiCapabilities
 import fr.vriege.anilib.feature.backup.ui.BackupUiCapabilities
+import fr.vriege.anilib.feature.tracker.ui.TrackerUiCapabilities
 import fr.vriege.anilib.framework.http.runtime.UrlConnectionHttpTransport
 import fr.vriege.anilib.platform.compose.AnilibApp
 import fr.vriege.anilib.platform.compose.ComposePlayerBackend
@@ -39,6 +40,7 @@ class MainActivity : ComponentActivity() {
         val player = started.capability(PlayerUiCapabilities.PRESENTATION)
         val downloads = started.capability(DownloadUiCapabilities.PRESENTATION)
         val backup = started.capability(BackupUiCapabilities.PRESENTATION)
+        val tracking = started.capability(TrackerUiCapabilities.PRESENTATION)
         val componentCount = started.components().size
         setContent {
             AnilibApp(
@@ -48,6 +50,7 @@ class MainActivity : ComponentActivity() {
                 player = player,
                 downloads = downloads,
                 backup = backup,
+                tracking = tracking,
                 pageDecoder = ::decodePage,
                 componentCount = componentCount,
             )

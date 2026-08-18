@@ -14,6 +14,7 @@ import fr.vriege.anilib.feature.reader.ui.ReaderUiCapabilities
 import fr.vriege.anilib.feature.player.ui.PlayerUiCapabilities
 import fr.vriege.anilib.feature.downloads.ui.DownloadUiCapabilities
 import fr.vriege.anilib.feature.backup.ui.BackupUiCapabilities
+import fr.vriege.anilib.feature.tracker.ui.TrackerUiCapabilities
 import fr.vriege.anilib.framework.http.jdk.JdkHttpTransport
 import fr.vriege.anilib.kernel.StartedAnilib
 import fr.vriege.anilib.platform.compose.AnilibApp
@@ -40,6 +41,7 @@ fun main() {
     val player = started.capability(PlayerUiCapabilities.PRESENTATION)
     val downloads = started.capability(DownloadUiCapabilities.PRESENTATION)
     val backup = started.capability(BackupUiCapabilities.PRESENTATION)
+    val tracking = started.capability(TrackerUiCapabilities.PRESENTATION)
     application {
         Window(
             onCloseRequest = {
@@ -55,6 +57,7 @@ fun main() {
                 player = player,
                 downloads = downloads,
                 backup = backup,
+                tracking = tracking,
                 pageDecoder = ::decodePage,
                 componentCount = started.components().size,
                 darkTheme = desktopDarkTheme(),
