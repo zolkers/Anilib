@@ -301,6 +301,8 @@ internal object UiTranslations {
             "Open source website" to "Ouvrir le site de la source",
             "Display mode" to "Mode d’affichage",
             "Extension actions" to "Actions de l’extension",
+            "Extension icon" to "Icône de l’extension",
+            "Extension icon unavailable" to "Icône de l’extension indisponible",
             "Close reader" to "Fermer le lecteur",
             "Reader menu" to "Menu du lecteur",
             "Refresh repositories" to "Actualiser les dépôts",
@@ -315,6 +317,7 @@ internal object UiTranslations {
             "Appearance changes apply immediately on Android and desktop." to
                 "Les changements d’apparence s’appliquent immédiatement sur Android et le bureau.",
             "Application data" to "Données de l’application",
+            "Application" to "Application",
             "Automatic challenge retry" to "Nouvelle tentative automatique après un défi",
             "Average title progress" to "Progression moyenne des titres",
             "Average tracker score" to "Note moyenne des services de suivi",

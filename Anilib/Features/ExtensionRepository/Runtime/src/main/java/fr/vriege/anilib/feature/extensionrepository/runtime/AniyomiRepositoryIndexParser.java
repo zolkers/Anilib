@@ -9,6 +9,8 @@ import fr.vriege.anilib.foundation.validation.Preconditions;
 
 import java.math.BigDecimal;
 import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -69,7 +71,13 @@ public final class AniyomiRepositoryIndexParser {
                 contentKind(packageName, entry.get("anilib")),
                 sources,
                 artifacts,
-                optionalStringAllowBlank(entry, "changelog").filter(value -> !value.isBlank()));
+                optionalStringAllowBlank(entry, "changelog").filter(value -> !value.isBlank()),
+                Optional.of(repository.resolve("icon/" + iconFileName(packageName))));
+    }
+
+    private String iconFileName(String packageName) {
+        return URLEncoder.encode(packageName, StandardCharsets.UTF_8)
+                .replace("+", "%20") + ".png";
     }
 
     private List<ExtensionArtifactMetadata> artifacts(URI repository, Map<String, Object> entry) {

@@ -4,21 +4,42 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.outlined.ChromeReaderMode
+import androidx.compose.material.icons.outlined.Backup
+import androidx.compose.material.icons.outlined.CollectionsBookmark
+import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.Extension
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Language
+import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.Security
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Storage
+import androidx.compose.material.icons.outlined.Sync
+import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.outlined.VideoSettings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -30,6 +51,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.multiplatform.webview.cookie.WebViewCookieManager
@@ -204,6 +226,18 @@ private fun SettingsHome(
     goBack: () -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
+    val general = settingMatches(query, "General", "Language start screen navigation")
+    val appearance = settingMatches(query, "Appearance", "Theme colors typography navigation")
+    val privacy = settingMatches(query, "Content and privacy", "Adult incognito history")
+    val library = settingMatches(query, "Library and updates", "Categories refresh Wi-Fi duplicate")
+    val reader = settingMatches(query, "Reader", "Reading mode controls display navigation")
+    val player = settingMatches(query, "Player", "Playback decoder audio subtitles gestures")
+    val downloads = settingMatches(query, "Downloads", "Wi-Fi queue storage offline")
+    val extensions = settingMatches(query, "Sources and repositories", "Extensions Git trust languages")
+    val tracking = settingMatches(query, "Tracking", "Accounts sync score privacy")
+    val backup = settingMatches(query, "Backup", "Automatic restore storage import")
+    val advanced = settingMatches(query, "Data and storage", "Cookies cache WebView database cleanup")
+    val about = settingMatches(query, "About", "Version licences diagnostics update channel")
     Scaffold(
         topBar = { SettingsTopBar("Settings", goBack) },
     ) { padding ->
@@ -217,66 +251,131 @@ private fun SettingsHome(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 10.dp),
                 )
             }
-            item { SettingsSection("General") }
-            settingRow(query, "General", "Language start screen navigation") {
-                SettingsRow("General", "Language and start screen") {
-                    openDestination(SettingsDestination.GENERAL)
+            if (general || appearance || privacy) {
+                item { SettingsSection("Application") }
+                item {
+                    SettingsGroup {
+                        if (general) {
+                            SettingsRow(
+                                "General",
+                                "Language and start screen",
+                                { openDestination(SettingsDestination.GENERAL) },
+                                Icons.Outlined.Language,
+                            )
+                        }
+                        if (appearance) {
+                            SettingsRow(
+                                "Appearance",
+                                "Theme and visual preferences",
+                                { openDestination(SettingsDestination.APPEARANCE) },
+                                Icons.Outlined.Palette,
+                            )
+                        }
+                        if (privacy) {
+                            SettingsRow(
+                                "Content and privacy",
+                                "Adult content and incognito mode",
+                                { openDestination(SettingsDestination.PRIVACY) },
+                                Icons.Outlined.Security,
+                            )
+                        }
+                    }
                 }
             }
-            settingRow(query, "Appearance", "Theme colors typography navigation") {
-                SettingsRow("Appearance", "Theme and visual preferences") {
-                    openDestination(SettingsDestination.APPEARANCE)
+            if (library || reader || player || downloads) {
+                item { SettingsSection("Library and media") }
+                item {
+                    SettingsGroup {
+                        if (library) {
+                            SettingsRow(
+                                "Library and updates",
+                                "Refresh and content policies",
+                                { openDestination(SettingsDestination.LIBRARY) },
+                                Icons.Outlined.CollectionsBookmark,
+                            )
+                        }
+                        if (reader) {
+                            SettingsRow(
+                                "Reader",
+                                "Reading behavior and per-title controls",
+                                { openDestination(SettingsDestination.READER) },
+                                Icons.AutoMirrored.Outlined.ChromeReaderMode,
+                            )
+                        }
+                        if (player) {
+                            SettingsRow(
+                                "Player",
+                                "Playback behavior and per-episode controls",
+                                { openDestination(SettingsDestination.PLAYER) },
+                                Icons.Outlined.VideoSettings,
+                            )
+                        }
+                        if (downloads) {
+                            SettingsRow(
+                                "Downloads",
+                                "Network policy and download queue",
+                                { openDestination(SettingsDestination.DOWNLOADS) },
+                                Icons.Outlined.Download,
+                            )
+                        }
+                    }
                 }
             }
-            settingRow(query, "Content and privacy", "Adult incognito history") {
-                SettingsRow("Content and privacy", "Adult content and incognito mode") {
-                    openDestination(SettingsDestination.PRIVACY)
+            if (extensions || tracking || backup) {
+                item { SettingsSection("Services") }
+                item {
+                    SettingsGroup {
+                        if (extensions) {
+                            SettingsRow(
+                                "Sources and repositories",
+                                "Languages, installed sources, trust, and repository URLs",
+                                openExtensionRepositories,
+                                Icons.Outlined.Extension,
+                            )
+                        }
+                        if (tracking) {
+                            SettingsRow(
+                                "Tracking",
+                                "Accounts, sync, score, and privacy",
+                                openTracking,
+                                Icons.Outlined.Sync,
+                            )
+                        }
+                        if (backup) {
+                            SettingsRow(
+                                "Backup",
+                                "Backups, restore, imports, and storage",
+                                openBackup,
+                                Icons.Outlined.Backup,
+                            )
+                        }
+                    }
                 }
             }
-            item { SettingsSection("Library and media") }
-            settingRow(query, "Library and updates", "Categories refresh Wi-Fi duplicate") {
-                SettingsRow("Library and updates", "Refresh and content policies") {
-                    openDestination(SettingsDestination.LIBRARY)
+            if (advanced || about) {
+                item { SettingsSection("Advanced") }
+                item {
+                    SettingsGroup {
+                        if (advanced) {
+                            SettingsRow(
+                                "Data and storage",
+                                "Network, browser, and unused data",
+                                { openDestination(SettingsDestination.ADVANCED) },
+                                Icons.Outlined.Storage,
+                            )
+                        }
+                        if (about) {
+                            SettingsRow(
+                                "About",
+                                "Version, updates, project, and help",
+                                openAbout,
+                                Icons.Outlined.Info,
+                            )
+                        }
+                    }
                 }
             }
-            settingRow(query, "Reader", "Reading mode controls display navigation") {
-                SettingsRow("Reader", "Reading behavior and per-title controls") {
-                    openDestination(SettingsDestination.READER)
-                }
-            }
-            settingRow(query, "Player", "Playback decoder audio subtitles gestures") {
-                SettingsRow("Player", "Playback behavior and per-episode controls") {
-                    openDestination(SettingsDestination.PLAYER)
-                }
-            }
-            settingRow(query, "Downloads", "Wi-Fi queue storage offline") {
-                SettingsRow("Downloads", "Network policy and download queue") {
-                    openDestination(SettingsDestination.DOWNLOADS)
-                }
-            }
-            item { SettingsSection("Services") }
-            settingRow(query, "Sources and repositories", "Extensions Git trust languages") {
-                SettingsRow(
-                    "Sources and repositories",
-                    "Languages, installed sources, trust, and repository URLs",
-                    openExtensionRepositories,
-                )
-            }
-            settingRow(query, "Tracking", "Accounts sync score privacy") {
-                SettingsRow("Tracking", "Accounts, sync, score, and privacy", openTracking)
-            }
-            settingRow(query, "Backup", "Automatic restore storage import") {
-                SettingsRow("Backup", "Backups, restore, imports, and storage", openBackup)
-            }
-            item { SettingsSection("Advanced") }
-            settingRow(query, "Data and storage", "Cookies cache WebView database cleanup") {
-                SettingsRow("Data and storage", "Network, browser, and unused data") {
-                    openDestination(SettingsDestination.ADVANCED)
-                }
-            }
-            settingRow(query, "About", "Version licences diagnostics update channel") {
-                SettingsRow("About", "Version, updates, project, and help", openAbout)
-            }
+            item { Spacer(Modifier.height(24.dp)) }
         }
     }
 }
@@ -672,23 +771,97 @@ private fun SettingsTopBar(title: String, goBack: () -> Unit) {
 private fun SettingsSection(label: String) {
     Text(
         label,
-        style = MaterialTheme.typography.titleMedium,
+        color = MaterialTheme.colorScheme.primary,
+        style = MaterialTheme.typography.labelLarge,
         fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 22.dp, bottom = 8.dp),
+        modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 22.dp, bottom = 10.dp),
     )
 }
 
 @Composable
-private fun SettingsRow(title: String, summary: String, action: (() -> Unit)? = null) {
-    Column(
+private fun SettingsGroup(content: @Composable ColumnScope.() -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = 1.dp,
+    ) {
+        Column(content = content)
+    }
+}
+
+@Composable
+private fun SettingsRow(
+    title: String,
+    summary: String,
+    action: (() -> Unit)? = null,
+    icon: ImageVector? = null,
+) {
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .then(if (action == null) Modifier else Modifier.clickable(onClick = action))
-            .padding(horizontal = 24.dp, vertical = 14.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(title, fontWeight = FontWeight.Medium)
-        Spacer(Modifier.height(3.dp))
-        Text(summary, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        val leadingIcon = icon ?: if (action != null) Icons.Outlined.Settings else null
+        if (leadingIcon != null) {
+            SettingsIcon(leadingIcon)
+            Spacer(Modifier.width(16.dp))
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, fontWeight = FontWeight.Medium)
+            Spacer(Modifier.height(3.dp))
+            Text(
+                summary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+        if (action != null) {
+            Spacer(Modifier.width(12.dp))
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SettingsRow(
+    title: String,
+    summary: String,
+    icon: ImageVector? = null,
+    action: () -> Unit,
+) {
+    SettingsRow(title, summary, action, icon)
+}
+
+@Composable
+private fun SettingsSwitchRow(
+    title: String,
+    summary: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    icon: ImageVector,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onCheckedChange(!checked) }
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        SettingsIcon(icon)
+        Spacer(Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
+            Text(title, fontWeight = FontWeight.Medium)
+            Spacer(Modifier.height(3.dp))
+            Text(summary, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 
@@ -699,19 +872,24 @@ private fun SettingsSwitchRow(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onCheckedChange(!checked) }
-            .padding(horizontal = 24.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    SettingsSwitchRow(title, summary, checked, onCheckedChange, Icons.Outlined.Tune)
+}
+
+@Composable
+private fun SettingsIcon(icon: ImageVector) {
+    Surface(
+        modifier = Modifier.size(40.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.primaryContainer,
     ) {
-        Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
-            Text(title, fontWeight = FontWeight.Medium)
-            Spacer(Modifier.height(3.dp))
-            Text(summary, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.size(22.dp),
+            )
         }
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 
@@ -758,17 +936,6 @@ private fun Enum<*>.displayName(): String = name
 
 private fun settingMatches(query: String, title: String, keywords: String): Boolean =
     query.isBlank() || title.contains(query, ignoreCase = true) || keywords.contains(query, ignoreCase = true)
-
-private fun androidx.compose.foundation.lazy.LazyListScope.settingRow(
-    query: String,
-    title: String,
-    keywords: String,
-    content: @Composable androidx.compose.foundation.lazy.LazyItemScope.() -> Unit,
-) {
-    if (settingMatches(query, title, keywords)) {
-        item(content = content)
-    }
-}
 
 private enum class SettingsDestination(val title: String) {
     GENERAL("General"),

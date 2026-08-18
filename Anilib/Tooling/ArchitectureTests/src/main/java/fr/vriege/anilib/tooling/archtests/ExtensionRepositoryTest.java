@@ -139,6 +139,9 @@ final class ExtensionRepositoryTest {
                 "Aniyomi indexes may advertise a source with an empty baseUrl");
         counter.check(extension.changelog().orElseThrow().equals("Improved source compatibility."),
                 "repository entries must retain optional release changelogs");
+        counter.check(extension.icon().orElseThrow().equals(
+                        URI.create("https://repo.example/extensions/icon/vendor%3Aany%2Fpkg%40v1.png")),
+                "Aniyomi extension icons must resolve through the repository icon directory");
     }
 
     private static void parsesPublicRepositoryShapes(Counter counter) {

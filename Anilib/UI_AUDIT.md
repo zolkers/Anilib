@@ -20,14 +20,14 @@ explicit so an architectural seam cannot be mistaken for a finished workflow.
 | Source catalogue, search, and filters | [x] | Complete | Popular/latest, paging, search, filters, source preferences, per-source persisted list/grid display, item menus, WebView entry, and library admission are live |
 | Local source | [x] | Complete | Aniyomi-compatible manga/anime roots expose metadata, covers, ordered chapters/episodes, thumbnails, subtitles, and an explicit atomic re-scan action |
 | Migration | [x] | Complete | Multi-title selection, target-source comparison, seasonal anime matching, title options, candidate preview, progress, cancellation, and retry of partial failures are live |
-| Extensions and repositories | [x] | Partial | Repository catalogue, language/pin ordering, dedicated permission/trust/version/changelog details, install/update progress with retryable diagnostics, enable/remove, APK hand-off, source navigation, and Browse update badges are live; add full per-source management parity |
+| Extensions and repositories | [x] | Partial | Repository catalogue, scrollable language/pin ordering, repository-provided extension artwork with a vector fallback, dedicated permission/trust/version/changelog details, install/update progress with retryable diagnostics, enable/remove, APK hand-off, source navigation, and Browse update badges are live; add full per-source management parity |
 | More hub | [x] | Partial | Core ordering and actions are live; add storage and help destinations plus richer download state |
 | Categories | [x] | Partial | The shared screen shows real counts plus create, rename, reorder, delete, display, and update policies |
 | Statistics | [x] | Complete | The shared screen reports real totals plus status, source, language, tracker-score bands, watched/known duration, average progress, and 7/30/365-day activity |
 | Downloads | [x] | Complete | Durable grouped priority queue, reorder/delete-all, speed/ETA, partial restart, validated storage migration, index repair, per-title management, storage usage, offline mode, controls, errors, status filters, and automatic category/media-limit/cleanup policies are live |
 | Backup and restore | [x] | Complete | Creation, daily/weekly scheduling, selected content, retention, configurable folders, inspection, confirmed restore/delete, rollback, Anilib/Aniyomi import, Android SAF/desktop export, and file sharing are live |
 | Tracking | [x] | Complete | Opt-in AniList and Kitsu authentication, branded provider icons, confirmed search/bind/remove, validated editing, progress/score/dates/privacy, automatic/manual bidirectional sync, durable preferences, and explicit conflict resolution are live |
-| Settings home | [x] | Partial | Search and dedicated General, Appearance, Privacy, Library, Reader, Player, Downloads, Services, Data/storage, and About routes are live; add exact Aniyomi icons and summary density |
+| Settings home | [x] | Complete | Searchable Application, Library/media, Services, and Advanced groups use rounded containers, Aniyomi-density summaries, distinct leading vector icons, and explicit navigation affordances; every interactive detail row also has a vector icon |
 | Appearance settings | [x] | Complete | Persistent complete English/French language packs, theme mode/family/accent palettes, typography scale, adaptive/bottom/rail navigation, and start-screen selection apply live |
 | Library and update settings | [x] | Complete | Wi-Fi policies, category defaults and per-category display/update policies, automatic download rules, full update scheduling, skip controls, and per-title exceptions are live |
 | Reader settings and reader | [x] | Complete | Immersive pages, resume, slider, navigation modes, persisted gestures/display profiles, filters, transitions, Android orientation, chapter lists and navigation, durable read state, exact downloads, and complete menus are live |
@@ -68,6 +68,9 @@ explicit so an architectural seam cannot be mistaken for a finished workflow.
 - [x] Added settings search and connected Sources, Tracking, Backup, and About to their working screens.
 - [x] Added stable/beta application-update checks, signed downloads, changelog/licence presentation, and platform-owned installation.
 - [x] Split Settings into searchable dedicated destinations and added a durable start-screen choice.
+- [x] Aligned Settings with the pinned Aniyomi visual system using grouped surfaces, compact summaries, leading vector icons, and trailing navigation affordances.
+- [x] Made source and extension language selectors bounded and scrollable with full-row selection targets.
+- [x] Loaded repository `icon/<package>.png` extension artwork through the shared cached HTTP pipeline with a bounded vector fallback.
 - [x] Localized every shared UI label and icon description in the advertised English/French packs and added a repository gate against untranslated additions.
 - [x] Added deterministic pixel and semantics captures with real clicks for the shared navigation routes at compact and expanded sizes.
 - [x] Added content-rich local manga, reader, anime, player, catalogue, and offline WebView fixtures to both adaptive capture sizes.

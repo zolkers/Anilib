@@ -8,7 +8,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -832,57 +834,67 @@ private fun ExtensionPackageCard(
     installApk: (() -> Unit)?,
 ) {
     Card(modifier = Modifier.fillMaxWidth().clickable(onClick = openDetails)) {
-        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(extension.displayName(), fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-                IconButton(onClick = { togglePinned(!pinned) }) {
-                    Icon(
-                        Icons.Default.PushPin,
-                        contentDescription = if (pinned) "Unpin extension" else "Pin extension",
-                        tint = if (pinned) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                    )
-                }
-            }
-            Text(
-                "${extension.languageTag()} · v${extension.versionName()} · "
-                    + extension.contentKind().name.lowercase(),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            val formats = extension.artifacts().joinToString(" + ") {
-                when (it.format()) {
-                    ExtensionArtifactFormat.ANILIB_BUNDLE -> "Anilib Bundle"
-                    ExtensionArtifactFormat.ANIYOMI_APK -> "Aniyomi APK"
-                }
-            }
-            Text(
-                "$formats · ${extension.sources().size} source(s)"
-                    + if (extension.adult()) " · 18+" else "",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            val portable = extension.artifacts().any { it.format() == ExtensionArtifactFormat.ANILIB_BUNDLE }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                when {
-                    installed == null && portable -> Button(onClick = install, enabled = !busy) { Text("Install") }
-                    installed != null -> {
-                        TextButton(onClick = {
-                            toggle(installed.state() == ExtensionInstallationState.DISABLED)
-                        }) {
-                            Text(if (installed.state() == ExtensionInstallationState.ENABLED) "Disable" else "Enable")
-                        }
-                        if (extension.versionCode() > installed.versionCode() && portable) {
-                            Button(onClick = update, enabled = !busy) { Text("Update") }
-                        }
-                        TextButton(onClick = remove) { Text("Remove") }
+        Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.Top) {
+            ExtensionIcon(extension.icon().orElse(null), extension.displayName())
+            Spacer(Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(extension.displayName(), fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                    IconButton(onClick = { togglePinned(!pinned) }) {
+                        Icon(
+                            Icons.Default.PushPin,
+                            contentDescription = if (pinned) "Unpin extension" else "Pin extension",
+                            tint = if (pinned) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                        )
                     }
                 }
-                if (extension.artifacts().any { it.format() == ExtensionArtifactFormat.ANIYOMI_APK }
-                    && installApk != null
-                ) {
-                    TextButton(onClick = installApk, enabled = !busy) { Text("Install APK") }
+                Text(
+                    "${extension.languageTag()} · v${extension.versionName()} · "
+                        + extension.contentKind().name.lowercase(),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                val formats = extension.artifacts().joinToString(" + ") {
+                    when (it.format()) {
+                        ExtensionArtifactFormat.ANILIB_BUNDLE -> "Anilib Bundle"
+                        ExtensionArtifactFormat.ANIYOMI_APK -> "Aniyomi APK"
+                    }
+                }
+                Text(
+                    "$formats · ${extension.sources().size} source(s)"
+                        + if (extension.adult()) " · 18+" else "",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                val portable = extension.artifacts().any { it.format() == ExtensionArtifactFormat.ANILIB_BUNDLE }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    when {
+                        installed == null && portable -> Button(onClick = install, enabled = !busy) { Text("Install") }
+                        installed != null -> {
+                            TextButton(onClick = {
+                                toggle(installed.state() == ExtensionInstallationState.DISABLED)
+                            }) {
+                                Text(
+                                    if (installed.state() == ExtensionInstallationState.ENABLED) {
+                                        "Disable"
+                                    } else {
+                                        "Enable"
+                                    },
+                                )
+                            }
+                            if (extension.versionCode() > installed.versionCode() && portable) {
+                                Button(onClick = update, enabled = !busy) { Text("Update") }
+                            }
+                            TextButton(onClick = remove) { Text("Remove") }
+                        }
+                    }
+                    if (extension.artifacts().any { it.format() == ExtensionArtifactFormat.ANIYOMI_APK }
+                        && installApk != null
+                    ) {
+                        TextButton(onClick = installApk, enabled = !busy) { Text("Install APK") }
+                    }
                 }
             }
         }
@@ -900,15 +912,18 @@ private fun ExtensionLanguageDialog(
         onDismissRequest = dismiss,
         title = { Text("Extension languages") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                available.forEach { language ->
+            LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp)) {
+                items(available, key = { it }) { language ->
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { toggle(language, language !in enabled) }
+                            .padding(vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Checkbox(
                             checked = language in enabled,
-                            onCheckedChange = { selected -> toggle(language, selected) },
+                            onCheckedChange = null,
                         )
                         Text(extensionLanguageName(language))
                     }

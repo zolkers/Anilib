@@ -152,6 +152,9 @@ class UiRouteScreenshotTest {
                 visitPrimary("History")
                 onNodeWithText("Browse").performClick()
                 captureStable("Browse landing and sources")
+                onNodeWithText("Languages").performClick()
+                waitForText("Source languages")
+                onNodeWithText("Done").performClick()
                 listOf(
                     "Anime sources",
                     "Manga sources",

@@ -522,15 +522,18 @@ private fun SourceLanguageDialog(
         onDismissRequest = dismiss,
         title = { Text("Source languages") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                available.forEach { language ->
+            LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp)) {
+                items(available, key = { it }) { language ->
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { toggle(language, language !in enabled) }
+                            .padding(vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Checkbox(
                             checked = language in enabled,
-                            onCheckedChange = { selected -> toggle(language, selected) },
+                            onCheckedChange = null,
                         )
                         Text(languageName(language))
                     }
@@ -1118,7 +1121,11 @@ private fun ExtensionList(
                     .padding(horizontal = 20.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                SourceBadge(source)
+                ExtensionIcon(
+                    extensionPackage?.icon()?.orElse(null),
+                    extension.manifest().component().displayName(),
+                    size = 40.dp,
+                )
                 Spacer(Modifier.width(14.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(extension.manifest().component().displayName(), fontWeight = FontWeight.Medium)

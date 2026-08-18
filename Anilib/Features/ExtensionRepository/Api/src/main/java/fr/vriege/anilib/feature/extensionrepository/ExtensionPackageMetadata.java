@@ -2,6 +2,7 @@ package fr.vriege.anilib.feature.extensionrepository;
 
 import fr.vriege.anilib.foundation.validation.Preconditions;
 
+import java.net.URI;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -18,7 +19,8 @@ public record ExtensionPackageMetadata(
         ExtensionContentKind contentKind,
         List<ExtensionSourceMetadata> sources,
         List<ExtensionArtifactMetadata> artifacts,
-        Optional<String> changelog) {
+        Optional<String> changelog,
+        Optional<URI> icon) {
     public ExtensionPackageMetadata {
         displayName = Preconditions.requireNonBlank(displayName, "displayName");
         packageName = ExtensionPackageIdentifiers.requireValid(packageName);
@@ -35,6 +37,7 @@ public record ExtensionPackageMetadata(
         }
         changelog = Preconditions.requireNonNull(changelog, "changelog")
                 .map(value -> Preconditions.requireNonBlank(value, "changelog"));
+        icon = Preconditions.requireNonNull(icon, "icon").map(ExtensionPackageMetadata::requireIconUri);
         if (changelog.map(String::length).orElse(0) > 20_000) {
             throw new IllegalArgumentException("changelog must not exceed 20000 characters");
         }
@@ -66,7 +69,43 @@ public record ExtensionPackageMetadata(
                 contentKind,
                 sources,
                 artifacts,
+                Optional.empty(),
                 Optional.empty());
+    }
+
+    public ExtensionPackageMetadata(
+            String displayName,
+            String packageName,
+            String languageTag,
+            long versionCode,
+            String versionName,
+            boolean adult,
+            ExtensionContentKind contentKind,
+            List<ExtensionSourceMetadata> sources,
+            List<ExtensionArtifactMetadata> artifacts,
+            Optional<String> changelog) {
+        this(
+                displayName,
+                packageName,
+                languageTag,
+                versionCode,
+                versionName,
+                adult,
+                contentKind,
+                sources,
+                artifacts,
+                changelog,
+                Optional.empty());
+    }
+
+    private static URI requireIconUri(URI value) {
+        URI iconUri = Preconditions.requireNonNull(value, "icon URI");
+        String scheme = iconUri.getScheme();
+        if (!iconUri.isAbsolute() || iconUri.getHost() == null
+                || !(scheme.equalsIgnoreCase("https") || scheme.equalsIgnoreCase("http"))) {
+            throw new IllegalArgumentException("icon URI must be an absolute HTTP(S) URI");
+        }
+        return iconUri;
     }
 
     private static String normalizeLanguage(String value) {

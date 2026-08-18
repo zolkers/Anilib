@@ -219,6 +219,7 @@ fun AnilibApp(
         LocalBrowserPolicy provides settings.browserPolicy(),
         LocalBrowserPlatformController provides browserPlatformController,
         LocalApplicationUpdatePlatformController provides applicationUpdatePlatformController,
+        LocalExtensionIconEnvironment provides ExtensionIconEnvironment(httpClient, pageDecoder),
         LocalReducedMotion provides settings.reducedMotion(),
         LocalLanguagePack provides settings.languagePack(),
     ) {
