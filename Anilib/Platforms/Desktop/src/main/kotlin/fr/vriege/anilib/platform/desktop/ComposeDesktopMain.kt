@@ -43,6 +43,7 @@ fun main() {
         return
     }
     val browserRuntimeStatus = DesktopBrowserRuntime.initialize(dataDirectory)
+    val browserDataController = DesktopBrowserDataController(dataDirectory)
     val presentation = started.capability(LibraryUiCapabilities.PRESENTATION)
     val discovery = started.capability(DiscoveryUiCapabilities.PRESENTATION)
     val extensionRepositories = started.capability(ExtensionRepositoryUiCapabilities.PRESENTATION)
@@ -75,6 +76,7 @@ fun main() {
                 networkMaintenance = started.capability(NetworkCapabilities.MAINTENANCE),
                 browserCookies = started.capability(NetworkCapabilities.COOKIES),
                 browserRuntimeStatus = browserRuntimeStatus,
+                browserDataController = browserDataController,
                 settingsPresentation = started.capability(SettingsUiCapabilities.PRESENTATION),
                 reader = reader,
                 player = player,

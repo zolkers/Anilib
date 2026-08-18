@@ -43,6 +43,7 @@ internal fun SettingsScreen(
     presentation: SettingsPresentation,
     settings: SettingsSnapshot,
     maintenance: NetworkMaintenance,
+    browserDataController: BrowserDataController,
     goBack: () -> Unit,
 ) {
     var confirmation by remember { mutableStateOf<MaintenanceAction?>(null) }
@@ -119,6 +120,11 @@ internal fun SettingsScreen(
                     confirmation = MaintenanceAction.CACHE
                 }
             }
+            item {
+                SettingsRow("Clear WebView data", "Remove browser cookies, cache, and site storage") {
+                    confirmation = MaintenanceAction.BROWSER_DATA
+                }
+            }
             result?.let { message ->
                 item {
                     Text(
@@ -153,6 +159,21 @@ internal fun SettingsScreen(
                         MaintenanceAction.CACHE -> {
                             maintenance.clearResponseCache()
                             result = action.result
+                        }
+                        MaintenanceAction.BROWSER_DATA -> scope.launch {
+                            val browserCookiesCleared = runCatching {
+                                browserCookies.removeAllCookies()
+                            }.isSuccess
+                            maintenance.clearCookies()
+                            val browserData = browserDataController.clearData()
+                            result = when {
+                                !browserData.successful ->
+                                    "HTTP cookies cleared. ${browserData.message}"
+                                !browserCookiesCleared ->
+                                    "HTTP cookies cleared. ${browserData.message} " +
+                                        "WebView cookies were unavailable."
+                                else -> "HTTP and WebView cookies cleared. ${browserData.message}"
+                            }
                         }
                     }
                     confirmation = null
@@ -228,5 +249,10 @@ private enum class MaintenanceAction(val title: String, val warning: String, val
         "Clear network cache?",
         "Cached source responses will be downloaded again when needed.",
         "Network cache cleared.",
+    ),
+    BROWSER_DATA(
+        "Clear WebView data?",
+        "Browser sessions and stored website data will be removed. This cannot be undone.",
+        "WebView data cleared.",
     ),
 }

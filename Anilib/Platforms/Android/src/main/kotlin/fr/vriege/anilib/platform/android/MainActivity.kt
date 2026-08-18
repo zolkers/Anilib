@@ -62,6 +62,7 @@ class MainActivity : ComponentActivity() {
             this,
             started.capability(NetworkCapabilities.HTTP_CLIENT),
         )
+        val browserDataController = AndroidBrowserDataController(this)
         val componentCount = started.components().size
         setContent {
             AnilibApp(
@@ -72,6 +73,7 @@ class MainActivity : ComponentActivity() {
                 networkMaintenance = started.capability(NetworkCapabilities.MAINTENANCE),
                 browserCookies = started.capability(NetworkCapabilities.COOKIES),
                 browserRuntimeStatus = BrowserRuntimeStatus.ready(),
+                browserDataController = browserDataController,
                 settingsPresentation = started.capability(SettingsUiCapabilities.PRESENTATION),
                 reader = reader,
                 player = player,

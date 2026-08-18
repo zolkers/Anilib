@@ -76,7 +76,8 @@ platform-specific.
 - [x] live Android and desktop theme selection from shared settings
 - [ ] enforce Wi-Fi, incognito, and adult-content policies in their owning Bundles
 - [x] user-confirmed clear actions for shared HTTP cache, HTTP cookies, and WebView cookies
-- [ ] clear remaining WebView cache/storage and unused database entries
+- [x] clear WebView cache/storage immediately on Android and before the next KCEF startup
+- [ ] clean unused application database entries
 - [x] source and title WebView with shared browser-session cookies
 - [x] source-declared WebView headers, User-Agent, and challenge-cookie completion
 - [ ] per-screen parity audit against the current Aniyomi information architecture

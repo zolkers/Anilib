@@ -103,6 +103,14 @@ through the framework `HttpCookieJar`; only platform adapters select the
 engine, using Android System WebView or desktop KCEF. Browser engine types and
 lifecycle therefore remain outside Java feature code.
 
+Browser-data maintenance follows the same outer boundary. The shared Settings
+screen invokes a small platform controller. Android clears System WebView
+cache, JavaScript storage, HTTP authentication, certificate decisions, and
+view state on the UI thread. Desktop writes a bounded cleanup marker because
+Chromium locks its profile while KCEF is alive; the desktop browser adapter
+removes only its normalized cache subtree, without following links, before the
+next KCEF initialization.
+
 Reader is another removable vertical over Library and Source. Its Bundle
 resolves a library origin only through the typed Source registry and accepts
 only sources implementing the versioned `PagedSource` contract. The shared
