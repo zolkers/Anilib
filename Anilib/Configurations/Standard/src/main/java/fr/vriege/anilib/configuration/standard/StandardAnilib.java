@@ -2,6 +2,7 @@ package fr.vriege.anilib.configuration.standard;
 
 import fr.vriege.anilib.feature.library.bundle.LibraryPlugin;
 import fr.vriege.anilib.feature.discovery.bundle.DiscoveryPlugin;
+import fr.vriege.anilib.feature.extensionrepository.bundle.ExtensionRepositoryPlugin;
 import fr.vriege.anilib.feature.localsource.bundle.LocalSourcePlugin;
 import fr.vriege.anilib.feature.network.bundle.NetworkPlugin;
 import fr.vriege.anilib.feature.reader.bundle.ReaderPlugin;
@@ -103,6 +104,7 @@ public final class StandardAnilib {
         Path localContent = dataDirectory.toAbsolutePath().normalize().resolve("local-content");
         Path httpCache = dataDirectory.toAbsolutePath().normalize().resolve("http-cache");
         Path sourcePreferences = dataDirectory.toAbsolutePath().normalize().resolve("source-preferences.properties");
+        Path extensionRepositories = dataDirectory.toAbsolutePath().normalize().resolve("extension-repositories.txt");
         Path downloads = dataDirectory.toAbsolutePath().normalize().resolve("downloads");
         Path playbackState = dataDirectory.toAbsolutePath().normalize().resolve("playback-state.anilib");
         Path trackingState = dataDirectory.toAbsolutePath().normalize().resolve("tracking.anilib");
@@ -114,6 +116,7 @@ public final class StandardAnilib {
         plugins.add(new LocalSourcePlugin(localContent));
         plugins.add(new NetworkPlugin(httpCache, httpTransport));
         plugins.add(new DiscoveryPlugin(sourcePreferences));
+        plugins.add(new ExtensionRepositoryPlugin(extensionRepositories));
         plugins.add(new ReaderPlugin());
         plugins.add(new DownloadPlugin(downloads));
         plugins.add(new PlayerPlugin(playbackState, playerBackend));

@@ -1,0 +1,8 @@
+dependencies {
+    implementation project(':Anilib:Foundation')
+    implementation project(':Anilib:Framework:Http:Api')
+    api project(':Anilib:Kernel:Api')
+    implementation project(':Anilib:Features:Network:Api')
+    api project(':Anilib:Features:ExtensionRepository:Api')
+    implementation project(':Anilib:Features:ExtensionRepository:Runtime')
+}

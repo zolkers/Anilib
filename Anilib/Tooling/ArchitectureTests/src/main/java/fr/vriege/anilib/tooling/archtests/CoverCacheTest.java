@@ -86,7 +86,7 @@ final class CoverCacheTest {
             try (StartedAnilib application = StandardAnilib.start(
                     productDirectory,
                     List.of(new CoverCachePlugin(productDirectory.resolve("covers"))))) {
-                check(application.components().size() == 12,
+                check(application.components().size() == 13,
                         "platform plugin must extend the standard product explicitly");
                 check(application.capability(CoverCacheCapabilities.CACHE).find(key).isEmpty(),
                         "cover cache Bundle must publish its capability");

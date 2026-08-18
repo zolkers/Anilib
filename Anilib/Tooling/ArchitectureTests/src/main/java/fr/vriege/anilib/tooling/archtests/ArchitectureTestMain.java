@@ -18,6 +18,7 @@ import fr.vriege.anilib.feature.updates.UpdateCapabilities;
 import fr.vriege.anilib.feature.updates.ui.UpdateUiCapabilities;
 import fr.vriege.anilib.feature.downloads.DownloadCapabilities;
 import fr.vriege.anilib.feature.downloads.ui.DownloadUiCapabilities;
+import fr.vriege.anilib.feature.extensionrepository.ExtensionRepositoryCapabilities;
 import fr.vriege.anilib.feature.backup.BackupCapabilities;
 import fr.vriege.anilib.feature.backup.ui.BackupUiCapabilities;
 import fr.vriege.anilib.feature.library.ui.LibraryUiCapabilities;
@@ -63,6 +64,7 @@ public final class ArchitectureTestMain {
         assertions += SourceExtensionIsolationRuleTest.run();
         assertions += DesktopReleaseRuleTest.run();
         assertions += AndroidReleaseRuleTest.run();
+        assertions += ExtensionRepositoryTest.run();
         assertions += DiscoveryTest.run();
         assertions += HttpFrameworkTest.run();
         assertions += ReaderTest.run();
@@ -86,7 +88,9 @@ public final class ArchitectureTestMain {
             LibraryItem item = LibraryItem.create("A test title", MediaKind.MANGA);
             catalog.save(item);
             check(catalog.find(item.id()).orElseThrow().equals(item), "library must return saved item");
-            check(application.components().size() == 11, "standard product must install eleven bootstrap bundles");
+            check(application.components().size() == 12, "standard product must install twelve bootstrap bundles");
+            check(application.capability(ExtensionRepositoryCapabilities.SERVICE).repositories().isEmpty(),
+                    "standard product must ship without a third-party extension repository");
             check(application.capability(LocalSourceCapabilities.CONTENT).publications().isEmpty(),
                     "standard product must expose the local source capability");
             SourceRegistry sourceRegistry = application.capability(SourceCapabilities.REGISTRY);

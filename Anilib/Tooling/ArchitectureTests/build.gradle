@@ -11,6 +11,8 @@ dependencies {
     implementation project(':Anilib:Features:Discovery:Api')
     implementation project(':Anilib:Features:Discovery:Runtime')
     implementation project(':Anilib:Features:Discovery:Ui')
+    implementation project(':Anilib:Features:ExtensionRepository:Api')
+    implementation project(':Anilib:Features:ExtensionRepository:Runtime')
     implementation project(':Anilib:Features:CoverCache:Api')
     implementation project(':Anilib:Features:CoverCache:Runtime')
     implementation project(':Anilib:Features:CoverCache:Bundle')
