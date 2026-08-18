@@ -9,7 +9,8 @@ adapters and are enforced by `AnilibJava`.
 | Component | Version | Purpose | License |
 | --- | --- | --- | --- |
 | Kotlin JVM, Multiplatform, and Compose compiler plugins | 2.4.10 | Compile platform renderers | Apache-2.0 |
-| Compose Multiplatform | 1.11.0 | Shared adaptive UI, Desktop runtime, Material 3, and icons | Apache-2.0 |
+| Compose Multiplatform | 1.11.1 | Shared adaptive UI, Desktop runtime, Material 3, and icons | Apache-2.0 |
+| ComposeMediaPlayer | 0.11.4 | Shared video surface over platform-native media engines | Apache-2.0 |
 
 ## Android application
 
@@ -17,11 +18,13 @@ adapters and are enforced by `AnilibJava`.
 | --- | --- | --- | --- |
 | Android Gradle Plugin | 9.1.1 | Build the Android library target and APK | Apache-2.0 |
 | AndroidX Activity Compose | 1.13.0 | Own the Android activity and Compose content boundary | Apache-2.0 |
+| AndroidX Media3 HLS | 1.10.1 | HLS playback for the Android media backend | Apache-2.0 |
 
 Primary projects:
 
 - <https://github.com/JetBrains/kotlin>
 - <https://github.com/JetBrains/compose-multiplatform>
+- <https://github.com/kdroidFilter/ComposeMediaPlayer>
 - <https://android.googlesource.com/platform/tools/base>
 - <https://android.googlesource.com/platform/frameworks/support>
 

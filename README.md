@@ -37,7 +37,10 @@ source preferences, and playback state with merge semantics and cross-section
 rollback.
 The removable Player Bundle consumes Source API 1.4 streaming extensions,
 exposes episodes, qualities, formats, request metadata, and subtitles, and
-persists per-episode resume and watched state across Android and desktop.
+persists per-episode resume and watched state across Android and desktop. Its
+narrow Java backend capability drives an Aniyomi-style shared video surface,
+using Media3 on Android and native media engines on desktop without leaking
+either implementation into the shared product core.
 The repository also contains the dependency-free
 `AnilibJava` quality checker. Kotlin and audited UI dependencies are confined
 to outer platform renderers; shared contracts and behavior remain Java 21.
@@ -54,9 +57,10 @@ Use Java 21 from the repository root:
 ```
 
 Only platform UI modules configure dependency repositories. The current
-allowlist contains Kotlin, Compose Multiplatform, Android Gradle Plugin, and
-AndroidX Activity only in their owning platform builds. The Android SDK remains
-an outer platform toolchain and may not leak into neutral modules.
+allowlist contains Kotlin, Compose Multiplatform, ComposeMediaPlayer, Android
+Gradle Plugin, and the exact AndroidX components used by their owning platform
+builds. The Android SDK remains an outer platform toolchain and may not leak
+into neutral modules.
 See [THIRD_PARTY.md](THIRD_PARTY.md) for the exact audited coordinates.
 
 See [ARCHITECTURE.md](Anilib/ARCHITECTURE.md) and
