@@ -12,6 +12,10 @@ import fr.vriege.anilib.feature.player.PlayerBackends;
 import fr.vriege.anilib.feature.player.bundle.PlayerPlugin;
 import fr.vriege.anilib.feature.tracker.TrackerCapabilities;
 import fr.vriege.anilib.feature.tracker.bundle.TrackerPlugin;
+import fr.vriege.anilib.feature.updates.LibraryUpdateNotifier;
+import fr.vriege.anilib.feature.updates.LibraryUpdateNotifiers;
+import fr.vriege.anilib.feature.updates.UpdateCapabilities;
+import fr.vriege.anilib.feature.updates.bundle.UpdatePlugin;
 import fr.vriege.anilib.feature.backup.bundle.BackupPlugin;
 import fr.vriege.anilib.feature.source.bundle.SourceSdkPlugin;
 import fr.vriege.anilib.framework.http.HttpTransport;
@@ -42,6 +46,7 @@ public final class StandardAnilib {
                 dataDirectory,
                 new UrlConnectionHttpTransport(),
                 PlayerBackends.unavailable(),
+                LibraryUpdateNotifiers.silent(),
                 additionalPlugins);
     }
 
@@ -53,6 +58,20 @@ public final class StandardAnilib {
                 dataDirectory,
                 httpTransport,
                 PlayerBackends.unavailable(),
+                LibraryUpdateNotifiers.silent(),
+                additionalPlugins);
+    }
+
+    public static StartedAnilib start(
+            Path dataDirectory,
+            HttpTransport httpTransport,
+            LibraryUpdateNotifier updateNotifier,
+            Collection<? extends AnilibPlugin> additionalPlugins) {
+        return start(
+                dataDirectory,
+                httpTransport,
+                PlayerBackends.unavailable(),
+                updateNotifier,
                 additionalPlugins);
     }
 
@@ -61,9 +80,24 @@ public final class StandardAnilib {
             HttpTransport httpTransport,
             PlayerBackend playerBackend,
             Collection<? extends AnilibPlugin> additionalPlugins) {
+        return start(
+                dataDirectory,
+                httpTransport,
+                playerBackend,
+                LibraryUpdateNotifiers.silent(),
+                additionalPlugins);
+    }
+
+    public static StartedAnilib start(
+            Path dataDirectory,
+            HttpTransport httpTransport,
+            PlayerBackend playerBackend,
+            LibraryUpdateNotifier updateNotifier,
+            Collection<? extends AnilibPlugin> additionalPlugins) {
         Objects.requireNonNull(dataDirectory, "dataDirectory must not be null");
         Objects.requireNonNull(httpTransport, "httpTransport must not be null");
         Objects.requireNonNull(playerBackend, "playerBackend must not be null");
+        Objects.requireNonNull(updateNotifier, "updateNotifier must not be null");
         Objects.requireNonNull(additionalPlugins, "additionalPlugins must not be null");
         Path libraryFile = dataDirectory.toAbsolutePath().normalize().resolve("library.anilib");
         Path localContent = dataDirectory.toAbsolutePath().normalize().resolve("local-content");
@@ -72,6 +106,7 @@ public final class StandardAnilib {
         Path downloads = dataDirectory.toAbsolutePath().normalize().resolve("downloads");
         Path playbackState = dataDirectory.toAbsolutePath().normalize().resolve("playback-state.anilib");
         Path trackingState = dataDirectory.toAbsolutePath().normalize().resolve("tracking.anilib");
+        Path updateState = dataDirectory.toAbsolutePath().normalize().resolve("library-updates.anilib");
         Path backups = dataDirectory.toAbsolutePath().normalize().resolve("backups");
         List<AnilibPlugin> plugins = new ArrayList<>();
         plugins.add(new LibraryPlugin(libraryFile));
@@ -83,9 +118,13 @@ public final class StandardAnilib {
         plugins.add(new DownloadPlugin(downloads));
         plugins.add(new PlayerPlugin(playbackState, playerBackend));
         plugins.add(new TrackerPlugin(trackingState));
+        plugins.add(new UpdatePlugin(updateState, updateNotifier));
         plugins.add(new BackupPlugin(
                 backups,
-                List.of(PlayerCapabilities.BACKUP_CODEC, TrackerCapabilities.BACKUP_CODEC)));
+                List.of(
+                        PlayerCapabilities.BACKUP_CODEC,
+                        TrackerCapabilities.BACKUP_CODEC,
+                        UpdateCapabilities.BACKUP_CODEC)));
         plugins.addAll(additionalPlugins);
         return new DefaultPluginEngine().start(List.copyOf(plugins));
     }

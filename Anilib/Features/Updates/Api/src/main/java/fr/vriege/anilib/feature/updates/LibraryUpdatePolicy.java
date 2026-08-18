@@ -1,0 +1,37 @@
+package fr.vriege.anilib.feature.updates;
+
+import java.util.Objects;
+import java.util.Set;
+
+/** Durable restrictions controlling which library titles are refreshed. */
+public record LibraryUpdatePolicy(
+        UpdateInterval interval,
+        boolean favoritesOnly,
+        boolean skipCompleted,
+        boolean skipNotStarted,
+        Set<String> includedCategories,
+        Set<String> excludedCategories) {
+    public LibraryUpdatePolicy {
+        Objects.requireNonNull(interval, "interval must not be null");
+        includedCategories = validatedCategories(includedCategories, "includedCategories");
+        excludedCategories = validatedCategories(excludedCategories, "excludedCategories");
+    }
+
+    public static LibraryUpdatePolicy defaults() {
+        return new LibraryUpdatePolicy(
+                UpdateInterval.DAILY,
+                false,
+                false,
+                false,
+                Set.of(),
+                Set.of());
+    }
+
+    private static Set<String> validatedCategories(Set<String> categories, String name) {
+        Set<String> copy = Set.copyOf(Objects.requireNonNull(categories, name + " must not be null"));
+        if (copy.stream().anyMatch(String::isBlank)) {
+            throw new IllegalArgumentException(name + " must not contain blank values");
+        }
+        return copy;
+    }
+}
