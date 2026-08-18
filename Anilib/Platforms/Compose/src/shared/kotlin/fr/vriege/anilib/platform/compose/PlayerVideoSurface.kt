@@ -48,6 +48,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import fr.vriege.anilib.feature.player.PlayerPlayback
+import fr.vriege.anilib.feature.player.PlayerAdvancedCapability
+import fr.vriege.anilib.feature.player.PlayerAdvancedState
 import fr.vriege.anilib.feature.player.PlayerOrientationPolicy
 import fr.vriege.anilib.feature.player.ui.PlayerController
 import io.github.kdroidfilter.composemediaplayer.VideoPlayerSurface
@@ -64,6 +66,8 @@ internal fun PlayerVideoSurface(
     requestPictureInPicture: () -> Unit,
     setPlayerActive: (Boolean) -> Unit,
     setBackgroundAudio: (Boolean) -> Unit,
+    enableAndroidControls: Boolean,
+    enableDesktopControls: Boolean,
 ) {
     val bridge = playback as? ComposePlayerPlayback
     if (bridge == null) {
@@ -78,6 +82,7 @@ internal fun PlayerVideoSurface(
     var volume by remember(bridge) { mutableFloatStateOf(bridge.snapshot().volume()) }
     var orientation by remember(bridge) { mutableStateOf(PlayerOrientationPolicy.SYSTEM) }
     var customMenu by remember(bridge) { mutableStateOf(false) }
+    var advancedMenu by remember(bridge) { mutableStateOf(false) }
     var backgroundAudio by remember(bridge) { mutableStateOf(false) }
     var leftAction by remember(bridge) { mutableStateOf(PlayerCustomAction.SEEK_BACK) }
     var rightAction by remember(bridge) { mutableStateOf(PlayerCustomAction.SEEK_FORWARD) }
@@ -299,14 +304,24 @@ internal fun PlayerVideoSurface(
                         TextButton(onClick = ::cycleSpeed) {
                             Text("${bridge.snapshot().playbackSpeed()}×", color = Color.White)
                         }
-                        TextButton(onClick = requestPictureInPicture) {
-                            Text("PiP", color = Color.White)
+                        if (enableAndroidControls) {
+                            TextButton(onClick = requestPictureInPicture) {
+                                Text("PiP", color = Color.White)
+                            }
+                            TextButton(onClick = {
+                                backgroundAudio = !backgroundAudio
+                                setBackgroundAudio(backgroundAudio)
+                            }) {
+                                Text(
+                                    if (backgroundAudio) "Background on" else "Background off",
+                                    color = Color.White,
+                                )
+                            }
                         }
-                        TextButton(onClick = {
-                            backgroundAudio = !backgroundAudio
-                            setBackgroundAudio(backgroundAudio)
-                        }) {
-                            Text(if (backgroundAudio) "Background on" else "Background off", color = Color.White)
+                        if (enableDesktopControls && controller.advancedCapabilities().isNotEmpty()) {
+                            TextButton(onClick = { advancedMenu = true }) {
+                                Text("Advanced", color = Color.White)
+                            }
                         }
                         IconButton(onClick = ::cycleOrientation) {
                             Icon(Icons.Default.ScreenRotation, "Orientation", tint = Color.White)
@@ -340,7 +355,92 @@ internal fun PlayerVideoSurface(
                 close = { customMenu = false },
             )
         }
+        if (advancedMenu) {
+            PlayerAdvancedDialog(controller, close = { advancedMenu = false })
+        }
     }
+}
+
+@Composable
+private fun PlayerAdvancedDialog(controller: PlayerController, close: () -> Unit) {
+    var revision by remember(controller) { mutableStateOf(0) }
+    var error by remember(controller) { mutableStateOf<String?>(null) }
+    val capabilities = controller.advancedCapabilities()
+    val state = remember(controller, revision) {
+        controller.advancedState().orElse(PlayerAdvancedState.defaults())
+    }
+    val command: (() -> Unit) -> Unit = { action ->
+        runCatching(action)
+            .onSuccess {
+                error = null
+                revision++
+            }
+            .onFailure { error = it.message ?: "Advanced player command failed." }
+    }
+    AlertDialog(
+        onDismissRequest = close,
+        title = { Text("Desktop player controls") },
+        text = {
+            Column {
+                error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                if (PlayerAdvancedCapability.LOOP in capabilities) {
+                    TextButton(onClick = { command { controller.setLoop(!state.loop()) } }) {
+                        Text(if (state.loop()) "Loop: On" else "Loop: Off")
+                    }
+                }
+                if (PlayerAdvancedCapability.RESTART in capabilities) {
+                    TextButton(onClick = { command(controller::restart) }) { Text("Restart") }
+                }
+                if (PlayerAdvancedCapability.FRAME_STEP in capabilities) {
+                    TextButton(onClick = { command(controller::frameStep) }) { Text("Next frame") }
+                }
+                if (PlayerAdvancedCapability.AUDIO_DELAY in capabilities) {
+                    DelayControl("Audio delay", state.audioDelayMillis()) {
+                        command { controller.setAudioDelay(it) }
+                    }
+                }
+                if (PlayerAdvancedCapability.SUBTITLE_DELAY in capabilities) {
+                    DelayControl("Subtitle delay", state.subtitleDelayMillis()) {
+                        command { controller.setSubtitleDelay(it) }
+                    }
+                }
+                if (PlayerAdvancedCapability.ASPECT_RATIO in capabilities) {
+                    TextButton(onClick = {
+                        command { controller.setAspectRatio(nextAspectRatio(state.aspectRatio())) }
+                    }) {
+                        Text("Aspect ratio: ${state.aspectRatio().orElse("Auto")}")
+                    }
+                }
+                if (PlayerAdvancedCapability.DEINTERLACE in capabilities) {
+                    TextButton(onClick = {
+                        command { controller.setDeinterlace(!state.deinterlace()) }
+                    }) {
+                        Text(if (state.deinterlace()) "Deinterlace: On" else "Deinterlace: Off")
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = close) { Text("Done") } },
+    )
+}
+
+@Composable
+private fun DelayControl(label: String, delayMillis: Long, update: (Long) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text("$label: ${delayMillis}ms", modifier = Modifier.weight(1f))
+        TextButton(onClick = { update((delayMillis - 50L).coerceAtLeast(-600_000L)) }) {
+            Text("-50")
+        }
+        TextButton(onClick = { update((delayMillis + 50L).coerceAtMost(600_000L)) }) {
+            Text("+50")
+        }
+    }
+}
+
+private fun nextAspectRatio(current: java.util.Optional<String>): java.util.Optional<String> {
+    val values = listOf(null, "16:9", "4:3", "2.35:1", "1:1")
+    val next = values[(values.indexOf(current.orElse(null)) + 1) % values.size]
+    return java.util.Optional.ofNullable(next)
 }
 
 private enum class PlayerCustomAction(val label: String) {

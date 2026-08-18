@@ -220,7 +220,7 @@ platform-specific.
 - [x] add decoder, audio, subtitle, quality, skip-intro/outro, and per-title
   preference policies
 - [x] add Android picture-in-picture and background/audio behavior
-- [ ] add desktop advanced controls and mpv-compatible policy where the selected
+- [x] add desktop advanced controls and mpv-compatible policy where the selected
   native backend supports it
 
 ### 5. Downloads and library updates

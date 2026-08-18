@@ -1,6 +1,9 @@
 package fr.vriege.anilib.platform.compose
 
 import fr.vriege.anilib.feature.player.PlaybackState
+import fr.vriege.anilib.feature.player.PlayerAdvancedCapability
+import fr.vriege.anilib.feature.player.PlayerAdvancedPlayback
+import fr.vriege.anilib.feature.player.PlayerAdvancedState
 import fr.vriege.anilib.feature.player.PlayerBackend
 import fr.vriege.anilib.feature.player.PlayerException
 import fr.vriege.anilib.feature.player.PlayerMedia
@@ -24,7 +27,7 @@ class ComposePlayerBackend : PlayerBackend {
 
 internal class ComposePlayerPlayback(
     private val media: PlayerMedia,
-) : PlayerPlayback {
+) : PlayerPlayback, PlayerAdvancedPlayback {
     private val headerProxy = if (
         media.stream().headers().isNotEmpty() || media.stream().subtitles().any { it.headers().isNotEmpty() }
     ) {
@@ -49,6 +52,7 @@ internal class ComposePlayerPlayback(
     private var requestedVolume = 1f
     private var requestedSpeed = 1f
     private var requestedSubtitle = media.subtitleId()
+    private var requestedLoop = false
     @Volatile
     private var ended = false
     private var closed = false
@@ -132,12 +136,36 @@ internal class ComposePlayerPlayback(
         applySubtitle(state)
     }
 
+    override fun advancedCapabilities(): Set<PlayerAdvancedCapability> = setOf(
+        PlayerAdvancedCapability.LOOP,
+        PlayerAdvancedCapability.RESTART,
+    )
+
+    override fun advancedState(): PlayerAdvancedState = synchronized(this) {
+        ensureOpen()
+        PlayerAdvancedState(requestedLoop, 0L, 0L, Optional.empty(), false)
+    }
+
+    override fun setLoop(loop: Boolean) = synchronized(this) {
+        ensureOpen()
+        requestedLoop = loop
+        state?.loop = loop
+    }
+
+    override fun restart() = synchronized(this) {
+        ensureOpen()
+        ended = false
+        state?.restart()
+        Unit
+    }
+
     fun attach(player: VideoPlayerState) = synchronized(this) {
         ensureOpen()
         state = player
         ended = false
         player.volume = requestedVolume
         player.playbackSpeed = requestedSpeed
+        player.loop = requestedLoop
         player.onPlaybackEnded = { ended = true }
         player.openUri(mediaLocation, InitialPlayerState.PLAY)
         applySubtitle(player)

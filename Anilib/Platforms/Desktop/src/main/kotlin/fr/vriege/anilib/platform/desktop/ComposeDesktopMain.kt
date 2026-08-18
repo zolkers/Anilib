@@ -95,6 +95,8 @@ fun main() {
                 requestPlayerPictureInPicture = {},
                 setPlayerActive = {},
                 setPlayerBackgroundAudio = {},
+                enableAndroidPlayerControls = false,
+                enableDesktopPlayerControls = true,
                 componentCount = started.components().size,
                 darkTheme = desktopDarkTheme(),
             )

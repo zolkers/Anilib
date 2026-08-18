@@ -3,6 +3,11 @@
 Anilib produces self-contained desktop packages through the Compose
 Multiplatform `jpackage` integration:
 
+The desktop Player negotiates advanced commands with its selected native
+backend. The bundled backend currently advertises loop and restart; compatible
+backends may additionally expose frame stepping, audio/subtitle delay, aspect
+ratio, and deinterlacing through the same platform-neutral contract.
+
 - `Anilib-<version>.msi` on Windows;
 - `anilib_<version>-1_amd64.deb` on Linux;
 - `Anilib-<version>.dmg` on macOS.

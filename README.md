@@ -42,6 +42,9 @@ Its persistent global or per-title profile selects decoder and audio hints,
 quality and subtitle behavior, and configurable intro/outro skip boundaries.
 Android adds manual or automatic picture-in-picture and an explicit background
 audio mode backed by a media-playback foreground service and notification.
+Desktop exposes only the advanced commands advertised by its selected backend;
+the contract covers loop/restart plus mpv-style frame stepping, audio/subtitle
+delay, aspect ratio, and deinterlacing without coupling the product to mpv.
 The shared Library screen persists grid/list density, sorting, and its landing
 category. Its category manager creates, renames, reorders, and deletes durable
 categories while retaining per-category display and update policy.

@@ -163,6 +163,8 @@ fun AnilibApp(
     requestPlayerPictureInPicture: () -> Unit,
     setPlayerActive: (Boolean) -> Unit,
     setPlayerBackgroundAudio: (Boolean) -> Unit,
+    enableAndroidPlayerControls: Boolean,
+    enableDesktopPlayerControls: Boolean,
     componentCount: Int,
     darkTheme: Boolean = isSystemInDarkTheme(),
 ) {
@@ -222,6 +224,8 @@ fun AnilibApp(
                     requestPlayerPictureInPicture,
                     setPlayerActive,
                     setPlayerBackgroundAudio,
+                    enableAndroidPlayerControls,
+                    enableDesktopPlayerControls,
                 ) {
                     activePlayerTitle = null
                 }

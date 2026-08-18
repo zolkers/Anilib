@@ -104,6 +104,8 @@ class MainActivity : ComponentActivity() {
                 requestPlayerPictureInPicture = ::enterPlayerPictureInPicture,
                 setPlayerActive = ::setPlayerActive,
                 setPlayerBackgroundAudio = ::setPlayerBackgroundAudio,
+                enableAndroidPlayerControls = true,
+                enableDesktopPlayerControls = false,
                 componentCount = componentCount,
             )
         }

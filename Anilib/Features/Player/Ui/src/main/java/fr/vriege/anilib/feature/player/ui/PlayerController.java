@@ -3,6 +3,10 @@ package fr.vriege.anilib.feature.player.ui;
 import fr.vriege.anilib.feature.player.PlayerSession;
 import fr.vriege.anilib.feature.player.PlayerSessionSnapshot;
 import fr.vriege.anilib.feature.player.PlayerPlayback;
+import fr.vriege.anilib.feature.player.PlayerAdvancedCapability;
+import fr.vriege.anilib.feature.player.PlayerAdvancedPlayback;
+import fr.vriege.anilib.feature.player.PlayerAdvancedState;
+import fr.vriege.anilib.feature.player.PlayerException;
 import fr.vriege.anilib.feature.player.PlayerPreferenceStore;
 import fr.vriege.anilib.feature.player.PlayerPreferences;
 import fr.vriege.anilib.feature.player.PlayerQualityPolicy;
@@ -11,8 +15,10 @@ import fr.vriege.anilib.feature.source.SourceSubtitleTrack;
 import fr.vriege.anilib.feature.source.SourceVideoStream;
 
 import java.util.Comparator;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 public final class PlayerController implements AutoCloseable {
     private final PlayerSession session;
@@ -93,6 +99,48 @@ public final class PlayerController implements AutoCloseable {
         session.setPlaybackSpeed(speed);
     }
 
+    public Set<PlayerAdvancedCapability> advancedCapabilities() {
+        if (session.playback() instanceof PlayerAdvancedPlayback advanced) {
+            return Set.copyOf(advanced.advancedCapabilities());
+        }
+        return Set.of();
+    }
+
+    public Optional<PlayerAdvancedState> advancedState() {
+        if (session.playback() instanceof PlayerAdvancedPlayback advanced) {
+            return Optional.of(advanced.advancedState());
+        }
+        return Optional.empty();
+    }
+
+    public void setLoop(boolean loop) {
+        advanced(PlayerAdvancedCapability.LOOP).setLoop(loop);
+    }
+
+    public void restart() {
+        advanced(PlayerAdvancedCapability.RESTART).restart();
+    }
+
+    public void frameStep() {
+        advanced(PlayerAdvancedCapability.FRAME_STEP).frameStep();
+    }
+
+    public void setAudioDelay(long delayMillis) {
+        advanced(PlayerAdvancedCapability.AUDIO_DELAY).setAudioDelay(delayMillis);
+    }
+
+    public void setSubtitleDelay(long delayMillis) {
+        advanced(PlayerAdvancedCapability.SUBTITLE_DELAY).setSubtitleDelay(delayMillis);
+    }
+
+    public void setAspectRatio(Optional<String> aspectRatio) {
+        advanced(PlayerAdvancedCapability.ASPECT_RATIO).setAspectRatio(aspectRatio);
+    }
+
+    public void setDeinterlace(boolean enabled) {
+        advanced(PlayerAdvancedCapability.DEINTERLACE).setDeinterlace(enabled);
+    }
+
     public void updatePlayback(long positionMillis, long durationMillis) {
         session.updatePlayback(positionMillis, durationMillis);
     }
@@ -170,5 +218,14 @@ public final class PlayerController implements AutoCloseable {
             }
         }
         return digit ? Math.max(score, current) : score;
+    }
+
+    private PlayerAdvancedPlayback advanced(PlayerAdvancedCapability capability) {
+        if (!(session.playback() instanceof PlayerAdvancedPlayback advanced)
+                || !advanced.advancedCapabilities().contains(capability)) {
+            throw new PlayerException(
+                    "Player backend does not support " + capability.name().toLowerCase(Locale.ROOT));
+        }
+        return advanced;
     }
 }

@@ -11,6 +11,9 @@ import fr.vriege.anilib.feature.library.LibraryOrigin;
 import fr.vriege.anilib.feature.library.MediaKind;
 import fr.vriege.anilib.feature.player.EpisodeSnapshot;
 import fr.vriege.anilib.feature.player.PlayerBackend;
+import fr.vriege.anilib.feature.player.PlayerAdvancedCapability;
+import fr.vriege.anilib.feature.player.PlayerAdvancedPlayback;
+import fr.vriege.anilib.feature.player.PlayerAdvancedState;
 import fr.vriege.anilib.feature.player.PlayerCapabilities;
 import fr.vriege.anilib.feature.player.PlayerException;
 import fr.vriege.anilib.feature.player.PlayerDecoderPolicy;
@@ -123,6 +126,28 @@ final class PlayerTest {
                 counter.check(media.decoderPolicy() == PlayerDecoderPolicy.SOFTWARE
                                 && media.preferredAudioLanguage().orElseThrow().equals("ja"),
                         "decoder and audio policy must reach the platform backend");
+                counter.check(controller.advancedCapabilities().equals(Set.of(
+                                PlayerAdvancedCapability.LOOP,
+                                PlayerAdvancedCapability.RESTART,
+                                PlayerAdvancedCapability.FRAME_STEP,
+                                PlayerAdvancedCapability.AUDIO_DELAY,
+                                PlayerAdvancedCapability.SUBTITLE_DELAY,
+                                PlayerAdvancedCapability.ASPECT_RATIO,
+                                PlayerAdvancedCapability.DEINTERLACE)),
+                        "Player UI must expose only advanced capabilities advertised by the backend");
+                controller.setLoop(true);
+                controller.setAudioDelay(125L);
+                controller.setSubtitleDelay(-250L);
+                controller.setAspectRatio(Optional.of("16:9"));
+                controller.setDeinterlace(true);
+                controller.frameStep();
+                PlayerAdvancedState advanced = controller.advancedState().orElseThrow();
+                counter.check(advanced.loop()
+                                && advanced.audioDelayMillis() == 125L
+                                && advanced.subtitleDelayMillis() == -250L
+                                && advanced.aspectRatio().orElseThrow().equals("16:9")
+                                && advanced.deinterlace(),
+                        "advanced Player controls must delegate through the mpv-compatible contract");
             }
             try (PlayerController reopened = presentation.open(item.id(), FIRST_EPISODE.id())) {
                 counter.check(reopened.preferences().equals(preferences),
@@ -467,13 +492,14 @@ final class PlayerTest {
         }
     }
 
-    private static final class RecordingPlayback implements PlayerPlayback {
+    private static final class RecordingPlayback implements PlayerPlayback, PlayerAdvancedPlayback {
         private final PlayerMedia media;
         private PlayerPlaybackStatus status = PlayerPlaybackStatus.PAUSED;
         private long position;
         private float volume = 1.0f;
         private float speed = 1.0f;
         private boolean closed;
+        private PlayerAdvancedState advanced = PlayerAdvancedState.defaults();
 
         private RecordingPlayback(PlayerMedia media) {
             this.media = media;
@@ -524,6 +550,78 @@ final class PlayerTest {
         @Override
         public void selectSubtitle(Optional<String> subtitleId) {
             // The Player session validates ownership before delegation.
+        }
+
+        @Override
+        public Set<PlayerAdvancedCapability> advancedCapabilities() {
+            return Set.of(PlayerAdvancedCapability.values());
+        }
+
+        @Override
+        public PlayerAdvancedState advancedState() {
+            return advanced;
+        }
+
+        @Override
+        public void setLoop(boolean loop) {
+            advanced = new PlayerAdvancedState(
+                    loop,
+                    advanced.audioDelayMillis(),
+                    advanced.subtitleDelayMillis(),
+                    advanced.aspectRatio(),
+                    advanced.deinterlace());
+        }
+
+        @Override
+        public void restart() {
+            position = 0L;
+            status = PlayerPlaybackStatus.PLAYING;
+        }
+
+        @Override
+        public void frameStep() {
+            position += 40L;
+            status = PlayerPlaybackStatus.PAUSED;
+        }
+
+        @Override
+        public void setAudioDelay(long delayMillis) {
+            advanced = new PlayerAdvancedState(
+                    advanced.loop(),
+                    delayMillis,
+                    advanced.subtitleDelayMillis(),
+                    advanced.aspectRatio(),
+                    advanced.deinterlace());
+        }
+
+        @Override
+        public void setSubtitleDelay(long delayMillis) {
+            advanced = new PlayerAdvancedState(
+                    advanced.loop(),
+                    advanced.audioDelayMillis(),
+                    delayMillis,
+                    advanced.aspectRatio(),
+                    advanced.deinterlace());
+        }
+
+        @Override
+        public void setAspectRatio(Optional<String> aspectRatio) {
+            advanced = new PlayerAdvancedState(
+                    advanced.loop(),
+                    advanced.audioDelayMillis(),
+                    advanced.subtitleDelayMillis(),
+                    aspectRatio,
+                    advanced.deinterlace());
+        }
+
+        @Override
+        public void setDeinterlace(boolean enabled) {
+            advanced = new PlayerAdvancedState(
+                    advanced.loop(),
+                    advanced.audioDelayMillis(),
+                    advanced.subtitleDelayMillis(),
+                    advanced.aspectRatio(),
+                    enabled);
         }
 
         @Override

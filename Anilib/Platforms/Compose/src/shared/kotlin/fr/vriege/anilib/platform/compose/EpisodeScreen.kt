@@ -63,6 +63,8 @@ internal fun EpisodeScreen(
     requestPictureInPicture: () -> Unit,
     setPlayerActive: (Boolean) -> Unit,
     setBackgroundAudio: (Boolean) -> Unit,
+    enableAndroidControls: Boolean,
+    enableDesktopControls: Boolean,
     goBack: () -> Unit,
 ) {
     var revision by remember(presentation, libraryItemId) { mutableIntStateOf(0) }
@@ -87,6 +89,8 @@ internal fun EpisodeScreen(
             requestPictureInPicture,
             setPlayerActive,
             setBackgroundAudio,
+            enableAndroidControls,
+            enableDesktopControls,
         ) { activeController = null }
         return
     }
@@ -202,6 +206,8 @@ private fun PlayerSelectionScreen(
     requestPictureInPicture: () -> Unit,
     setPlayerActive: (Boolean) -> Unit,
     setBackgroundAudio: (Boolean) -> Unit,
+    enableAndroidControls: Boolean,
+    enableDesktopControls: Boolean,
     goBack: () -> Unit,
 ) {
     var revision by remember(controller) { mutableIntStateOf(0) }
@@ -252,6 +258,8 @@ private fun PlayerSelectionScreen(
                     requestPictureInPicture,
                     setPlayerActive,
                     setBackgroundAudio,
+                    enableAndroidControls,
+                    enableDesktopControls,
                 )
             }
             item {
