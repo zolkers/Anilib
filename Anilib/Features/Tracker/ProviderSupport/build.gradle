@@ -1,0 +1,4 @@
+dependencies {
+    api project(':Anilib:Features:Tracker:Api')
+    implementation project(':Anilib:Framework:Http:Api')
+}

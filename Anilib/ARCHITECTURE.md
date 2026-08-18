@@ -207,6 +207,10 @@ filesystem, reflection, Network, and Kernel import bans used for source
 extensions. Core stores no credentials. It atomically persists only remote
 title mirrors and owns their versioned `tracking` backup section. Android and
 desktop share the same account settings, search, binding, and editing surfaces.
+Optional first-party AniList and Kitsu Bundles use this same boundary: AniList
+performs token-authenticated GraphQL operations only at `graphql.anilist.co`,
+while Kitsu performs its password OAuth and JSON:API lifecycle only at
+`kitsu.io`. Neither Bundle is selected by Standard or persists its session.
 
 Updates is a removable vertical over Library and Source. Its single shared job
 filters eligible titles, groups them by source, runs at most five source groups

@@ -236,7 +236,7 @@ platform-specific.
 
 ### 6. Tracking and backup
 
-- [ ] ship opt-in first-party tracker Bundles with complete authentication flows
+- [x] ship opt-in first-party tracker Bundles with complete authentication flows
   for the selected services
 - [ ] add provider icons, richer search/edit dialogs, automatic synchronization,
   conflict handling, and sync preferences

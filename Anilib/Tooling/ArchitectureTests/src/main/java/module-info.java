@@ -43,6 +43,8 @@ module fr.vriege.anilib.tooling.archtests {
     requires fr.vriege.anilib.feature.player.runtime;
     requires fr.vriege.anilib.feature.player.ui;
     requires fr.vriege.anilib.feature.tracker.api;
+    requires fr.vriege.anilib.feature.tracker.anilist;
+    requires fr.vriege.anilib.feature.tracker.kitsu;
     requires fr.vriege.anilib.feature.tracker.runtime;
     requires fr.vriege.anilib.feature.tracker.ui;
     requires fr.vriege.anilib.feature.updates.api;

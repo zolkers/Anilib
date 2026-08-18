@@ -42,6 +42,8 @@ dependencies {
     implementation project(':Anilib:Features:Player:Runtime')
     implementation project(':Anilib:Features:Player:Ui')
     implementation project(':Anilib:Features:Tracker:Api')
+    implementation project(':Anilib:Features:Tracker:AniList')
+    implementation project(':Anilib:Features:Tracker:Kitsu')
     implementation project(':Anilib:Features:Tracker:Runtime')
     implementation project(':Anilib:Features:Tracker:Ui')
     implementation project(':Anilib:Features:Updates:Api')
