@@ -65,6 +65,13 @@ portable Bundles are revalidated on restart and loaded through one explicit,
 in-memory JPMS layer per artifact into the shared Source registry; a broken
 artifact is reported without blocking valid Bundles. Anilib ships with no
 third-party source catalogue.
+On Android, the same screen inventories installed Aniyomi extension APKs that
+the OS already exposes, including their source entrypoints, Aniyomi library
+generation,
+content flags, and signing-certificate fingerprints. This metadata-only bridge
+does not load legacy bytecode or request unrestricted package visibility;
+executing those APKs still requires an isolated implementation of Aniyomi's
+host ABI. Portable Anilib Bundles are the executable cross-platform format.
 The removable Settings Bundle atomically persists shared appearance and policy
 preferences. System, light, and dark themes apply live on Android and desktop;
 the shared Aniyomi-style hierarchy also provides confirmed actions for clearing

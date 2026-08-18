@@ -71,7 +71,9 @@ platform-specific.
   restart-isolated module boundary
 - [x] Android-only HTTPS download and user-confirmed PackageInstaller hand-off
   for user-supplied Aniyomi extension APKs
-- [ ] best-effort Android discovery and Aniyomi extension API compatibility adapter
+- [x] best-effort Android discovery and metadata compatibility for visible Aniyomi APKs
+- [ ] execute discovered Aniyomi sources through a compatibility runtime without
+  importing Aniyomi's external host dependency graph into shared Anilib modules
 - [x] shared Settings Bundle with durable appearance and feature-policy preferences
 - [x] live Android and desktop theme selection from shared settings
 - [ ] enforce Wi-Fi, incognito, and adult-content policies in their owning Bundles

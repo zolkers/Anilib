@@ -46,7 +46,9 @@ import fr.vriege.anilib.feature.extensionrepository.InstalledExtensionPackage
 import fr.vriege.anilib.feature.extensionrepository.ui.ExtensionRepositoryPresentation
 import fr.vriege.anilib.feature.extensionrepository.ui.ExtensionRepositoryRow
 import fr.vriege.anilib.feature.extensionrepository.ui.ExtensionRepositoryView
+import fr.vriege.anilib.feature.extensionrepository.ui.LegacyExtensionCompatibility
 import fr.vriege.anilib.feature.extensionrepository.ui.LegacyExtensionInstaller
+import fr.vriege.anilib.feature.extensionrepository.ui.LegacyExtensionPackage
 import java.util.concurrent.CompletableFuture
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -61,6 +63,9 @@ internal fun ExtensionRepositoriesScreen(
     var trusting by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var legacyExtensions by remember(legacyInstaller) {
+        mutableStateOf(runCatching(legacyInstaller::discoverInstalled).getOrDefault(emptyList()))
+    }
     DisposableEffect(presentation) {
         val observation = presentation.observe { view = presentation.snapshot() }
         onDispose { observation.close() }
@@ -80,6 +85,9 @@ internal fun ExtensionRepositoriesScreen(
     }
 
     fun refresh() {
+        runCatching(legacyInstaller::discoverInstalled)
+            .onSuccess { legacyExtensions = it }
+            .onFailure { error = it.message ?: "Installed APK discovery failed." }
         complete(presentation.refreshAll())
     }
 
@@ -126,6 +134,12 @@ internal fun ExtensionRepositoriesScreen(
                 }
             }
             error?.let { message -> item { Text(message, color = MaterialTheme.colorScheme.error) } }
+            if (legacyExtensions.isNotEmpty()) {
+                item { SectionTitle("Installed Aniyomi APKs") }
+                items(legacyExtensions, key = { it.packageName() }) { extension ->
+                    LegacyExtensionCard(extension)
+                }
+            }
             if (view.trustedKeyIds().isNotEmpty()) {
                 item { SectionTitle("Trusted publishers") }
                 items(view.trustedKeyIds(), key = { it }) { keyId ->
@@ -223,6 +237,46 @@ internal fun ExtensionRepositoriesScreen(
             },
         )
     }
+}
+
+@Composable
+private fun LegacyExtensionCard(extension: LegacyExtensionPackage) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+            Text(extension.displayName(), fontWeight = FontWeight.Medium)
+            Text(
+                "v${extension.versionName()} - Aniyomi library ${extension.libraryVersion()}"
+                    + if (extension.adult()) " - 18+" else ""
+                    + if (extension.torrent()) " - torrent" else "",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                "${extension.sourceEntrypoints().size} source entrypoint(s)"
+                    + if (extension.sourceFactory().isPresent) " - factory" else ""
+                    + " - "
+                    + legacyCompatibility(extension.compatibility()),
+                color = if (extension.compatibility() == LegacyExtensionCompatibility.COMPATIBLE_METADATA) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.error
+                },
+            )
+            extension.signingCertificateSha256().firstOrNull()?.let { certificate ->
+                Text(
+                    "Signing certificate ${certificate.take(16)}...",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+private fun legacyCompatibility(compatibility: LegacyExtensionCompatibility): String = when (compatibility) {
+    LegacyExtensionCompatibility.COMPATIBLE_METADATA ->
+        "detected; Aniyomi execution runtime still required"
+    LegacyExtensionCompatibility.UNSUPPORTED_LIBRARY -> "unsupported Aniyomi library version"
+    LegacyExtensionCompatibility.MISSING_ENTRYPOINT -> "missing source entrypoint metadata"
+    LegacyExtensionCompatibility.UNSIGNED -> "unsigned package"
 }
 
 @Composable

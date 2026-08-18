@@ -41,6 +41,22 @@ artifact used by Android and desktop after checksum, signature, compatibility,
 and installation validation. Repository discovery and artifact installation
 are separate capabilities so merely viewing an index never executes code.
 
+## Legacy Android APK discovery
+
+On Android, the shared repository screen also lists separately installed
+Aniyomi extension APKs that are visible under Android's normal package-visibility
+rules. The platform adapter recognizes the `tachiyomi.animeextension` feature,
+projects entrypoint/factory, library, content, documentation, torrent, and
+SHA-256 signing-certificate metadata into a Java UI contract, and labels malformed
+or unsupported packages. Discovery never loads extension bytecode and Anilib does
+not request `QUERY_ALL_PACKAGES`.
+
+This is metadata compatibility only. Existing Aniyomi APKs compile against the
+Aniyomi source API and host-provided external libraries, so they are not executed
+until a separately isolated Android compatibility runtime can satisfy that ABI.
+Signed portable Anilib Bundles remain the only source artifact executed on both
+Android and desktop.
+
 Portable artifacts are accepted only when `sha256`, `signature`, `keyId`, and
 `api` are present, the user has explicitly imported the publisher's X.509
 Ed25519 public key, and the raw archive verifies against both checksum and

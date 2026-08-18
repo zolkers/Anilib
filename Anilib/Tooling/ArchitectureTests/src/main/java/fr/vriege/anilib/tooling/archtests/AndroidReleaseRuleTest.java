@@ -57,7 +57,14 @@ final class AndroidReleaseRuleTest {
             check(rule.analyze(snapshot).stream()
                             .anyMatch(diagnostic -> diagnostic.message().contains("usesCleartextTraffic")),
                     "an insecure manifest change must produce an actionable diagnostic");
-            return 3;
+            write(manifest, """
+                    android:usesCleartextTraffic="false" android:exported="false"
+                    android.permission.QUERY_ALL_PACKAGES
+                    """);
+            check(rule.analyze(snapshot).stream()
+                            .anyMatch(diagnostic -> diagnostic.message().contains("broad package visibility")),
+                    "Android discovery must not gain unrestricted package visibility");
+            return 4;
         } catch (IOException exception) {
             throw new AssertionError("Unable to run Android release rule test", exception);
         } finally {

@@ -55,6 +55,11 @@ public final class AndroidReleaseRule implements AnilibJavaRule {
                 diagnostics,
                 "android:usesCleartextTraffic=\"false\"",
                 "android:exported=\"false\"");
+        forbidToken(
+                repository,
+                MANIFEST,
+                diagnostics,
+                "android.permission.QUERY_ALL_PACKAGES");
         requireTokens(
                 repository,
                 WORKFLOW,
@@ -67,6 +72,25 @@ public final class AndroidReleaseRule implements AnilibJavaRule {
                 "writeAndroidReleaseChecksums",
                 "actions/upload-artifact@v7.0.1");
         return List.copyOf(diagnostics);
+    }
+
+    private void forbidToken(
+            RepositorySnapshot repository,
+            Path relativePath,
+            List<Diagnostic> diagnostics,
+            String forbiddenToken) {
+        Path file = repository.root().resolve(relativePath);
+        if (!Files.isRegularFile(file) || Files.isSymbolicLink(file)) {
+            return;
+        }
+        try {
+            if (Files.readString(file, StandardCharsets.UTF_8).contains(forbiddenToken)) {
+                diagnostics.add(new Diagnostic(name(), relativePath, 1,
+                        "Android release contract forbids broad package visibility: " + forbiddenToken));
+            }
+        } catch (IOException exception) {
+            throw new UncheckedIOException("Unable to inspect " + file, exception);
+        }
     }
 
     private void requireTokens(

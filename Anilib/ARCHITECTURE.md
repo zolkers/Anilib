@@ -251,6 +251,15 @@ platform, runs the complete gate, packages the APK, and publishes a SHA-256
 manifest. AnilibJava keeps the SDK, platform boundary, network policy, signing
 seam, checksum task, and workflow versions present.
 
+The Android extension adapter can also inventory separately installed Aniyomi
+APKs that Android already makes visible to Anilib. It reads their feature,
+entrypoint/factory, library-version, content, documentation, torrent, and
+signing-certificate metadata without loading their classes. Anilib deliberately
+does not request unrestricted package visibility. A metadata-compatible result
+is therefore discovery evidence, not an execution claim: those classes still
+expect the Aniyomi host ABI and its external runtime dependency graph. Portable
+Anilib Bundles remain the executable cross-platform source format.
+
 ## External dependency policy
 
 Foundation, Framework, Kernel, Features, Configurations, Tooling, and tests may

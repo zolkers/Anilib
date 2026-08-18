@@ -14,6 +14,9 @@ import fr.vriege.anilib.feature.extensionrepository.runtime.DefaultExtensionRepo
 import fr.vriege.anilib.feature.extensionrepository.runtime.FileExtensionTrustStore;
 import fr.vriege.anilib.feature.extensionrepository.runtime.FileExtensionRepositoryStore;
 import fr.vriege.anilib.feature.extensionrepository.runtime.FileInstalledExtensionStore;
+import fr.vriege.anilib.feature.extensionrepository.ui.LegacyExtensionCompatibility;
+import fr.vriege.anilib.feature.extensionrepository.ui.LegacyExtensionInstallers;
+import fr.vriege.anilib.feature.extensionrepository.ui.LegacyExtensionPackage;
 import fr.vriege.anilib.framework.http.AnilibHttpClient;
 import fr.vriege.anilib.framework.http.HttpRequest;
 import fr.vriege.anilib.framework.http.HttpResponse;
@@ -56,6 +59,7 @@ final class ExtensionRepositoryTest {
         rejectsUnsafeMetadata(counter);
         persistsAndRefreshesUserRepositories(counter);
         installsOnlyTrustedPortableBundles(counter);
+        modelsLegacyAndroidDiscovery(counter);
         return counter.value;
     }
 
@@ -209,6 +213,46 @@ final class ExtensionRepositoryTest {
                 Clock.fixed(Instant.parse("2026-08-18T12:00:00Z"), ZoneOffset.UTC),
                 new FileInstalledExtensionStore(directory.resolve("installed.tsv")),
                 new FileExtensionTrustStore(directory.resolve("trusted-keys.txt")));
+    }
+
+    private static void modelsLegacyAndroidDiscovery(Counter counter) {
+        LegacyExtensionPackage extension = new LegacyExtensionPackage(
+                "eu.kanade.tachiyomi.animeextension.en.example",
+                "Example",
+                7,
+                "16.7",
+                "16.0",
+                false,
+                false,
+                List.of("eu.kanade.tachiyomi.animeextension.en.example.Example"),
+                Optional.of("eu.kanade.tachiyomi.animeextension.en.example.ExampleFactory"),
+                true,
+                true,
+                List.of(SHA_256),
+                LegacyExtensionCompatibility.COMPATIBLE_METADATA);
+        counter.check(extension.sourceEntrypoints().size() == 1
+                        && extension.sourceFactory().isPresent()
+                        && extension.hasReadme()
+                        && extension.compatibility() == LegacyExtensionCompatibility.COMPATIBLE_METADATA,
+                "Android discovery metadata must retain the Aniyomi extension contract");
+        counter.check(LegacyExtensionInstallers.unavailable().discoverInstalled().isEmpty(),
+                "platforms without APK support must expose an empty legacy inventory");
+        counter.expectIllegalArgument(
+                () -> new LegacyExtensionPackage(
+                        " ",
+                        "Example",
+                        1,
+                        "16.1",
+                        "16.0",
+                        false,
+                        false,
+                        List.of(),
+                        Optional.empty(),
+                        false,
+                        false,
+                        List.of(),
+                        LegacyExtensionCompatibility.MISSING_ENTRYPOINT),
+                "legacy extension metadata must reject blank package identities");
     }
 
     private static ExtensionPackageMetadata portablePackage(byte[] bundle, KeyPair keyPair, long versionCode) {

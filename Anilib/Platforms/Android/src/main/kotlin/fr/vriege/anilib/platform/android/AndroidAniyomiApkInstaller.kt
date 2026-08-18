@@ -13,6 +13,7 @@ import androidx.activity.ComponentActivity
 import fr.vriege.anilib.feature.extensionrepository.ExtensionArtifactFormat
 import fr.vriege.anilib.feature.extensionrepository.ExtensionPackageMetadata
 import fr.vriege.anilib.feature.extensionrepository.ui.LegacyExtensionInstaller
+import fr.vriege.anilib.feature.extensionrepository.ui.LegacyExtensionPackage
 import fr.vriege.anilib.framework.http.AnilibHttpClient
 import fr.vriege.anilib.framework.http.HttpCachePolicy
 import fr.vriege.anilib.framework.http.HttpRequest
@@ -24,8 +25,11 @@ import java.util.concurrent.CompletableFuture
 internal class AndroidAniyomiApkInstaller(
     private val activity: ComponentActivity,
     private val client: AnilibHttpClient,
+    private val inventory: AndroidAniyomiExtensionInventory = AndroidAniyomiExtensionInventory(activity),
 ) : LegacyExtensionInstaller {
     override fun available(): Boolean = true
+
+    override fun discoverInstalled(): List<LegacyExtensionPackage> = inventory.discover()
 
     override fun install(extensionPackage: ExtensionPackageMetadata): CompletableFuture<String> {
         if (!activity.packageManager.canRequestPackageInstalls()) {
