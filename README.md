@@ -67,6 +67,7 @@ Use Java 21 from the repository root:
 .\gradlew.bat --no-daemon --console=plain check
 .\gradlew.bat --no-daemon --console=plain :Anilib:Platforms:Desktop:run
 .\gradlew.bat --no-daemon --console=plain :Anilib:Platforms:Android:assembleDebug
+.\gradlew.bat --no-daemon --console=plain :Anilib:Platforms:Desktop:writeDesktopReleaseChecksums
 .\gradlew.bat --no-daemon --console=plain javaQuality
 ```
 
@@ -79,6 +80,8 @@ See [THIRD_PARTY.md](THIRD_PARTY.md) for the exact audited coordinates.
 
 See [ARCHITECTURE.md](Anilib/ARCHITECTURE.md) and
 [ROADMAP.md](Anilib/ROADMAP.md) for the dependency contract and parity plan.
+Desktop packaging and the three-host release matrix are documented in
+[Desktop release](Anilib/Platforms/Desktop/README.md).
 
 ## Legal
 

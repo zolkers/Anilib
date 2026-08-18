@@ -1,0 +1,33 @@
+# Desktop release
+
+Anilib produces self-contained desktop packages through the Compose
+Multiplatform `jpackage` integration:
+
+- `Anilib-<version>.msi` on Windows;
+- `anilib_<version>-1_amd64.deb` on Linux;
+- `Anilib-<version>.dmg` on macOS.
+
+Cross-compilation is deliberately not attempted because the native packaging
+toolchain requires its target operating system. The
+`.github/workflows/desktop-release.yml` matrix uses fixed Windows, Ubuntu, and
+macOS runner generations with Microsoft OpenJDK 21.0.10. A manual version or a
+numeric `vMAJOR.MINOR.PATCH` tag drives the same Gradle invocation on each host.
+
+Run the current-host pipeline locally with:
+
+```powershell
+.\gradlew.bat --no-daemon --console=plain `
+  :Anilib:Platforms:Desktop:writeDesktopReleaseChecksums `
+  '-PanilibVersion=0.1.0' '-PanilibPackageVersion=0.1.0'
+```
+
+The build rejects dynamic or changing dependencies, normalizes every Gradle
+archive's timestamps and entry order, validates the native numeric version,
+uses stable application identifiers, and includes the complete Java runtime
+module set. Every host emits `build/release/SHA256SUMS` beside its installer.
+AnilibJava verifies that the three target formats, pinned runner matrix,
+toolchain, integrity manifest, and stable identifiers remain present.
+
+Unsigned development packages are suitable for local testing. Public macOS
+distribution still requires Apple signing and notarization credentials; those
+secrets are intentionally not stored in this repository.

@@ -198,6 +198,15 @@ launcher for its own lifecycle, window, storage directory, and final HTTP
 transport. Kotlin, Android, and UI toolkit types stay in platform modules; all
 inward modules remain ordinary Java and are shared unchanged.
 
+Desktop release packaging is host-native and repeatable rather than
+cross-compiled. One fixed workflow matrix builds MSI, DEB, and DMG installers on
+their matching operating systems with the same pinned JDK, numeric product
+version, complete runtime-module policy, stable platform identifiers, and
+dependency graph. Gradle archives normalize timestamps and ordering, dynamic or
+changing dependencies fail resolution, and every host publishes deterministic
+SHA-256 metadata with its package. AnilibJava owns the repository rule that
+keeps this release contract and its three target hosts present.
+
 ## External dependency policy
 
 Foundation, Framework, Kernel, Features, Configurations, Tooling, and tests may
