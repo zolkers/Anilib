@@ -4,11 +4,14 @@ import fr.vriege.anilib.feature.downloads.DownloadId;
 import fr.vriege.anilib.feature.downloads.DownloadQueueSnapshot;
 import fr.vriege.anilib.feature.downloads.DownloadPriority;
 import fr.vriege.anilib.feature.downloads.DownloadRecoveryMode;
+import fr.vriege.anilib.feature.downloads.DownloadIndexRepairResult;
+import fr.vriege.anilib.feature.downloads.DownloadStorageSnapshot;
 import fr.vriege.anilib.feature.downloads.DownloadService;
 import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.source.SourceContentUnitId;
 
 import java.util.Objects;
+import java.nio.file.Path;
 
 public final class DefaultDownloadPresentation implements DownloadPresentation {
     private final DownloadService downloads;
@@ -75,6 +78,36 @@ public final class DefaultDownloadPresentation implements DownloadPresentation {
     @Override
     public void retry(DownloadId id, DownloadRecoveryMode mode) {
         downloads.retry(id, mode);
+    }
+
+    @Override
+    public DownloadStorageSnapshot storage() {
+        return downloads.storage();
+    }
+
+    @Override
+    public void changeStorageLocation(Path location) {
+        downloads.changeStorageLocation(location);
+    }
+
+    @Override
+    public DownloadIndexRepairResult repairIndex() {
+        return downloads.repairIndex();
+    }
+
+    @Override
+    public void pauseTitle(LibraryItemId libraryItemId) {
+        downloads.pauseTitle(libraryItemId);
+    }
+
+    @Override
+    public void resumeTitle(LibraryItemId libraryItemId) {
+        downloads.resumeTitle(libraryItemId);
+    }
+
+    @Override
+    public void removeTitle(LibraryItemId libraryItemId) {
+        downloads.removeTitle(libraryItemId);
     }
 
     @Override

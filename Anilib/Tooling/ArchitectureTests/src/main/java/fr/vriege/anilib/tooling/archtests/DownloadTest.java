@@ -5,6 +5,7 @@ import fr.vriege.anilib.feature.downloads.DownloadCapabilities;
 import fr.vriege.anilib.feature.downloads.DownloadException;
 import fr.vriege.anilib.feature.downloads.DownloadId;
 import fr.vriege.anilib.feature.downloads.DownloadJobSnapshot;
+import fr.vriege.anilib.feature.downloads.DownloadIndexRepairResult;
 import fr.vriege.anilib.feature.downloads.DownloadPriority;
 import fr.vriege.anilib.feature.downloads.DownloadRecoveryMode;
 import fr.vriege.anilib.feature.downloads.DownloadService;
@@ -73,6 +74,7 @@ final class DownloadTest {
     private static void verifiesPriorityMetricsAndRecovery(Counter counter) {
         Path queueRoot = null;
         Path recoveryRoot = null;
+        Path customStorage = null;
         try {
             queueRoot = Files.createTempDirectory("anilib-download-priority");
             MemoryLibraryCatalog library = new MemoryLibraryCatalog();
@@ -104,10 +106,33 @@ final class DownloadTest {
                 await(downloads, third, job -> job.status() == DownloadStatus.COMPLETED);
                 counter.check(source.completionOrder().equals(List.of("a", "c", "b")),
                         "high-priority queued work must run before manually reordered normal work");
+                customStorage = Files.createTempDirectory("anilib-download-custom-storage");
+                downloads.changeStorageLocation(customStorage);
+                counter.check(downloads.storage().customLocation()
+                                && downloads.storage().location().equals(customStorage.toAbsolutePath().normalize())
+                                && downloads.storage().writable(),
+                        "download storage migration must validate and expose the selected location");
+                Path orphan = Files.createDirectories(
+                        customStorage.resolve("content").resolve(DownloadId.create().toString()));
+                Files.write(orphan.resolve("00000000.page"), new byte[] {9});
+                DownloadIndexRepairResult repair = downloads.repairIndex();
+                counter.check(repair.orphanedDirectoriesRemoved() == 1 && repair.indexedBytes() == 24L,
+                        "download index repair must remove managed orphans and recount indexed bytes");
+                downloads.removeTitle(item.id());
+                counter.check(downloads.snapshot().jobs().isEmpty()
+                                && downloads.snapshot().usedStorageBytes() == 0L,
+                        "per-title download removal must clear every job and managed page");
+                DownloadId replacement = downloads.enqueue(item.id(), source.unit("a").id());
+                await(downloads, replacement, job -> job.status() == DownloadStatus.COMPLETED);
                 downloads.removeAll();
                 counter.check(downloads.snapshot().jobs().isEmpty()
                                 && downloads.snapshot().usedStorageBytes() == 0L,
                         "delete-all must clear queue metadata and downloaded files");
+            }
+            try (DefaultDownloadService restarted = new DefaultDownloadService(
+                    new SingleSourceRegistry(source), library, queueRoot, policy)) {
+                counter.check(restarted.storage().location().equals(customStorage.toAbsolutePath().normalize()),
+                        "selected download storage must survive a service restart");
             }
 
             recoveryRoot = Files.createTempDirectory("anilib-download-recovery");
@@ -131,6 +156,7 @@ final class DownloadTest {
         } finally {
             deleteTree(queueRoot);
             deleteTree(recoveryRoot);
+            deleteTree(customStorage);
         }
     }
 

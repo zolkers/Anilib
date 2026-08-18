@@ -57,6 +57,8 @@ Statistics combine library status/source/language/progress and activity with
 tracker scores and persisted player duration without failing on unavailable sources.
 Downloads use a durable grouped priority queue with manual ordering, confirmed
 delete-all, measured speed/ETA, and resume-or-restart recovery for partial jobs.
+Their validated storage location can be migrated safely, repaired from the
+managed files, and controlled title by title.
 Browse shows live source-extension update badges and actions, compact fixed-density
 rows, richer overflow menus, and asynchronous loading, retry, and error states.
 Source catalogues retain their grid/list choice independently and expose item
@@ -73,7 +75,8 @@ Multi-selection exposes bulk category, favourite, download, guided migration,
 and confirmed deletion actions from the same shared Android/desktop screen.
 The removable Downloads Bundle adds a durable queue, bounded concurrent jobs,
 pause/cancel/resume controls, restart-safe partial downloads, storage quotas,
-and offline reading through the same Reader on Android and desktop.
+custom storage migration and repair, per-title actions, and offline reading
+through the same Reader on Android and desktop.
 The removable Backup Bundle creates checksum-verified local archives from
 feature-owned versioned codecs, previews their contents, and restores Library
 source preferences, playback state, and tracking bindings with merge semantics

@@ -2,6 +2,7 @@ package fr.vriege.anilib.feature.downloads.runtime;
 
 import fr.vriege.anilib.feature.downloads.DownloadException;
 import fr.vriege.anilib.feature.downloads.DownloadId;
+import fr.vriege.anilib.feature.downloads.DownloadIndexRepairResult;
 import fr.vriege.anilib.feature.downloads.DownloadJobSnapshot;
 import fr.vriege.anilib.feature.downloads.DownloadQueueSnapshot;
 import fr.vriege.anilib.feature.downloads.DownloadPriority;
@@ -9,6 +10,7 @@ import fr.vriege.anilib.feature.downloads.DownloadRecoveryMode;
 import fr.vriege.anilib.feature.downloads.DownloadService;
 import fr.vriege.anilib.feature.downloads.DownloadStatus;
 import fr.vriege.anilib.feature.downloads.DownloadStoragePolicy;
+import fr.vriege.anilib.feature.downloads.DownloadStorageSnapshot;
 import fr.vriege.anilib.feature.library.LibraryCatalog;
 import fr.vriege.anilib.feature.library.LibraryItem;
 import fr.vriege.anilib.feature.library.LibraryItemId;
@@ -59,10 +61,13 @@ public final class DefaultDownloadService
 
     private final SourceRegistry sources;
     private final LibraryCatalog library;
-    private final Path contentRoot;
+    private final Path defaultStorageRoot;
+    private Path storageRoot;
+    private Path contentRoot;
     private final DownloadStoragePolicy policy;
     private final Clock clock;
     private final FileDownloadQueueStore store;
+    private final FileDownloadStorageLocationStore locationStore;
     private final ExecutorService workers;
     private final BooleanSupplier largeTransfersAllowed;
     private final Map<DownloadId, DownloadRecord> records = new LinkedHashMap<>();
@@ -108,6 +113,8 @@ public final class DefaultDownloadService
         this.sources = Objects.requireNonNull(sources, "sources must not be null");
         this.library = Objects.requireNonNull(library, "library must not be null");
         Path normalizedRoot = Objects.requireNonNull(root, "root must not be null").toAbsolutePath().normalize();
+        this.defaultStorageRoot = normalizedRoot;
+        this.storageRoot = normalizedRoot;
         this.contentRoot = normalizedRoot.resolve("content");
         this.policy = Objects.requireNonNull(policy, "policy must not be null");
         this.clock = Objects.requireNonNull(clock, "clock must not be null");
@@ -116,6 +123,7 @@ public final class DefaultDownloadService
                 largeTransfersAllowed,
                 "largeTransfersAllowed must not be null");
         this.store = new FileDownloadQueueStore(normalizedRoot.resolve("queue.anilib"));
+        this.locationStore = new FileDownloadStorageLocationStore(normalizedRoot.resolve("storage-location.anilib"));
         load();
     }
 
@@ -331,6 +339,151 @@ public final class DefaultDownloadService
         }
         transition(record, DownloadStatus.QUEUED, null);
         schedule(record);
+    }
+
+    @Override
+    public synchronized DownloadStorageSnapshot storage() {
+        ensureOpen();
+        try {
+            return new DownloadStorageSnapshot(
+                    storageRoot,
+                    !storageRoot.equals(defaultStorageRoot),
+                    Files.isWritable(contentRoot),
+                    Files.getFileStore(contentRoot).getUsableSpace());
+        } catch (IOException exception) {
+            return new DownloadStorageSnapshot(
+                    storageRoot,
+                    !storageRoot.equals(defaultStorageRoot),
+                    false,
+                    0L);
+        }
+    }
+
+    @Override
+    public synchronized void changeStorageLocation(Path location) {
+        ensureOpen();
+        Path targetRoot = validateStorageRoot(location);
+        Path targetContent = targetRoot.resolve("content").normalize();
+        if (targetContent.equals(contentRoot)) {
+            return;
+        }
+        if (targetContent.startsWith(contentRoot) || contentRoot.startsWith(targetContent)) {
+            throw new DownloadException("Download storage locations must not contain each other");
+        }
+        Map<DownloadId, DownloadStatus> previousStatuses = new LinkedHashMap<>();
+        records.values().forEach(record -> {
+            previousStatuses.put(record.id, record.status);
+            if (record.status == DownloadStatus.DOWNLOADING || record.status == DownloadStatus.QUEUED) {
+                record.status = DownloadStatus.PAUSED;
+            }
+        });
+        Path previousContent = contentRoot;
+        try {
+            copyManagedContent(previousContent, targetContent);
+            locationStore.save(targetRoot);
+            storageRoot = targetRoot;
+            contentRoot = targetContent;
+            restoreMigratedStatuses(previousStatuses);
+            persist();
+            notifyListeners();
+            cleanupMigratedContent(previousContent);
+            scheduleAvailable();
+        } catch (IOException | RuntimeException exception) {
+            previousStatuses.forEach((id, status) -> {
+                DownloadRecord record = records.get(id);
+                if (record != null) {
+                    record.status = status;
+                }
+            });
+            throw exception instanceof DownloadException downloadException
+                    ? downloadException
+                    : new DownloadException("Unable to migrate download storage", exception);
+        }
+    }
+
+    @Override
+    public synchronized DownloadIndexRepairResult repairIndex() {
+        ensureOpen();
+        int repaired = 0;
+        int orphaned = 0;
+        try {
+            usedStorageBytes = 0L;
+            for (DownloadRecord record : records.values()) {
+                DownloadStatus status = record.status;
+                int pages = record.completedPages;
+                long bytes = record.downloadedBytes;
+                String error = record.error;
+                reconcile(record);
+                if (status != record.status || pages != record.completedPages
+                        || bytes != record.downloadedBytes || !Objects.equals(error, record.error)) {
+                    repaired++;
+                }
+            }
+            Set<String> known = records.keySet().stream().map(DownloadId::toString).collect(
+                    java.util.stream.Collectors.toSet());
+            try (java.util.stream.Stream<Path> entries = Files.list(contentRoot)) {
+                for (Path entry : entries.filter(Files::isDirectory).toList()) {
+                    if (!known.contains(entry.getFileName().toString()) && isDownloadDirectory(entry)) {
+                        deleteDirectory(entry, false);
+                        orphaned++;
+                    }
+                }
+            }
+            persist();
+            notifyListeners();
+            scheduleAvailable();
+            return new DownloadIndexRepairResult(repaired, orphaned, usedStorageBytes);
+        } catch (IOException exception) {
+            throw new DownloadException("Unable to repair download index", exception);
+        }
+    }
+
+    @Override
+    public synchronized void pauseTitle(LibraryItemId libraryItemId) {
+        Objects.requireNonNull(libraryItemId, "libraryItemId must not be null");
+        ensureOpen();
+        boolean changed = false;
+        for (DownloadRecord record : records.values()) {
+            if (record.libraryItemId.equals(libraryItemId)
+                    && (record.status == DownloadStatus.QUEUED
+                    || record.status == DownloadStatus.DOWNLOADING)) {
+                record.status = DownloadStatus.PAUSED;
+                record.updatedAt = clock.instant();
+                changed = true;
+            }
+        }
+        finishBulkChange(changed);
+    }
+
+    @Override
+    public synchronized void resumeTitle(LibraryItemId libraryItemId) {
+        Objects.requireNonNull(libraryItemId, "libraryItemId must not be null");
+        ensureOnline();
+        boolean changed = false;
+        for (DownloadRecord record : records.values()) {
+            if (record.libraryItemId.equals(libraryItemId)
+                    && (record.status == DownloadStatus.PAUSED || record.status == DownloadStatus.FAILED)) {
+                record.status = DownloadStatus.QUEUED;
+                record.error = null;
+                record.updatedAt = clock.instant();
+                changed = true;
+            }
+        }
+        finishBulkChange(changed);
+        scheduleAvailable();
+    }
+
+    @Override
+    public synchronized void removeTitle(LibraryItemId libraryItemId) {
+        Objects.requireNonNull(libraryItemId, "libraryItemId must not be null");
+        ensureOpen();
+        List<DownloadRecord> removed = records.values().stream()
+                .filter(record -> record.libraryItemId.equals(libraryItemId))
+                .toList();
+        removed.forEach(record -> record.status = DownloadStatus.CANCELLED);
+        removed.forEach(this::deleteFiles);
+        removed.forEach(record -> records.remove(record.id));
+        finishBulkChange(!removed.isEmpty());
     }
 
     @Override
@@ -648,6 +801,9 @@ public final class DefaultDownloadService
 
     private void load() {
         try {
+            storageRoot = locationStore.load().orElse(defaultStorageRoot);
+            storageRoot = validateStorageRoot(storageRoot);
+            contentRoot = storageRoot.resolve("content").normalize();
             Files.createDirectories(contentRoot);
             FileDownloadQueueStore.LoadResult loaded = store.load();
             offlineMode = loaded.offlineMode();
@@ -714,13 +870,17 @@ public final class DefaultDownloadService
     }
 
     private void deleteFiles(DownloadRecord record) {
-        Path directory = recordDirectory(record);
+        deleteDirectory(recordDirectory(record), true);
+    }
+
+    private void deleteDirectory(Path directory, boolean accountStorage) {
         if (!Files.exists(directory)) {
             return;
         }
         try (java.util.stream.Stream<Path> paths = Files.walk(directory)) {
             for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) {
-                if (Files.isRegularFile(path) && path.getFileName().toString().endsWith(".page")) {
+                if (accountStorage && Files.isRegularFile(path)
+                        && path.getFileName().toString().endsWith(".page")) {
                     usedStorageBytes -= Files.size(path);
                 }
                 Files.deleteIfExists(path);
@@ -732,12 +892,16 @@ public final class DefaultDownloadService
     }
 
     private Path pageFile(DownloadRecord record, int index) {
-        return recordDirectory(record).resolve(String.format(java.util.Locale.ROOT, "%08d.page", index));
+        return recordDirectory(record).resolve(pageFileName(index));
     }
 
     private Path recordDirectory(DownloadRecord record) {
-        Path directory = contentRoot.resolve(record.id.toString()).normalize();
-        if (!directory.getParent().equals(contentRoot)) {
+        return recordDirectory(record, contentRoot);
+    }
+
+    private static Path recordDirectory(DownloadRecord record, Path root) {
+        Path directory = root.resolve(record.id.toString()).normalize();
+        if (!directory.getParent().equals(root)) {
             throw new DownloadException("Invalid download storage path");
         }
         return directory;
@@ -792,6 +956,109 @@ public final class DefaultDownloadService
         if (closed) {
             throw new DownloadException("Download service is closed");
         }
+    }
+
+    private Path validateStorageRoot(Path location) {
+        Path normalized = Objects.requireNonNull(location, "location must not be null")
+                .toAbsolutePath()
+                .normalize();
+        Path probe = null;
+        try {
+            if (Files.exists(normalized) && !Files.isDirectory(normalized)) {
+                throw new DownloadException("Download storage location must be a directory");
+            }
+            Path managedContent = normalized.resolve("content").normalize();
+            if (!managedContent.getParent().equals(normalized)) {
+                throw new DownloadException("Invalid download storage location");
+            }
+            Files.createDirectories(managedContent);
+            probe = Files.createTempFile(managedContent, ".anilib-write-", ".tmp");
+            return normalized;
+        } catch (IOException exception) {
+            throw new DownloadException("Download storage location is not writable", exception);
+        } finally {
+            if (probe != null) {
+                try {
+                    Files.deleteIfExists(probe);
+                } catch (IOException ignored) {
+                    // The storage validation result remains actionable.
+                }
+            }
+        }
+    }
+
+    private void copyManagedContent(Path sourceRoot, Path targetRoot) throws IOException {
+        Files.createDirectories(targetRoot);
+        for (DownloadRecord record : records.values()) {
+            Path sourceDirectory = recordDirectory(record, sourceRoot);
+            Path targetDirectory = recordDirectory(record, targetRoot);
+            if (Files.exists(targetDirectory)) {
+                deleteDirectory(targetDirectory, false);
+            }
+            for (int index = 0; index < record.pages.size(); index++) {
+                Path source = sourceDirectory.resolve(pageFileName(index));
+                if (!Files.isRegularFile(source)) {
+                    continue;
+                }
+                Files.createDirectories(targetDirectory);
+                Path target = targetDirectory.resolve(pageFileName(index));
+                Path temporary = target.resolveSibling(target.getFileName() + ".tmp");
+                Files.copy(source, temporary, StandardCopyOption.REPLACE_EXISTING);
+                if (Files.size(source) != Files.size(temporary)) {
+                    throw new IOException("Migrated download page size did not match");
+                }
+                try {
+                    Files.move(
+                            temporary,
+                            target,
+                            StandardCopyOption.ATOMIC_MOVE,
+                            StandardCopyOption.REPLACE_EXISTING);
+                } catch (AtomicMoveNotSupportedException exception) {
+                    Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
+                }
+            }
+        }
+    }
+
+    private void restoreMigratedStatuses(Map<DownloadId, DownloadStatus> previousStatuses) {
+        previousStatuses.forEach((id, status) -> {
+            DownloadRecord record = records.get(id);
+            if (record != null) {
+                record.status = status == DownloadStatus.DOWNLOADING ? DownloadStatus.QUEUED : status;
+                record.updatedAt = clock.instant();
+            }
+        });
+    }
+
+    private void cleanupMigratedContent(Path previousContent) {
+        for (DownloadRecord record : records.values()) {
+            Path directory = recordDirectory(record, previousContent);
+            try {
+                deleteDirectory(directory, false);
+            } catch (DownloadException ignored) {
+                // The committed target remains authoritative if old storage cleanup fails.
+            }
+        }
+    }
+
+    private static boolean isDownloadDirectory(Path entry) {
+        try {
+            DownloadId.parse(entry.getFileName().toString());
+            return true;
+        } catch (IllegalArgumentException exception) {
+            return false;
+        }
+    }
+
+    private void finishBulkChange(boolean changed) {
+        if (changed) {
+            persist();
+            notifyListeners();
+        }
+    }
+
+    private static String pageFileName(int index) {
+        return String.format(java.util.Locale.ROOT, "%08d.page", index);
     }
 
     private static long saturatedRate(long bytes, long elapsedNanos) {

@@ -227,7 +227,7 @@ platform-specific.
 
 - [x] add queue grouping, reorder, priority, delete-all, speed, ETA, and richer
   partial/error recovery
-- [ ] add user-selectable storage locations, validation, migration, index repair,
+- [x] add user-selectable storage locations, validation, migration, index repair,
   and per-title download management
 - [ ] complete automatic-download rules, category rules, episode/chapter limits,
   and cleanup policies

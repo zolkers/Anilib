@@ -27,6 +27,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -48,6 +49,8 @@ import fr.vriege.anilib.feature.downloads.DownloadPriority
 import fr.vriege.anilib.feature.downloads.DownloadRecoveryMode
 import fr.vriege.anilib.feature.downloads.DownloadStatus
 import fr.vriege.anilib.feature.downloads.ui.DownloadPresentation
+import fr.vriege.anilib.feature.library.LibraryItemId
+import java.nio.file.Path
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -57,6 +60,11 @@ internal fun DownloadsScreen(presentation: DownloadPresentation, goBack: () -> U
     var commandError by remember(presentation) { mutableStateOf<String?>(null) }
     var filter by remember(presentation) { mutableStateOf(DownloadFilter.ALL) }
     var confirmRemoveAll by remember(presentation) { mutableStateOf(false) }
+    var storageDialog by remember(presentation) { mutableStateOf(false) }
+    var repairMessage by remember(presentation) { mutableStateOf<String?>(null) }
+    var confirmRemoveTitle by remember(presentation) {
+        mutableStateOf<Pair<LibraryItemId, String>?>(null)
+    }
     DisposableEffect(presentation) {
         val registration = presentation.observe { revision++ }
         onDispose { runCatching { registration.close() } }
@@ -89,6 +97,7 @@ internal fun DownloadsScreen(presentation: DownloadPresentation, goBack: () -> U
                 pauseAll = { command(presentation::pauseAll) },
                 resumeAll = { command(presentation::resumeAll) },
                 removeAll = { confirmRemoveAll = true },
+                openStorage = { storageDialog = true },
                 setOfflineMode = { enabled -> command { presentation.setOfflineMode(enabled) } },
             )
             Text(
@@ -115,6 +124,7 @@ internal fun DownloadsScreen(presentation: DownloadPresentation, goBack: () -> U
                 }
             }
             commandError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            repairMessage?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
             Spacer(Modifier.height(8.dp))
             if (queue.jobs().isEmpty()) {
                 EmptyPage("Your download queue is empty.")
@@ -124,11 +134,25 @@ internal fun DownloadsScreen(presentation: DownloadPresentation, goBack: () -> U
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     jobs.groupBy { it.libraryItemId() }.values.forEach { group ->
                         item(key = "group-${group.first().libraryItemId().value()}") {
-                            Text(
-                                "${group.first().title()} · ${group.size}",
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(top = 8.dp),
-                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    "${group.first().title()} · ${group.size}",
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                TextButton(onClick = {
+                                    command { presentation.pauseTitle(group.first().libraryItemId()) }
+                                }) { Text("Pause") }
+                                TextButton(onClick = {
+                                    command { presentation.resumeTitle(group.first().libraryItemId()) }
+                                }) { Text("Resume") }
+                                TextButton(onClick = {
+                                    confirmRemoveTitle = group.first().libraryItemId() to group.first().title()
+                                }) { Text("Delete") }
+                            }
                         }
                         items(group, key = { it.id().toString() }) { job ->
                             DownloadJobCard(
@@ -166,6 +190,40 @@ internal fun DownloadsScreen(presentation: DownloadPresentation, goBack: () -> U
             },
         )
     }
+    if (storageDialog) {
+        DownloadStorageDialog(
+            presentation = presentation,
+            migrate = { location ->
+                command { presentation.changeStorageLocation(Path.of(location)) }
+            },
+            repair = {
+                runCatching { presentation.repairIndex() }
+                    .onSuccess { result ->
+                        repairMessage = "Index repaired: ${result.repairedJobs()} jobs, " +
+                            "${result.orphanedDirectoriesRemoved()} orphans, " +
+                            formatBytes(result.indexedBytes())
+                    }
+                    .onFailure { commandError = it.message ?: "Index repair failed." }
+            },
+            close = { storageDialog = false },
+        )
+    }
+    confirmRemoveTitle?.let { (itemId, title) ->
+        AlertDialog(
+            onDismissRequest = { confirmRemoveTitle = null },
+            title = { Text("Delete downloads for $title?") },
+            text = { Text("All completed files and partial jobs for this title will be removed.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    command { presentation.removeTitle(itemId) }
+                    confirmRemoveTitle = null
+                }) { Text("Delete") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmRemoveTitle = null }) { Text("Cancel") }
+            },
+        )
+    }
 }
 
 @Composable
@@ -174,6 +232,7 @@ private fun DownloadQueueControls(
     pauseAll: () -> Unit,
     resumeAll: () -> Unit,
     removeAll: () -> Unit,
+    openStorage: () -> Unit,
     setOfflineMode: (Boolean) -> Unit,
 ) {
     Row(
@@ -191,12 +250,54 @@ private fun DownloadQueueControls(
             IconButton(onClick = removeAll) {
                 Icon(Icons.Default.Delete, contentDescription = "Delete all")
             }
+            TextButton(onClick = openStorage) { Text("Storage") }
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Offline mode", fontWeight = FontWeight.Medium)
             Switch(checked = offlineMode, onCheckedChange = setOfflineMode)
         }
     }
+}
+
+@Composable
+private fun DownloadStorageDialog(
+    presentation: DownloadPresentation,
+    migrate: (String) -> Unit,
+    repair: () -> Unit,
+    close: () -> Unit,
+) {
+    val storage = remember(presentation) { presentation.storage() }
+    var location by remember(presentation) { mutableStateOf(storage.location().toString()) }
+    AlertDialog(
+        onDismissRequest = close,
+        title = { Text("Download storage") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    if (storage.writable()) "Writable · ${formatBytes(storage.availableBytes())} available"
+                    else "Storage is not writable",
+                )
+                OutlinedTextField(
+                    value = location,
+                    onValueChange = { location = it },
+                    label = { Text("Storage directory") },
+                    singleLine = true,
+                )
+                Text(
+                    "Changing this path validates the destination, copies every indexed page, " +
+                        "then removes the old managed copies.",
+                )
+                TextButton(onClick = repair) { Text("Repair download index") }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                migrate(location)
+                close()
+            }) { Text("Migrate") }
+        },
+        dismissButton = { TextButton(onClick = close) { Text("Cancel") } },
+    )
 }
 
 @Composable

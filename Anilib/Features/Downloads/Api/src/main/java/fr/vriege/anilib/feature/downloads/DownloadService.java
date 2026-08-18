@@ -3,6 +3,8 @@ package fr.vriege.anilib.feature.downloads;
 import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.source.SourceContentUnitId;
 
+import java.nio.file.Path;
+
 public interface DownloadService {
     DownloadQueueSnapshot snapshot();
 
@@ -27,6 +29,18 @@ public interface DownloadService {
     void move(DownloadId id, int queuePosition);
 
     void retry(DownloadId id, DownloadRecoveryMode mode);
+
+    DownloadStorageSnapshot storage();
+
+    void changeStorageLocation(Path location);
+
+    DownloadIndexRepairResult repairIndex();
+
+    void pauseTitle(LibraryItemId libraryItemId);
+
+    void resumeTitle(LibraryItemId libraryItemId);
+
+    void removeTitle(LibraryItemId libraryItemId);
 
     void pauseAll();
 
