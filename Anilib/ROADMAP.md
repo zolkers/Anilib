@@ -200,7 +200,7 @@ platform-specific.
 - [x] persist catalogue grid/list choice and add catalogue item menus
 - [x] add batch migration, seasonal-anime handling, source comparison, options,
   preview, progress, cancellation, and partial-failure recovery
-- [ ] run public compatibility fixtures for Anilib repository indexes that use
+- [x] run public compatibility fixtures for Anilib repository indexes that use
   the Yuzono and Keiyoushi JSON shapes without redistributing their catalogues
 
 ### 3. Reader

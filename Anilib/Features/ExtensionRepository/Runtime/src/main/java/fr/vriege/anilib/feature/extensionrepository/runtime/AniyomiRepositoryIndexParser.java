@@ -76,7 +76,7 @@ public final class AniyomiRepositoryIndexParser {
         List<ExtensionArtifactMetadata> artifacts = new ArrayList<>();
         optionalString(entry, "apk").ifPresent(value -> artifacts.add(new ExtensionArtifactMetadata(
                 ExtensionArtifactFormat.ANIYOMI_APK,
-                repository.resolve(value),
+                resolveApk(repository, value),
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
@@ -96,6 +96,14 @@ public final class AniyomiRepositoryIndexParser {
             throw new IllegalArgumentException("Extension package must declare apk or anilib.bundle");
         }
         return List.copyOf(artifacts);
+    }
+
+    private URI resolveApk(URI repository, String value) {
+        URI declared = URI.create(value);
+        if (declared.isAbsolute() || value.contains("/")) {
+            return repository.resolve(declared);
+        }
+        return repository.resolve("apk/" + value);
     }
 
     private ExtensionSourceMetadata sourceMetadata(Map<String, Object> source) {

@@ -52,6 +52,7 @@ explicit so an architectural seam cannot be mistaken for a finished workflow.
 - [x] Verified catalogue paging, global/per-source search, filters, preferences, WebView entry, and migration routes.
 - [x] Persisted each source catalogue's grid/list choice and added item action menus.
 - [x] Completed batch migration with seasonal matching, source comparison, preview, progress, cancellation, and partial-failure retry.
+- [x] Added synthetic offline compatibility fixtures for the public Yuzono and Keiyoushi repository JSON shapes.
 - [x] Added episode search/unwatched filtering, download status filtering, and reader page retry.
 - [x] Verified backup inspection/rollback/import, tracking edit flows, and browser cookie/challenge handling.
 - [x] Added settings search and connected Sources, Tracking, Backup, and About to their working screens.

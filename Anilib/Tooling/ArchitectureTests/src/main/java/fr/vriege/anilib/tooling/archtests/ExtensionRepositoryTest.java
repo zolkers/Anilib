@@ -82,6 +82,7 @@ final class ExtensionRepositoryTest {
     static int run() {
         Counter counter = new Counter();
         parsesAniyomiAndPortableArtifacts(counter);
+        parsesPublicRepositoryShapes(counter);
         rejectsUnsafeMetadata(counter);
         persistsAndRefreshesUserRepositories(counter);
         persistsBrowsePreferences(counter);
@@ -138,6 +139,68 @@ final class ExtensionRepositoryTest {
                 "Aniyomi indexes may advertise a source with an empty baseUrl");
         counter.check(extension.changelog().orElseThrow().equals("Improved source compatibility."),
                 "repository entries must retain optional release changelogs");
+    }
+
+    private static void parsesPublicRepositoryShapes(Counter counter) {
+        URI yuzonoIndex = URI.create(
+                "https://raw.githubusercontent.com/yuzono/anime-repo/repo/index.min.json");
+        String yuzonoShape = """
+                [{
+                  "name":"Synthetic Anime Fixture",
+                  "pkg":"eu.kanade.tachiyomi.animeextension.en.synthetic",
+                  "apk":"aniyomi-en.synthetic-v14.7.apk",
+                  "lang":"en",
+                  "code":7,
+                  "version":"14.7",
+                  "nsfw":0,
+                  "sources":[{
+                    "name":"Synthetic Anime Source",
+                    "lang":"en",
+                    "id":"92233720368547758070",
+                    "baseUrl":"https://anime.example.test"
+                  }]
+                }]
+                """;
+        ExtensionPackageMetadata anime = new AniyomiRepositoryIndexParser()
+                .parse(yuzonoIndex, yuzonoShape)
+                .getFirst();
+        counter.check(anime.contentKind() == ExtensionContentKind.ANIME
+                        && anime.sources().getFirst().sourceId().equals("92233720368547758070"),
+                "the Yuzono JSON shape must retain anime identity and unsigned 64-bit source ids");
+        counter.check(anime.artifacts().getFirst().uri().equals(URI.create(
+                        "https://raw.githubusercontent.com/yuzono/anime-repo/repo/apk/"
+                                + "aniyomi-en.synthetic-v14.7.apk")),
+                "Yuzono APK filenames must resolve through the public repository apk directory");
+
+        URI keiyoushiIndex = URI.create(
+                "https://raw.githubusercontent.com/keiyoushi/extensions/repo/index.min.json");
+        String keiyoushiShape = """
+                [{
+                  "name":"Synthetic Manga Fixture",
+                  "pkg":"eu.kanade.tachiyomi.extension.all.synthetic",
+                  "apk":"tachiyomi-all.synthetic-v1.4.1.apk",
+                  "lang":"all",
+                  "code":1,
+                  "version":"1.4.1",
+                  "nsfw":false,
+                  "sources":[
+                    {"name":"Synthetic Manga","lang":"all","id":"1","baseUrl":""},
+                    {"name":"Synthetic Manga","lang":"pt-BR","id":"2",
+                     "baseUrl":"https://manga.example.test"}
+                  ]
+                }]
+                """;
+        ExtensionPackageMetadata manga = new AniyomiRepositoryIndexParser()
+                .parse(keiyoushiIndex, keiyoushiShape)
+                .getFirst();
+        counter.check(manga.contentKind() == ExtensionContentKind.MANGA
+                        && manga.languageTag().equals("und")
+                        && manga.sources().get(1).languageTag().equals("pt-br"),
+                "the Keiyoushi JSON shape must normalize all and regional language tags");
+        counter.check(manga.artifacts().getFirst().uri().equals(URI.create(
+                        "https://raw.githubusercontent.com/keiyoushi/extensions/repo/apk/"
+                                + "tachiyomi-all.synthetic-v1.4.1.apk")),
+                "Keiyoushi APK filenames must resolve through the public repository apk directory");
     }
 
     private static void rejectsUnsafeMetadata(Counter counter) {

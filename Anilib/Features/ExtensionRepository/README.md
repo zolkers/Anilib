@@ -10,6 +10,15 @@ artifact downloads require HTTPS, redirects are revalidated hop by hop, index
 size and nesting are bounded, duplicate packages are rejected, and URLs with
 credentials or fragments are invalid.
 
+Offline compatibility tests use synthetic entries matching the public
+[Yuzono anime](https://raw.githubusercontent.com/yuzono/anime-repo/repo/index.min.json)
+and [Keiyoushi manga](https://raw.githubusercontent.com/keiyoushi/extensions/repo/index.min.json)
+JSON shapes inspected on 2026-08-18. They retain only field structure and edge
+cases such as unsigned 64-bit source identifiers, `all`/regional languages, and
+filename-only APK paths; no third-party catalogue entry is redistributed.
+Filename-only APK values resolve through the conventional adjacent `apk/`
+directory, while explicit relative paths and absolute HTTPS URLs remain intact.
+
 `pkg` is an opaque publisher identity: no `eu.kanade`, reverse-domain, vendor,
 or Java-package prefix is required. Anilib preserves printable Unicode values
 verbatim and derives separate hashed local filenames, so accepting another

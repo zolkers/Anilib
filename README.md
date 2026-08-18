@@ -48,6 +48,8 @@ targeted retry after partial failure.
 Dedicated extension details expose permissions, publisher and installed signing
 identity, available and installed versions, changelog, progress, retry, and
 failure diagnostics before lifecycle actions.
+Synthetic offline fixtures verify the public Yuzono anime and Keiyoushi manga
+repository JSON shapes without redistributing either catalogue.
 Multi-selection exposes bulk category, favourite, download, guided migration,
 and confirmed deletion actions from the same shared Android/desktop screen.
 The removable Downloads Bundle adds a durable queue, bounded concurrent jobs,
