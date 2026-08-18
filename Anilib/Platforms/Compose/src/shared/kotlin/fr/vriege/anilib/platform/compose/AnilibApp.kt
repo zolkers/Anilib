@@ -70,6 +70,7 @@ import fr.vriege.anilib.feature.library.ui.LibraryPage
 import fr.vriege.anilib.feature.library.ui.LibraryPresentation
 import fr.vriege.anilib.feature.reader.ui.ReaderController
 import fr.vriege.anilib.feature.reader.ui.ReaderPresentation
+import fr.vriege.anilib.feature.player.ui.PlayerPresentation
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -87,6 +88,7 @@ fun AnilibApp(
     presentation: LibraryPresentation,
     discovery: DiscoveryPresentation,
     reader: ReaderPresentation,
+    player: PlayerPresentation,
     downloads: DownloadPresentation,
     backup: BackupPresentation,
     pageDecoder: (ByteArray) -> ImageBitmap?,
@@ -97,7 +99,9 @@ fun AnilibApp(
     var destination by remember { mutableStateOf(navigator.state()) }
     var section by remember { mutableStateOf(AppSection.LIBRARY) }
     var activeReader by remember { mutableStateOf<ReaderController?>(null) }
+    var activePlayerTitle by remember { mutableStateOf<LibraryItemId?>(null) }
     var readerError by remember { mutableStateOf<String?>(null) }
+    var playerError by remember { mutableStateOf<String?>(null) }
     var downloadError by remember { mutableStateOf<String?>(null) }
     var moreDestination by remember { mutableStateOf<MoreDestination?>(null) }
     val navigate: ((LibraryNavigator) -> Unit) -> Unit = { transition ->
@@ -112,11 +116,14 @@ fun AnilibApp(
     MaterialTheme(colorScheme = if (darkTheme) darkColorScheme() else lightColorScheme()) {
         Surface(modifier = Modifier.fillMaxSize()) {
             val controller = activeReader
+            val playerTitle = activePlayerTitle
             if (controller != null) {
                 DisposableEffect(controller) {
                     onDispose { controller.close() }
                 }
                 ReaderScreen(controller, pageDecoder) { activeReader = null }
+            } else if (playerTitle != null) {
+                EpisodeScreen(player, playerTitle) { activePlayerTitle = null }
             } else {
                 val openReader: (LibraryItemId) -> Unit = { id ->
                     runCatching { reader.open(id) }
@@ -131,12 +138,23 @@ fun AnilibApp(
                         .onSuccess { downloadError = null }
                         .onFailure { downloadError = it.message ?: "The download could not be queued." }
                 }
+                val openPlayer: (LibraryItemId) -> Unit = { id ->
+                    runCatching {
+                        check(player.canOpen(id)) { "This title no longer has a streaming source." }
+                    }
+                        .onSuccess {
+                            playerError = null
+                            activePlayerTitle = id
+                        }
+                        .onFailure { playerError = it.message ?: "The episode list could not be opened." }
+                }
                 BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                     if (maxWidth >= 720.dp) {
                         ExpandedShell(
                             presentation,
                             discovery,
                             reader,
+                            player,
                             downloads,
                             backup,
                             destination,
@@ -146,6 +164,8 @@ fun AnilibApp(
                             openSection,
                             openReader,
                             readerError,
+                            openPlayer,
+                            playerError,
                             enqueueDownload,
                             downloadError,
                             moreDestination,
@@ -157,6 +177,7 @@ fun AnilibApp(
                             presentation,
                             discovery,
                             reader,
+                            player,
                             downloads,
                             backup,
                             destination,
@@ -166,6 +187,8 @@ fun AnilibApp(
                             openSection,
                             openReader,
                             readerError,
+                            openPlayer,
+                            playerError,
                             enqueueDownload,
                             downloadError,
                             moreDestination,
@@ -184,6 +207,7 @@ private fun ExpandedShell(
     presentation: LibraryPresentation,
     discovery: DiscoveryPresentation,
     reader: ReaderPresentation,
+    player: PlayerPresentation,
     downloads: DownloadPresentation,
     backup: BackupPresentation,
     destination: LibraryNavigationState,
@@ -193,6 +217,8 @@ private fun ExpandedShell(
     openSection: (AppSection) -> Unit,
     openReader: (LibraryItemId) -> Unit,
     readerError: String?,
+    openPlayer: (LibraryItemId) -> Unit,
+    playerError: String?,
     enqueueDownload: (LibraryItemId) -> Unit,
     downloadError: String?,
     moreDestination: MoreDestination?,
@@ -207,6 +233,7 @@ private fun ExpandedShell(
                 presentation,
                 discovery,
                 reader,
+                player,
                 downloads,
                 backup,
                 destination,
@@ -216,6 +243,8 @@ private fun ExpandedShell(
                 openSection,
                 openReader,
                 readerError,
+                openPlayer,
+                playerError,
                 enqueueDownload,
                 downloadError,
                 moreDestination,
@@ -231,6 +260,7 @@ private fun CompactShell(
     presentation: LibraryPresentation,
     discovery: DiscoveryPresentation,
     reader: ReaderPresentation,
+    player: PlayerPresentation,
     downloads: DownloadPresentation,
     backup: BackupPresentation,
     destination: LibraryNavigationState,
@@ -240,6 +270,8 @@ private fun CompactShell(
     openSection: (AppSection) -> Unit,
     openReader: (LibraryItemId) -> Unit,
     readerError: String?,
+    openPlayer: (LibraryItemId) -> Unit,
+    playerError: String?,
     enqueueDownload: (LibraryItemId) -> Unit,
     downloadError: String?,
     moreDestination: MoreDestination?,
@@ -252,6 +284,7 @@ private fun CompactShell(
                 presentation,
                 discovery,
                 reader,
+                player,
                 downloads,
                 backup,
                 destination,
@@ -261,6 +294,8 @@ private fun CompactShell(
                 openSection,
                 openReader,
                 readerError,
+                openPlayer,
+                playerError,
                 enqueueDownload,
                 downloadError,
                 moreDestination,
@@ -319,6 +354,7 @@ private fun AppDestination(
     presentation: LibraryPresentation,
     discovery: DiscoveryPresentation,
     reader: ReaderPresentation,
+    player: PlayerPresentation,
     downloads: DownloadPresentation,
     backup: BackupPresentation,
     destination: LibraryNavigationState,
@@ -328,6 +364,8 @@ private fun AppDestination(
     openSection: (AppSection) -> Unit,
     openReader: (LibraryItemId) -> Unit,
     readerError: String?,
+    openPlayer: (LibraryItemId) -> Unit,
+    playerError: String?,
     enqueueDownload: (LibraryItemId) -> Unit,
     downloadError: String?,
     moreDestination: MoreDestination?,
@@ -339,11 +377,14 @@ private fun AppDestination(
             LibraryPage.DETAILS -> DetailsDestination(
                 presentation,
                 reader,
+                player,
                 downloads,
                 destination,
                 navigate,
                 openReader,
                 readerError,
+                openPlayer,
+                playerError,
                 enqueueDownload,
                 downloadError,
             )
@@ -492,11 +533,14 @@ private fun HistoryCard(row: LibraryHistoryRow, openDetails: () -> Unit) {
 private fun DetailsDestination(
     presentation: LibraryPresentation,
     reader: ReaderPresentation,
+    player: PlayerPresentation,
     downloads: DownloadPresentation,
     destination: LibraryNavigationState,
     navigate: ((LibraryNavigator) -> Unit) -> Unit,
     openReader: (LibraryItemId) -> Unit,
     readerError: String?,
+    openPlayer: (LibraryItemId) -> Unit,
+    playerError: String?,
     enqueueDownload: (LibraryItemId) -> Unit,
     downloadError: String?,
 ) {
@@ -508,10 +552,13 @@ private fun DetailsDestination(
         DetailsPage(
             details = details,
             canRead = runCatching { reader.canOpen(details.id()) }.getOrDefault(false),
+            canWatch = runCatching { player.canOpen(details.id()) }.getOrDefault(false),
             canDownload = runCatching { downloads.canEnqueue(details.id()) }.getOrDefault(false),
             readerError = readerError,
+            playerError = playerError,
             downloadError = downloadError,
             read = { openReader(details.id()) },
+            watch = { openPlayer(details.id()) },
             download = { enqueueDownload(details.id()) },
             goBack = { navigate(LibraryNavigator::back) },
         )
@@ -523,10 +570,13 @@ private fun DetailsDestination(
 private fun DetailsPage(
     details: LibraryDetails,
     canRead: Boolean,
+    canWatch: Boolean,
     canDownload: Boolean,
     readerError: String?,
+    playerError: String?,
     downloadError: String?,
     read: () -> Unit,
+    watch: () -> Unit,
     download: () -> Unit,
     goBack: () -> Unit,
 ) {
@@ -548,6 +598,9 @@ private fun DetailsPage(
             if (!readerError.isNullOrBlank()) {
                 item { Text(readerError, color = MaterialTheme.colorScheme.error) }
             }
+            if (!playerError.isNullOrBlank()) {
+                item { Text(playerError, color = MaterialTheme.colorScheme.error) }
+            }
             if (!downloadError.isNullOrBlank()) {
                 item { Text(downloadError, color = MaterialTheme.colorScheme.error) }
             }
@@ -556,8 +609,11 @@ private fun DetailsPage(
                     modifier = Modifier.padding(vertical = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Button(onClick = read, enabled = canRead) {
-                        Text("Read")
+                    if (canWatch) {
+                        Button(onClick = watch) { Text("Watch") }
+                    }
+                    if (canRead) {
+                        Button(onClick = read) { Text("Read") }
                     }
                     Button(onClick = download, enabled = canDownload) {
                         Text("Download")

@@ -16,6 +16,7 @@ dependencies {
     implementation project(':Anilib:Features:Discovery:Ui')
     implementation project(':Anilib:Features:Library:Ui')
     implementation project(':Anilib:Features:Reader:Ui')
+    implementation project(':Anilib:Features:Player:Ui')
     implementation project(':Anilib:Features:Downloads:Ui')
     implementation project(':Anilib:Features:Backup:Ui')
     implementation project(':Anilib:Kernel:Api')
