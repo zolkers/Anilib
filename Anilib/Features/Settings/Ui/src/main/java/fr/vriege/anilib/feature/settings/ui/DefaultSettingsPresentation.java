@@ -3,15 +3,23 @@ package fr.vriege.anilib.feature.settings.ui;
 import fr.vriege.anilib.feature.settings.SettingsService;
 import fr.vriege.anilib.feature.settings.SettingsSnapshot;
 import fr.vriege.anilib.feature.settings.ThemeMode;
+import fr.vriege.anilib.feature.settings.UnusedDataCleanupResult;
+import fr.vriege.anilib.feature.settings.UnusedDataMaintenance;
 
 import java.util.Objects;
 import java.util.function.Consumer;
 
 public final class DefaultSettingsPresentation implements SettingsPresentation {
     private final SettingsService service;
+    private final UnusedDataMaintenance maintenance;
 
     public DefaultSettingsPresentation(SettingsService service) {
+        this(service, UnusedDataCleanupResult::empty);
+    }
+
+    public DefaultSettingsPresentation(SettingsService service, UnusedDataMaintenance maintenance) {
         this.service = Objects.requireNonNull(service, "service must not be null");
+        this.maintenance = Objects.requireNonNull(maintenance, "maintenance must not be null");
     }
 
     @Override
@@ -47,5 +55,10 @@ public final class DefaultSettingsPresentation implements SettingsPresentation {
     @Override
     public void setUpdateOnlyOnWifi(boolean enabled) {
         service.replace(service.snapshot().withUpdateOnlyOnWifi(enabled));
+    }
+
+    @Override
+    public UnusedDataCleanupResult cleanUnusedData() {
+        return maintenance.clean();
     }
 }

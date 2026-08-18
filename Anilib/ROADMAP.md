@@ -107,7 +107,7 @@ platform-specific.
 - [x] enforce Wi-Fi, incognito, and adult-content policies in their owning Bundles
 - [x] user-confirmed clear actions for shared HTTP cache, HTTP cookies, and WebView cookies
 - [x] clear WebView cache/storage immediately on Android and before the next KCEF startup
-- [ ] clean unused application database entries
+- [x] clean unused application database entries
 - [x] source and title WebView with shared browser-session cookies
 - [x] source-declared WebView headers, User-Agent, and challenge-cookie completion
 - [ ] per-screen parity audit against the current Aniyomi information architecture

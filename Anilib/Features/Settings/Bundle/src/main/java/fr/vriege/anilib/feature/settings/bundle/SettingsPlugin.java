@@ -2,6 +2,7 @@ package fr.vriege.anilib.feature.settings.bundle;
 
 import fr.vriege.anilib.feature.settings.SettingsCapabilities;
 import fr.vriege.anilib.feature.settings.runtime.FileSettingsService;
+import fr.vriege.anilib.feature.settings.runtime.DefaultUnusedDataMaintenance;
 import fr.vriege.anilib.feature.settings.ui.DefaultSettingsPresentation;
 import fr.vriege.anilib.feature.settings.ui.SettingsUiCapabilities;
 import fr.vriege.anilib.foundation.component.ComponentDescriptor;
@@ -16,6 +17,7 @@ public final class SettingsPlugin implements AnilibPlugin {
     private static final PluginManifest MANIFEST = PluginManifest.builder(
                     ComponentDescriptor.of("feature.settings", "Settings", "1.0.0"))
             .provides(SettingsCapabilities.SERVICE)
+            .provides(SettingsCapabilities.UNUSED_DATA_REGISTRAR)
             .provides(SettingsUiCapabilities.PRESENTATION)
             .build();
 
@@ -35,7 +37,11 @@ public final class SettingsPlugin implements AnilibPlugin {
     @Override
     public void install(PluginInstallationContext context) {
         FileSettingsService service = new FileSettingsService(settingsFile);
+        DefaultUnusedDataMaintenance maintenance = new DefaultUnusedDataMaintenance();
         context.publish(SettingsCapabilities.SERVICE, service);
-        context.publish(SettingsUiCapabilities.PRESENTATION, new DefaultSettingsPresentation(service));
+        context.publish(SettingsCapabilities.UNUSED_DATA_REGISTRAR, maintenance);
+        context.publish(
+                SettingsUiCapabilities.PRESENTATION,
+                new DefaultSettingsPresentation(service, maintenance));
     }
 }

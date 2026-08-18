@@ -230,6 +230,14 @@ rejects, and skips adult packages unless enabled. Desktop treats its ordinary
 host connection as suitable for large transfers, while Android admits validated
 Wi-Fi and Ethernet transports.
 
+Database cleanup is coordinated by Settings without taking ownership of feature
+state. Downloads, Player, Tracker, and Updates register narrow cleanup callbacks
+during Bundle installation and unregister them during shutdown. One confirmed
+Android/desktop action removes only records whose Library title no longer exists,
+including downloaded files, while every feature performs its own atomic rewrite.
+Unlike Aniyomi, Anilib does not persist titles merely viewed during discovery, so
+there is no non-library catalogue table to purge.
+
 ## Product lifecycle
 
 1. A configuration selects feature Bundles.

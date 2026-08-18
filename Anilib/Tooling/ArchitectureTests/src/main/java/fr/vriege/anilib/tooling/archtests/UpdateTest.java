@@ -9,6 +9,7 @@ import fr.vriege.anilib.feature.library.LibraryOrigin;
 import fr.vriege.anilib.feature.library.MediaKind;
 import fr.vriege.anilib.feature.player.PlayerBackends;
 import fr.vriege.anilib.feature.network.NetworkStatus;
+import fr.vriege.anilib.feature.settings.ui.SettingsUiCapabilities;
 import fr.vriege.anilib.feature.source.SourceCatalogueItemId;
 import fr.vriege.anilib.feature.source.SourceContentKind;
 import fr.vriege.anilib.feature.source.SourceDescriptor;
@@ -55,6 +56,7 @@ final class UpdateTest {
     static int run() {
         Counter counter = new Counter();
         enforcesNetworkPolicy(counter);
+        cleansOrphanedUpdateState(counter);
         Path sourceDirectory = temporaryDirectory("anilib-updates-source");
         Path targetDirectory = temporaryDirectory("anilib-updates-target");
         MutableStreamingSource source = new MutableStreamingSource(List.of(episode("episode-1", 1.0d)));
@@ -152,6 +154,34 @@ final class UpdateTest {
                 counter.check(expected.getCause() instanceof fr.vriege.anilib.feature.updates.LibraryUpdateException,
                         "library update network policy must report a feature-owned failure");
             }
+        } finally {
+            deleteDirectory(directory);
+        }
+    }
+
+    private static void cleansOrphanedUpdateState(Counter counter) {
+        Path directory = temporaryDirectory("anilib-updates-cleanup");
+        MutableStreamingSource source = new MutableStreamingSource(List.of(episode("episode-1", 1.0d)));
+        try (StartedAnilib application = start(directory, source, new RecordingNotifier())) {
+            LibraryItem item = new LibraryItem(
+                    new LibraryItemId("updates-cleanup"),
+                    "Update cleanup",
+                    MediaKind.ANIME,
+                    Instant.parse("2026-08-01T00:00:00Z"),
+                    Set.of())
+                    .withFavorite(true)
+                    .withOrigin(new LibraryOrigin(SOURCE_ID.toString(), SOURCE_ITEM_ID.value()));
+            application.capability(LibraryCapabilities.CATALOG).save(item);
+            LibraryUpdateService updates = application.capability(UpdateCapabilities.SERVICE);
+            updates.runNow().join();
+            source.replace(List.of(episode("episode-2", 2.0d), episode("episode-1", 1.0d)));
+            updates.runNow().join();
+            application.capability(LibraryCapabilities.CATALOG).remove(item.id());
+            var result = application.capability(SettingsUiCapabilities.PRESENTATION).cleanUnusedData();
+            counter.check(result.removedByOwner().getOrDefault("updates", 0) == 2,
+                    "database cleanup must remove update baselines and events for deleted titles");
+            counter.check(updates.snapshot().events().isEmpty(),
+                    "database cleanup must remove orphaned entries from the Updates feed");
         } finally {
             deleteDirectory(directory);
         }

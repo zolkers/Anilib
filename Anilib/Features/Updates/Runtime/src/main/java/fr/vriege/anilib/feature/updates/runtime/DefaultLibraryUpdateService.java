@@ -197,6 +197,39 @@ public final class DefaultLibraryUpdateService implements LibraryUpdateService, 
         notifyListeners();
     }
 
+    public synchronized int cleanUnusedData() {
+        ensureOpen();
+        if (running != null && !running.isDone()) {
+            throw new LibraryUpdateException("Unused update data cannot be cleaned during a library update");
+        }
+        Set<LibraryItemId> retainedIds = library.snapshot().stream()
+                .map(LibraryItem::id)
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        LibraryUpdateStore.State current = store.snapshot();
+        Map<LibraryItemId, Set<String>> baselines = current.baselines().entrySet().stream()
+                .filter(entry -> retainedIds.contains(entry.getKey()))
+                .collect(java.util.stream.Collectors.toUnmodifiableMap(
+                        Map.Entry::getKey,
+                        Map.Entry::getValue));
+        List<LibraryUpdateEvent> events = current.events().stream()
+                .filter(event -> retainedIds.contains(event.libraryItemId()))
+                .toList();
+        int removed = current.baselines().size() - baselines.size()
+                + current.events().size() - events.size();
+        if (removed > 0) {
+            store.replace(new LibraryUpdateStore.State(
+                    current.policy(),
+                    baselines,
+                    events,
+                    current.lastRunAt()));
+            discovered = discovered.stream()
+                    .filter(event -> retainedIds.contains(event.libraryItemId()))
+                    .toList();
+            notifyListeners();
+        }
+        return removed;
+    }
+
     @Override
     public AutoCloseable observe(Runnable listener) {
         Runnable value = Objects.requireNonNull(listener, "listener must not be null");

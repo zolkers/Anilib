@@ -288,6 +288,24 @@ public final class DefaultDownloadService
         notifyListeners();
     }
 
+    public synchronized int cleanUnusedData() {
+        ensureOpen();
+        List<DownloadRecord> orphaned = records.values().stream()
+                .filter(record -> library.find(record.libraryItemId).isEmpty())
+                .toList();
+        if (orphaned.isEmpty()) {
+            return 0;
+        }
+        orphaned.forEach(record -> {
+            deleteFiles(record);
+            records.remove(record.id);
+            scheduled.remove(record.id);
+        });
+        persist();
+        notifyListeners();
+        return orphaned.size();
+    }
+
     @Override
     public synchronized AutoCloseable observe(Runnable listener) {
         Objects.requireNonNull(listener, "listener must not be null");

@@ -198,6 +198,19 @@ public final class DefaultTrackerService implements TrackerService {
         notifyListeners();
     }
 
+    public int cleanUnusedData() {
+        List<TrackerEntry> current = entries.snapshot();
+        List<TrackerEntry> retained = current.stream()
+                .filter(entry -> library.find(entry.libraryItemId()).isPresent())
+                .toList();
+        int removed = current.size() - retained.size();
+        if (removed > 0) {
+            entries.replaceAll(retained);
+            notifyListeners();
+        }
+        return removed;
+    }
+
     @Override
     public AutoCloseable observe(Runnable listener) {
         Runnable value = Objects.requireNonNull(listener, "listener must not be null");

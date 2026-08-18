@@ -3,6 +3,7 @@ package fr.vriege.anilib.tooling.archtests;
 import fr.vriege.anilib.feature.settings.SettingsSnapshot;
 import fr.vriege.anilib.feature.settings.ThemeMode;
 import fr.vriege.anilib.feature.settings.runtime.FileSettingsService;
+import fr.vriege.anilib.feature.settings.runtime.DefaultUnusedDataMaintenance;
 import fr.vriege.anilib.feature.settings.ui.DefaultSettingsPresentation;
 import fr.vriege.anilib.feature.settings.ui.SettingsPresentation;
 
@@ -18,6 +19,7 @@ final class SettingsTest {
 
     static int run() {
         Counter counter = new Counter();
+        verifiesUnusedDataCoordination(counter);
         Path directory = temporaryDirectory();
         Path file = directory.resolve("settings.properties");
         try {
@@ -53,6 +55,17 @@ final class SettingsTest {
         } finally {
             deleteDirectory(directory);
         }
+    }
+
+    private static void verifiesUnusedDataCoordination(Counter counter) {
+        DefaultUnusedDataMaintenance maintenance = new DefaultUnusedDataMaintenance();
+        AutoCloseable first = maintenance.register("player", () -> 2);
+        maintenance.register("downloads", () -> 1);
+        counter.check(maintenance.clean().totalRemoved() == 3,
+                "unused-data maintenance must aggregate every registered feature cleaner");
+        close(first);
+        counter.check(maintenance.clean().removedByOwner().equals(java.util.Map.of("downloads", 1)),
+                "closing a feature registration must remove its unused-data cleaner");
     }
 
     private static Path temporaryDirectory() {

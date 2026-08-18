@@ -62,6 +62,7 @@ final class DownloadTest {
         verifiesResumableQueue(counter);
         verifiesStorageLimit(counter);
         enforcesLargeTransferPolicy(counter);
+        cleansOrphanedDownloads(counter);
         return counter.value;
     }
 
@@ -222,6 +223,34 @@ final class DownloadTest {
             }
         } catch (IOException exception) {
             throw new AssertionError("Unable to prepare download network policy test", exception);
+        } finally {
+            deleteTree(root);
+        }
+    }
+
+    private static void cleansOrphanedDownloads(Counter counter) {
+        Path root = null;
+        try {
+            root = Files.createTempDirectory("anilib-download-cleanup");
+            MemoryLibraryCatalog library = new MemoryLibraryCatalog();
+            LibraryItem item = LibraryItem.create("Cleanup", MediaKind.MANGA)
+                    .withOrigin(new LibraryOrigin("test.download", "title"));
+            library.save(item);
+            try (DefaultDownloadService downloads = new DefaultDownloadService(
+                    new SingleSourceRegistry(new BlockingPagedSource(false)),
+                    library,
+                    root,
+                    DownloadStoragePolicy.standard())) {
+                DownloadId id = downloads.enqueue(item.id());
+                await(downloads, id, job -> job.status() == DownloadStatus.COMPLETED);
+                library.remove(item.id());
+                counter.check(downloads.cleanUnusedData() == 1 && downloads.snapshot().jobs().isEmpty(),
+                        "database cleanup must remove download records for deleted library titles");
+                counter.check(downloads.snapshot().usedStorageBytes() == 0,
+                        "database cleanup must reclaim orphaned download page files");
+            }
+        } catch (IOException exception) {
+            throw new AssertionError("Unable to prepare download cleanup test", exception);
         } finally {
             deleteTree(root);
         }

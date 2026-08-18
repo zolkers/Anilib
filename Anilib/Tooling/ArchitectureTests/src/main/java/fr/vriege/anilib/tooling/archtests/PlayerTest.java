@@ -35,6 +35,7 @@ import fr.vriege.anilib.feature.source.StreamingSource;
 import fr.vriege.anilib.feature.source.SourceExtensionPlugin;
 import fr.vriege.anilib.feature.settings.SettingsCapabilities;
 import fr.vriege.anilib.feature.settings.SettingsService;
+import fr.vriege.anilib.feature.settings.ui.SettingsUiCapabilities;
 import fr.vriege.anilib.foundation.component.ComponentDescriptor;
 import fr.vriege.anilib.framework.http.runtime.UrlConnectionHttpTransport;
 import fr.vriege.anilib.kernel.AnilibPlugin;
@@ -77,6 +78,7 @@ final class PlayerTest {
         verifiesSelectionAndPersistence(counter);
         verifiesPlaybackBackup(counter);
         suppressesIncognitoPersistence(counter);
+        cleansOrphanedPlaybackState(counter);
         rejectsInvalidSourceResults(counter);
         return counter.value;
     }
@@ -245,6 +247,27 @@ final class PlayerTest {
                             .filter(episode -> episode.episode().id().equals(FIRST_EPISODE.id()))
                             .findFirst().orElseThrow().playback().isEmpty(),
                     "incognito Player sessions must not write Player-owned resume state");
+        } finally {
+            deleteDirectory(directory);
+        }
+    }
+
+    private static void cleansOrphanedPlaybackState(Counter counter) {
+        Path directory = temporaryDirectory("anilib-player-cleanup");
+        try (StartedAnilib application = StandardAnilib.start(
+                directory,
+                List.of(sourcePlugin(new TestStreamingSource(false))))) {
+            LibraryCatalog library = application.capability(LibraryCapabilities.CATALOG);
+            LibraryItem item = animeItem("player-cleanup");
+            library.save(item);
+            try (PlayerSession session = application.capability(PlayerCapabilities.SERVICE)
+                    .open(item.id(), FIRST_EPISODE.id())) {
+                session.updatePlayback(10_000L, 100_000L);
+            }
+            library.remove(item.id());
+            var cleanup = application.capability(SettingsUiCapabilities.PRESENTATION).cleanUnusedData();
+            counter.check(cleanup.removedByOwner().getOrDefault("player", 0) == 1,
+                    "database cleanup must remove Player state whose library title was deleted");
         } finally {
             deleteDirectory(directory);
         }

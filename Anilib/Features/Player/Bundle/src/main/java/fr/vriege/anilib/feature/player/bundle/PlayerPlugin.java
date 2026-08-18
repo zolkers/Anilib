@@ -13,6 +13,7 @@ import fr.vriege.anilib.feature.source.SourceCapabilities;
 import fr.vriege.anilib.feature.source.SourceRegistry;
 import fr.vriege.anilib.feature.settings.SettingsCapabilities;
 import fr.vriege.anilib.feature.settings.SettingsService;
+import fr.vriege.anilib.feature.settings.UnusedDataRegistrar;
 import fr.vriege.anilib.foundation.component.ComponentDescriptor;
 import fr.vriege.anilib.kernel.AnilibPlugin;
 import fr.vriege.anilib.kernel.PluginInstallationContext;
@@ -27,6 +28,7 @@ public final class PlayerPlugin implements AnilibPlugin {
             .requires(SourceCapabilities.REGISTRY)
             .requires(LibraryCapabilities.CATALOG)
             .requires(SettingsCapabilities.SERVICE)
+            .requires(SettingsCapabilities.UNUSED_DATA_REGISTRAR)
             .provides(PlayerCapabilities.SERVICE)
             .provides(PlayerCapabilities.BACKEND)
             .provides(PlayerCapabilities.BACKUP_CODEC)
@@ -56,12 +58,14 @@ public final class PlayerPlugin implements AnilibPlugin {
         SourceRegistry sources = context.require(SourceCapabilities.REGISTRY);
         LibraryCatalog library = context.require(LibraryCapabilities.CATALOG);
         SettingsService settings = context.require(SettingsCapabilities.SERVICE);
+        UnusedDataRegistrar cleanup = context.require(SettingsCapabilities.UNUSED_DATA_REGISTRAR);
         DefaultPlayerService service = context.own(new DefaultPlayerService(
                 sources,
                 library,
                 stateFile,
                 backend,
                 () -> !settings.snapshot().incognitoMode()));
+        context.own(cleanup.register("player", service::cleanUnusedData));
         context.publish(PlayerCapabilities.SERVICE, service);
         context.publish(PlayerCapabilities.BACKEND, backend);
         context.publish(PlayerCapabilities.BACKUP_CODEC, new PlayerBackupCodec(service));

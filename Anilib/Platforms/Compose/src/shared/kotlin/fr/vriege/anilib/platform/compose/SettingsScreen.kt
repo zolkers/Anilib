@@ -125,6 +125,11 @@ internal fun SettingsScreen(
                     confirmation = MaintenanceAction.BROWSER_DATA
                 }
             }
+            item {
+                SettingsRow("Clean database", "Remove feature data for titles no longer in the library") {
+                    confirmation = MaintenanceAction.UNUSED_DATA
+                }
+            }
             result?.let { message ->
                 item {
                     Text(
@@ -173,6 +178,14 @@ internal fun SettingsScreen(
                                     "HTTP cookies cleared. ${browserData.message} " +
                                         "WebView cookies were unavailable."
                                 else -> "HTTP and WebView cookies cleared. ${browserData.message}"
+                            }
+                        }
+                        MaintenanceAction.UNUSED_DATA -> {
+                            val cleanup = presentation.cleanUnusedData()
+                            result = if (cleanup.totalRemoved() == 0) {
+                                "Database is already clean."
+                            } else {
+                                "Removed ${cleanup.totalRemoved()} unused database entries."
                             }
                         }
                     }
@@ -254,5 +267,10 @@ private enum class MaintenanceAction(val title: String, val warning: String, val
         "Clear WebView data?",
         "Browser sessions and stored website data will be removed. This cannot be undone.",
         "WebView data cleared.",
+    ),
+    UNUSED_DATA(
+        "Clean database?",
+        "Player, download, tracking, and update records for removed titles will be deleted.",
+        "Unused database entries removed.",
     ),
 }

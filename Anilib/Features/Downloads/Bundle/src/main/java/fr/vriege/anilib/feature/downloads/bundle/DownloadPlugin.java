@@ -15,6 +15,7 @@ import fr.vriege.anilib.feature.source.SourceCapabilities;
 import fr.vriege.anilib.feature.source.SourceRegistry;
 import fr.vriege.anilib.feature.settings.SettingsCapabilities;
 import fr.vriege.anilib.feature.settings.SettingsService;
+import fr.vriege.anilib.feature.settings.UnusedDataRegistrar;
 import fr.vriege.anilib.foundation.component.ComponentDescriptor;
 import fr.vriege.anilib.kernel.AnilibPlugin;
 import fr.vriege.anilib.kernel.PluginInstallationContext;
@@ -31,6 +32,7 @@ public final class DownloadPlugin implements AnilibPlugin {
             .requires(ReaderCapabilities.CONTENT_REGISTRAR)
             .requires(NetworkCapabilities.STATUS)
             .requires(SettingsCapabilities.SERVICE)
+            .requires(SettingsCapabilities.UNUSED_DATA_REGISTRAR)
             .provides(DownloadCapabilities.SERVICE)
             .provides(DownloadUiCapabilities.PRESENTATION)
             .build();
@@ -61,6 +63,7 @@ public final class DownloadPlugin implements AnilibPlugin {
         ReaderContentRegistrar registrar = context.require(ReaderCapabilities.CONTENT_REGISTRAR);
         NetworkStatus network = context.require(NetworkCapabilities.STATUS);
         SettingsService settings = context.require(SettingsCapabilities.SERVICE);
+        UnusedDataRegistrar cleanup = context.require(SettingsCapabilities.UNUSED_DATA_REGISTRAR);
         DefaultDownloadService service = context.own(new DefaultDownloadService(
                 sources,
                 library,
@@ -68,6 +71,7 @@ public final class DownloadPlugin implements AnilibPlugin {
                 policy,
                 () -> !settings.snapshot().downloadOnlyOnWifi() || network.allowsLargeTransfers()));
         context.own(registrar.register(service));
+        context.own(cleanup.register("downloads", service::cleanUnusedData));
         context.publish(DownloadCapabilities.SERVICE, service);
         context.publish(DownloadUiCapabilities.PRESENTATION, new DefaultDownloadPresentation(service));
     }

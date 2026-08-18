@@ -6,6 +6,7 @@ import fr.vriege.anilib.feature.network.NetworkCapabilities;
 import fr.vriege.anilib.feature.network.NetworkStatus;
 import fr.vriege.anilib.feature.settings.SettingsCapabilities;
 import fr.vriege.anilib.feature.settings.SettingsService;
+import fr.vriege.anilib.feature.settings.UnusedDataRegistrar;
 import fr.vriege.anilib.feature.source.SourceCapabilities;
 import fr.vriege.anilib.feature.source.SourceRegistry;
 import fr.vriege.anilib.feature.updates.LibraryUpdateNotifier;
@@ -29,6 +30,7 @@ public final class UpdatePlugin implements AnilibPlugin {
             .requires(SourceCapabilities.REGISTRY)
             .requires(NetworkCapabilities.STATUS)
             .requires(SettingsCapabilities.SERVICE)
+            .requires(SettingsCapabilities.UNUSED_DATA_REGISTRAR)
             .provides(UpdateCapabilities.SERVICE)
             .provides(UpdateCapabilities.NOTIFIER)
             .provides(UpdateCapabilities.BACKUP_CODEC)
@@ -55,12 +57,14 @@ public final class UpdatePlugin implements AnilibPlugin {
         SourceRegistry sources = context.require(SourceCapabilities.REGISTRY);
         NetworkStatus network = context.require(NetworkCapabilities.STATUS);
         SettingsService settings = context.require(SettingsCapabilities.SERVICE);
+        UnusedDataRegistrar cleanup = context.require(SettingsCapabilities.UNUSED_DATA_REGISTRAR);
         DefaultLibraryUpdateService service = context.own(new DefaultLibraryUpdateService(
                 library,
                 sources,
                 notifier,
                 stateFile,
                 () -> !settings.snapshot().updateOnlyOnWifi() || network.allowsLargeTransfers()));
+        context.own(cleanup.register("updates", service::cleanUnusedData));
         context.publish(UpdateCapabilities.SERVICE, service);
         context.publish(UpdateCapabilities.NOTIFIER, notifier);
         context.publish(UpdateCapabilities.BACKUP_CODEC, new UpdateBackupCodec(service));

@@ -215,6 +215,20 @@ public final class DefaultPlayerService implements PlayerService, AutoCloseable 
         return states;
     }
 
+    public synchronized int cleanUnusedData() {
+        ensureOpen();
+        List<PlaybackState> current = states.snapshot();
+        List<PlaybackState> retained = current.stream()
+                .filter(state -> library.find(state.libraryItemId()).isPresent())
+                .toList();
+        int removed = current.size() - retained.size();
+        if (removed > 0) {
+            states.replaceAll(retained);
+            notifyListeners();
+        }
+        return removed;
+    }
+
     synchronized void removeSession(DefaultPlayerSession session) {
         sessions.remove(session);
     }
