@@ -18,6 +18,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.TextButton
@@ -37,6 +38,9 @@ import fr.vriege.anilib.feature.library.MediaKind
 import fr.vriege.anilib.feature.library.PublicationStatus
 import fr.vriege.anilib.feature.library.LibraryCategory
 import fr.vriege.anilib.feature.library.LibraryCategoryUpdatePolicy
+import fr.vriege.anilib.feature.library.LibraryDisplayDensity
+import fr.vriege.anilib.feature.library.LibraryDisplayMode
+import fr.vriege.anilib.feature.library.LibrarySort
 import fr.vriege.anilib.feature.discovery.ui.DiscoveryPresentation
 import fr.vriege.anilib.feature.library.ui.LibraryPresentation
 import fr.vriege.anilib.feature.player.ui.PlayerPresentation
@@ -56,17 +60,17 @@ import kotlinx.coroutines.withContext
 internal fun CategoriesScreen(presentation: LibraryPresentation, goBack: () -> Unit) {
     var revision by remember(presentation) { mutableStateOf(0) }
     val overview = remember(presentation, revision) { presentation.library() }
-    var newCategory by remember { mutableStateOf("") }
+    var creating by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    fun update(action: () -> Unit) {
-        try {
+    fun update(action: () -> Unit): Boolean = try {
             action()
             error = null
             revision++
+            true
         } catch (failure: RuntimeException) {
             error = failure.message ?: "Unable to update categories."
+            false
         }
-    }
     MoreScaffold("Categories", goBack) { padding ->
         val uncategorized = overview.titles().count { it.categories().isEmpty() }
         LazyColumn(
@@ -76,22 +80,16 @@ internal fun CategoriesScreen(presentation: LibraryPresentation, goBack: () -> U
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    OutlinedTextField(
-                        value = newCategory,
-                        onValueChange = { newCategory = it },
-                        label = { Text("New category") },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Button(
-                        enabled = newCategory.isNotBlank(),
-                        onClick = {
-                            update { presentation.createCategory(newCategory.trim()) }
-                            if (error == null) newCategory = ""
-                        },
-                    ) { Text("Add") }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Organize your library", fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "Each category can use its own layout, density, sort and update policy.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Button(onClick = { creating = true }) { Text("Create") }
                 }
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }
@@ -104,14 +102,11 @@ internal fun CategoriesScreen(presentation: LibraryPresentation, goBack: () -> U
                         count,
                         index,
                         overview.categoryConfigurations().lastIndex,
-                        rename = { next ->
-                            update { presentation.renameCategory(category.name(), next) }
+                        replace = { next ->
+                            update { presentation.replaceCategory(category.name(), next) }
                         },
                         move = { target ->
                             update { presentation.moveCategory(category.name(), target) }
-                        },
-                        setUpdatePolicy = { policy ->
-                            update { presentation.setCategoryUpdatePolicy(category.name(), policy) }
                         },
                         delete = { update { presentation.deleteCategory(category.name()) } },
                     )
@@ -122,6 +117,25 @@ internal fun CategoriesScreen(presentation: LibraryPresentation, goBack: () -> U
             }
         }
     }
+    if (creating) {
+        val preferences = overview.displayPreferences()
+        CategoryEditorDialog(
+            title = "Create category",
+            confirmLabel = "Create",
+            initial = LibraryCategory(
+                "New category",
+                preferences.mode(),
+                preferences.density(),
+                preferences.sort(),
+                LibraryCategoryUpdatePolicy.DEFAULT,
+            ),
+            clearInitialName = true,
+            dismiss = { creating = false },
+            confirm = { category ->
+                if (update { presentation.createCategory(category) }) creating = false
+            },
+        )
+    }
 }
 
 @Composable
@@ -130,14 +144,12 @@ private fun CategoryCard(
     count: Int,
     index: Int,
     lastIndex: Int,
-    rename: (String) -> Unit,
+    replace: (LibraryCategory) -> Boolean,
     move: (Int) -> Unit,
-    setUpdatePolicy: (LibraryCategoryUpdatePolicy) -> Unit,
     delete: () -> Unit,
 ) {
     var editing by remember(category.name()) { mutableStateOf(false) }
     var confirmingDelete by remember(category.name()) { mutableStateOf(false) }
-    var nextName by remember(category.name()) { mutableStateOf(category.name()) }
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
@@ -147,41 +159,44 @@ private fun CategoryCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(category.name(), fontWeight = FontWeight.Medium)
                     Text("$count titles", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        "${category.displayMode().displayLabel()} · " +
+                            "${category.density().densityLabel()} · ${category.sort().sortLabel()}",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            "Library updates",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            "·",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            category.updatePolicy().updateLabel(),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
                 TextButton(enabled = index > 0, onClick = { move(index - 1) }) { Text("Up") }
                 TextButton(enabled = index < lastIndex, onClick = { move(index + 1) }) { Text("Down") }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = { editing = true }) { Text("Rename") }
-                TextButton(onClick = {
-                    setUpdatePolicy(category.updatePolicy().next())
-                }) { Text("Updates: ${category.updatePolicy().label()}") }
+                TextButton(onClick = { editing = true }) { Text("Edit") }
                 TextButton(onClick = { confirmingDelete = true }) { Text("Delete") }
             }
         }
     }
     if (editing) {
-        AlertDialog(
-            onDismissRequest = { editing = false },
-            title = { Text("Rename category") },
-            text = {
-                OutlinedTextField(
-                    value = nextName,
-                    onValueChange = { nextName = it },
-                    label = { Text("Category name") },
-                    singleLine = true,
-                )
+        CategoryEditorDialog(
+            title = "Edit category",
+            confirmLabel = "Save",
+            initial = category,
+            dismiss = { editing = false },
+            confirm = {
+                if (replace(it)) editing = false
             },
-            confirmButton = {
-                TextButton(
-                    enabled = nextName.isNotBlank(),
-                    onClick = {
-                        rename(nextName.trim())
-                        editing = false
-                    },
-                ) { Text("Rename") }
-            },
-            dismissButton = { TextButton(onClick = { editing = false }) { Text("Cancel") } },
         )
     }
     if (confirmingDelete) {
@@ -202,14 +217,113 @@ private fun CategoryCard(
     }
 }
 
-private fun LibraryCategoryUpdatePolicy.next(): LibraryCategoryUpdatePolicy = when (this) {
-    LibraryCategoryUpdatePolicy.DEFAULT -> LibraryCategoryUpdatePolicy.INCLUDE
-    LibraryCategoryUpdatePolicy.INCLUDE -> LibraryCategoryUpdatePolicy.EXCLUDE
-    LibraryCategoryUpdatePolicy.EXCLUDE -> LibraryCategoryUpdatePolicy.DEFAULT
+@Composable
+private fun CategoryEditorDialog(
+    title: String,
+    confirmLabel: String,
+    initial: LibraryCategory,
+    clearInitialName: Boolean = false,
+    dismiss: () -> Unit,
+    confirm: (LibraryCategory) -> Unit,
+) {
+    var name by remember(initial.name(), clearInitialName) {
+        mutableStateOf(if (clearInitialName) "" else initial.name())
+    }
+    var displayMode by remember(initial) { mutableStateOf(initial.displayMode()) }
+    var density by remember(initial) { mutableStateOf(initial.density()) }
+    var sort by remember(initial) { mutableStateOf(initial.sort()) }
+    var updatePolicy by remember(initial) { mutableStateOf(initial.updatePolicy()) }
+    AlertDialog(
+        onDismissRequest = dismiss,
+        title = { Text(title) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Category name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                CategoryOption("Display mode", displayMode.displayLabel()) {
+                    displayMode = nextValue(displayMode, DISPLAY_MODES)
+                }
+                CategoryOption("Density", density.densityLabel()) {
+                    density = nextValue(density, DISPLAY_DENSITIES)
+                }
+                CategoryOption("Sort", sort.sortLabel()) {
+                    sort = nextValue(sort, SORTS)
+                }
+                CategoryOption("Library updates", updatePolicy.updateLabel()) {
+                    updatePolicy = nextValue(updatePolicy, UPDATE_POLICIES)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = name.isNotBlank(),
+                onClick = {
+                    confirm(LibraryCategory(name.trim(), displayMode, density, sort, updatePolicy))
+                },
+            ) { Text(confirmLabel) }
+        },
+        dismissButton = { TextButton(onClick = dismiss) { Text("Cancel") } },
+    )
 }
 
-private fun LibraryCategoryUpdatePolicy.label(): String =
-    name.lowercase().replaceFirstChar(Char::uppercase)
+@Composable
+private fun CategoryOption(label: String, value: String, selectNext: () -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        OutlinedButton(onClick = selectNext, modifier = Modifier.fillMaxWidth()) { Text(value) }
+    }
+}
+
+private val DISPLAY_MODES = listOf(LibraryDisplayMode.GRID, LibraryDisplayMode.LIST)
+private val DISPLAY_DENSITIES = listOf(
+    LibraryDisplayDensity.COMPACT,
+    LibraryDisplayDensity.COMFORTABLE,
+    LibraryDisplayDensity.RELAXED,
+)
+private val SORTS = listOf(
+    LibrarySort.TITLE_ASCENDING,
+    LibrarySort.TITLE_DESCENDING,
+    LibrarySort.ADDED_NEWEST,
+    LibrarySort.ADDED_OLDEST,
+)
+private val UPDATE_POLICIES = listOf(
+    LibraryCategoryUpdatePolicy.DEFAULT,
+    LibraryCategoryUpdatePolicy.INCLUDE,
+    LibraryCategoryUpdatePolicy.EXCLUDE,
+)
+
+private fun <T> nextValue(current: T, values: List<T>): T {
+    val index = values.indexOf(current)
+    return values[(index + 1).mod(values.size)]
+}
+
+private fun LibraryDisplayMode.displayLabel(): String =
+    if (this == LibraryDisplayMode.GRID) "Grid" else "List"
+
+private fun LibraryDisplayDensity.densityLabel(): String = name.titleLabel()
+
+private fun LibrarySort.sortLabel(): String {
+    if (this == LibrarySort.TITLE_ASCENDING) return "Title A–Z"
+    if (this == LibrarySort.TITLE_DESCENDING) return "Title Z–A"
+    if (this == LibrarySort.ADDED_NEWEST) return "Recently added"
+    return "Oldest added"
+}
+
+private fun LibraryCategoryUpdatePolicy.updateLabel(): String {
+    if (this == LibraryCategoryUpdatePolicy.DEFAULT) return "Use global policy"
+    if (this == LibraryCategoryUpdatePolicy.INCLUDE) return "Always include"
+    return "Exclude"
+}
+
+private fun String.titleLabel(): String = lowercase().replaceFirstChar(Char::uppercase)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

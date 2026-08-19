@@ -273,6 +273,18 @@ class UiRouteScreenshotTest {
             onAllNodes(hasText("Calculating statistics…")).fetchSemanticsNodes().isEmpty()
         }
         val root = onRoot(useUnmergedTree = true)
+        var previousSemantics: String? = null
+        var stablePolls = 0
+        waitUntil(timeoutMillis = 5_000) {
+            val currentSemantics = root.printToString(maxDepth = 80)
+            if (currentSemantics == previousSemantics) {
+                stablePolls++
+            } else {
+                previousSemantics = currentSemantics
+                stablePolls = 0
+            }
+            stablePolls >= 10
+        }
         val firstSemantics = root.printToString(maxDepth = 80)
         val firstImage = root.captureToImage()
         waitForIdle()

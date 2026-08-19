@@ -127,7 +127,13 @@ public final class DefaultLibraryPresentation implements LibraryPresentation {
     @Override
     public synchronized void createCategory(String name) {
         LibraryConfigurationSnapshot current = normalizedConfiguration();
-        LibraryCategory category = LibraryCategory.defaults(name, current.displayPreferences());
+        createCategory(LibraryCategory.defaults(name, current.displayPreferences()));
+    }
+
+    @Override
+    public synchronized void createCategory(LibraryCategory category) {
+        Objects.requireNonNull(category, "category must not be null");
+        LibraryConfigurationSnapshot current = normalizedConfiguration();
         if (current.categories().stream().anyMatch(value -> value.name().equals(category.name()))) {
             throw new IllegalArgumentException("Library category already exists: " + category.name());
         }
@@ -140,28 +146,37 @@ public final class DefaultLibraryPresentation implements LibraryPresentation {
     public synchronized void renameCategory(String currentName, String nextName) {
         LibraryConfigurationSnapshot current = normalizedConfiguration();
         LibraryCategory category = requireCategory(current.categories(), currentName);
-        LibraryCategory replacement = new LibraryCategory(
+        replaceCategory(currentName, new LibraryCategory(
                 nextName,
                 category.displayMode(),
                 category.density(),
                 category.sort(),
-                category.updatePolicy());
-        if (!currentName.equals(nextName)
-                && current.categories().stream().anyMatch(value -> value.name().equals(nextName))) {
-            throw new IllegalArgumentException("Library category already exists: " + nextName);
+                category.updatePolicy()));
+    }
+
+    @Override
+    public synchronized void replaceCategory(String currentName, LibraryCategory replacement) {
+        Objects.requireNonNull(replacement, "category must not be null");
+        LibraryConfigurationSnapshot current = normalizedConfiguration();
+        requireCategory(current.categories(), currentName);
+        if (!currentName.equals(replacement.name())
+                && current.categories().stream()
+                .anyMatch(value -> value.name().equals(replacement.name()))) {
+            throw new IllegalArgumentException(
+                    "Library category already exists: " + replacement.name());
         }
         List<LibraryCategory> categories = replaceCategory(
                 current.categories(),
                 currentName,
                 replacement);
         Optional<String> defaultCategory = current.displayPreferences().defaultCategory()
-                .map(value -> value.equals(currentName) ? nextName : value);
+                .map(value -> value.equals(currentName) ? replacement.name() : value);
         LibraryDisplayPreferences preferences = withDefaultCategory(
                 current.displayPreferences(),
                 defaultCategory);
         List<LibraryItem> before = catalog.snapshot();
         List<LibraryItem> after = before.stream()
-                .map(item -> renameCategory(item, currentName, nextName))
+                .map(item -> renameCategory(item, currentName, replacement.name()))
                 .toList();
         replaceItemsAndConfiguration(
                 before,
@@ -207,11 +222,7 @@ public final class DefaultLibraryPresentation implements LibraryPresentation {
     @Override
     public synchronized void updateCategory(LibraryCategory category) {
         Objects.requireNonNull(category, "category must not be null");
-        LibraryConfigurationSnapshot current = normalizedConfiguration();
-        requireCategory(current.categories(), category.name());
-        saveConfiguration(new LibraryConfigurationSnapshot(
-                current.displayPreferences(),
-                replaceCategory(current.categories(), category.name(), category)));
+        replaceCategory(category.name(), category);
     }
 
     @Override

@@ -31,7 +31,11 @@ public interface LibraryPresentation {
 
     void createCategory(String name);
 
+    void createCategory(LibraryCategory category);
+
     void renameCategory(String currentName, String nextName);
+
+    void replaceCategory(String currentName, LibraryCategory category);
 
     void moveCategory(String name, int targetIndex);
 

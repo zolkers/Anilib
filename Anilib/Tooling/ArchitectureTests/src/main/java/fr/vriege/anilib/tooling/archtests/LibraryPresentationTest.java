@@ -2,8 +2,10 @@ package fr.vriege.anilib.tooling.archtests;
 
 import fr.vriege.anilib.feature.library.LibraryHistoryEntry;
 import fr.vriege.anilib.feature.library.LibraryCategoryUpdatePolicy;
+import fr.vriege.anilib.feature.library.LibraryCategory;
 import fr.vriege.anilib.feature.library.LibraryDisplayDensity;
 import fr.vriege.anilib.feature.library.LibraryDisplayMode;
+import fr.vriege.anilib.feature.library.LibrarySort;
 import fr.vriege.anilib.feature.library.LibraryItem;
 import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.library.LibraryProgress;
@@ -65,15 +67,36 @@ final class LibraryPresentationTest {
                         .anyMatch(card -> card.id().equals(new LibraryItemId("beta"))),
                 "related titles must include same-kind category matches");
 
-        presentation.createCategory("Archive");
+        presentation.createCategory(new LibraryCategory(
+                "Archive",
+                LibraryDisplayMode.LIST,
+                LibraryDisplayDensity.RELAXED,
+                LibrarySort.ADDED_OLDEST,
+                LibraryCategoryUpdatePolicy.INCLUDE));
+        counter.check(presentation.library().categoryConfigurations().stream()
+                        .anyMatch(category -> category.name().equals("Archive")
+                                && category.displayMode() == LibraryDisplayMode.LIST
+                                && category.density() == LibraryDisplayDensity.RELAXED
+                                && category.sort() == LibrarySort.ADDED_OLDEST
+                                && category.updatePolicy() == LibraryCategoryUpdatePolicy.INCLUDE),
+                "category creation must retain every category preference");
         presentation.moveCategory("Archive", 0);
-        presentation.renameCategory("Anime", "Animation");
+        presentation.replaceCategory("Anime", new LibraryCategory(
+                "Animation",
+                LibraryDisplayMode.GRID,
+                LibraryDisplayDensity.COMFORTABLE,
+                LibrarySort.TITLE_DESCENDING,
+                LibraryCategoryUpdatePolicy.DEFAULT));
         counter.check(catalog.find(new LibraryItemId("zulu")).orElseThrow()
                         .categories().contains("Animation"),
                 "renaming a category must update assigned titles");
         counter.check(presentation.library().displayPreferences().defaultCategory()
                         .orElseThrow().equals("Animation"),
                 "renaming the landing category must preserve the selection");
+        counter.check(presentation.library().categoryConfigurations().stream()
+                        .anyMatch(category -> category.name().equals("Animation")
+                                && category.sort() == LibrarySort.TITLE_DESCENDING),
+                "category replacement must persist its display configuration");
         presentation.deleteCategory("Animation");
         counter.check(catalog.find(new LibraryItemId("zulu")).orElseThrow()
                         .categories().equals(Set.of("Seasonal")),
