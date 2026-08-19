@@ -5,8 +5,12 @@ import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.AnimeFilterList;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.AnimesPage;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.online.AnimeHttpSource;
+import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.source.model.Page;
+import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.source.online.HttpSource;
 import java.util.List;
 import kotlin.coroutines.Continuation;
+import okhttp3.Request;
+import okhttp3.Response;
 
 public final class ExtensionOperationDispatcherSmoke {
     private ExtensionOperationDispatcherSmoke() {
@@ -32,6 +36,37 @@ public final class ExtensionOperationDispatcherSmoke {
                 new ReactiveSource(), "getPageList", "fetchPageList", "chapter");
         if (!reactive.available() || !reactive.value().equals(List.of("page"))) {
             throw new IllegalStateException("Reactive source fallback dispatch failed");
+        }
+
+        LazyImageSource imageSource = new LazyImageSource();
+        Page page = new Page(0, "https://example.invalid/chapter/page-1", null, null);
+        Request imageRequest = ExtensionSourceOperations.imageRequest(imageSource, page);
+        if (!page.getImageUrl().equals("https://cdn.example.invalid/page-1.webp")
+                || !imageRequest.url().toString().equals(page.getImageUrl())
+                || !"https://example.invalid/chapter/page-1".equals(imageRequest.header("Referer"))) {
+            throw new IllegalStateException("Lazy manga image URL/request dispatch failed");
+        }
+    }
+
+    private static final class LazyImageSource extends HttpSource {
+        @Override public String getBaseUrl() { return "https://example.invalid"; }
+        @Override public String getName() { return "Lazy images"; }
+        @Override public String getLang() { return "en"; }
+        @Override public boolean getSupportsLatest() { return false; }
+
+        public Object getImageUrl(Page page, Continuation<? super String> continuation) {
+            return "https://cdn.example.invalid/page-1.webp";
+        }
+
+        @Override protected Request imageRequest(Page page) {
+            return new Request.Builder()
+                    .url(page.getImageUrl())
+                    .header("Referer", page.getUrl())
+                    .build();
+        }
+
+        @Override protected String imageUrlParse(Response response) {
+            throw new AssertionError("The modern image URL operation should be preferred");
         }
     }
 

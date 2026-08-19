@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.IconButton
@@ -43,6 +44,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -99,6 +101,7 @@ internal fun ReaderScreen(
     var settingsMenu by remember(controller) { mutableStateOf(false) }
     var chapterMenu by remember(controller) { mutableStateOf(false) }
     var readerMenu by remember(controller) { mutableStateOf(false) }
+    var readingModeMenu by remember(controller) { mutableStateOf(false) }
     var actionMessage by remember(controller) { mutableStateOf<String?>(null) }
     var splitSecondHalf by remember(controller) { mutableStateOf(false) }
     var interactions by remember(controller) { mutableStateOf(controller.interactions()) }
@@ -109,7 +112,13 @@ internal fun ReaderScreen(
     var decodedPage by remember(controller) { mutableStateOf<Result<ImageBitmap>?>(null) }
     var decodedAdjacentPage by remember(controller) { mutableStateOf<Result<ImageBitmap>?>(null) }
     var readerBusy by remember(controller) { mutableStateOf(false) }
+    var continuousScrollTarget by remember(controller) { mutableStateOf<Int?>(null) }
     val snapshot = remember(controller, revision) { controller.snapshot() }
+    var continuousPageIndex by remember(controller, snapshot.contentUnit().id()) {
+        mutableIntStateOf(snapshot.currentPageIndex())
+    }
+    val continuous = snapshot.direction() == ReadingDirection.VERTICAL ||
+        snapshot.direction() == ReadingDirection.WEBTOON
     CrashSafeLaunchedEffect(controller, snapshot.contentUnit().id()) {
         contentUnits = null
         contentUnits = withContext(Dispatchers.IO) {
@@ -121,10 +130,12 @@ internal fun ReaderScreen(
         snapshot.contentUnit().id(),
         snapshot.currentPageIndex(),
         display.dualPage(),
+        continuous,
         revision,
     ) {
         decodedPage = null
         decodedAdjacentPage = null
+        if (continuous) return@CrashSafeLaunchedEffect
         val pageIndex = snapshot.currentPageIndex()
         val loadAdjacent = display.dualPage() && pageIndex + 1 < snapshot.pageCount()
         val pages = withContext(Dispatchers.IO) {
@@ -150,9 +161,10 @@ internal fun ReaderScreen(
         settingsMenu,
         chapterMenu,
         readerMenu,
+        readingModeMenu,
         snapshot.currentPageIndex(),
     ) {
-        if (controlsVisible && !settingsMenu && !chapterMenu && !readerMenu) {
+        if (controlsVisible && !settingsMenu && !chapterMenu && !readerMenu && !readingModeMenu) {
             delay(READER_CONTROLS_HIDE_DELAY_MILLIS)
             controlsVisible = false
         }
@@ -246,11 +258,12 @@ internal fun ReaderScreen(
     }
 
     var drag by remember(controller) { mutableStateOf(Offset.Zero) }
+    val readerModifier = Modifier.fillMaxSize().background(Color.Black)
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black)
-            .pointerInput(interactions, snapshot.direction()) {
+        modifier = if (continuous) {
+            readerModifier
+        } else {
+            readerModifier.pointerInput(interactions, snapshot.direction()) {
                 detectDragGestures(
                     onDragStart = { drag = Offset.Zero },
                     onDrag = { change, amount ->
@@ -269,10 +282,27 @@ internal fun ReaderScreen(
                         execute(horizontalAction(action, snapshot.direction()))
                     },
                 )
-            },
+            }
+        },
     ) {
         val reducedMotion = LocalReducedMotion.current
-        decodedPage?.getOrNull()?.let { image ->
+        if (continuous) {
+            key(snapshot.contentUnit().id()) {
+                ReaderContinuousPages(
+                    controller = controller,
+                    pageDecoder = pageDecoder,
+                    pageCount = snapshot.pageCount(),
+                    initialPage = snapshot.currentPageIndex(),
+                    direction = snapshot.direction(),
+                    display = display,
+                    revision = revision,
+                    scrollTarget = continuousScrollTarget,
+                    consumeScrollTarget = { continuousScrollTarget = null },
+                    pageSelected = { continuousPageIndex = it },
+                    toggleControls = { controlsVisible = !controlsVisible },
+                )
+            }
+        } else decodedPage?.getOrNull()?.let { image ->
             val frame = ReaderPageFrame(
                 image,
                 decodedAdjacentPage?.getOrNull(),
@@ -302,11 +332,13 @@ internal fun ReaderScreen(
             ReaderPageError(decodedPage?.exceptionOrNull()?.message) { revision++ }
         }
 
-        ReaderTapZones(
-            direction = snapshot.direction(),
-            interactions = interactions,
-            execute = ::execute,
-        )
+        if (!continuous) {
+            ReaderTapZones(
+                direction = snapshot.direction(),
+                interactions = interactions,
+                execute = ::execute,
+            )
+        }
 
         if (controlsVisible) {
             ReaderTopBar(
@@ -314,16 +346,21 @@ internal fun ReaderScreen(
                 contentUnit = snapshot.contentUnit().title(),
                 closeReader = closeReader,
                 openSettings = { settingsMenu = true },
+                openReadingMode = { readingModeMenu = true },
                 openChapters = { chapterMenu = true },
                 openMenu = { readerMenu = true },
             )
             ReaderBottomBar(
-                pageIndex = snapshot.currentPageIndex(),
+                pageIndex = if (continuous) continuousPageIndex else snapshot.currentPageIndex(),
                 pageCount = snapshot.pageCount(),
                 goToPage = { index ->
-                    controller.goToPage(index)
-                    splitSecondHalf = false
-                    revision++
+                    if (continuous) {
+                        continuousScrollTarget = index
+                    } else {
+                        controller.goToPage(index)
+                        splitSecondHalf = false
+                        revision++
+                    }
                 },
                 splitSecondHalf = splitSecondHalf,
                 dualPage = display.dualPage(),
@@ -362,6 +399,20 @@ internal fun ReaderScreen(
                     }
                 },
                 close = { settingsMenu = false },
+            )
+        }
+        if (readingModeMenu) {
+            ReaderModeDialog(
+                current = snapshot.direction(),
+                select = {
+                    continuousPageIndex = snapshot.currentPageIndex()
+                    controller.setDirection(it)
+                    splitSecondHalf = false
+                    continuousScrollTarget = null
+                    readingModeMenu = false
+                    revision++
+                },
+                close = { readingModeMenu = false },
             )
         }
         if (chapterMenu) {
@@ -477,7 +528,7 @@ private fun ReaderPages(
 }
 
 @Composable
-private fun ReaderPageImage(
+internal fun ReaderPageImage(
     image: ImageBitmap,
     pageIndex: Int,
     display: ReaderDisplayPreferences,
@@ -611,6 +662,7 @@ private fun ReaderTopBar(
     contentUnit: String,
     closeReader: () -> Unit,
     openSettings: () -> Unit,
+    openReadingMode: () -> Unit,
     openChapters: () -> Unit,
     openMenu: () -> Unit,
 ) {
@@ -648,7 +700,42 @@ private fun ReaderTopBar(
         IconButton(onClick = openMenu) {
             Icon(Icons.Default.MoreVert, contentDescription = "Reader menu", tint = Color.White)
         }
+        IconButton(onClick = openReadingMode) {
+            Icon(Icons.Default.SwapVert, contentDescription = "Reading mode", tint = Color.White)
+        }
     }
+}
+
+@Composable
+private fun ReaderModeDialog(
+    current: ReadingDirection,
+    select: (ReadingDirection) -> Unit,
+    close: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = close,
+        title = { Text("Reading mode") },
+        text = {
+            Column {
+                ReadingDirection.entries.forEach { direction ->
+                    TextButton(onClick = { select(direction) }) {
+                        Text(
+                            (if (direction == current) "✓ " else "") +
+                                readingDirectionLabel(direction),
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = close) { Text("Close") } },
+    )
+}
+
+private fun readingDirectionLabel(direction: ReadingDirection): String = when (direction) {
+    ReadingDirection.LEFT_TO_RIGHT -> "Left to right"
+    ReadingDirection.RIGHT_TO_LEFT -> "Right to left"
+    ReadingDirection.VERTICAL -> "Vertical"
+    ReadingDirection.WEBTOON -> "Webtoon"
 }
 
 private enum class InteractionSlot(val label: String) {

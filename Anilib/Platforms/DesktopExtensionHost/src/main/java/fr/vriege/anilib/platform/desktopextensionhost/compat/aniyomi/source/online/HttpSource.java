@@ -69,6 +69,13 @@ public abstract class HttpSource implements CatalogueSource {
         return RequestsKt.GET(page.getUrl(), getHeaders(), null);
     }
     protected String imageUrlParse(Response response) { throw unsupported("manga image URL"); }
+    protected Request imageRequest(Page page) {
+        String imageUrl = page.getImageUrl();
+        if (imageUrl == null || imageUrl.isBlank()) {
+            throw new IllegalStateException("Manga page image URL has not been resolved");
+        }
+        return RequestsKt.GET(imageUrl, getHeaders(), null);
+    }
     public FilterList getFilterList() { return new FilterList(); }
 
     public Observable<MangasPage> fetchPopularManga(int page) {

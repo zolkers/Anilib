@@ -213,9 +213,22 @@ public final class DesktopExtensionHostServer implements AutoCloseable {
         }
         Map<String, String> query = ExtensionHostHttpExchange.query(exchange);
         long sourceId = parseSourceId(required(query, "sourceId"));
+        int pageIndex = query.containsKey("pageIndex")
+                ? nonNegativeInteger(query.get("pageIndex"), "pageIndex")
+                : -1;
         ExtensionSourceOperations.ProxiedResource resource =
-                sourceOperations.proxy(sourceId, required(query, "url"));
+                sourceOperations.proxy(sourceId, required(query, "url"), pageIndex);
         ExtensionHostHttpExchange.bytes(exchange, 200, resource.contentType(), resource.body());
+    }
+
+    private static int nonNegativeInteger(String value, String name) {
+        try {
+            int parsed = Integer.parseInt(value);
+            if (parsed < 0) throw new IllegalArgumentException(name + " must not be negative");
+            return parsed;
+        } catch (NumberFormatException exception) {
+            throw new IllegalArgumentException(name + " must be an integer", exception);
+        }
     }
 
     private void handleManga(HttpExchange exchange) {

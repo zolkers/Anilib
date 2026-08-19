@@ -35,6 +35,7 @@ public final class ExtensionSourceOperations {
     private final Map<ModelKey, SAnime> animeByUrl = retainedModels();
     private final Map<ModelKey, SChapter> chapterByUrl = retainedModels();
     private final Map<ModelKey, SEpisode> episodeByUrl = retainedModels();
+    private final Map<PageKey, Page> pageByUrl = retainedModels();
 
     public ExtensionSourceOperations(ExtensionRuntimeCatalog catalog) {
         this.catalog = Objects.requireNonNull(catalog, "catalog");
@@ -147,11 +148,18 @@ public final class ExtensionSourceOperations {
             }
             var modern = ExtensionOperationDispatcher.modernOrRx(
                     source, "getPageList", "fetchPageList", chapter);
-            return modern.available()
+            List<Page> result = modern.available()
                     ? ExtensionOperationDispatcher.listResult(modern.value(), Page.class)
                     : ExtensionOperationDispatcher.listResult(requestAndParse(
                             source, "pageListRequest", new Object[]{chapter},
                             "pageListParse", List.class), Page.class);
+            result.forEach(page -> {
+                pageByUrl.put(new PageKey(sourceId, page.getUrl(), page.getIndex()), page);
+                if (page.getImageUrl() != null && !page.getImageUrl().isBlank()) {
+                    pageByUrl.put(new PageKey(sourceId, page.getImageUrl(), page.getIndex()), page);
+                }
+            });
+            return result;
         });
     }
 
@@ -242,18 +250,14 @@ public final class ExtensionSourceOperations {
         return hosts.isEmpty() ? "none" : String.join(", ", hosts);
     }
 
-    public ProxiedResource proxy(long sourceId, String url) {
-        URI location = URI.create(url);
-        if (!("http".equalsIgnoreCase(location.getScheme()) || "https".equalsIgnoreCase(location.getScheme()))
-                || location.getHost() == null) {
-            throw new IllegalArgumentException("Proxy URL must be absolute HTTP(S)");
-        }
+    public ProxiedResource proxy(long sourceId, String url, int pageIndex) {
         return executeAny(sourceId, "source.proxy", url, source -> {
             OkHttpClient client = ExtensionOperationDispatcher.result(
                     ExtensionOperationDispatcher.invokeAny(source, "getClient"), OkHttpClient.class);
-            okhttp3.Headers headers = ExtensionOperationDispatcher.result(
-                    ExtensionOperationDispatcher.invokeAny(source, "getHeaders"), okhttp3.Headers.class);
-            Request request = new Request.Builder().url(location.toString()).headers(headers).build();
+            Page page = pageIndex < 0 ? null : pageByUrl.get(new PageKey(sourceId, url, pageIndex));
+            Request request = page == null ? directResourceRequest(source, url) : imageRequest(source, page);
+            URI location = request.url().uri();
+            requireWebLocation(location);
             try (Response response = client.newCall(request).execute()) {
                 if (!response.isSuccessful()) {
                     throw new RemoteRequestException("Source resource failed with HTTP " + response.code());
@@ -276,6 +280,37 @@ public final class ExtensionSourceOperations {
                 throw new UncheckedIOException("Source resource request failed", exception);
             }
         });
+    }
+
+    static Request imageRequest(Object source, Page page) {
+        if (page.getImageUrl() == null || page.getImageUrl().isBlank()) {
+            var modern = ExtensionOperationDispatcher.modernOrRx(
+                    source, "getImageUrl", "fetchImageUrl", page);
+            String imageUrl = modern.available()
+                    ? ExtensionOperationDispatcher.result(modern.value(), String.class)
+                    : requestAndParse(source, "imageUrlRequest", new Object[]{page},
+                            "imageUrlParse", String.class);
+            page.setImageUrl(requireWebLocation(URI.create(imageUrl)).toASCIIString());
+        }
+        Request request = ExtensionOperationDispatcher.result(
+                ExtensionOperationDispatcher.invokeAny(source, "imageRequest", page), Request.class);
+        requireWebLocation(request.url().uri());
+        return request;
+    }
+
+    private static Request directResourceRequest(Object source, String url) {
+        URI location = requireWebLocation(URI.create(url));
+        okhttp3.Headers headers = ExtensionOperationDispatcher.result(
+                ExtensionOperationDispatcher.invokeAny(source, "getHeaders"), okhttp3.Headers.class);
+        return new Request.Builder().url(location.toString()).headers(headers).build();
+    }
+
+    private static URI requireWebLocation(URI location) {
+        if (!("http".equalsIgnoreCase(location.getScheme()) || "https".equalsIgnoreCase(location.getScheme()))
+                || location.getHost() == null) {
+            throw new IllegalArgumentException("Proxy URL must be absolute HTTP(S)");
+        }
+        return location;
     }
 
     private MangasPage classicMangaCatalogue(Object source, String operation, Object[] arguments) {
@@ -476,6 +511,13 @@ public final class ExtensionSourceOperations {
     private record ModelKey(long sourceId, String url) {
         private ModelKey {
             Objects.requireNonNull(url, "url");
+        }
+    }
+
+    private record PageKey(long sourceId, String url, int index) {
+        private PageKey {
+            Objects.requireNonNull(url, "url");
+            if (index < 0) throw new IllegalArgumentException("page index must not be negative");
         }
     }
 
