@@ -11,12 +11,14 @@ import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.regex.Pattern;
 
 record SourcePackageConfiguration(
         Path configurationFile,
         Path bundle,
+        Optional<Path> apk,
         String displayName,
         String packageName,
         String language,
@@ -31,6 +33,7 @@ record SourcePackageConfiguration(
             "[A-Za-z_$][A-Za-z0-9_$]*(?:\\.[A-Za-z_$][A-Za-z0-9_$]*)+");
 
     SourcePackageConfiguration {
+        apk = java.util.Objects.requireNonNull(apk, "apk must not be null");
         sources = List.copyOf(sources);
     }
 
@@ -46,6 +49,12 @@ record SourcePackageConfiguration(
         }
         Path parent = file.getParent();
         Path bundle = parent.resolve(required(properties, "bundle")).normalize();
+        Optional<Path> apk = optional(properties, "apk").map(value -> parent.resolve(value).normalize());
+        apk.ifPresent(path -> {
+            if (!path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".apk")) {
+                throw new IllegalArgumentException("apk must point to an .apk file");
+            }
+        });
         String packageName = packageIdentifier(required(properties, "package"));
         long versionCode = positiveLong(required(properties, "versionCode"), "versionCode");
         int sourceCount = positiveInt(required(properties, "source.count"), "source.count", 128);
@@ -62,6 +71,7 @@ record SourcePackageConfiguration(
         return new SourcePackageConfiguration(
                 file,
                 bundle,
+                apk,
                 required(properties, "name"),
                 packageName,
                 required(properties, "lang"),
@@ -78,12 +88,27 @@ record SourcePackageConfiguration(
         return "anilib-source-" + packageHash(packageName) + "-v" + versionCode + ".jar";
     }
 
+    String apkArtifactName() {
+        if (apk.isEmpty()) {
+            throw new IllegalStateException("Package does not declare an APK artifact");
+        }
+        return "anilib-android-" + packageHash(packageName) + "-v" + versionCode + ".apk";
+    }
+
     private static String required(Properties properties, String name) {
         String value = properties.getProperty(name);
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException("Package configuration must declare " + name);
         }
         return value.strip();
+    }
+
+    private static Optional<String> optional(Properties properties, String name) {
+        String value = properties.getProperty(name);
+        if (value == null || value.isBlank()) {
+            return Optional.empty();
+        }
+        return Optional.of(value.strip());
     }
 
     private static String qualifiedName(String value, String name) {

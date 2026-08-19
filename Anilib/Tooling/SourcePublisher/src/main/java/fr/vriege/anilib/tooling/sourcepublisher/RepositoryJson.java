@@ -39,6 +39,9 @@ final class RepositoryJson {
         json.append('{');
         field(json, "name", value.displayName(), pretty, depth + 1, false);
         field(json, "pkg", value.packageName(), pretty, depth + 1, true);
+        if (value.apk().isPresent()) {
+            field(json, "apk", value.apkArtifactName(), pretty, depth + 1, true);
+        }
         field(json, "lang", value.language(), pretty, depth + 1, true);
         number(json, "code", value.versionCode(), pretty, depth + 1);
         field(json, "version", value.versionName(), pretty, depth + 1, true);

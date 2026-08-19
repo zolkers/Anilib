@@ -6,6 +6,7 @@ import fr.vriege.anilib.feature.extensionrepository.ExtensionBrowsePreferences;
 import fr.vriege.anilib.feature.extensionrepository.ExtensionContentKind;
 import fr.vriege.anilib.feature.extensionrepository.ExtensionInstallationState;
 import fr.vriege.anilib.feature.extensionrepository.ExtensionPackageMetadata;
+import fr.vriege.anilib.feature.extensionrepository.ExtensionPlatformAvailability;
 import fr.vriege.anilib.feature.extensionrepository.ExtensionRepositorySnapshot;
 import fr.vriege.anilib.feature.extensionrepository.ExtensionRepositoryService;
 import fr.vriege.anilib.feature.extensionrepository.ExtensionSourceMetadata;
@@ -82,6 +83,7 @@ final class ExtensionRepositoryTest {
     static int run() {
         Counter counter = new Counter();
         parsesAniyomiAndPortableArtifacts(counter);
+        selectsArtifactsByHostPlatform(counter);
         parsesPublicRepositoryShapes(counter);
         rejectsUnsafeMetadata(counter);
         persistsAndRefreshesUserRepositories(counter);
@@ -96,6 +98,51 @@ final class ExtensionRepositoryTest {
         adaptsModernMangaSource(counter);
         adaptsConfigurableAnimeSourcePreferences(counter);
         return counter.value;
+    }
+
+    private static void selectsArtifactsByHostPlatform(Counter counter) {
+        AniyomiRepositoryIndexParser parser = new AniyomiRepositoryIndexParser();
+        ExtensionPackageMetadata apkOnly = parser.parse(INDEX, """
+                [{"name":"APK","pkg":"vendor.apk","apk":"only.apk","lang":"en",
+                "code":1,"version":"1","sources":[{"name":"APK","lang":"en","id":"1"}]}]
+                """).getFirst();
+        ExtensionPlatformAvailability apkAvailability = ExtensionPlatformAvailability.from(apkOnly);
+        counter.check(apkAvailability.android() && !apkAvailability.desktop()
+                        && apkAvailability.androidArtifact().orElseThrow().format()
+                        == ExtensionArtifactFormat.ANIYOMI_APK,
+                "APK-only packages must be Android-only");
+
+        ExtensionPackageMetadata portableOnly = parser.parse(INDEX, """
+                [{"name":"Bundle","pkg":"vendor.bundle","lang":"en","code":1,"version":"1",
+                "anilib":{"bundle":"bundle.jar","api":"1.6","sha256":"%s",
+                "signature":"c2ln","keyId":"publisher","kind":"manga"},
+                "sources":[{"name":"Bundle","lang":"en","id":"2"}]}]
+                """.formatted(SHA_256)).getFirst();
+        ExtensionPlatformAvailability portableAvailability = ExtensionPlatformAvailability.from(portableOnly);
+        counter.check(portableAvailability.android() && portableAvailability.desktop()
+                        && portableAvailability.androidArtifact().orElseThrow().format()
+                        == ExtensionArtifactFormat.ANILIB_BUNDLE,
+                "portable-only packages must select the Bundle on Android and desktop");
+
+        String dualJson = """
+                [{"name":"Dual","pkg":"vendor.dual","apk":"fallback.apk","lang":"en",
+                "code":1,"version":"1","anilib":{"bundle":"dual.jar","api":"1.6",
+                "sha256":"%s","signature":"c2ln","keyId":"publisher","kind":"anime"},
+                "sources":[{"name":"Dual","lang":"en","id":"3"}]}]
+                """.formatted(SHA_256);
+        ExtensionPlatformAvailability dualAvailability = ExtensionPlatformAvailability.from(
+                parser.parse(INDEX, dualJson).getFirst());
+        counter.check(dualAvailability.androidArtifact().orElseThrow().format()
+                        == ExtensionArtifactFormat.ANILIB_BUNDLE
+                        && dualAvailability.desktopArtifact().orElseThrow().format()
+                        == ExtensionArtifactFormat.ANILIB_BUNDLE,
+                "dual packages must prefer the portable Bundle on every host");
+        counter.expectIllegalArgument(
+                () -> parser.parse(INDEX, """
+                        [{"name":"Invalid","pkg":"vendor.invalid","lang":"en","code":1,"version":"1",
+                        "sources":[{"name":"Invalid","lang":"en","id":"4"}]}]
+                        """),
+                "packages without an APK or portable Bundle must be rejected");
     }
 
     private static void parsesAniyomiAndPortableArtifacts(Counter counter) {

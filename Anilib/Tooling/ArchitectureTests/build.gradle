@@ -4,6 +4,7 @@ plugins {
 
 dependencies {
     implementation project(':Anilib:Tooling:JavaQuality')
+    implementation project(':Anilib:Tooling:ExtensionPortability')
     implementation project(':Anilib:Tooling:SourcePublisher')
     implementation project(':Anilib:Foundation')
     implementation project(':Anilib:Kernel:Api')

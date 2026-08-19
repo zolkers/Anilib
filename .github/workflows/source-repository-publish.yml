@@ -1,0 +1,81 @@
+name: Publish Anilib source repository
+
+on:
+  workflow_call:
+    inputs:
+      bundle-task:
+        description: Exact Gradle task that builds the portable source Bundle
+        required: true
+        type: string
+      package-configuration:
+        description: Repository-relative source-publisher.properties path
+        required: true
+        type: string
+      publication-branch:
+        description: Branch containing indexes and artifacts
+        required: false
+        default: repo
+        type: string
+    secrets:
+      SOURCE_PUBLISHER_PRIVATE_KEY:
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6.0.2
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v5.6.0
+        with:
+          distribution: microsoft
+          java-version: 21.0.10
+          cache: gradle
+      - name: Validate publication inputs
+        env:
+          BUNDLE_TASK: ${{ inputs.bundle-task }}
+          PACKAGE_CONFIGURATION: ${{ inputs.package-configuration }}
+          PUBLICATION_BRANCH: ${{ inputs.publication-branch }}
+        run: |
+          [[ "$BUNDLE_TASK" =~ ^:[A-Za-z0-9:_-]+$ ]]
+          [[ "$PACKAGE_CONFIGURATION" =~ ^[A-Za-z0-9._/-]+$ ]]
+          [[ "$PACKAGE_CONFIGURATION" != /* ]]
+          [[ "$PACKAGE_CONFIGURATION" != *..* ]]
+          test -f "$PACKAGE_CONFIGURATION"
+          [[ "$PUBLICATION_BRANCH" =~ ^[A-Za-z0-9._/-]+$ ]]
+      - name: Build source artifacts and publisher
+        env:
+          BUNDLE_TASK: ${{ inputs.bundle-task }}
+        run: |
+          ./gradlew --no-daemon --console=plain "$BUNDLE_TASK" \
+            :Anilib:Tooling:SourcePublisher:installDist
+      - name: Sign Bundle and generate repository
+        env:
+          PACKAGE_CONFIGURATION: ${{ inputs.package-configuration }}
+          SOURCE_PUBLISHER_PRIVATE_KEY: ${{ secrets.SOURCE_PUBLISHER_PRIVATE_KEY }}
+        run: |
+          test -n "$SOURCE_PUBLISHER_PRIVATE_KEY"
+          install -d -m 700 build/source-publication
+          printf '%s\n' "$SOURCE_PUBLISHER_PRIVATE_KEY" > build/source-publication/private.key
+          Anilib/Tooling/SourcePublisher/build/install/anilib-tooling-sourcepublisher/bin/anilib-tooling-sourcepublisher \
+            publish \
+            build/source-publication/private.key \
+            build/source-publication/repository \
+            "$PACKAGE_CONFIGURATION"
+          rm build/source-publication/private.key
+      - name: Publish indexes, artifacts, and checksums
+        env:
+          PUBLICATION_BRANCH: ${{ inputs.publication-branch }}
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git switch --orphan source-repository-publication
+          git rm -rf .
+          cp -R build/source-publication/repository/. .
+          git add --all
+          git commit -m "chore(repository): publish source index"
+          git push --force origin "HEAD:$PUBLICATION_BRANCH"

@@ -46,6 +46,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import fr.vriege.anilib.feature.extensionrepository.ExtensionArtifactFormat
+import fr.vriege.anilib.feature.extensionrepository.ExtensionPlatformAvailability
 import fr.vriege.anilib.feature.extensionrepository.ExtensionInstallationState
 import fr.vriege.anilib.feature.extensionrepository.ExtensionPackageMetadata
 import fr.vriege.anilib.feature.extensionrepository.InstalledExtensionPackage
@@ -697,7 +698,7 @@ private fun ExtensionDetailScreen(
                             TextButton(onClick = remove, enabled = !loading) { Text("Remove") }
                         }
                     }
-                    if (installed == null && extension.artifacts().any {
+                    if (installed == null && !portable && extension.artifacts().any {
                             it.format() == ExtensionArtifactFormat.ANIYOMI_APK
                         } && installApk != null
                     ) {
@@ -892,8 +893,11 @@ private fun ExtensionPackageCard(
                         + if (extension.adult()) " · 18+" else "",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                val portable = extension.artifacts().any { it.format() == ExtensionArtifactFormat.ANILIB_BUNDLE }
-                val apk = extension.artifacts().any { it.format() == ExtensionArtifactFormat.ANIYOMI_APK }
+                val availability = ExtensionPlatformAvailability.from(extension)
+                val portable = availability.desktop()
+                val apk = availability.androidArtifact().map {
+                    it.format() == ExtensionArtifactFormat.ANIYOMI_APK
+                }.orElse(false)
                 if (installed == null && !portable && apk && installApk == null) {
                     Text(
                         "Android-only extension · install it from Anilib on Android",

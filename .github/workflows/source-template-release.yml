@@ -6,43 +6,12 @@ on:
     tags:
       - 'source-template-v*'
 
-permissions:
-  contents: write
-
 jobs:
   publish:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v6.0.2
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-java@v5.6.0
-        with:
-          distribution: microsoft
-          java-version: 21.0.10
-          cache: gradle
-      - name: Build source Bundle and publisher
-        run: ./gradlew --no-daemon --console=plain :Anilib:Examples:SourceTemplate:jar :Anilib:Tooling:SourcePublisher:installDist
-      - name: Sign Bundle and generate indexes
-        env:
-          SOURCE_PUBLISHER_PRIVATE_KEY: ${{ secrets.SOURCE_PUBLISHER_PRIVATE_KEY }}
-        run: |
-          test -n "$SOURCE_PUBLISHER_PRIVATE_KEY"
-          install -d -m 700 build/source-publication
-          printf '%s\n' "$SOURCE_PUBLISHER_PRIVATE_KEY" > build/source-publication/private.key
-          Anilib/Tooling/SourcePublisher/build/install/anilib-tooling-sourcepublisher/bin/anilib-tooling-sourcepublisher \
-            publish \
-            build/source-publication/private.key \
-            build/source-publication/repository \
-            Anilib/Examples/SourceTemplate/source-publisher.properties
-          rm build/source-publication/private.key
-      - name: Publish repository branch
-        run: |
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git switch --orphan repo-publication
-          git rm -rf .
-          cp -R build/source-publication/repository/. .
-          git add --all
-          git commit -m "chore(repository): publish source index"
-          git push --force origin HEAD:repo
+    uses: ./.github/workflows/source-repository-publish.yml
+    with:
+      bundle-task: :Anilib:Examples:SourceTemplate:jar
+      package-configuration: Anilib/Examples/SourceTemplate/source-publisher.properties
+      publication-branch: repo
+    secrets:
+      SOURCE_PUBLISHER_PRIVATE_KEY: ${{ secrets.SOURCE_PUBLISHER_PRIVATE_KEY }}

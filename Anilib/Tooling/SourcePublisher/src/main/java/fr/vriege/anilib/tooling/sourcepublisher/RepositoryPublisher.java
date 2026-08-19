@@ -16,6 +16,7 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 import java.util.zip.ZipEntry;
@@ -44,6 +45,7 @@ final class RepositoryPublisher {
         }
         PublisherFiles.writeText(output.resolve("index.min.json"), RepositoryJson.minified(packages));
         PublisherFiles.writeText(output.resolve("index.json"), RepositoryJson.pretty(packages));
+        PublisherFiles.writeText(output.resolve("checksums.sha256"), checksums(packages));
     }
 
     private static PublishedPackage publishPackage(
@@ -55,7 +57,36 @@ final class RepositoryPublisher {
         String sha256 = sha256(bundle);
         String signature = sign(bundle, privateKey);
         PublisherFiles.write(output.resolve(configuration.artifactName()), bundle);
-        return new PublishedPackage(configuration, sha256, signature);
+        Optional<String> apkSha256 = configuration.apk().map(path -> publishApk(configuration, path, output));
+        return new PublishedPackage(configuration, sha256, signature, apkSha256);
+    }
+
+    private static String publishApk(
+            SourcePackageConfiguration configuration,
+            Path apkPath,
+            Path output) {
+        byte[] apk = PublisherFiles.read(apkPath, "Android fallback APK");
+        if (apk.length == 0) {
+            throw new IllegalArgumentException("Android fallback APK must not be empty");
+        }
+        PublisherFiles.write(output.resolve("apk").resolve(configuration.apkArtifactName()), apk);
+        return sha256(apk);
+    }
+
+    private static String checksums(List<PublishedPackage> packages) {
+        StringBuilder result = new StringBuilder();
+        for (PublishedPackage published : packages) {
+            SourcePackageConfiguration configuration = published.configuration();
+            result.append(published.sha256())
+                    .append("  ")
+                    .append(configuration.artifactName())
+                    .append(System.lineSeparator());
+            published.apkSha256().ifPresent(checksum -> result.append(checksum)
+                    .append("  apk/")
+                    .append(configuration.apkArtifactName())
+                    .append(System.lineSeparator()));
+        }
+        return result.toString();
     }
 
     private static void verifyDescriptor(SourcePackageConfiguration configuration, byte[] bundle) {
@@ -114,6 +145,13 @@ final class RepositoryPublisher {
         }
     }
 
-    record PublishedPackage(SourcePackageConfiguration configuration, String sha256, String signature) {
+    record PublishedPackage(
+            SourcePackageConfiguration configuration,
+            String sha256,
+            String signature,
+            Optional<String> apkSha256) {
+        PublishedPackage {
+            apkSha256 = java.util.Objects.requireNonNull(apkSha256, "apkSha256 must not be null");
+        }
     }
 }

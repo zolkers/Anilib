@@ -35,6 +35,7 @@ final class SourcePublisherTest {
             Path configuration = requiredFileProperty("anilib.example.source.configuration");
             Path bundle = directory.resolve("anilib-example-source.jar");
             Path publishConfiguration = directory.resolve("source-publisher.properties");
+            Path fallbackApk = directory.resolve("fallback.apk");
             Path privateKey = directory.resolve("private.key");
             Path publicKey = directory.resolve("public.key");
             Path repository = directory.resolve("repository");
@@ -42,7 +43,9 @@ final class SourcePublisherTest {
             String configured = Files.readString(configuration, StandardCharsets.UTF_8)
                     .replace(
                             "bundle=build/libs/anilib-example-source.jar",
-                            "bundle=" + bundle.toString().replace('\\', '/'));
+                            "bundle=" + bundle.toString().replace('\\', '/'))
+                    + "apk=" + fallbackApk.toString().replace('\\', '/') + System.lineSeparator();
+            Files.write(fallbackApk, "synthetic-android-fallback".getBytes(StandardCharsets.UTF_8));
             Files.writeString(publishConfiguration, configured, StandardCharsets.UTF_8);
             SourcePublisher.generateKeys(privateKey, publicKey);
             SourcePublisher.publish(privateKey, repository, List.of(publishConfiguration));
@@ -57,13 +60,22 @@ final class SourcePublisherTest {
             ExtensionPackageMetadata metadata = packages.getFirst();
             check(metadata.packageName().startsWith("fr.vriege.anilib."),
                     "official source template must use the Anilib package namespace");
+            check(metadata.artifacts().size() == 2
+                            && metadata.artifacts().getFirst().format()
+                            == fr.vriege.anilib.feature.extensionrepository.ExtensionArtifactFormat.ANIYOMI_APK,
+                    "publisher must merge the Android fallback and portable Bundle into one package entry");
 
             byte[] bundleBytes = Files.readAllBytes(bundle);
             DefaultExtensionInstallationService installation = new DefaultExtensionInstallationService(
                     directory.resolve("extensions"),
                     new BundleClient(bundleBytes));
             installation.trust(
-                    metadata.artifacts().getFirst().signingKeyId().orElseThrow(),
+                    metadata.artifacts().stream()
+                            .filter(artifact -> artifact.signingKeyId().isPresent())
+                            .findFirst()
+                            .orElseThrow()
+                            .signingKeyId()
+                            .orElseThrow(),
                     Files.readString(publicKey, StandardCharsets.UTF_8).strip());
             installation.install(metadata);
             check(installation.installed().size() == 1,
@@ -78,11 +90,26 @@ final class SourcePublisherTest {
             }
             check(Files.isRegularFile(repository.resolve("index.min.json")),
                     "publisher must emit the minified dynamic index");
-            return 6;
+            check(Files.isRegularFile(repository.resolve("apk").resolve(
+                            "anilib-android-" + packageHash(metadata.packageName()) + "-v1.apk"))
+                            && Files.readString(repository.resolve("checksums.sha256"), StandardCharsets.UTF_8)
+                            .lines().count() == 2,
+                    "publisher must copy both artifacts and emit deterministic SHA-256 checksums");
+            return 8;
         } catch (IOException exception) {
             throw new AssertionError("Unable to verify source publication", exception);
         } finally {
             deleteDirectory(directory);
+        }
+    }
+
+    private static String packageHash(String packageName) {
+        try {
+            byte[] digest = java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(packageName.getBytes(StandardCharsets.UTF_8));
+            return java.util.HexFormat.of().formatHex(digest, 0, 16);
+        } catch (java.security.NoSuchAlgorithmException exception) {
+            throw new AssertionError("JDK must provide SHA-256", exception);
         }
     }
 
