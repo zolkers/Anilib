@@ -154,12 +154,16 @@ internal fun DiscoveryScreen(
     }
     val updatesBySource = remember(extensionView) {
         extensionView.updates().flatMap { candidate ->
-            candidate.available().sources().map { source -> source.sourceId() to candidate }
+            candidate.available().sources().flatMap { source ->
+                source.runtimeSourceIds().map { sourceId -> sourceId to candidate }
+            }
         }.toMap()
     }
     val packagesBySource = remember(extensionView) {
         extensionView.packages().flatMap { extension ->
-            extension.sources().map { source -> source.sourceId() to extension }
+            extension.sources().flatMap { source ->
+                source.runtimeSourceIds().map { sourceId -> sourceId to extension }
+            }
         }.toMap()
     }
     fun updateSource(sourceId: SourceId) {

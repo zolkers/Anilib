@@ -344,6 +344,9 @@ final class ExtensionRepositoryTest {
                         .equals(URI.create("https://manga.example.test"))
                         && extension.sources().get(1).baseUri().isEmpty(),
                 "Mihon v2 Protobuf source identities and home URLs must remain intact");
+        counter.check(extension.sources().getFirst().runtimeSourceIds()
+                        .contains("aniyomi.6170936930338275444"),
+                "repository source identities must match their active Aniyomi adapter identity");
         counter.check(extension.artifacts().getFirst().uri()
                         .equals(URI.create("https://repo.example/apk/example.apk"))
                         && extension.icon().orElseThrow()
