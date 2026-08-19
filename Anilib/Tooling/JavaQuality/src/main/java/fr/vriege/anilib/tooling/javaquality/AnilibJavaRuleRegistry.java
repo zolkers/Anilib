@@ -9,6 +9,7 @@ public final class AnilibJavaRuleRegistry {
     public static List<AnilibJavaRule> standard() {
         return List.of(
                 new PackageLayoutRule(),
+                new EmptyModuleRule(),
                 new ImportPolicyRule(),
                 new ModuleArchitectureRule(),
                 new BuildDependencyRule(),
