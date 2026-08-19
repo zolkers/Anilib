@@ -128,6 +128,7 @@ class MainActivity : ComponentActivity() {
             AndroidApkExtensionPlatform(
                 this,
                 started.capability(NetworkCapabilities.HTTP_CLIENT),
+                product = started,
                 startupReports = apkActivation.reports,
             )
         }

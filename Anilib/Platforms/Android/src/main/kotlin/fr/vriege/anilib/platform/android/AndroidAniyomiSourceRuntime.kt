@@ -71,6 +71,42 @@ internal class AndroidAniyomiSourceRuntime(
         return AndroidApkSourceActivation(bundles.toList(), reports.toMap())
     }
 
+    fun prepare(extension: InstalledApkExtension): AndroidApkSourceActivation {
+        val report = preflight.report(extension)
+        if (report.state() != ApkExtensionRuntimeState.HOST_ABI_AVAILABLE) {
+            return AndroidApkSourceActivation(emptyList(), mapOf(extension.packageName() to report))
+        }
+        val certificate = report.trustedCertificateSha256().orElseThrow()
+        return try {
+            val adapted = load(extension)
+            require(adapted.isNotEmpty()) { "APK extension created no sources" }
+            val sourceIds = adapted.map(AdaptedApkSource::sourceId)
+            require(sourceIds.toSet().size == sourceIds.size) {
+                "APK extension created duplicate source IDs"
+            }
+            AndroidApkSourceActivation(
+                adapted.map(AdaptedApkSource::bundle),
+                mapOf(
+                    extension.packageName() to ApkExtensionRuntimeReport.active(
+                        extension.packageName(),
+                        certificate,
+                    ),
+                ),
+            )
+        } catch (failure: Throwable) {
+            AndroidApkSourceActivation(
+                emptyList(),
+                mapOf(
+                    extension.packageName() to ApkExtensionRuntimeReport.activationFailed(
+                        extension.packageName(),
+                        certificate,
+                        failureMessage(failure),
+                    ),
+                ),
+            )
+        }
+    }
+
     private fun load(
         extension: InstalledApkExtension,
     ): List<AdaptedApkSource> {
