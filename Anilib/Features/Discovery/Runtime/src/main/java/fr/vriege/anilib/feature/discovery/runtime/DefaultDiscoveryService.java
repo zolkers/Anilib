@@ -123,16 +123,14 @@ public final class DefaultDiscoveryService implements DiscoveryService {
 
     @Override
     public Optional<SourceWebPage> sourceWebPage(SourceId sourceId) {
-        return webSource(sourceId).map(source -> Objects.requireNonNull(
-                source.homeBrowserPage(), "source browser page must not be null"));
+        return webSource(sourceId).flatMap(source -> browserPage(source::homeBrowserPage));
     }
 
     @Override
     public Optional<SourceWebPage> titleWebPage(SourceCatalogueItemId itemId) {
         Objects.requireNonNull(itemId, "itemId must not be null");
         return webSource(itemId.sourceId())
-                .flatMap(source -> Objects.requireNonNull(
-                        source.titleBrowserPage(itemId), "title browser page must not be null"));
+                .flatMap(source -> browserPage(() -> source.titleBrowserPage(itemId)).flatMap(value -> value));
     }
 
     @Override
@@ -411,6 +409,14 @@ public final class DefaultDiscoveryService implements DiscoveryService {
         return registry.find(Objects.requireNonNull(sourceId, "sourceId must not be null"))
                 .filter(WebSource.class::isInstance)
                 .map(WebSource.class::cast);
+    }
+
+    private static <T> Optional<T> browserPage(java.util.function.Supplier<T> supplier) {
+        try {
+            return Optional.ofNullable(supplier.get());
+        } catch (IllegalArgumentException | IllegalStateException ignored) {
+            return Optional.empty();
+        }
     }
 
     private static void requireUnique(List<String> values, String label) {

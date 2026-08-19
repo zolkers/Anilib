@@ -23,6 +23,7 @@ import fr.vriege.anilib.feature.source.SourceStreamFormat;
 import fr.vriege.anilib.feature.source.SourceSubtitleTrack;
 import fr.vriege.anilib.feature.source.SourceVideoStream;
 import fr.vriege.anilib.feature.source.StreamingSource;
+import fr.vriege.anilib.feature.source.WebSource;
 import fr.vriege.anilib.kernel.AnilibPlugin;
 
 import java.lang.reflect.InvocationTargetException;
@@ -116,7 +117,7 @@ public final class AniyomiAnimeSourceAdapter {
         }
     }
 
-    private static final class ReflectedAnimeSource implements CatalogueSource, StreamingSource {
+    private static final class ReflectedAnimeSource implements CatalogueSource, StreamingSource, WebSource {
         private final Object delegate;
         private final BooleanSupplier authorized;
         private final AniyomiSourcePreferences preferences;
@@ -151,6 +152,31 @@ public final class AniyomiAnimeSourceAdapter {
         @Override
         public SourceDescriptor descriptor() {
             return descriptor;
+        }
+
+        @Override
+        public URI homePage() {
+            requireAuthorized();
+            return webHomePage(delegate);
+        }
+
+        @Override
+        public Optional<URI> titlePage(SourceCatalogueItemId itemId) {
+            requireAuthorized();
+            requireOwned(itemId);
+            return resolveWebPage(delegate, itemId.value());
+        }
+
+        @Override
+        public Map<String, String> browserHeaders(URI location) {
+            requireAuthorized();
+            return safeBrowserHeaders(delegate);
+        }
+
+        @Override
+        public Optional<String> browserUserAgent(URI location) {
+            requireAuthorized();
+            return sourceUserAgent(delegate);
         }
 
         @Override
@@ -637,6 +663,43 @@ public final class AniyomiAnimeSourceAdapter {
         }
     }
 
+    static URI webHomePage(Object delegate) {
+        return webUri(invokeOptional(delegate, "getBaseUrl").orElse(null))
+                .orElseThrow(() -> new IllegalStateException("APK source does not expose a valid HTTP(S) base URL"));
+    }
+
+    static Optional<URI> resolveWebPage(Object delegate, String value) {
+        if (value == null || value.isBlank()) {
+            return Optional.empty();
+        }
+        Optional<URI> absolute = webUri(value);
+        if (absolute.isPresent()) {
+            return absolute;
+        }
+        try {
+            return Optional.of(webHomePage(delegate).resolve(URI.create(value.strip())));
+        } catch (IllegalArgumentException | IllegalStateException ignored) {
+            return Optional.empty();
+        }
+    }
+
+    private static Optional<URI> webUri(Object value) {
+        if (!(value instanceof String text) || text.isBlank()) {
+            return Optional.empty();
+        }
+        try {
+            URI location = URI.create(text.strip()).normalize();
+            String scheme = location.getScheme();
+            if (!location.isAbsolute() || location.getHost() == null || location.getUserInfo() != null
+                    || !("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme))) {
+                return Optional.empty();
+            }
+            return Optional.of(location);
+        } catch (IllegalArgumentException ignored) {
+            return Optional.empty();
+        }
+    }
+
     static Optional<Instant> uploadedAt(Object value) {
         if (!(value instanceof Number number) || number.longValue() <= 0) {
             return Optional.empty();
@@ -669,6 +732,35 @@ public final class AniyomiAnimeSourceAdapter {
             }
         });
         return Map.copyOf(headers);
+    }
+
+    static Map<String, String> safeBrowserHeaders(Object delegate) {
+        try {
+            Map<String, String> sourceHeaders = headers(invokeOptional(delegate, "getHeaders").orElse(null));
+            Map<String, String> result = new LinkedHashMap<>();
+            sourceHeaders.forEach((name, value) -> {
+                if (!Set.of("cookie", "set-cookie", "user-agent", "authorization", "proxy-authorization")
+                        .contains(name.toLowerCase(Locale.ROOT))) {
+                    result.put(name, value);
+                }
+            });
+            return Map.copyOf(result);
+        } catch (IllegalArgumentException | IllegalStateException ignored) {
+            return Map.of();
+        }
+    }
+
+    static Optional<String> sourceUserAgent(Object delegate) {
+        try {
+            return headers(invokeOptional(delegate, "getHeaders").orElse(null)).entrySet().stream()
+                    .filter(entry -> entry.getKey().equalsIgnoreCase("User-Agent"))
+                    .map(Map.Entry::getValue)
+                    .map(String::strip)
+                    .filter(value -> !value.isEmpty())
+                    .findFirst();
+        } catch (IllegalArgumentException | IllegalStateException ignored) {
+            return Optional.empty();
+        }
     }
 
     private static String headerValue(Object value) {

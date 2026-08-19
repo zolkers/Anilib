@@ -19,6 +19,7 @@ import fr.vriege.anilib.feature.source.SourcePage;
 import fr.vriege.anilib.feature.source.SourcePageResource;
 import fr.vriege.anilib.feature.source.SourcePreferenceDefinition;
 import fr.vriege.anilib.feature.source.SourceSearchRequest;
+import fr.vriege.anilib.feature.source.WebSource;
 import fr.vriege.anilib.foundation.component.ComponentDescriptor;
 import fr.vriege.anilib.foundation.validation.Preconditions;
 import fr.vriege.anilib.kernel.AnilibPlugin;
@@ -92,7 +93,7 @@ public final class AniyomiMangaSourceAdapter {
         }
     }
 
-    private static final class ReflectedMangaSource implements CatalogueSource, PagedSource {
+    private static final class ReflectedMangaSource implements CatalogueSource, PagedSource, WebSource {
         private final Object delegate;
         private final BooleanSupplier authorized;
         private final AniyomiSourcePreferences preferences;
@@ -131,6 +132,31 @@ public final class AniyomiMangaSourceAdapter {
         @Override
         public SourceDescriptor descriptor() {
             return descriptor;
+        }
+
+        @Override
+        public URI homePage() {
+            requireAuthorized();
+            return AniyomiAnimeSourceAdapter.webHomePage(delegate);
+        }
+
+        @Override
+        public Optional<URI> titlePage(SourceCatalogueItemId itemId) {
+            requireAuthorized();
+            requireOwned(itemId);
+            return AniyomiAnimeSourceAdapter.resolveWebPage(delegate, itemId.value());
+        }
+
+        @Override
+        public Map<String, String> browserHeaders(URI location) {
+            requireAuthorized();
+            return AniyomiAnimeSourceAdapter.safeBrowserHeaders(delegate);
+        }
+
+        @Override
+        public Optional<String> browserUserAgent(URI location) {
+            requireAuthorized();
+            return AniyomiAnimeSourceAdapter.sourceUserAgent(delegate);
         }
 
         @Override

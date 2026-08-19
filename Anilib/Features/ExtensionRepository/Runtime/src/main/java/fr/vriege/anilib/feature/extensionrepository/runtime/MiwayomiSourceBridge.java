@@ -23,6 +23,7 @@ import fr.vriege.anilib.feature.source.SourceStreamFormat;
 import fr.vriege.anilib.feature.source.SourceSubtitleTrack;
 import fr.vriege.anilib.feature.source.SourceVideoStream;
 import fr.vriege.anilib.feature.source.StreamingSource;
+import fr.vriege.anilib.feature.source.WebSource;
 import fr.vriege.anilib.feature.source.DetailedSource;
 import fr.vriege.anilib.feature.source.SourcePublicationStatus;
 import fr.vriege.anilib.feature.source.SourceTitleDetails;
@@ -196,6 +197,42 @@ public final class MiwayomiSourceBridge {
             }
         }
         return List.copyOf(result);
+    }
+
+    private Optional<URI> homePage(RemoteSource source) {
+        Map<String, Object> document = object(get(
+                "/api/v1/sources/" + encode(source.remoteId) + "/prefs", Map.of()));
+        Object raw = document.get("prefs");
+        if (!(raw instanceof List<?> values)) {
+            return Optional.empty();
+        }
+        for (Object entry : values) {
+            Map<String, Object> preference = object(entry);
+            String identity = (optionalText(preference, "key").orElse("") + " "
+                    + optionalText(preference, "title").orElse("") + " "
+                    + optionalText(preference, "summary").orElse("")).toLowerCase(Locale.ROOT);
+            if (identity.contains("url") || identity.contains("domain") || identity.contains("host")) {
+                Optional<URI> location = webUri(preference.get("value"));
+                if (location.isPresent()) {
+                    return location;
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    private Optional<URI> titlePage(RemoteSource source, SourceCatalogueItemId itemId) {
+        requireOwned(source, itemId);
+        Optional<URI> absolute = webUri(itemId.value());
+        if (absolute.isPresent()) {
+            return absolute;
+        }
+        try {
+            URI relative = URI.create(itemId.value());
+            return homePage(source).map(base -> base.resolve(relative));
+        } catch (IllegalArgumentException ignored) {
+            return Optional.empty();
+        }
     }
 
     private void applyPreferences(RemoteSource source, Map<String, String> values) {
@@ -453,7 +490,7 @@ public final class MiwayomiSourceBridge {
     private record RemoteSource(String remoteId, SourceDescriptor descriptor) {
     }
 
-    private final class MangaBridge implements CatalogueSource, DetailedSource, PagedSource {
+    private final class MangaBridge implements CatalogueSource, DetailedSource, PagedSource, WebSource {
         private final RemoteSource source;
 
         private MangaBridge(RemoteSource source) {
@@ -463,6 +500,17 @@ public final class MiwayomiSourceBridge {
         @Override
         public SourceDescriptor descriptor() {
             return source.descriptor;
+        }
+
+        @Override
+        public URI homePage() {
+            return MiwayomiSourceBridge.this.homePage(source)
+                    .orElseThrow(() -> new IllegalStateException("Desktop APK source has no discoverable web URL"));
+        }
+
+        @Override
+        public Optional<URI> titlePage(SourceCatalogueItemId itemId) {
+            return MiwayomiSourceBridge.this.titlePage(source, itemId);
         }
 
         @Override
@@ -545,7 +593,7 @@ public final class MiwayomiSourceBridge {
         }
     }
 
-    private final class AnimeBridge implements CatalogueSource, DetailedSource, StreamingSource {
+    private final class AnimeBridge implements CatalogueSource, DetailedSource, StreamingSource, WebSource {
         private final RemoteSource source;
 
         private AnimeBridge(RemoteSource source) {
@@ -555,6 +603,17 @@ public final class MiwayomiSourceBridge {
         @Override
         public SourceDescriptor descriptor() {
             return source.descriptor;
+        }
+
+        @Override
+        public URI homePage() {
+            return MiwayomiSourceBridge.this.homePage(source)
+                    .orElseThrow(() -> new IllegalStateException("Desktop APK source has no discoverable web URL"));
+        }
+
+        @Override
+        public Optional<URI> titlePage(SourceCatalogueItemId itemId) {
+            return MiwayomiSourceBridge.this.titlePage(source, itemId);
         }
 
         @Override

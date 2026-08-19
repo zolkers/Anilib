@@ -20,6 +20,10 @@ public final class AniyomiAdapterFixture {
             return "en";
         }
 
+        public String getBaseUrl() {
+            return "https://example.test";
+        }
+
         public boolean getSupportsLatest() {
             return true;
         }
@@ -135,6 +139,10 @@ public final class AniyomiAdapterFixture {
 
         public String getLang() {
             return "en";
+        }
+
+        public String getBaseUrl() {
+            return "https://manga.example.test";
         }
 
         public boolean getSupportsLatest() {

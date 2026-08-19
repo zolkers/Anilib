@@ -46,6 +46,7 @@ import fr.vriege.anilib.feature.source.SourcePreferenceDefinition;
 import fr.vriege.anilib.feature.source.SourcePreferenceType;
 import fr.vriege.anilib.feature.source.SourceSearchRequest;
 import fr.vriege.anilib.feature.source.StreamingSource;
+import fr.vriege.anilib.feature.source.WebSource;
 import fr.vriege.anilib.feature.source.SourceCapabilities;
 import fr.vriege.anilib.feature.source.SourceRegistry;
 import fr.vriege.anilib.feature.source.bundle.SourceSdkPlugin;
@@ -149,6 +150,13 @@ final class ExtensionRepositoryTest {
                             && streams.getFirst().headers().get("Referer").equals("https://source.example/")
                             && streams.getFirst().subtitles().size() == 1,
                     "the desktop anime bridge must hand original streams and headers to Anilib's media relay");
+            WebSource mangaWeb = (WebSource) mangaCatalogue;
+            WebSource animeWeb = (WebSource) animeCatalogue;
+            counter.check(mangaWeb.titlePage(mangaPage.items().getFirst().id()).orElseThrow()
+                            .equals(URI.create("https://manga.example/manga/bridge"))
+                            && animeWeb.titlePage(animePage.items().getFirst().id()).orElseThrow()
+                            .equals(URI.create("https://anime.example/anime/bridge")),
+                    "desktop APK sources must resolve WebView pages from their live base-URL preference");
         }
         String installed = bridge.install(URI.create("https://repo.example/extensions/example.apk"));
         counter.check(
@@ -659,6 +667,11 @@ final class ExtensionRepositoryTest {
                 "an adapted APK source must become one explicit Source Bundle");
         counter.check(adapted.manifest().permissions().equals(Set.of(SourcePermission.TRUSTED_PLATFORM_RUNTIME)),
                 "the APK adapter must declare its audited platform-runtime exception explicitly");
+        WebSource web = (WebSource) adapted.source();
+        counter.check(web.homePage().equals(URI.create("https://example.test"))
+                        && web.titlePage(page.items().getFirst().id()).orElseThrow()
+                        .equals(URI.create("https://example.test/anime/example")),
+                "an Android APK source must expose its own website and resolve relative title paths");
         authorized.set(false);
         counter.expectSecurity(
                 () -> catalogue.popular(new SourceBrowseRequest(1, 20, List.of(), Map.of())),
@@ -761,6 +774,10 @@ final class ExtensionRepositoryTest {
                         && pages.getFirst().index() == 0
                         && pages.getFirst().value().contains("page-1.jpg"),
                 "the manga APK bridge must project a validated reader page sequence");
+        WebSource web = (WebSource) adapted.source();
+        counter.check(web.titlePage(page.items().getFirst().id()).orElseThrow()
+                        .equals(URI.create("https://manga.example.test/manga/example")),
+                "a manga APK source must resolve its title website through the shared browser contract");
     }
 
     private static ExtensionPackageMetadata portablePackage(
@@ -916,6 +933,14 @@ final class ExtensionRepositoryTest {
                         {"videos":[{"videoUrl":"https://cdn.example/master.m3u8","videoTitle":"1080p",
                         "headers":{"Referer":"https://source.example/"},
                         "subtitleTracks":[{"url":"https://cdn.example/sub.vtt","lang":"fr"}]}]}
+                        """;
+                case "/api/v1/sources/42/prefs" -> """
+                        {"sourceId":"42","prefs":[{"key":"base_url","title":"Base URL",
+                        "type":"text","value":"https://manga.example/"}]}
+                        """;
+                case "/api/v1/sources/43/prefs" -> """
+                        {"sourceId":"43","prefs":[{"key":"base_url_pref","title":"URL de base",
+                        "type":"text","value":"https://anime.example/"}]}
                         """;
                 case "/api/v1/extensions/repos" -> {
                     savedRepositories = request.method().name().equals("POST")
