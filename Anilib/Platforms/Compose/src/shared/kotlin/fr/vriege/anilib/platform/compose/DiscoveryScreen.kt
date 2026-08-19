@@ -325,6 +325,15 @@ internal fun DiscoveryScreen(
                     },
                     globalQuery,
                     manageExtensions,
+                    onSourcesChanged = {
+                        extensionRevision++
+                        sourceBrowseRevision++
+                        section = if (section.kind == SourceContentKind.ANIME) {
+                            BrowseSection.ANIME_SOURCES
+                        } else {
+                            BrowseSection.MANGA_SOURCES
+                        }
+                    },
                 )
             } else if (globalSearch && globalQuery.isNotBlank() && section.sourceTab()) {
                 GlobalSearchContent(presentation, section.kind!!, globalQuery)
@@ -333,7 +342,7 @@ internal fun DiscoveryScreen(
                     BrowseSection.ANIME_SOURCES,
                     BrowseSection.MANGA_SOURCES,
                     -> {
-                        val sectionsResult = remember(section, sourceBrowseRevision) {
+                        val sectionsResult = remember(section, sourceBrowseRevision, extensionRevision) {
                             runCatching { presentation.sourceSections(section.kind!!) }
                         }
                         LaunchedEffect(sectionsResult) {

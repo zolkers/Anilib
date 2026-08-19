@@ -29,7 +29,9 @@ import java.time.Duration;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.Locale;
 import java.util.Objects;
@@ -49,7 +51,7 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
     private volatile MiwayomiSourceBridge bridge;
     private volatile Process process;
     private final List<AnilibPlugin> sourceBundles;
-    private final List<PluginRegistration> dynamicRegistrations = new ArrayList<>();
+    private final Map<String, List<PluginRegistration>> dynamicRegistrations = new LinkedHashMap<>();
     private final Set<String> installedPackageNames = new LinkedHashSet<>();
     private volatile StartedAnilib started;
     private volatile String diagnostic;
@@ -61,6 +63,7 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
             MiwayomiSourceBridge bridge,
             Process process,
             List<AnilibPlugin> sourceBundles,
+            Set<String> installedPackages,
             String diagnostic) {
         this.dataDirectory = dataDirectory;
         this.engineDirectory = engineDirectory;
@@ -68,7 +71,7 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
         this.bridge = bridge;
         this.process = process;
         this.sourceBundles = List.copyOf(sourceBundles);
-        sourceBundles.forEach(bundle -> installedPackageNames.add(bundle.manifest().descriptor().version()));
+        this.installedPackageNames.addAll(installedPackages);
         this.diagnostic = diagnostic;
     }
 
@@ -113,11 +116,17 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
 
     synchronized void attach(StartedAnilib product) {
         started = Objects.requireNonNull(product, "product must not be null");
+        sourceBundles.forEach(bundle -> registerSource(product, bundle));
     }
 
     @Override
     public synchronized Set<String> installedPackageNames() {
         return Set.copyOf(installedPackageNames);
+    }
+
+    @Override
+    public synchronized Set<String> activePackageNames() {
+        return Set.copyOf(dynamicRegistrations.keySet());
     }
 
     @Override
@@ -161,8 +170,29 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
             ensureAvailable();
             bridge.install(artifact);
             int activated = activateNewSources();
+            if (activated == 0) {
+                bridge.uninstall(extensionPackage.packageName());
+                installedPackageNames.remove(extensionPackage.packageName());
+                throw new IllegalStateException(
+                        extensionPackage.displayName() + " could not activate a compatible manga or anime source");
+            }
             return extensionPackage.displayName() + " installed. " + activated
                     + " source(s) added immediately to Browse.";
+        });
+    }
+
+    @Override
+    public boolean uninstallationSupported() {
+        return true;
+    }
+
+    @Override
+    public CompletableFuture<String> uninstall(String packageName) {
+        return CompletableFuture.supplyAsync(() -> {
+            ensureAvailable();
+            String message = bridge.uninstall(packageName);
+            deactivate(packageName);
+            return message + " Its sources were removed from Browse.";
         });
     }
 
@@ -176,13 +206,31 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
         int count = 0;
         for (AnilibPlugin bundle : bridge.sourceBundles()) {
-            installedPackageNames.add(bundle.manifest().descriptor().version());
             if (active.add(bundle.manifest().descriptor().id())) {
-                dynamicRegistrations.add(product.install(bundle));
+                registerSource(product, bundle);
                 count++;
             }
         }
         return count;
+    }
+
+    private void registerSource(StartedAnilib product, AnilibPlugin bundle) {
+        String packageName = bundle.manifest().descriptor().version();
+        dynamicRegistrations.computeIfAbsent(packageName, ignored -> new ArrayList<>())
+                .add(product.install(bundle));
+    }
+
+    private synchronized void deactivate(String packageName) {
+        installedPackageNames.remove(packageName);
+        List<PluginRegistration> registrations = dynamicRegistrations.remove(packageName);
+        if (registrations != null) {
+            registrations.reversed().forEach(registration -> {
+                try {
+                    registration.close();
+                } catch (RuntimeException ignored) {
+                }
+            });
+        }
     }
 
     @Override
@@ -216,6 +264,8 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
         }
         bridge = started.bridge;
         process = started.process;
+        installedPackageNames.clear();
+        installedPackageNames.addAll(started.installedPackageNames);
         diagnostic = started.diagnostic;
     }
 
@@ -242,6 +292,7 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
                         .toList();
                 bridge.saveRepositories(repositories);
                 List<AnilibPlugin> sources = bridge.sourceBundles();
+                Set<String> installedPackages = bridge.installedPackageNames();
                 return new DesktopExtensionEngine(
                         dataDirectory,
                         engineDirectory,
@@ -249,6 +300,7 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
                         bridge,
                         process,
                         sources,
+                        installedPackages,
                         "Desktop APK engine is running with " + sources.size() + " source bundles.");
             } catch (RuntimeException exception) {
                 failure = exception;
@@ -463,6 +515,7 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
                 null,
                 null,
                 List.of(),
+                Set.of(),
                 diagnostic);
     }
 

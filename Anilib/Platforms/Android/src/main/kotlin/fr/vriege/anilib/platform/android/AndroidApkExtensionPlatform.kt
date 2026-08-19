@@ -25,6 +25,7 @@ import java.net.URI
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.atomic.AtomicInteger
 
 internal class AndroidApkExtensionPlatform(
     private val activity: ComponentActivity,
@@ -41,6 +42,10 @@ internal class AndroidApkExtensionPlatform(
     override fun available(): Boolean = true
 
     override fun discoverInstalled(): List<InstalledApkExtension> = inventory.discover()
+
+    override fun activePackageNames(): Set<String> = runtimeReports.values
+        .filter { it.state() == ApkExtensionRuntimeState.ACTIVE }
+        .mapTo(mutableSetOf()) { it.packageName() }
 
     override fun runtimeReport(extensionPackage: InstalledApkExtension): ApkExtensionRuntimeReport {
         val current = runtimePreflight.report(extensionPackage)
@@ -90,6 +95,34 @@ internal class AndroidApkExtensionPlatform(
             handOff(extensionPackage.packageName(), bytes)
         }.thenApply {
             activateInstalled(extensionPackage.packageName())
+        }
+    }
+
+    override fun uninstallationSupported(): Boolean = true
+
+    override fun uninstall(packageName: String): CompletableFuture<String> {
+        val extension = inventory.discover(packageName)
+            ?: return CompletableFuture<String>().apply {
+                completeExceptionally(IllegalArgumentException("APK extension is not installed: $packageName"))
+            }
+        val operation = AndroidApkUninstallCoordinator.register()
+        val result = PendingIntent.getBroadcast(
+            activity,
+            operation.id,
+            Intent(activity, AnilibApkUninstallReceiver::class.java).putExtra(
+                AnilibApkUninstallReceiver.EXTRA_OPERATION_ID,
+                operation.id,
+            ),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
+        )
+        activity.packageManager.packageInstaller.uninstall(packageName, result.intentSender)
+        return operation.completion.thenApply {
+            dynamicRegistrations.remove(packageName)?.asReversed()?.forEach { registration ->
+                runCatching { registration.close() }
+            }
+            runtimeReports.remove(packageName)
+            runCatching { runtimePreflight.forget(extension) }
+            "${extension.displayName()} uninstalled. Its sources were removed from Browse."
         }
     }
 
@@ -231,6 +264,39 @@ class AnilibApkInstallReceiver : BroadcastReceiver() {
     }
 }
 
+class AnilibApkUninstallReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        val operationId = intent.getIntExtra(EXTRA_OPERATION_ID, -1)
+        val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)
+        if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
+            confirmation(intent)?.let { context.startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            return
+        }
+        val message = if (status == PackageInstaller.STATUS_SUCCESS) {
+            "Extension uninstalled from Anilib by Android."
+        } else {
+            intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE) ?: "APK uninstall failed."
+        }
+        if (status == PackageInstaller.STATUS_SUCCESS) {
+            AndroidApkUninstallCoordinator.complete(operationId)
+        } else {
+            AndroidApkUninstallCoordinator.fail(operationId, message)
+        }
+        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+    }
+
+    @Suppress("DEPRECATION")
+    private fun confirmation(intent: Intent): Intent? = if (Build.VERSION.SDK_INT >= 33) {
+        intent.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java)
+    } else {
+        intent.getParcelableExtra(Intent.EXTRA_INTENT)
+    }
+
+    companion object {
+        const val EXTRA_OPERATION_ID = "fr.vriege.anilib.extensionUninstallOperation"
+    }
+}
+
 private object AndroidApkInstallCoordinator {
     private val pending = ConcurrentHashMap<Int, CompletableFuture<String?>>()
 
@@ -246,3 +312,28 @@ private object AndroidApkInstallCoordinator {
         pending.remove(sessionId)?.completeExceptionally(IllegalStateException(message))
     }
 }
+
+private object AndroidApkUninstallCoordinator {
+    private val nextId = AtomicInteger(40_000)
+    private val pending = ConcurrentHashMap<Int, CompletableFuture<Unit>>()
+
+    fun register(): UninstallOperation {
+        val id = nextId.getAndUpdate { current -> if (current == Int.MAX_VALUE) 40_000 else current + 1 }
+        val completion = CompletableFuture<Unit>()
+        check(pending.putIfAbsent(id, completion) == null) { "Duplicate Android uninstall operation" }
+        return UninstallOperation(id, completion)
+    }
+
+    fun complete(operationId: Int) {
+        pending.remove(operationId)?.complete(Unit)
+    }
+
+    fun fail(operationId: Int, message: String) {
+        pending.remove(operationId)?.completeExceptionally(IllegalStateException(message))
+    }
+}
+
+private data class UninstallOperation(
+    val id: Int,
+    val completion: CompletableFuture<Unit>,
+)

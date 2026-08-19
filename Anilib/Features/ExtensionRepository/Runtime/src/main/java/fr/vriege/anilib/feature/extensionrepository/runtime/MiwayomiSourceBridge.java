@@ -81,6 +81,15 @@ public final class MiwayomiSourceBridge {
         return List.copyOf(bundles);
     }
 
+    public Set<String> installedPackageNames() {
+        Map<String, Object> document = object(get("/api/v1/extensions/installed", Map.of()));
+        Set<String> packages = new java.util.LinkedHashSet<>();
+        for (Object value : array(document, "extensions")) {
+            packages.add(text(object(value), "pkg"));
+        }
+        return Set.copyOf(packages);
+    }
+
     public void saveRepositories(List<URI> repositories) {
         List<URI> values = List.copyOf(Preconditions.requireNonNull(repositories, "repositories"));
         String body = "{\"repos\":[" + String.join(",", values.stream()
@@ -102,6 +111,18 @@ public final class MiwayomiSourceBridge {
         }
         String name = optionalText(result, "name").orElse(uri.getPath());
         return name + " installed for desktop.";
+    }
+
+    public String uninstall(String packageName) {
+        String name = Preconditions.requireNonBlank(packageName, "packageName");
+        Map<String, Object> result = object(post(
+                "/api/v1/extensions/uninstall",
+                "{\"pkg\":" + jsonString(name) + "}"));
+        if (!booleanValue(result.get("ok"))) {
+            throw new IllegalStateException(optionalText(result, "error")
+                    .orElse("Extension engine rejected the uninstall request"));
+        }
+        return name + " uninstalled from the desktop engine.";
     }
 
     private AnilibPlugin bundle(Source source) {

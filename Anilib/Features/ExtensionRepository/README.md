@@ -48,11 +48,21 @@ keeps repository discovery complete without bypassing the user's content
 policy. Platform lists remain lazy, so a catalogue containing thousands of
 entries does not eagerly create every card.
 
+Installed portable Bundles and platform APKs are grouped ahead of the
+available catalogue and can be searched by extension, package, source, or
+language. Removal always requires confirmation. Portable artifacts are deleted
+from Anilib's managed store, Android delegates APK removal to the system package
+installer, and desktop uses Miwayomi's persistent uninstall endpoint. Dynamic
+sources are detached immediately; sources selected during startup disappear on
+the next restart. Removing a repository is a separate confirmed action and
+keeps extensions already installed from it.
+
 The shared UI makes artifact support explicit. Android shows an `Install on
 Android` action for APK entries and hands the HTTPS artifact to the system
 package installer. Desktop exposes `Install for desktop` when its optional APK
-engine is configured; installation activates the new Source Bundles on restart
-instead of rendering an actionless card. Signed portable Anilib Bundles keep
+engine is configured; a compatible APK activates its new Source Bundles
+immediately, while an APK that yields no executable source is rolled back and
+reported as failed. Signed portable Anilib Bundles keep
 the ordinary `Install` action on both platforms. Pinning updates the
 filled/outlined icon and catalogue ordering immediately, and an empty Browse
 extension tab links directly to repository management.

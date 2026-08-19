@@ -117,6 +117,7 @@ final class ExtensionRepositoryTest {
         MiwayomiSourceBridge bridge = new MiwayomiSourceBridge(URI.create("http://127.0.0.1:43127/"), client);
         bridge.requireHealthy();
         bridge.saveRepositories(List.of(INDEX));
+        Set<String> installedPackages = bridge.installedPackageNames();
         List<AnilibPlugin> bundles = bridge.sourceBundles();
         List<AnilibPlugin> plugins = new java.util.ArrayList<>();
         plugins.add(new SourceSdkPlugin());
@@ -162,9 +163,12 @@ final class ExtensionRepositoryTest {
                     "desktop APK sources must resolve WebView pages from their live base-URL preference");
         }
         String installed = bridge.install(URI.create("https://repo.example/extensions/example.apk"));
+        String uninstalled = bridge.uninstall("example.pkg");
         counter.check(
-                client.savedRepositories && client.installRequested && installed.contains("installed for desktop"),
-                "desktop APK installation must synchronize repositories and report immediate installation");
+                client.savedRepositories && client.installRequested && client.uninstallRequested
+                        && installedPackages.equals(Set.of("example.pkg"))
+                        && installed.contains("installed for desktop") && uninstalled.contains("uninstalled"),
+                "desktop APK installation and removal must use the engine's persistent extension lifecycle");
         counter.expectIllegalArgument(
                 () -> new MiwayomiSourceBridge(URI.create("http://example.test:43127/"), client),
                 "the desktop APK bridge must reject non-loopback engines");
@@ -1017,6 +1021,7 @@ final class ExtensionRepositoryTest {
     private static final class MiwayomiBridgeClient implements AnilibHttpClient {
         private boolean savedRepositories;
         private boolean installRequested;
+        private boolean uninstallRequested;
 
         @Override
         public HttpResponse execute(HttpRequest request) {
@@ -1066,10 +1071,18 @@ final class ExtensionRepositoryTest {
                             && new String(request.body(), StandardCharsets.UTF_8).contains(INDEX.toString());
                     yield "{\"ok\":true}";
                 }
+                case "/api/v1/extensions/installed" -> """
+                        {"extensions":[{"name":"Example APK","pkg":"example.pkg","installed":true}]}
+                        """;
                 case "/api/v1/extensions/install" -> {
                     installRequested = request.method().name().equals("POST")
                             && new String(request.body(), StandardCharsets.UTF_8).contains("example.apk");
                     yield "{\"ok\":true,\"name\":\"Example APK\",\"pkg\":\"example.pkg\"}";
+                }
+                case "/api/v1/extensions/uninstall" -> {
+                    uninstallRequested = request.method().name().equals("POST")
+                            && new String(request.body(), StandardCharsets.UTF_8).contains("example.pkg");
+                    yield "{\"ok\":true}";
                 }
                 case "/api/v1/proxy" -> null;
                 default -> throw new AssertionError("Unexpected desktop engine route: " + request.uri());

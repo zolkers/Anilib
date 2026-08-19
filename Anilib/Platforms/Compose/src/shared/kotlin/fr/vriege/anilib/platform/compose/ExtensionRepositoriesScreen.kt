@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.AlertDialog
@@ -76,6 +77,7 @@ internal fun ExtensionRepositoriesScreen(
     var adding by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var pendingRepositoryRemoval by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
     DisposableEffect(presentation) {
@@ -142,8 +144,7 @@ internal fun ExtensionRepositoriesScreen(
             } else {
                 items(view.repositories(), key = { it.indexUri().toString() }) { repository ->
                     RepositoryCard(repository) {
-                        runCatching { presentation.remove(repository.indexUri().toString()) }
-                            .onFailure { error = it.message ?: "Repository removal failed." }
+                        pendingRepositoryRemoval = repository.indexUri().toString()
                     }
                 }
             }
@@ -165,6 +166,17 @@ internal fun ExtensionRepositoriesScreen(
             },
         )
     }
+    pendingRepositoryRemoval?.let { repository ->
+        ConfirmRepositoryRemovalDialog(
+            repository = repository,
+            dismiss = { pendingRepositoryRemoval = null },
+            confirm = {
+                pendingRepositoryRemoval = null
+                runCatching { presentation.remove(repository) }
+                    .onFailure { error = it.message ?: "Repository removal failed." }
+            },
+        )
+    }
 }
 
 @Composable
@@ -174,15 +186,20 @@ internal fun ExtensionDiscoveryList(
     kind: ExtensionContentKind,
     query: String,
     manageRepositories: () -> Unit,
+    onSourcesChanged: () -> Unit,
 ) {
     var view by remember { mutableStateOf(presentation.snapshot()) }
     var installedApkPackages by remember(apkExtensionPlatform) {
         mutableStateOf(runCatching(apkExtensionPlatform::installedPackageNames).getOrDefault(emptySet()))
     }
+    var activeApkPackages by remember(apkExtensionPlatform) {
+        mutableStateOf(runCatching(apkExtensionPlatform::activePackageNames).getOrDefault(emptySet()))
+    }
     var loadingPackage by remember { mutableStateOf<String?>(null) }
     var refreshing by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
+    var pendingRemoval by remember { mutableStateOf<ExtensionRemovalRequest?>(null) }
     val scope = rememberCoroutineScope()
 
     DisposableEffect(presentation) {
@@ -201,8 +218,14 @@ internal fun ExtensionDiscoveryList(
 
     val packages = view.packages().filter { extension ->
         (extension.contentKind() == kind || extension.contentKind() == ExtensionContentKind.MIXED) &&
-            (query.isBlank() || extension.displayName().contains(query, ignoreCase = true))
-    }
+            extensionMatches(extension, query)
+    }.sortedWith(
+        compareByDescending<ExtensionPackageMetadata> { extension ->
+            extension.packageName() in installedApkPackages || view.installed().any {
+                it.packageName() == extension.packageName()
+            }
+        }.thenBy(String.CASE_INSENSITIVE_ORDER) { it.displayName() },
+    )
     if (view.repositories().isEmpty()) {
         Column(
             modifier = Modifier.fillMaxSize().padding(28.dp),
@@ -261,8 +284,15 @@ internal fun ExtensionDiscoveryList(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         val installed = apkInstalled || installedPortable != null
+                        val installationStatus = when {
+                            apkInstalled && extension.packageName() in activeApkPackages ->
+                                "Installed · available in Sources"
+                            apkInstalled -> "Installed · no compatible source activated"
+                            installedPortable != null -> "Installed"
+                            else -> "Available"
+                        }
                         Text(
-                            if (installed) "Installed · available in Sources" else "Available",
+                            installationStatus,
                             color = if (installed) {
                                 MaterialTheme.colorScheme.primary
                             } else {
@@ -292,7 +322,8 @@ internal fun ExtensionDiscoveryList(
                                             withContext(Dispatchers.IO) { presentation.install(extension).get() }
                                         }.onSuccess {
                                             view = it
-                                            message = "${extension.displayName()} installed."
+                                            message = "${extension.displayName()} installed. " +
+                                                "Restart Anilib to activate its sources."
                                         }.onFailure { failure ->
                                             error = failure.cause?.message ?: failure.message
                                         }
@@ -311,6 +342,10 @@ internal fun ExtensionDiscoveryList(
                                             installedApkPackages = runCatching(
                                                 apkExtensionPlatform::installedPackageNames,
                                             ).getOrDefault(installedApkPackages)
+                                            activeApkPackages = runCatching(
+                                                apkExtensionPlatform::activePackageNames,
+                                            ).getOrDefault(activeApkPackages)
+                                            onSourcesChanged()
                                         }
                                     }
                                 }
@@ -318,11 +353,58 @@ internal fun ExtensionDiscoveryList(
                         ) {
                             Text(if (loadingPackage == extension.packageName()) "Installing…" else "Install")
                         }
+                    } else {
+                        TextButton(
+                            enabled = loadingPackage == null,
+                            onClick = {
+                                pendingRemoval = ExtensionRemovalRequest(
+                                    extension.packageName(),
+                                    extension.displayName(),
+                                    apkInstalled,
+                                )
+                            },
+                        ) { Text("Uninstall") }
                     }
                 }
             }
         }
         item { Spacer(Modifier.height(16.dp)) }
+    }
+    pendingRemoval?.let { target ->
+        ConfirmExtensionRemovalDialog(
+            target = target,
+            dismiss = { pendingRemoval = null },
+            confirm = {
+                pendingRemoval = null
+                loadingPackage = target.packageName
+                error = null
+                message = null
+                if (target.apk) {
+                    uninstallApkExtension(apkExtensionPlatform, target.packageName, scope) { feedback, failure ->
+                        loadingPackage = null
+                        error = failure
+                        message = feedback
+                        if (failure == null) {
+                            installedApkPackages = runCatching(apkExtensionPlatform::installedPackageNames)
+                                .getOrDefault(installedApkPackages - target.packageName)
+                            activeApkPackages = runCatching(apkExtensionPlatform::activePackageNames)
+                                .getOrDefault(activeApkPackages - target.packageName)
+                            onSourcesChanged()
+                        }
+                    }
+                } else {
+                    runCatching { presentation.removeInstalled(target.packageName) }
+                        .onSuccess {
+                            loadingPackage = null
+                            view = presentation.snapshot()
+                            message = "${target.displayName} removed. Restart Anilib to unload its sources."
+                        }.onFailure { failure ->
+                            loadingPackage = null
+                            error = failure.message ?: "Extension removal failed."
+                        }
+                }
+            },
+        )
     }
 }
 
@@ -343,6 +425,9 @@ private fun ExtensionRepositoryCatalogueScreen(
     var feedback by remember { mutableStateOf<String?>(null) }
     var retry by remember { mutableStateOf<(() -> Unit)?>(null) }
     var selectedExtension by remember { mutableStateOf<ExtensionPackageMetadata?>(null) }
+    var installedQuery by remember { mutableStateOf("") }
+    var pendingRemoval by remember { mutableStateOf<ExtensionRemovalRequest?>(null) }
+    var pendingRepositoryRemoval by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     var pendingApkTrust by remember { mutableStateOf<InstalledApkExtension?>(null) }
     var installedApkExtensions by remember(apkExtensionPlatform) {
@@ -350,6 +435,9 @@ private fun ExtensionRepositoryCatalogueScreen(
     }
     var installedApkPackages by remember(apkExtensionPlatform) {
         mutableStateOf(runCatching(apkExtensionPlatform::installedPackageNames).getOrDefault(emptySet()))
+    }
+    var activeApkPackages by remember(apkExtensionPlatform) {
+        mutableStateOf(runCatching(apkExtensionPlatform::activePackageNames).getOrDefault(emptySet()))
     }
     var apkRuntimeReports by remember(apkExtensionPlatform) {
         mutableStateOf(inspectApkRuntimes(apkExtensionPlatform, installedApkExtensions))
@@ -391,6 +479,8 @@ private fun ExtensionRepositoryCatalogueScreen(
                 apkRuntimeReports = inspectApkRuntimes(apkExtensionPlatform, it)
                 installedApkPackages = runCatching(apkExtensionPlatform::installedPackageNames)
                     .getOrDefault(emptySet())
+                activeApkPackages = runCatching(apkExtensionPlatform::activePackageNames)
+                    .getOrDefault(emptySet())
             }
             .onFailure { error = it.message ?: "Installed APK discovery failed." }
         complete("Refreshing repositories") { presentation.refreshAll() }
@@ -424,8 +514,11 @@ private fun ExtensionRepositoryCatalogueScreen(
                     .onFailure { error = it.message ?: "Extension state change failed." }
             },
             remove = {
-                runCatching { presentation.removeInstalled(extension.packageName()) }
-                    .onFailure { error = it.message ?: "Extension removal failed." }
+                pendingRemoval = ExtensionRemovalRequest(
+                    extension.packageName(),
+                    extension.displayName(),
+                    false,
+                )
             },
             installApk = if (apkExtensionPlatform.installationSupported()) {
                 { installApkExtension(apkExtensionPlatform, extension, scope, { state ->
@@ -554,9 +647,53 @@ private fun ExtensionRepositoryCatalogueScreen(
                     }
                 }
             }
-            if (installedApkExtensions.isNotEmpty()) {
+            val normalizedInstalledQuery = installedQuery.trim().lowercase(Locale.ROOT)
+            val metadataByPackage = view.packages().associateBy { it.packageName() }
+            val visibleInstalledApks = installedApkExtensions.filter { extension ->
+                installedExtensionMatches(
+                    extension.packageName(),
+                    extension.displayName(),
+                    metadataByPackage[extension.packageName()],
+                    normalizedInstalledQuery,
+                )
+            }
+            val visibleInstalledBundles = view.installed().filter { extension ->
+                installedExtensionMatches(
+                    extension.packageName(),
+                    extension.displayName(),
+                    metadataByPackage[extension.packageName()],
+                    normalizedInstalledQuery,
+                )
+            }
+            val inventoriedPackages = installedApkExtensions.map { it.packageName() }.toSet()
+            val visibleEnginePackages = installedApkPackages
+                .filterNot { it in inventoriedPackages }
+                .filter { packageName ->
+                    val metadata = metadataByPackage[packageName]
+                    installedExtensionMatches(
+                        packageName,
+                        metadata?.displayName() ?: packageName,
+                        metadata,
+                        normalizedInstalledQuery,
+                    )
+                }
+                .sortedBy { metadataByPackage[it]?.displayName()?.lowercase(Locale.ROOT) ?: it }
+            if (installedApkPackages.isNotEmpty() || view.installed().isNotEmpty()) {
+                item { SectionTitle("Installed extensions") }
+                item {
+                    OutlinedTextField(
+                        value = installedQuery,
+                        onValueChange = { installedQuery = it },
+                        singleLine = true,
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                        placeholder = { Text("Search installed extensions") },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+            if (visibleInstalledApks.isNotEmpty()) {
                 item { SectionTitle("Installed APK extensions") }
-                items(installedApkExtensions, key = { it.packageName() }) { extension ->
+                items(visibleInstalledApks, key = { it.packageName() }) { extension ->
                     val runtime = apkRuntimeReports.getValue(extension.packageName())
                     ApkExtensionCard(
                         extension = extension,
@@ -570,8 +707,54 @@ private fun ExtensionRepositoryCatalogueScreen(
                                 }
                                 .onFailure { error = it.message ?: "Certificate trust removal failed." }
                         },
+                        uninstall = {
+                            pendingRemoval = ExtensionRemovalRequest(
+                                extension.packageName(),
+                                extension.displayName(),
+                                true,
+                            )
+                        },
                     )
                 }
+            }
+            if (visibleEnginePackages.isNotEmpty()) {
+                item { SectionTitle("Installed desktop extensions") }
+                items(visibleEnginePackages, key = { it }) { packageName ->
+                    InstalledEngineExtensionCard(
+                        packageName = packageName,
+                        metadata = metadataByPackage[packageName],
+                        active = packageName in activeApkPackages,
+                        uninstall = {
+                            pendingRemoval = ExtensionRemovalRequest(
+                                packageName,
+                                metadataByPackage[packageName]?.displayName() ?: packageName,
+                                true,
+                            )
+                        },
+                    )
+                }
+            }
+            if (visibleInstalledBundles.isNotEmpty()) {
+                item { SectionTitle("Installed Anilib Bundles") }
+                items(visibleInstalledBundles, key = { it.packageName() }) { installed ->
+                    InstalledExtensionCard(
+                        installed = installed,
+                        toggle = { enabled -> presentation.setEnabled(installed.packageName(), enabled) },
+                        remove = {
+                            pendingRemoval = ExtensionRemovalRequest(
+                                installed.packageName(),
+                                installed.displayName(),
+                                false,
+                            )
+                        },
+                    )
+                }
+            }
+            if (installedQuery.isNotBlank() &&
+                visibleInstalledApks.isEmpty() && visibleEnginePackages.isEmpty() &&
+                visibleInstalledBundles.isEmpty()
+            ) {
+                item { EmptyPage("No installed extension matches your search.") }
             }
             if (view.trustedKeyIds().isNotEmpty()) {
                 item { SectionTitle("Trusted publishers") }
@@ -588,14 +771,18 @@ private fun ExtensionRepositoryCatalogueScreen(
             } else {
                 items(view.repositories(), key = { it.indexUri().toString() }) { repository ->
                     RepositoryCard(repository) {
-                        runCatching { presentation.remove(repository.indexUri().toString()) }
-                            .onFailure { error = it.message ?: "Repository removal failed." }
+                        pendingRepositoryRemoval = repository.indexUri().toString()
                     }
                 }
             }
             if (view.packages().isNotEmpty()) {
                 item { SectionTitle("Available extensions") }
-                items(view.packages(), key = { it.packageName() }) { extension ->
+                val availablePackages = view.packages().filter { extension ->
+                    extension.packageName() !in installedApkPackages && view.installed().none {
+                        it.packageName() == extension.packageName()
+                    }
+                }
+                items(availablePackages, key = { it.packageName() }) { extension ->
                     val installed = view.installed().firstOrNull { it.packageName() == extension.packageName() }
                     ExtensionPackageCard(
                         extension = extension,
@@ -642,6 +829,8 @@ private fun ExtensionRepositoryCatalogueScreen(
                                         installedApkPackages =
                                             runCatching(apkExtensionPlatform::installedPackageNames)
                                                 .getOrDefault(installedApkPackages)
+                                        activeApkPackages = runCatching(apkExtensionPlatform::activePackageNames)
+                                            .getOrDefault(activeApkPackages)
                                     }
                                 }
                             }
@@ -649,19 +838,6 @@ private fun ExtensionRepositoryCatalogueScreen(
                             null
                         },
                         installApkLabel = apkExtensionPlatform.installActionLabel(),
-                    )
-                }
-            }
-            val unavailable = view.installed().filter { installed ->
-                view.packages().none { it.packageName() == installed.packageName() }
-            }
-            if (unavailable.isNotEmpty()) {
-                item { SectionTitle("Installed but unavailable") }
-                items(unavailable, key = { it.packageName() }) { installed ->
-                    InstalledExtensionCard(
-                        installed = installed,
-                        toggle = { enabled -> presentation.setEnabled(installed.packageName(), enabled) },
-                        remove = { presentation.removeInstalled(installed.packageName()) },
                     )
                 }
             }
@@ -717,6 +893,54 @@ private fun ExtensionRepositoryCatalogueScreen(
             },
         )
     }
+    pendingRemoval?.let { target ->
+        ConfirmExtensionRemovalDialog(
+            target = target,
+            dismiss = { pendingRemoval = null },
+            confirm = {
+                pendingRemoval = null
+                if (target.apk) {
+                    loading = true
+                    operationLabel = "Uninstalling ${target.displayName}"
+                    uninstallApkExtension(apkExtensionPlatform, target.packageName, scope) { message, failure ->
+                        loading = false
+                        operationLabel = null
+                        error = failure
+                        feedback = message
+                        if (failure == null) {
+                            installedApkExtensions = runCatching(apkExtensionPlatform::discoverInstalled)
+                                .getOrDefault(installedApkExtensions.filterNot {
+                                    it.packageName() == target.packageName
+                                })
+                            installedApkPackages = runCatching(apkExtensionPlatform::installedPackageNames)
+                                .getOrDefault(installedApkPackages - target.packageName)
+                            activeApkPackages = runCatching(apkExtensionPlatform::activePackageNames)
+                                .getOrDefault(activeApkPackages - target.packageName)
+                            apkRuntimeReports = inspectApkRuntimes(apkExtensionPlatform, installedApkExtensions)
+                        }
+                    }
+                } else {
+                    runCatching { presentation.removeInstalled(target.packageName) }
+                        .onSuccess {
+                            view = presentation.snapshot()
+                            feedback = "${target.displayName} removed. Restart Anilib to unload its sources."
+                            selectedExtension = null
+                        }.onFailure { error = it.message ?: "Extension removal failed." }
+                }
+            },
+        )
+    }
+    pendingRepositoryRemoval?.let { repository ->
+        ConfirmRepositoryRemovalDialog(
+            repository = repository,
+            dismiss = { pendingRepositoryRemoval = null },
+            confirm = {
+                pendingRepositoryRemoval = null
+                runCatching { presentation.remove(repository) }
+                    .onFailure { error = it.message ?: "Repository removal failed." }
+            },
+        )
+    }
 }
 
 @Composable
@@ -725,6 +949,7 @@ private fun ApkExtensionCard(
     runtime: ApkExtensionRuntimeReport,
     trust: () -> Unit,
     forgetTrust: () -> Unit,
+    uninstall: () -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
@@ -772,6 +997,7 @@ private fun ApkExtensionCard(
                 if (runtime.trustedCertificateSha256().isPresent) {
                     TextButton(onClick = forgetTrust) { Text("Forget trust") }
                 }
+                TextButton(onClick = uninstall) { Text("Uninstall") }
             }
         }
     }
@@ -782,6 +1008,93 @@ private fun inspectApkRuntimes(
     extensions: List<InstalledApkExtension>,
 ): Map<String, ApkExtensionRuntimeReport> = extensions.associate { extension ->
     extension.packageName() to platform.runtimeReport(extension)
+}
+
+private fun extensionMatches(extension: ExtensionPackageMetadata, query: String): Boolean {
+    val normalized = query.trim().lowercase(Locale.ROOT)
+    return normalized.isEmpty() || extension.displayName().lowercase(Locale.ROOT).contains(normalized) ||
+        extension.packageName().lowercase(Locale.ROOT).contains(normalized) ||
+        extension.languageTag().lowercase(Locale.ROOT).contains(normalized) ||
+        extension.sources().any { source ->
+            source.displayName().lowercase(Locale.ROOT).contains(normalized)
+        }
+}
+
+private fun installedExtensionMatches(
+    packageName: String,
+    displayName: String,
+    metadata: ExtensionPackageMetadata?,
+    normalizedQuery: String,
+): Boolean = normalizedQuery.isEmpty() ||
+    packageName.lowercase(Locale.ROOT).contains(normalizedQuery) ||
+    displayName.lowercase(Locale.ROOT).contains(normalizedQuery) ||
+    metadata?.sources()?.any { source ->
+        source.displayName().lowercase(Locale.ROOT).contains(normalizedQuery) ||
+            source.languageTag().lowercase(Locale.ROOT).contains(normalizedQuery)
+    } == true
+
+private fun uninstallApkExtension(
+    platform: ApkExtensionPlatform,
+    packageName: String,
+    scope: CoroutineScope,
+    complete: (String?, String?) -> Unit,
+) {
+    if (!platform.uninstallationSupported()) {
+        complete(null, "Extension removal is unavailable on this platform.")
+        return
+    }
+    scope.launch {
+        runCatching { withContext(Dispatchers.IO) { platform.uninstall(packageName).get() } }
+            .onSuccess { complete(it, null) }
+            .onFailure { failure ->
+                complete(null, failure.cause?.message ?: failure.message ?: "Extension removal failed.")
+            }
+    }
+}
+
+private data class ExtensionRemovalRequest(
+    val packageName: String,
+    val displayName: String,
+    val apk: Boolean,
+)
+
+@Composable
+private fun ConfirmExtensionRemovalDialog(
+    target: ExtensionRemovalRequest,
+    dismiss: () -> Unit,
+    confirm: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = dismiss,
+        title = { Text("Uninstall extension?") },
+        text = {
+            Text(
+                "${target.displayName} and every source provided by this extension will be removed from Anilib.",
+            )
+        },
+        confirmButton = { Button(onClick = confirm) { Text("Uninstall") } },
+        dismissButton = { TextButton(onClick = dismiss) { Text("Cancel") } },
+    )
+}
+
+@Composable
+private fun ConfirmRepositoryRemovalDialog(
+    repository: String,
+    dismiss: () -> Unit,
+    confirm: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = dismiss,
+        title = { Text("Remove repository?") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("The repository will disappear from Anilib. Installed extensions are kept.")
+                Text(repository, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        },
+        confirmButton = { Button(onClick = confirm) { Text("Remove") } },
+        dismissButton = { TextButton(onClick = dismiss) { Text("Cancel") } },
+    )
 }
 
 private fun apkRuntimeStatus(runtime: ApkExtensionRuntimeReport): String = when (runtime.state()) {
@@ -1326,6 +1639,42 @@ private fun InstalledExtensionCard(
                 }
                 TextButton(onClick = remove) { Text("Remove") }
             }
+        }
+    }
+}
+
+@Composable
+private fun InstalledEngineExtensionCard(
+    packageName: String,
+    metadata: ExtensionPackageMetadata?,
+    active: Boolean,
+    uninstall: () -> Unit,
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            ExtensionIcon(metadata?.icon()?.orElse(null), metadata?.displayName() ?: packageName)
+            Spacer(Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(metadata?.displayName() ?: packageName, fontWeight = FontWeight.Medium)
+                Text(
+                    metadata?.let { "${it.languageTag()} · ${it.versionName()}" } ?: packageName,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    if (active) "Available in Sources" else "No compatible source activated",
+                    color = if (active) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.error
+                    },
+                )
+            }
+            TextButton(onClick = uninstall) { Text("Uninstall") }
         }
     }
 }

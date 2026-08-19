@@ -27,6 +27,14 @@ public interface ApkExtensionPlatform {
         return "Handing APK to Android";
     }
 
+    default boolean uninstallationSupported() {
+        return false;
+    }
+
+    default String uninstallActionLabel() {
+        return "Uninstall";
+    }
+
     default List<InstalledApkExtension> discoverInstalled() {
         return List.of();
     }
@@ -35,6 +43,10 @@ public interface ApkExtensionPlatform {
         return discoverInstalled().stream()
                 .map(InstalledApkExtension::packageName)
                 .collect(java.util.stream.Collectors.toUnmodifiableSet());
+    }
+
+    default Set<String> activePackageNames() {
+        return installedPackageNames();
     }
 
     default ApkExtensionRuntimeReport runtimeReport(InstalledApkExtension extensionPackage) {
@@ -49,6 +61,11 @@ public interface ApkExtensionPlatform {
 
     default ApkExtensionRuntimeReport forgetCertificateTrust(InstalledApkExtension extensionPackage) {
         throw new UnsupportedOperationException("APK extension trust is unavailable on this platform");
+    }
+
+    default CompletableFuture<String> uninstall(String packageName) {
+        return CompletableFuture.failedFuture(
+                new UnsupportedOperationException("APK extension removal is unavailable on this platform"));
     }
 
     CompletableFuture<String> install(ExtensionPackageMetadata extensionPackage);

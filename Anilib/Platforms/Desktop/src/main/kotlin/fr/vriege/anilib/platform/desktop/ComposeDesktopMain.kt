@@ -40,8 +40,7 @@ fun main() {
     val dataDirectory = DesktopDataDirectory.resolve()
     val transport = JdkHttpTransport()
     val extensionEngine = DesktopExtensionEngine.open(dataDirectory, transport)
-    val plugins = listOf(CoverCachePlugin(dataDirectory.resolve("cache").resolve("covers"))) +
-        extensionEngine.sourceBundles()
+    val plugins = listOf(CoverCachePlugin(dataDirectory.resolve("cache").resolve("covers")))
     val started = try {
         StandardAnilib.start(
             dataDirectory,
