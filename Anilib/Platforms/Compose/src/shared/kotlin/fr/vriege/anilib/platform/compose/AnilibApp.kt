@@ -9,6 +9,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -18,6 +21,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -33,8 +37,14 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CollectionsBookmark
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.NewReleases
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.outlined.Assessment
 import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material.icons.outlined.Category
@@ -50,6 +60,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -1500,9 +1511,15 @@ private fun DetailsDestination(
             runCatching { discovery.sourceWebPage(SourceId.of(origin.sourceId())) }
                 .getOrDefault(java.util.Optional.empty())
         }.orElse(null)
+        val sourceName = details.origin().map { origin ->
+            runCatching {
+                discovery.source(SourceId.of(origin.sourceId())).orElse(null)?.displayName()
+            }.getOrNull() ?: origin.sourceId()
+        }.orElse("Local")
         DetailsPage(
             details = details,
-            artwork = { Artwork(details, detailPlatform) },
+            sourceName = sourceName,
+            artwork = { modifier -> MediaArtwork(details, detailPlatform, modifier) },
             chapters = chapters,
             episodes = episodes,
             unitError = unitError,
@@ -1517,7 +1534,21 @@ private fun DetailsDestination(
             read = { openReader(details.id()) },
             watch = { openPlayer(details.id()) },
             download = { enqueueDownload(details.id()) },
+            downloadChapter = { chapter ->
+                runCatching { downloads.enqueue(details.id(), chapter.id()) }
+                    .onSuccess { unitError = null }
+                    .onFailure { unitError = it.message ?: "The chapter could not be queued." }
+            },
+            downloadEpisode = { episode ->
+                runCatching { downloads.enqueue(details.id(), episode.episode().id().value()) }
+                    .onSuccess { unitError = null }
+                    .onFailure { unitError = it.message ?: "The episode could not be queued." }
+            },
             track = { openTracking(details.id()) },
+            favorite = {
+                presentation.setFavorite(setOf(details.id()), !details.favorite())
+                revision++
+            },
             edit = { title, metadata ->
                 presentation.editTitle(details.id(), title, metadata)
                 revision++
@@ -1540,7 +1571,8 @@ private fun DetailsDestination(
 @Composable
 private fun DetailsPage(
     details: LibraryDetails,
-    artwork: @Composable () -> Unit,
+    sourceName: String,
+    artwork: @Composable (Modifier) -> Unit,
     chapters: List<SourceContentUnit>,
     episodes: List<EpisodeSnapshot>,
     unitError: String?,
@@ -1555,7 +1587,10 @@ private fun DetailsPage(
     read: () -> Unit,
     watch: () -> Unit,
     download: () -> Unit,
+    downloadChapter: (SourceContentUnit) -> Unit,
+    downloadEpisode: (EpisodeSnapshot) -> Unit,
     track: () -> Unit,
+    favorite: () -> Unit,
     edit: (String, LibraryTitleMetadata) -> Unit,
     openTitleWeb: (() -> Unit)?,
     openSourceWeb: (() -> Unit)?,
@@ -1573,93 +1608,98 @@ private fun DetailsPage(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
+                actions = {
+                    IconButton(onClick = { editing = true }) {
+                        Icon(Icons.Default.Edit, contentDescription = "Edit")
+                    }
+                    IconButton(onClick = share) {
+                        Icon(Icons.Default.Share, contentDescription = "Share")
+                    }
+                    IconButton(onClick = download, enabled = canDownload) {
+                        Icon(Icons.Outlined.Download, contentDescription = "Download")
+                    }
+                },
             )
+        },
+        floatingActionButton = {
+            if (canWatch || canRead) {
+                ExtendedFloatingActionButton(
+                    onClick = if (canWatch) watch else read,
+                    icon = {
+                        Icon(
+                            Icons.Default.PlayArrow,
+                            contentDescription = if (canWatch) "Watch" else "Read",
+                        )
+                    },
+                    text = { Text(if (canWatch) "Watch" else "Read") },
+                )
+            }
         },
     ) { padding ->
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            modifier = Modifier.fillMaxSize().padding(padding),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 104.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            item { artwork() }
-            item { Text(formatEnum(details.kind()), color = MaterialTheme.colorScheme.primary) }
-            item { DetailsFacts(details) }
+            item { MediaDetailsHero(details, sourceName, artwork) }
             item {
-                Text("Description", fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    details.description().ifBlank { "No description available." },
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                MediaDetailsActions(
+                    favorite = details.favorite(),
+                    episodeCount = episodes.size,
+                    chapterCount = chapters.size,
+                    canTrack = canTrack,
+                    canOpenWeb = openTitleWeb != null || openSourceWeb != null,
+                    toggleFavorite = favorite,
+                    track = track,
+                    openWeb = openTitleWeb ?: openSourceWeb ?: {},
                 )
             }
-            if (!readerError.isNullOrBlank()) {
-                item { Text(readerError, color = MaterialTheme.colorScheme.error) }
-            }
-            if (!playerError.isNullOrBlank()) {
-                item { Text(playerError, color = MaterialTheme.colorScheme.error) }
-            }
-            if (!downloadError.isNullOrBlank()) {
-                item { Text(downloadError, color = MaterialTheme.colorScheme.error) }
-            }
-            if (!unitError.isNullOrBlank()) {
-                item { Text(unitError, color = MaterialTheme.colorScheme.error) }
-            }
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Button(onClick = { editing = true }) { Text("Edit") }
-                    Button(onClick = share) { Text("Share") }
-                    openTitleWeb?.let { action ->
-                        Button(onClick = action) { Text("Open title web") }
-                    }
-                    openSourceWeb?.let { action ->
-                        Button(onClick = action) { Text("Open source web") }
+                Column(Modifier.fillMaxWidth().widthIn(max = 900.dp)) {
+                    Text(
+                        details.description().ifBlank { "No description available." },
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (details.genres().isNotEmpty()) {
+                        MediaGenreChips(details.genres())
                     }
                 }
             }
-            if (canTrack) {
-                item { Button(onClick = track) { Text("Tracking") } }
-            }
-            item {
-                Row(
-                    modifier = Modifier.padding(vertical = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    if (canWatch) {
-                        Button(onClick = watch) { Text("Watch") }
-                    }
-                    if (canRead) {
-                        Button(onClick = read) { Text("Read") }
-                    }
-                    Button(onClick = download, enabled = canDownload) {
-                        Text("Download")
-                    }
+            listOfNotNull(readerError, playerError, downloadError, unitError)
+                .filter(String::isNotBlank)
+                .forEach { message ->
+                    item { Text(message, color = MaterialTheme.colorScheme.error) }
                 }
-            }
             if (chapters.isNotEmpty()) {
-                item { Text("Chapters", fontWeight = FontWeight.SemiBold, fontSize = 18.sp) }
+                item { MediaContentHeading("${chapters.size} chapters") }
                 items(chapters, key = { it.id().value() }) { chapter ->
-                    ContentUnitCard(
-                        chapter.title(),
-                        chapter.publishedAt().map(dateTimeFormatter::format).orElse("Unknown date"),
-                        read,
+                    MediaUnitRow(
+                        title = chapter.title(),
+                        summary = chapter.publishedAt().map(dateTimeFormatter::format).orElse("Available"),
+                        open = read,
+                        download = { downloadChapter(chapter) },
                     )
                 }
             }
             if (episodes.isNotEmpty()) {
-                item { Text("Episodes", fontWeight = FontWeight.SemiBold, fontSize = 18.sp) }
+                item { MediaContentHeading("${episodes.size} episodes") }
                 items(episodes, key = { it.episode().id().value() }) { episode ->
                     val playback = episode.playback().orElse(null)
-                    ContentUnitCard(
-                        episode.episode().title(),
-                        playback?.let { "${it.positionMillis()} ms watched" } ?: "Unwatched",
-                        watch,
+                    val metadata = listOfNotNull(
+                        episode.episode().uploadedAt().map(dateTimeFormatter::format).orElse(null),
+                        episode.episode().scanlator().orElse(null),
+                        playback?.let { "${it.positionMillis() / 60_000} min watched" },
+                    ).ifEmpty { listOf("Available") }.joinToString(" · ")
+                    MediaUnitRow(
+                        title = episode.episode().title(),
+                        summary = metadata,
+                        open = watch,
+                        download = { downloadEpisode(episode) },
                     )
                 }
             }
             if (related.isNotEmpty()) {
-                item { Text("Related titles", fontWeight = FontWeight.SemiBold, fontSize = 18.sp) }
+                item { MediaContentHeading("Related titles") }
                 items(related, key = { it.id().value() }) { card ->
                     LibraryTitleCard(card, false, false, {}, { openRelated(card.id()) })
                 }
@@ -1679,20 +1719,120 @@ private fun DetailsPage(
 }
 
 @Composable
-private fun ContentUnitCard(title: String, summary: String, open: () -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = open),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-    ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-            Text(title, fontWeight = FontWeight.Medium)
-            Text(summary, color = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun MediaDetailsHero(
+    details: LibraryDetails,
+    sourceName: String,
+    artwork: @Composable (Modifier) -> Unit,
+) {
+    BoxWithConstraints(Modifier.fillMaxWidth().widthIn(max = 900.dp).padding(top = 8.dp, bottom = 12.dp)) {
+        val coverWidth = if (maxWidth < 600.dp) 112.dp else 156.dp
+        val coverHeight = if (maxWidth < 600.dp) 168.dp else 232.dp
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            artwork(Modifier.width(coverWidth).height(coverHeight).clip(RoundedCornerShape(8.dp)))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(details.title(), style = MaterialTheme.typography.headlineSmall)
+                Text(
+                    details.authors().firstOrNull()?.let { "By $it" } ?: "Unknown author",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    "${formatEnum(details.publicationStatus())} · $sourceName",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun Artwork(details: LibraryDetails, platform: DetailPlatform) {
+private fun MediaDetailsActions(
+    favorite: Boolean,
+    episodeCount: Int,
+    chapterCount: Int,
+    canTrack: Boolean,
+    canOpenWeb: Boolean,
+    toggleFavorite: () -> Unit,
+    track: () -> Unit,
+    openWeb: () -> Unit,
+) {
+    val count = if (episodeCount > 0) "$episodeCount episodes" else "$chapterCount chapters"
+    Row(
+        modifier = Modifier.fillMaxWidth().widthIn(max = 720.dp).padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+    ) {
+        MediaDetailAction(
+            if (favorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+            if (favorite) "In Library" else "Favorite",
+            true,
+            toggleFavorite,
+        )
+        MediaDetailAction(Icons.Default.History, count, false) {}
+        MediaDetailAction(Icons.Default.MoreHoriz, "Tracking", canTrack, track)
+        MediaDetailAction(Icons.Default.Public, "WebView", canOpenWeb, openWeb)
+    }
+}
+
+@Composable
+private fun MediaDetailAction(icon: ImageVector, label: String, enabled: Boolean, action: () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(92.dp)) {
+        IconButton(onClick = action, enabled = enabled) {
+            Icon(icon, contentDescription = label)
+        }
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 2,
+        )
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun MediaGenreChips(genres: List<String>) {
+    FlowRow(
+        modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        genres.forEach { genre ->
+            FilterChip(selected = false, onClick = {}, label = { Text(genre) })
+        }
+    }
+}
+
+@Composable
+private fun MediaContentHeading(label: String) {
+    Text(
+        label,
+        modifier = Modifier.fillMaxWidth().widthIn(max = 900.dp).padding(top = 20.dp, bottom = 8.dp),
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 18.sp,
+    )
+}
+
+@Composable
+private fun MediaUnitRow(title: String, summary: String, open: () -> Unit, download: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().widthIn(max = 900.dp).clickable(onClick = open).padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, fontWeight = FontWeight.Medium)
+            Text(summary, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        IconButton(onClick = download) {
+            Icon(Icons.Outlined.Download, contentDescription = "Download $title")
+        }
+    }
+    HorizontalDivider(modifier = Modifier.fillMaxWidth().widthIn(max = 900.dp))
+}
+
+@Composable
+private fun MediaArtwork(details: LibraryDetails, platform: DetailPlatform, modifier: Modifier) {
     val location = details.artwork().orElse(null)
     var image by remember(location) { mutableStateOf<ImageBitmap?>(null) }
     var failed by remember(location) { mutableStateOf(false) }
@@ -1714,8 +1854,7 @@ private fun Artwork(details: LibraryDetails, platform: DetailPlatform) {
                 check(response.statusCode() in 200..299) {
                     "Artwork request failed with HTTP ${response.statusCode()}"
                 }
-                platform.pageDecoder(response.body())
-                    ?: error("Artwork format is not supported")
+                platform.pageDecoder(response.body()) ?: error("Artwork format is not supported")
             }
         }.onSuccess { image = it }.onFailure { failed = true }
     }
@@ -1723,21 +1862,18 @@ private fun Artwork(details: LibraryDetails, platform: DetailPlatform) {
         image != null -> Image(
             image!!,
             contentDescription = "${details.title()} artwork",
-            modifier = Modifier.fillMaxWidth().height(280.dp),
-            contentScale = ContentScale.Fit,
+            modifier = modifier,
+            contentScale = ContentScale.Crop,
         )
-        location == null -> ArtworkPlaceholder("No artwork")
-        failed -> ArtworkPlaceholder("Artwork unavailable")
-        else -> ArtworkPlaceholder("Loading artwork…")
+        location == null -> MediaArtworkPlaceholder("No artwork", modifier)
+        failed -> MediaArtworkPlaceholder("Artwork unavailable", modifier)
+        else -> MediaArtworkPlaceholder("Loading artwork", modifier)
     }
 }
 
 @Composable
-private fun ArtworkPlaceholder(label: String) {
-    Box(
-        modifier = Modifier.fillMaxWidth().height(180.dp),
-        contentAlignment = Alignment.Center,
-    ) {
+private fun MediaArtworkPlaceholder(label: String, modifier: Modifier) {
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
         Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
@@ -1810,38 +1946,6 @@ private fun commaSeparated(value: String): List<String> = value.split(',')
 
 private fun PublicationStatus.next(): PublicationStatus =
     PublicationStatus.entries[(ordinal + 1) % PublicationStatus.entries.size]
-
-@Composable
-private fun DetailsFacts(details: LibraryDetails) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Fact("Favorite", if (details.favorite()) "Yes" else "No")
-            Fact("Status", formatEnum(details.publicationStatus()))
-            Fact("Added", dateTimeFormatter.format(details.addedAt()))
-            Fact("Categories", joined(details.categories()))
-            Fact("Authors", joined(details.authors()))
-            Fact("Artists", joined(details.artists()))
-            Fact("Genres", joined(details.genres()))
-            Fact("Source", details.origin().map { it.sourceId() }.orElse("Local"))
-            Fact("Progress", details.progress().map(::progress).orElse("Not started"))
-            Fact("History", "${details.historyEntryCount()} entries")
-        }
-    }
-}
-
-@Composable
-private fun Fact(label: String, value: String) {
-    Row(modifier = Modifier.fillMaxWidth()) {
-        Text(label, fontWeight = FontWeight.Medium, modifier = Modifier.width(116.dp))
-        Text(value, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
 
 @Composable
 internal fun EmptyPage(message: String) {
