@@ -44,12 +44,13 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
     private static final Pattern SHA_256 = Pattern.compile("[0-9a-f]{64}");
     private static final Duration START_TIMEOUT = Duration.ofSeconds(30);
     private static final int START_ATTEMPTS = 3;
+    private static final String RUNTIME_STATE_FILE = "process.properties";
 
     private final Path dataDirectory;
     private final Path engineDirectory;
     private final HttpTransport transport;
     private volatile MiwayomiSourceBridge bridge;
-    private volatile Process process;
+    private volatile ProcessHandle process;
     private final List<AnilibPlugin> sourceBundles;
     private final Map<String, List<PluginRegistration>> dynamicRegistrations = new LinkedHashMap<>();
     private final Set<String> installedPackageNames = new LinkedHashSet<>();
@@ -61,7 +62,7 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
             Path engineDirectory,
             HttpTransport transport,
             MiwayomiSourceBridge bridge,
-            Process process,
+            ProcessHandle process,
             List<AnilibPlugin> sourceBundles,
             Set<String> installedPackages,
             String diagnostic) {
@@ -99,6 +100,10 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
             Path approvedJar = approvedJar(engineDirectory, properties);
             String expectedSha256 = expectedSha256(properties);
             requireChecksum(approvedJar, expectedSha256);
+            DesktopExtensionEngine running = resume(data, engineDirectory, transport);
+            if (running != null) {
+                return running;
+            }
             Path runtimeJar = prepareRuntimeCopy(engineDirectory, approvedJar, expectedSha256);
             return start(data, engineDirectory, runtimeJar, transport);
         } catch (RuntimeException exception) {
@@ -236,17 +241,23 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
     @Override
     public void close() {
         if (process == null || !process.isAlive()) {
+            clearRuntimeState(engineDirectory, process);
             return;
         }
         process.destroy();
         try {
-            if (!process.waitFor(5, TimeUnit.SECONDS)) {
+            process.onExit().get(5, TimeUnit.SECONDS);
+        } catch (java.util.concurrent.TimeoutException exception) {
+            if (process.isAlive()) {
                 process.destroyForcibly();
-                process.waitFor(5, TimeUnit.SECONDS);
             }
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
             process.destroyForcibly();
+        } catch (java.util.concurrent.ExecutionException exception) {
+            process.destroyForcibly();
+        } finally {
+            clearRuntimeState(engineDirectory, process);
         }
     }
 
@@ -284,7 +295,9 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
                 MiwayomiSourceBridge bridge = new MiwayomiSourceBridge(
                         URI.create("http://127.0.0.1:" + port + "/"),
                         client);
-                awaitHealthy(bridge, process);
+                ProcessHandle processHandle = process.toHandle();
+                awaitHealthy(bridge, processHandle);
+                writeRuntimeState(engineDirectory, processHandle, port, runtimeJar);
                 List<URI> repositories = new FileExtensionRepositoryStore(
                         dataDirectory.resolve("extension-repositories.txt")).load().stream()
                         .map(ExtensionRepositoryLocations::indexCandidates)
@@ -298,7 +311,7 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
                         engineDirectory,
                         transport,
                         bridge,
-                        process,
+                        processHandle,
                         sources,
                         installedPackages,
                         "Desktop APK engine is running with " + sources.size() + " source bundles.");
@@ -307,9 +320,136 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
                 if (process != null && process.isAlive()) {
                     process.destroyForcibly();
                 }
+                if (process != null) {
+                    clearRuntimeState(engineDirectory, process.toHandle());
+                }
             }
         }
         throw new IllegalStateException("Extension engine did not become ready", failure);
+    }
+
+    private static DesktopExtensionEngine resume(
+            Path dataDirectory,
+            Path engineDirectory,
+            HttpTransport transport) {
+        Path stateFile = runtimeStateFile(engineDirectory);
+        if (!Files.isRegularFile(stateFile, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(stateFile)) {
+            return null;
+        }
+        try {
+            Properties state = load(stateFile);
+            long pid = Long.parseLong(requireProperty(state, "pid"));
+            int port = Integer.parseInt(requireProperty(state, "port"));
+            if (pid <= 0 || port < 1 || port > 65_535) {
+                return null;
+            }
+            Path runtimeJar = engineDirectory.resolve("runtime").resolve("engine-runtime.jar")
+                    .toAbsolutePath().normalize();
+            Path engineData = engineDirectory.resolve("data").toAbsolutePath().normalize();
+            if (!runtimeJar.toString().equals(requireProperty(state, "runtime"))
+                    || !engineData.toString().equals(requireProperty(state, "data"))) {
+                return null;
+            }
+            ProcessHandle handle = ProcessHandle.of(pid).filter(ProcessHandle::isAlive).orElse(null);
+            if (handle == null || !matchesRuntimeCommand(handle, runtimeJar, engineData, port)) {
+                return null;
+            }
+            AnilibHttpClient client = request -> transport.exchange(request, request.headers());
+            MiwayomiSourceBridge bridge = new MiwayomiSourceBridge(
+                    URI.create("http://127.0.0.1:" + port + "/"), client);
+            bridge.requireHealthy();
+            List<URI> repositories = new FileExtensionRepositoryStore(
+                    dataDirectory.resolve("extension-repositories.txt")).load().stream()
+                    .map(ExtensionRepositoryLocations::indexCandidates)
+                    .map(List::getFirst)
+                    .toList();
+            bridge.saveRepositories(repositories);
+            List<AnilibPlugin> sources = bridge.sourceBundles();
+            Set<String> installedPackages = bridge.installedPackageNames();
+            return new DesktopExtensionEngine(
+                    dataDirectory,
+                    engineDirectory,
+                    transport,
+                    bridge,
+                    handle,
+                    sources,
+                    installedPackages,
+                    "Desktop APK engine resumed with " + sources.size() + " source bundles.");
+        } catch (RuntimeException exception) {
+            return null;
+        }
+    }
+
+    private static boolean matchesRuntimeCommand(
+            ProcessHandle process,
+            Path runtimeJar,
+            Path engineData,
+            int port) {
+        String command = process.info().commandLine().orElse("").toLowerCase(Locale.ROOT);
+        return command.contains(runtimeJar.toString().toLowerCase(Locale.ROOT))
+                && command.contains(engineData.toString().toLowerCase(Locale.ROOT))
+                && command.contains("--port " + port)
+                && command.contains("--host 127.0.0.1");
+    }
+
+    private static void writeRuntimeState(
+            Path engineDirectory,
+            ProcessHandle process,
+            int port,
+            Path runtimeJar) {
+        Path stateFile = runtimeStateFile(engineDirectory);
+        Path temporary = null;
+        try {
+            Files.createDirectories(stateFile.getParent());
+            if (Files.exists(stateFile, LinkOption.NOFOLLOW_LINKS) && Files.isSymbolicLink(stateFile)) {
+                throw new IllegalStateException("Extension engine runtime state must not be a symbolic link");
+            }
+            Properties state = new Properties();
+            state.setProperty("pid", Long.toString(process.pid()));
+            state.setProperty("port", Integer.toString(port));
+            state.setProperty("runtime", runtimeJar.toAbsolutePath().normalize().toString());
+            state.setProperty("data", engineDirectory.resolve("data").toAbsolutePath().normalize().toString());
+            temporary = Files.createTempFile(stateFile.getParent(), ".process-", ".tmp");
+            try (var output = Files.newOutputStream(temporary)) {
+                state.store(output, "Anilib extension engine runtime");
+            }
+            try {
+                Files.move(temporary, stateFile, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            } catch (java.nio.file.AtomicMoveNotSupportedException ignored) {
+                Files.move(temporary, stateFile, StandardCopyOption.REPLACE_EXISTING);
+            }
+            temporary = null;
+        } catch (IOException exception) {
+            throw new UncheckedIOException("Unable to persist extension engine runtime state", exception);
+        } finally {
+            if (temporary != null) {
+                try {
+                    Files.deleteIfExists(temporary);
+                } catch (IOException ignored) {
+                }
+            }
+        }
+    }
+
+    private static void clearRuntimeState(Path engineDirectory, ProcessHandle process) {
+        if (process == null) {
+            return;
+        }
+        Path stateFile = runtimeStateFile(engineDirectory);
+        try {
+            if (!Files.isRegularFile(stateFile, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(stateFile)) {
+                return;
+            }
+            Properties state = load(stateFile);
+            if (Long.toString(process.pid()).equals(state.getProperty("pid"))) {
+                Files.deleteIfExists(stateFile);
+            }
+        } catch (RuntimeException | IOException ignored) {
+        }
+    }
+
+    private static Path runtimeStateFile(Path engineDirectory) {
+        return engineDirectory.resolve("runtime").resolve(RUNTIME_STATE_FILE);
     }
 
     private static Process launch(Path engineDirectory, Path runtimeJar, int port) {
@@ -342,12 +482,12 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
         }
     }
 
-    private static void awaitHealthy(MiwayomiSourceBridge bridge, Process process) {
+    private static void awaitHealthy(MiwayomiSourceBridge bridge, ProcessHandle process) {
         long deadline = System.nanoTime() + START_TIMEOUT.toNanos();
         RuntimeException failure = null;
         while (System.nanoTime() < deadline) {
             if (!process.isAlive()) {
-                throw new IllegalStateException("Extension engine exited with code " + process.exitValue(), failure);
+                throw new IllegalStateException("Extension engine exited before becoming healthy", failure);
             }
             try {
                 bridge.requireHealthy();

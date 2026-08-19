@@ -20,6 +20,7 @@ import fr.vriege.anilib.feature.settings.SettingsCapabilities
 import fr.vriege.anilib.feature.player.ui.PlayerUiCapabilities
 import fr.vriege.anilib.feature.downloads.ui.DownloadUiCapabilities
 import fr.vriege.anilib.feature.backup.ui.BackupUiCapabilities
+import fr.vriege.anilib.feature.source.SourceCapabilities
 import fr.vriege.anilib.feature.tracker.ui.TrackerUiCapabilities
 import fr.vriege.anilib.feature.updates.ui.UpdateUiCapabilities
 import fr.vriege.anilib.feature.applicationupdate.ui.ApplicationUpdateUiCapabilities
@@ -37,7 +38,7 @@ import fr.vriege.anilib.platform.compose.ShareController
 import java.awt.GraphicsEnvironment
 import org.jetbrains.skia.Image
 
-fun main() {
+fun main(arguments: Array<String>) {
     val dataDirectory = DesktopDataDirectory.resolve()
     val transport = JdkHttpTransport()
     val extensionEngine = DesktopExtensionEngine.open(dataDirectory, transport)
@@ -55,7 +56,7 @@ fun main() {
         throw failure
     }
     extensionEngine.attach(started)
-    if (GraphicsEnvironment.isHeadless()) {
+    if (GraphicsEnvironment.isHeadless() || arguments.contains("--headless")) {
         printHeadlessSummary(started)
         try {
             started.close()
@@ -168,8 +169,11 @@ private fun decodePage(bytes: ByteArray): ImageBitmap? =
 
 private fun printHeadlessSummary(started: StartedAnilib) {
     val count = started.capability(LibraryUiCapabilities.PRESENTATION).library().titles().size
+    val sources = started.capability(SourceCapabilities.REGISTRY).sources()
     println(
-        "Anilib started headlessly with ${started.components().size} bundles and $count library items.",
+        "Anilib started headlessly with ${started.components().size} bundles, " +
+            "${sources.size} sources (${sources.joinToString { it.descriptor().id().toString() }}), " +
+            "and $count library items.",
     )
 }
 

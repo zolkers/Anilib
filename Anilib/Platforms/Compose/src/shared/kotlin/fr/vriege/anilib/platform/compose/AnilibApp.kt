@@ -1818,7 +1818,10 @@ private fun DetailsPage(
         ),
         artwork = artwork,
         favorite = details.favorite(),
-        contentLabel = if (episodes.isNotEmpty()) "${episodes.size} episodes" else "${chapters.size} chapters",
+        contentLabel = when (details.kind()) {
+            MediaKind.ANIME -> "${episodes.size} episodes"
+            MediaKind.MANGA, MediaKind.NOVEL, MediaKind.OTHER -> "${chapters.size} chapters"
+        },
         canTrack = canTrack,
         canOpenWeb = openTitleWeb != null || openSourceWeb != null,
         canDownload = canDownload,
