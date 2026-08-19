@@ -179,6 +179,11 @@ private data class DetailPlatform(
     val pageDecoder: (ByteArray) -> ImageBitmap?,
 )
 
+private data class HistoryContentKey(
+    val libraryItemId: LibraryItemId,
+    val contentId: String,
+)
+
 @Composable
 fun AnilibApp(
     presentation: LibraryPresentation,
@@ -716,6 +721,8 @@ private fun AppDestination(
         AppSection.MORE -> when (moreDestination) {
             MoreDestination.HISTORY -> HistoryPage(
                 presentation,
+                reader,
+                player,
                 openReader,
                 openPlayer,
                 readerError ?: playerError,
@@ -1368,6 +1375,8 @@ private fun RemainingEpisodeBadge(remainingEpisodeCount: Int?) {
 @Composable
 private fun HistoryPage(
     presentation: LibraryPresentation,
+    reader: ReaderPresentation,
+    player: PlayerPresentation,
     openReader: (LibraryItemId) -> Unit,
     openPlayer: (LibraryItemId, SourceEpisodeId?) -> Unit,
     resumeError: String?,
@@ -1380,10 +1389,40 @@ private fun HistoryPage(
     var query by remember { mutableStateOf("") }
     var searching by remember { mutableStateOf(false) }
     var kind by remember { mutableStateOf(MediaKind.ANIME) }
+    var contentLabels by remember(reader, player) {
+        mutableStateOf<Map<HistoryContentKey, String>>(emptyMap())
+    }
+    LaunchedEffect(reader, player, kind, history) {
+        val rows = history.entries().filter { it.kind() == kind }
+        contentLabels = withContext(Dispatchers.IO) {
+            val labels = mutableMapOf<HistoryContentKey, String>()
+            rows.groupBy { it.libraryItemId() }.forEach { (libraryItemId, titleRows) ->
+                if (kind == MediaKind.ANIME) {
+                    runCatching { player.episodes(libraryItemId) }.getOrDefault(emptyList()).forEach { episode ->
+                        val fallbackPosition = titleRows
+                            .filter { it.contentId() == episode.episode().id().value() }
+                            .maxOfOrNull { it.position() }
+                            ?: 0L
+                        val position = episode.playback()
+                            .map { it.positionMillis() }
+                            .orElse(fallbackPosition)
+                        labels[HistoryContentKey(libraryItemId, episode.episode().id().value())] =
+                            "${episode.episode().title()} · ${formatHistoryDuration(position)}"
+                    }
+                } else {
+                    runCatching { reader.contentUnits(libraryItemId) }.getOrDefault(emptyList()).forEach { unit ->
+                        labels[HistoryContentKey(libraryItemId, unit.id().value())] = unit.title()
+                    }
+                }
+            }
+            labels
+        }
+    }
     val entries = history.entries().filter {
+        val contentLabel = contentLabels[HistoryContentKey(it.libraryItemId(), it.contentId())]
         it.kind() == kind &&
             (query.isBlank() || it.title().contains(query, ignoreCase = true) ||
-                it.contentId().contains(query, ignoreCase = true))
+                contentLabel?.contains(query, ignoreCase = true) == true)
     }
     val groups = entries.groupBy { row ->
         row.openedAt().atZone(ZoneId.systemDefault()).toLocalDate()
@@ -1479,6 +1518,7 @@ private fun HistoryPage(
                             HistoryCard(
                                 row,
                                 cards[row.libraryItemId()],
+                                contentLabels[HistoryContentKey(row.libraryItemId(), row.contentId())],
                                 resume = {
                                     if (row.kind() == MediaKind.ANIME) {
                                         openPlayer(row.libraryItemId(), null)
@@ -1515,6 +1555,7 @@ private fun HistoryPage(
 private fun HistoryCard(
     row: LibraryHistoryRow,
     card: LibraryCard?,
+    contentLabel: String?,
     resume: () -> Unit,
     remove: () -> Unit,
     toggleFavorite: () -> Unit,
@@ -1540,7 +1581,11 @@ private fun HistoryCard(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = "${row.contentId()} · ${dateTimeFormatter.format(row.openedAt())}",
+                text = contentLabel ?: if (row.kind() == MediaKind.ANIME) {
+                    "Episode · ${formatHistoryDuration(row.position())}"
+                } else {
+                    "Chapter"
+                },
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -1558,6 +1603,18 @@ private fun HistoryCard(
         IconButton(onClick = remove) {
             Icon(Icons.Default.Delete, contentDescription = "Remove history entry")
         }
+    }
+}
+
+private fun formatHistoryDuration(positionMillis: Long): String {
+    val totalSeconds = positionMillis.coerceAtLeast(0L) / 1000L
+    val hours = totalSeconds / 3600L
+    val minutes = totalSeconds % 3600L / 60L
+    val seconds = totalSeconds % 60L
+    return if (hours > 0L) {
+        "%d:%02d:%02d".format(Locale.ROOT, hours, minutes, seconds)
+    } else {
+        "%02d:%02d".format(Locale.ROOT, minutes, seconds)
     }
 }
 
