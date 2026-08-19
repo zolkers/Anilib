@@ -236,6 +236,12 @@ fun AnilibApp(
         destination = navigator.state()
     }
     val openSection: (AppSection) -> Unit = { next ->
+        val changingMediaKind = section != next &&
+            (section == AppSection.ANIME || section == AppSection.MANGA) &&
+            (next == AppSection.ANIME || next == AppSection.MANGA)
+        if (changingMediaKind && destination.page() == LibraryPage.DETAILS) {
+            navigate(LibraryNavigator::openLibrary)
+        }
         section = next
         if (next != AppSection.MORE) moreDestination = null
     }
