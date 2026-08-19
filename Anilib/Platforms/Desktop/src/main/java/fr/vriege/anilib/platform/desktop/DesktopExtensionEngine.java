@@ -267,17 +267,19 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
         try {
             Files.createDirectories(engineData);
             Files.writeString(log, "", StandardCharsets.UTF_8);
-            ProcessBuilder builder = new ProcessBuilder(
-                    java.toString(),
-                    "-jar",
-                    runtimeJar.toString(),
-                    "--host",
-                    "127.0.0.1",
-                    "--port",
-                    Integer.toString(port),
-                    "--data",
-                    engineData.toString(),
-                    "--no-open");
+            List<String> command = new java.util.ArrayList<>();
+            command.add(java.toString());
+            if (requiresFallbackTruffleRuntime()) {
+                command.add("-Dtruffle.TruffleRuntime=com.oracle.truffle.api.impl.DefaultTruffleRuntime");
+                command.add("-Dpolyglot.engine.WarnInterpreterOnly=false");
+            }
+            command.addAll(List.of(
+                    "-jar", runtimeJar.toString(),
+                    "--host", "127.0.0.1",
+                    "--port", Integer.toString(port),
+                    "--data", engineData.toString(),
+                    "--no-open"));
+            ProcessBuilder builder = new ProcessBuilder(command);
             builder.directory(engineDirectory.toFile());
             builder.redirectErrorStream(true);
             builder.redirectOutput(ProcessBuilder.Redirect.appendTo(log.toFile()));
@@ -334,6 +336,7 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
             }
             Files.copy(approvedJar, runtimeJar, StandardCopyOption.REPLACE_EXISTING);
             requireChecksum(runtimeJar, expectedSha256);
+            MiwayomiRuntimePatcher.apply(runtimeJar);
             return runtimeJar;
         } catch (IOException exception) {
             throw new UncheckedIOException("Unable to prepare isolated engine copy", exception);
@@ -417,6 +420,12 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
             throw new IllegalStateException("Java executable is unavailable under java.home");
         }
         return executable;
+    }
+
+    private static boolean requiresFallbackTruffleRuntime() {
+        String operatingSystem = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
+        String architecture = System.getProperty("os.arch", "").toLowerCase(Locale.ROOT);
+        return operatingSystem.contains("win") && (architecture.equals("aarch64") || architecture.equals("arm64"));
     }
 
     private static int freePort() {

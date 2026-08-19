@@ -409,6 +409,13 @@ source into an explicit leaf Bundle, so an APK installed during a session can be
 registered immediately without changing the product capability graph. Portable Anilib Bundles
 remain the preferred signed, dependency-free cross-platform format.
 
+The official sidecar checksum is verified before Anilib prepares its disposable
+runtime copy. A narrow desktop-owned compatibility step then aligns the sidecar's
+QuickJs close contract with current anime extensions. Windows ARM64 additionally
+selects GraalJS's pure-Java fallback because the pinned sidecar publishes native
+Truffle resources for Windows x64 only. The downloaded artifact and installed APK
+remain unchanged, while the temporary runtime works on both Windows architectures.
+
 Anilib deliberately does not synthesize `eu.kanade.*` host classes or copy the
 Aniyomi dependency graph into its own process merely to make arbitrary APK bytecode link. APKs whose
 preflight finds a missing host ABI remain disabled with a visible report. This
