@@ -43,11 +43,12 @@ public final class ImportPolicyRule implements AnilibJavaRule {
         return imported.startsWith("java.")
                 || imported.startsWith("javax.")
                 || imported.startsWith("fr.vriege.anilib.")
-                || isArchitectureTestHttpServer(imported, source);
+                || isJdkHttpServer(imported, source);
     }
 
-    private static boolean isArchitectureTestHttpServer(String imported, JavaSource source) {
-        return source.module().id().equals("tooling.architecture-tests")
+    private static boolean isJdkHttpServer(String imported, JavaSource source) {
+        return (source.module().id().equals("tooling.architecture-tests")
+                || source.module().id().equals("platform.desktop-engine"))
                 && imported.startsWith("com.sun.net.httpserver.");
     }
 }
