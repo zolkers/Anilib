@@ -39,7 +39,8 @@ changing repository metadata.
 
 The shared UI makes artifact support explicit. Android shows an `Install on
 Android` action for APK entries and hands the HTTPS artifact to the system
-package installer. Desktop explains that APK-only entries require Android
+package installer. Desktop exposes `Install for desktop` when its optional APK
+engine is configured; installation activates the new Source Bundles on restart
 instead of rendering an actionless card. Signed portable Anilib Bundles keep
 the ordinary `Install` action on both platforms. Pinning updates the
 filled/outlined icon and catalogue ordering immediately, and an empty Browse
@@ -130,7 +131,7 @@ filters, preferences, and the Anilib Reader contract. One package failure does n
 select a partial Bundle and is displayed in the shared repository screen. Each
 bridged operation rechecks the currently installed signer, so forgetting trust
 or replacing the APK immediately blocks subsequent calls.
-Signed portable Anilib Bundles remain the only source artifact executed on both
+Signed portable Anilib Bundles remain the preferred source artifact executed on both
 Android and desktop without that compatibility ABI.
 
 Portable artifacts are accepted only when `sha256`, `signature`, `keyId`, and

@@ -15,10 +15,10 @@ features. `AnilibJava` protects those boundaries and the release contract.
 
 The source model is bring-your-own-supply. Anilib ships no third-party
 catalogue. Users may add HTTPS indexes or GitHub repositories with arbitrary
-printable package identities. Signed Anilib source Bundles are the executable
-cross-platform format. Existing Aniyomi APKs remain an isolated, best-effort
-Android compatibility path; Anilib will not recreate `eu.kanade.*` host classes
-or import Aniyomi's dependency graph into the portable architecture.
+printable package identities. Signed Anilib source Bundles are the preferred
+cross-platform format. Existing ecosystem APKs also run on desktop through an
+optional, checksum-pinned JVM sidecar; its Android compatibility ABI and third-
+party dependencies stay outside Anilib's process and portable architecture.
 
 ## Documentation map
 
@@ -130,11 +130,12 @@ next restart-isolated module-layer load.
 
 Aniyomi repositories usually point to Android APKs. Android can download them,
 ask the system to install them, inspect metadata/certificates, and attempt the
-isolated bridge only when its host-ABI preflight passes. Desktop cannot execute
-an Android APK. To support both products, publish an Anilib Bundle; the official
-template and publisher under `Examples/SourceTemplate` and `Tooling/SourcePublisher`
-produce the JAR, signatures, `index.json`, and `index.min.json` without an
-external runtime library.
+isolated bridge only when its host-ABI preflight passes. Desktop can install the
+same APK into its optional local engine. Anilib verifies the configured engine
+JAR, launches a disposable copy on `127.0.0.1`, maps manga/anime REST operations
+to the shared Source API, and keeps page/media traffic behind that loopback
+relay. Native Anilib Bundles remain smaller, signed per publisher, and preferred
+when present; the template and publisher remain the long-term ecosystem path.
 
 ### Recommended next task
 
@@ -176,6 +177,9 @@ revision and run the same fixtures on packaged Android and desktop hosts.
 - [x] ship the dependency-free extension portability analyzer, JSON/Markdown
   reports, identity-preserving Anilib module scaffold, dual-artifact publisher,
   checksums, and reusable GitHub publication workflow
+- [x] execute existing manga and anime APK sources on desktop through an optional
+  checksum-pinned sidecar, explicit Source Bundles, loopback-only catalogue,
+  chapter/page/episode/stream adapters, repository sync, and restart activation
 
 ## Remaining product work
 

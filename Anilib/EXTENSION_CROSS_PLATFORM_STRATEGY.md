@@ -1,20 +1,22 @@
 # Strategie des extensions Android et Desktop
 
-Statut : implementation active ; phases 1, 2 et 5 livrees, phase 4 utilisable,
+Statut : implementation active ; phases 1, 2, 5 et 6 livrees, phase 4 utilisable,
 validation externe de phase 3 en attente d'autorisation des mainteneurs
 
 Date : 2026-08-19
 
 ## Decision en une phrase
 
-Anilib doit presenter **une seule extension logique dans un seul catalogue**, mais
-autoriser deux artefacts sous cette identite : un APK Aniyomi facultatif pour
-Android et un Bundle Anilib signe pour Android, Windows, Linux et macOS.
+Anilib presente **une seule extension logique dans un seul catalogue**. Le
+Bundle Anilib signe reste le format natif recommande. Lorsqu'un depot ne publie
+qu'un APK existant, Android utilise son adaptateur audite et Desktop le delegue
+a un moteur JVM local, optionnel et isole.
 
-Le Bundle portable est la cible recommandee sur toutes les plateformes. L'APK
-reste un chemin de compatibilite Android lorsque le Bundle n'existe pas encore.
-La version portable doit etre produite depuis le code source de l'extension, et
-non par conversion automatique du fichier APK.
+Le moteur Desktop est une voie de compatibilite pragmatique, pas la nouvelle ABI
+d'Anilib : son JAR est epingle par SHA-256, lance dans un processus separe sur
+`127.0.0.1`, et projette ses sources en Bundles explicites. Une version portable
+produite depuis le code source reste preferable pour la securite, le poids, la
+reproductibilite et la maintenance.
 
 ## Problematique
 
@@ -60,7 +62,8 @@ Le premier objectif accepte un APK. Le second exige un artefact portable.
 
 - Promettre que n'importe quel APK ferme ou obfusque fonctionnera sur PC.
 - Embarquer un emulateur Android complet dans l'application Desktop.
-- Recreer l'ensemble d'Aniyomi et de ses dependances dans le coeur d'Anilib.
+- Recreer l'ensemble d'Aniyomi et de ses dependances dans le coeur ou le
+  classpath d'Anilib.
 - Telecharger ou executer du code pendant la simple consultation d'un depot.
 - Livrer, recommander ou republier un catalogue tiers sans choix de
   l'utilisateur et sans autorisation du mainteneur.
@@ -72,7 +75,8 @@ Le premier objectif accepte un APK. Le second exige un artefact portable.
 | Option | APK existants | PC autonome | Maintenance | Poids et UX | Securite | Decision |
 | --- | --- | --- | --- | --- | --- | --- |
 | Emulateur Android integre | Bonne compatibilite potentielle | Oui | Tres elevee | Tres lourd, virtualisation et demarrage lent | Grande surface d'attaque | Rejete |
-| Conversion DEX vers JVM avec fausse ABI Aniyomi | Partielle et imprevisible | Oui | Extreme a chaque changement d'ABI | Invisible si elle marche, erreurs difficiles sinon | Charge du bytecode peu fiable dans l'application | Rejete |
+| Conversion DEX vers JVM chargee dans Anilib | Partielle et imprevisible | Oui | Extreme a chaque changement d'ABI | Invisible si elle marche, erreurs difficiles sinon | Compromet le processus hote | Rejete |
+| Moteur JVM APK en processus local | Bonne pour les API implementees | Oui | Porte par un composant isole | Demarrage et memoire supplementaires | Code tiers hors processus, boucle locale et hash epingle | **Retenu comme compatibilite** |
 | Telephone utilise comme relais pour le PC | Bonne sur Android | Non, telephone obligatoire | Elevee | Appairage, latence et indisponibilite hors ligne | Nouveau protocole distant sensible | Secours eventuel, pas cible principale |
 | Reecriture manuelle de chaque extension | Oui apres portage | Oui | Elevee par extension | Bonne a l'execution | Maitrisable | Utile pour les cas complexes |
 | Double publication depuis le code source | Oui sur Android, puis portable partout | Oui | Raisonnable et testable | Native et legere | Compatible avec la signature et les permissions Anilib | **Retenu** |
@@ -112,8 +116,7 @@ dependance Android dans les fonctionnalites partagees.
 Un depot peut continuer a publier ses APK pour Aniyomi tout en ajoutant un champ
 `anilib`. Les anciens clients ignorent ce champ. Anilib utilise immediatement le
 Bundle sur PC et peut le preferer aussi sur Android. Les extensions non encore
-portees restent disponibles sur Android, avec un etat explicite « Android
-uniquement » sur Desktop.
+portees restent disponibles sur Android et via le moteur Desktop optionnel.
 
 ## Architecture cible
 
@@ -129,6 +132,7 @@ flowchart LR
     D -->|"Desktop"| PB["Bundle portable"]
     D -->|"Android avec Bundle"| AB["Bundle portable recommande"]
     D -->|"Android sans Bundle"| AA["APK via PackageInstaller et pont Aniyomi"]
+    D -->|"Desktop sans Bundle"| DE["APK via moteur JVM local epingle"]
 ```
 
 ### Identite logique unique
@@ -136,7 +140,7 @@ flowchart LR
 Une carte d'extension correspond a un `pkg`, pas a un fichier. Elle peut
 annoncer :
 
-- un artefact `apk`, compatible Android uniquement ;
+- un artefact `apk`, natif Android et executable sur Desktop via le sidecar ;
 - un artefact `anilib`, compatible Android et Desktop ;
 - les deux pendant la migration ;
 - uniquement `anilib` pour une future extension native Anilib.
@@ -152,7 +156,7 @@ pour les deux artefacts.
 | Android | Oui | Oui ou non | Installer le Bundle portable par defaut |
 | Android | Non | Oui | Proposer l'APK avec avertissement de compatibilite |
 | Desktop | Oui | Oui ou non | Installer le Bundle portable |
-| Desktop | Non | Oui | Afficher « Android uniquement », sans faux bouton Installer |
+| Desktop | Non | Oui | Installer dans le moteur local s'il est configure ; sinon expliquer la configuration requise |
 | Toute plateforme | Non | Non | Entree invalide, rejetee au chargement de l'index |
 
 Android doit permettre un choix avance de l'APK seulement si un mainteneur
@@ -269,7 +273,7 @@ Les actions suivent la plateforme :
 
 - `Installer` pour un Bundle compatible avec l'appareil courant ;
 - `Installer l'APK sur Android` pour le secours APK ;
-- aucun bouton inoperant sur Desktop ;
+- `Installer sur Desktop` lorsque le moteur local verifie est disponible ;
 - une explication et, si elle existe, un lien vers la demande de portage ;
 - un seul etat epingle, une seule fiche et une seule position dans la liste.
 
@@ -325,6 +329,24 @@ raison exacte d'un blocage.
 - [x] Encourager les mainteneurs a partager un noyau de logique entre adaptateurs
   plutot qu'a maintenir deux scrapers independants.
 
+### Phase 6 - Compatibilite APK Desktop sans cooperation des mainteneurs
+
+- [x] Integrer le moteur existant comme sidecar optionnel au lieu de charger son
+  ABI et ses dependances dans Anilib.
+- [x] Exiger un JAR local non symbolique et son SHA-256 exact avant lancement.
+- [x] Executer une copie jetable avec un environnement reduit sur `127.0.0.1` et
+  fermer le processus avec l'application.
+- [x] Synchroniser les depots utilisateur et installer leurs APK HTTPS depuis
+  l'ecran d'extensions Desktop.
+- [x] Mapper populaire, recentes, recherche, chapitres/pages, episodes, videos,
+  sous-titres, HLS et DASH vers la Source API partagee.
+- [x] Garder images et medias authentifies derriere le relais loopback afin que
+  cookies et en-tetes restent possedes par le moteur de source.
+- [x] Tester le protocole complet avec un faux moteur deterministe sans catalogue
+  ni artefact tiers dans le depot Anilib.
+- [ ] Executer des APK publics representatifs sur les produits packages et
+  documenter chaque classe d'incompatibilite restante.
+
 ## Utilisation de l'assistant livre
 
 La commande suivante analyse une copie locale en lecture seule, ecrit les deux
@@ -345,15 +367,15 @@ La strategie est consideree livree lorsque :
 
 - une URL de depot affiche une seule fiche par `pkg` ;
 - une extension double artefact s'installe comme Bundle sur Android et Desktop ;
-- une extension APK seule reste installable sur Android et est explicitement
-  marquee Android uniquement sur PC ;
+- une extension APK seule reste installable sur Android et sur Desktop lorsque
+  son moteur local epingle est configure ;
 - bibliotheque, historique, favoris et migration conservent les memes IDs de
   sources entre APK et Bundle ;
 - une mise a jour ne peut pas changer silencieusement d'editeur ;
 - aucun APK, DEX ou code de catalogue n'est execute pendant la decouverte ;
 - les tests de contrat passent sur Android, Windows, Linux et macOS ;
 - l'application n'embarque ni emulateur Android ni ABI Aniyomi factice dans son
-  coeur portable.
+  coeur portable ; le moteur de compatibilite reste un processus facultatif.
 
 ## Risques restant a assumer
 
@@ -369,17 +391,15 @@ preferable a une promesse « tous les APK fonctionnent » impossible a garantir.
 
 ## Conclusion
 
-La meilleure solution est donc **un catalogue unifie et une double cible de
-build**, avec le Bundle Anilib comme format commun. Elle donne une application
-legere et native sur telephone comme sur PC, reutilise les depots Aniyomi sans
-les casser, preserve l'identite des sources et ouvre un chemin propre vers des
-extensions Anilib natives.
+La meilleure solution combine **un catalogue unifie, un Bundle natif recommande
+et un moteur APK Desktop isole**. Anilib peut ainsi utiliser immediatement les
+depots existants sans attendre leurs mainteneurs, tout en conservant une voie
+plus legere, signee et reproductible pour les sources Anilib natives.
 
-L'emulation ou la conversion d'APK peut sembler plus rapide pour obtenir une
-compatibilite immediate, mais elle deplace la complexite dans chaque appareil,
-augmente fortement la surface d'attaque et reste moins fiable. Le portage au
-moment du build concentre cette complexite chez le mainteneur, ou elle peut etre
-revue, testee, signee et corrigee une seule fois pour tous les utilisateurs.
+La conversion et l'ABI de compatibilite restent moins fiables qu'un Bundle natif.
+Elles sont donc confinees au sidecar, jamais fusionnees au Kernel ou aux Features.
+Le portage au moment du build reste la cible de qualite ; le sidecar resout le
+besoin immediat quand ce portage n'arrivera pas.
 
 ## References
 
@@ -389,3 +409,4 @@ revue, testee, signee et corrigee une seule fois pour tous les utilisateurs.
 - [Depot officiel Aniyomi](https://github.com/aniyomiorg/aniyomi)
 - [Guide officiel de creation des extensions Aniyomi](https://github.com/aniyomiorg/aniyomi-extensions/blob/master/CONTRIBUTING.md)
 - [Depot historique officiel des extensions Aniyomi](https://github.com/aniyomiorg/aniyomi-extensions)
+- [Moteur JVM Miwayomi utilise comme sidecar](https://github.com/miwayomi/miwayomi)

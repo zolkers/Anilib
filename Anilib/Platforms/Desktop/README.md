@@ -1,5 +1,32 @@
 # Desktop release
 
+## Existing APK sources
+
+Desktop can optionally delegate existing manga and anime extension APKs to a
+local JVM compatibility engine. Anilib never loads that engine or APK bytecode
+into its own process. On first launch it writes setup instructions under the
+application data directory at `extension-engine/README.txt`.
+
+Place `miwayomi-all.jar` in that directory and create `engine.properties`:
+
+```properties
+enabled=true
+jar=miwayomi-all.jar
+sha256=<the exact lowercase SHA-256 of the downloaded JAR>
+```
+
+At every start Anilib validates the approved non-link file, copies it to a
+disposable runtime location, launches it on `127.0.0.1`, synchronizes the user's
+repository URLs, and registers each returned manga/anime source as an explicit
+Source Bundle. Catalogue, pages, episodes, subtitles, HLS and DASH traffic stays
+behind the loopback bridge. APKs installed while Anilib is open activate after
+restart because the Kernel graph is immutable.
+
+Automated smoke tests may supply the equivalent
+`anilib.extensionEngine.jar`, `anilib.extensionEngine.sha256`, and
+`anilib.dataDirectory` JVM properties. Both engine properties are mandatory
+together; normal installations should use `engine.properties`.
+
 Anilib produces self-contained desktop packages through the Compose
 Multiplatform `jpackage` integration:
 

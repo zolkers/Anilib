@@ -18,7 +18,7 @@ exists but the corresponding Aniyomi workflow or settings depth is incomplete.
 | Backup | Complete | Versioned Anilib archive, daily/weekly automation, atomic policy persistence, content selection, retention, configurable native destinations, Android SAF/desktop export and file sharing, bounded Aniyomi import, previews, checksums, and rollback | — |
 | Local source | Complete | Aniyomi `local`/`localanime` roots, strict details/chapters/episodes JSON, covers, ordered folder/ZIP/CBZ/EPUB manga chapters, MP4/MKV episodes, thumbnails, sidecar subtitles, atomic index, and explicit re-scan | — |
 | Extension repositories | Partial | User-managed HTTPS indexes or GitHub repository URLs, dynamic default-branch JSON discovery, shared catalogue, dedicated permission/trust/version/changelog details, retryable install diagnostics, durable language filters and pinned ordering, Ed25519 publisher trust, SHA-256/signature/API/archive verification, durable lifecycle actions, and restart-isolated JPMS loading into the Android/desktop Source registry | Full per-source management parity |
-| APK extensions (Android) | Partial | HTTPS APK hand-off, package discovery, certificate trust, host-ABI preflight, and isolated best-effort anime/manga adapters | Bytecode requiring unavailable Aniyomi host classes is intentionally rejected; portable Anilib Bundles are the active Android/desktop source format |
+| APK extensions | Partial | Android HTTPS hand-off, package discovery, certificate trust and host-ABI preflight; optional desktop checksum-pinned JVM sidecar with repository sync, APK installation, explicit manga/anime Source Bundles, catalogue/search/latest, chapters/pages, episodes and loopback-relayed streams | Real public APK fixtures and packaged-host journeys remain to be executed; native signed Anilib Bundles remain preferred |
 | Settings | Complete | Removable Settings Bundle, atomic persistence, dedicated shared destinations, complete appearance and browser policy, category defaults/exceptions, enforced policies, bounded diagnostics, native export, allowlisted two-phase resets, complete English/French shared UI packs, and reachable privacy/licence/third-party notices | — |
 | Network maintenance | Complete | Durable live User-Agent, HTTP proxy, RFC 8484 DNS-over-HTTPS resolution gate, timeout and response-cache policy; bounded per-source diagnostics; shared cookies/rate limits; and confirmed Android/desktop cleanup actions | — |
 | WebView | Complete | Source API 1.6 source/title entry points, durable browser policy, Android System WebView, desktop KCEF, navigation controls, bidirectional cookies, per-source headers/User-Agent, platform file chooser/pop-up/download handling, and automatic cookie-driven challenge retry without provider code | — |
@@ -32,8 +32,9 @@ repository and accepts only URLs entered by the user. Repository owners remain
 responsible for their content and binaries.
 
 Existing Aniyomi extensions are Android APKs compiled against Android and
-Aniyomi-specific APIs. Android may provide a constrained, best-effort APK
-bridge, but desktop cannot execute those APKs directly. Cross-platform sources
+Aniyomi-specific APIs. Android provides a constrained best-effort bridge;
+desktop delegates them to an optional isolated JVM compatibility engine rather
+than loading their bytecode into Anilib. Cross-platform sources
 use signed Anilib Bundles against the Java Source SDK. Repository entries may
 publish both artifacts so one user-supplied index serves Android compatibility
 and portable Anilib products.

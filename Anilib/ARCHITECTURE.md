@@ -383,11 +383,22 @@ immediately before invoking it. Its
 and forbidden to portable extension modules. Every bridged operation rechecks
 the installed signer against current trust before invoking APK code. The app
 still needs a complete, compatible host ABI before a real installed APK can
-reach that path, so portable Anilib Bundles remain the executable cross-platform
-format.
+reach that Android path.
+
+Desktop supplies the missing ecosystem ABI only through an optional external
+JVM sidecar. The platform adapter verifies a user-approved engine JAR by exact
+SHA-256, rejects links, launches a disposable copy with a reduced environment on
+`127.0.0.1`, waits for a typed health response, synchronizes user-owned repository
+URLs, and owns process shutdown. Extension Repository Runtime maps the loopback
+protocol into ordinary explicit Source Bundles with the original unsigned
+numeric source identity. Catalogue, chapters, pages, episodes, videos, subtitles,
+HLS, and DASH are relayed through that boundary; neither engine classes nor APK
+bytecode enter Anilib's classpath. The immutable Kernel graph means an APK
+installed during a session activates after restart. Portable Anilib Bundles
+remain the preferred signed, dependency-free cross-platform format.
 
 Anilib deliberately does not synthesize `eu.kanade.*` host classes or copy the
-Aniyomi dependency graph merely to make arbitrary APK bytecode link. APKs whose
+Aniyomi dependency graph into its own process merely to make arbitrary APK bytecode link. APKs whose
 preflight finds a missing host ABI remain disabled with a visible report. This
 keeps Android compatibility optional and prevents it from becoming a hidden
 dependency of the portable Source SDK used by both products.
