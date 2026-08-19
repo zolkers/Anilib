@@ -7,10 +7,12 @@ import org.objectweb.asm.commons.ClassRemapper;
 import org.objectweb.asm.commons.Remapper;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.FieldInsnNode;
 import org.objectweb.asm.tree.InsnNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
 import org.objectweb.asm.tree.TypeInsnNode;
+import org.objectweb.asm.tree.VarInsnNode;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -33,7 +35,7 @@ import java.util.jar.JarOutputStream;
 public final class ExtensionBytecodeRelocator {
     private static final int MAX_ENTRIES = 25_000;
     private static final long MAX_EXPANDED_BYTES = 256L * 1024L * 1024L;
-    private static final String TARGET = "fr/vriege/anilib/platform/desktopengine/compat/";
+    private static final String TARGET = "fr/vriege/anilib/platform/desktopextensionhost/compat/";
     private static final Map<String, String> PREFIXES = Map.ofEntries(
             Map.entry("eu/kanade/tachiyomi/source/", TARGET + "aniyomi/source/"),
             Map.entry("eu/kanade/tachiyomi/animesource/", TARGET + "aniyomi/animesource/"),
@@ -44,6 +46,7 @@ public final class ExtensionBytecodeRelocator {
             Map.entry("aniyomi/core/", TARGET + "aniyomi/core/"),
             Map.entry("androidx/preference/", TARGET + "androidx/preference/"),
             Map.entry("android/", TARGET + "android/"),
+            Map.entry("uy/kohesive/injekt/", TARGET + "injekt/"),
             Map.entry("app/cash/quickjs/", TARGET + "quickjs/"),
             Map.entry("com/squareup/duktape/", TARGET + "duktape/"),
             Map.entry("logcat/", TARGET + "logcat/"),
@@ -54,10 +57,12 @@ public final class ExtensionBytecodeRelocator {
         Path input = inputJar.toAbsolutePath().normalize();
         Path output = outputJar.toAbsolutePath().normalize();
         Map<String, byte[]> entries = readEntries(input);
+        ClassHierarchy hierarchy = ClassHierarchy.from(entries);
+        Map<String, ClassNode> classes = readClasses(entries);
         Map<String, byte[]> transformed = new LinkedHashMap<>();
         Set<String> unresolved = new HashSet<>();
         int relocatedClasses = 0;
-        int repairs = 0;
+        int repairs = repairConvertedClasses(classes);
         for (Map.Entry<String, byte[]> entry : entries.entrySet()) {
             String name = entry.getKey();
             byte[] bytes = entry.getValue();
@@ -67,11 +72,11 @@ public final class ExtensionBytecodeRelocator {
                 }
                 continue;
             }
-            Transformation transformation = transform(bytes);
+            ClassNode node = classes.get(new ClassReader(bytes).getClassName());
+            Transformation transformation = transform(node, hierarchy);
             if (!java.util.Arrays.equals(bytes, transformation.bytes())) {
                 relocatedClasses++;
             }
-            repairs += transformation.repairs();
             collectUnresolved(transformation.bytes(), unresolved);
             String className = new ClassReader(transformation.bytes()).getClassName() + ".class";
             putUnique(transformed, className, transformation.bytes());
@@ -83,18 +88,175 @@ public final class ExtensionBytecodeRelocator {
         return new RelocationResult(relocatedClasses, repairs, unresolved.stream().sorted().toList());
     }
 
-    private static Transformation transform(byte[] source) {
-        ClassNode node = new ClassNode();
-        new ClassReader(source).accept(node, 0);
-        int repairs = repairWrongConstructorOwners(node);
-        ClassWriter writer = new ClassWriter(0);
+    private static Transformation transform(ClassNode node, ClassHierarchy hierarchy) {
+        ClassWriter writer = new CompatibilityClassWriter(hierarchy);
         node.accept(new ClassRemapper(writer, new AbiRemapper()));
-        return new Transformation(writer.toByteArray(), repairs);
+        return new Transformation(writer.toByteArray());
     }
 
-    private static int repairWrongConstructorOwners(ClassNode owner) {
+    private static Map<String, ClassNode> readClasses(Map<String, byte[]> entries) {
+        Map<String, ClassNode> result = new LinkedHashMap<>();
+        for (Map.Entry<String, byte[]> entry : entries.entrySet()) {
+            if (!entry.getKey().endsWith(".class")) {
+                continue;
+            }
+            ClassNode node = new ClassNode();
+            new ClassReader(entry.getValue()).accept(node, 0);
+            result.put(node.name, node);
+        }
+        return result;
+    }
+
+    private static int repairConvertedClasses(Map<String, ClassNode> classes) {
         int repairs = 0;
-        for (MethodNode method : owner.methods) {
+        for (ClassNode node : classes.values()) {
+            repairs += repairWrongConstructorOwners(node, classes);
+            repairs += repairDirectObjectStores(node, classes);
+            repairs += repairLocalObjectStores(node, classes);
+        }
+        return repairs;
+    }
+
+    private static final class CompatibilityClassWriter extends ClassWriter {
+        private final ClassHierarchy hierarchy;
+
+        private CompatibilityClassWriter(ClassHierarchy hierarchy) {
+            super(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
+            this.hierarchy = hierarchy;
+        }
+
+        @Override
+        protected String getCommonSuperClass(String first, String second) {
+            return hierarchy.commonSuperClass(first, second);
+        }
+    }
+
+    private static final class ClassHierarchy {
+        private final Map<String, ClassInfo> classes;
+
+        private ClassHierarchy(Map<String, ClassInfo> classes) {
+            this.classes = Map.copyOf(classes);
+        }
+
+        private static ClassHierarchy from(Map<String, byte[]> entries) {
+            Map<String, ClassInfo> result = new LinkedHashMap<>();
+            AbiRemapper remapper = new AbiRemapper();
+            for (Map.Entry<String, byte[]> entry : entries.entrySet()) {
+                if (!entry.getKey().endsWith(".class")) {
+                    continue;
+                }
+                ClassReader reader = new ClassReader(entry.getValue());
+                String name = remapper.mapType(reader.getClassName());
+                String parent = reader.getSuperName() == null ? null : remapper.mapType(reader.getSuperName());
+                List<String> interfaces = java.util.Arrays.stream(reader.getInterfaces())
+                        .map(remapper::mapType)
+                        .toList();
+                result.put(name, new ClassInfo(parent, interfaces, (reader.getAccess() & Opcodes.ACC_INTERFACE) != 0));
+            }
+            return new ClassHierarchy(result);
+        }
+
+        private String commonSuperClass(String first, String second) {
+            if (assignable(first, second, new HashSet<>())) {
+                return first;
+            }
+            if (assignable(second, first, new HashSet<>())) {
+                return second;
+            }
+            if (interfaceType(first) || interfaceType(second)) {
+                return "java/lang/Object";
+            }
+            String candidate = parent(first);
+            while (candidate != null) {
+                if (assignable(candidate, second, new HashSet<>())) {
+                    return candidate;
+                }
+                candidate = parent(candidate);
+            }
+            return "java/lang/Object";
+        }
+
+        private boolean assignable(String target, String source, Set<String> visited) {
+            if (target.equals(source)) {
+                return true;
+            }
+            if (!visited.add(source)) {
+                return false;
+            }
+            ClassInfo info = classes.get(source);
+            if (info != null) {
+                if (info.parent() != null && assignable(target, info.parent(), visited)) {
+                    return true;
+                }
+                for (String contract : info.interfaces()) {
+                    if (assignable(target, contract, visited)) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+            try {
+                ClassLoader loader = ExtensionBytecodeRelocator.class.getClassLoader();
+                Class<?> targetType = Class.forName(target.replace('/', '.'), false, loader);
+                Class<?> sourceType = Class.forName(source.replace('/', '.'), false, loader);
+                return targetType.isAssignableFrom(sourceType);
+            } catch (ClassNotFoundException | LinkageError ignored) {
+                return "java/lang/Object".equals(target);
+            }
+        }
+
+        private boolean interfaceType(String name) {
+            ClassInfo info = classes.get(name);
+            if (info != null) {
+                return info.interfaceType();
+            }
+            try {
+                return Class.forName(name.replace('/', '.'), false,
+                        ExtensionBytecodeRelocator.class.getClassLoader()).isInterface();
+            } catch (ClassNotFoundException | LinkageError ignored) {
+                return false;
+            }
+        }
+
+        private String parent(String name) {
+            ClassInfo info = classes.get(name);
+            if (info != null) {
+                return info.parent();
+            }
+            try {
+                Class<?> parent = Class.forName(name.replace('/', '.'), false,
+                        ExtensionBytecodeRelocator.class.getClassLoader()).getSuperclass();
+                return parent == null ? null : parent.getName().replace('.', '/');
+            } catch (ClassNotFoundException | LinkageError ignored) {
+                return "java/lang/Object".equals(name) ? null : "java/lang/Object";
+            }
+        }
+    }
+
+    private record ClassInfo(String parent, List<String> interfaces, boolean interfaceType) {
+    }
+
+    private static int repairWrongConstructorOwners(ClassNode owner, Map<String, ClassNode> classes) {
+        int repairs = 0;
+        for (MethodNode method : List.copyOf(owner.methods)) {
+            if ("<init>".equals(method.name)) {
+                for (AbstractInsnNode instruction : method.instructions) {
+                    if (instruction instanceof MethodInsnNode call
+                            && call.getOpcode() == Opcodes.INVOKESPECIAL
+                            && "<init>".equals(call.name)) {
+                        if ("java/lang/Object".equals(call.owner)
+                                && !"java/lang/Object".equals(owner.superName)) {
+                            call.owner = owner.superName;
+                            ClassNode parent = classes.get(owner.superName);
+                            if (parent != null && "()V".equals(call.desc)) {
+                                ensureDefaultConstructor(parent);
+                            }
+                            repairs++;
+                        }
+                        break;
+                    }
+                }
+            }
             ArrayDeque<TypeInsnNode> pending = new ArrayDeque<>();
             TypeInsnNode created = null;
             for (AbstractInsnNode instruction : method.instructions) {
@@ -117,6 +279,135 @@ public final class ExtensionBytecodeRelocator {
             }
         }
         return repairs;
+    }
+
+    private static int repairDirectObjectStores(ClassNode owner, Map<String, ClassNode> classes) {
+        int repairs = 0;
+        for (MethodNode method : List.copyOf(owner.methods)) {
+            for (AbstractInsnNode instruction : method.instructions) {
+                if (!(instruction instanceof FieldInsnNode field)
+                        || (field.getOpcode() != Opcodes.PUTFIELD && field.getOpcode() != Opcodes.PUTSTATIC)
+                        || !field.desc.startsWith("L") || !field.desc.endsWith(";")) {
+                    continue;
+                }
+                AbstractInsnNode callNode = previousMeaningful(field);
+                AbstractInsnNode duplicate = previousMeaningful(callNode);
+                AbstractInsnNode createdNode = previousMeaningful(duplicate);
+                String target = field.desc.substring(1, field.desc.length() - 1);
+                ClassNode targetClass = classes.get(target);
+                if (targetClass == null
+                        || !(createdNode instanceof TypeInsnNode created)
+                        || created.getOpcode() != Opcodes.NEW
+                        || !"java/lang/Object".equals(created.desc)
+                        || duplicate == null || duplicate.getOpcode() != Opcodes.DUP
+                        || !(callNode instanceof MethodInsnNode call)
+                        || call.getOpcode() != Opcodes.INVOKESPECIAL
+                        || !"<init>".equals(call.name)
+                        || !"java/lang/Object".equals(call.owner)
+                        || !"()V".equals(call.desc)) {
+                    continue;
+                }
+                created.desc = target;
+                call.owner = target;
+                ensureDefaultConstructor(targetClass);
+                repairs++;
+            }
+        }
+        return repairs;
+    }
+
+    private static int repairLocalObjectStores(ClassNode owner, Map<String, ClassNode> classes) {
+        int repairs = 0;
+        for (MethodNode method : List.copyOf(owner.methods)) {
+            for (AbstractInsnNode instruction : method.instructions) {
+                if (!(instruction instanceof FieldInsnNode field)
+                        || (field.getOpcode() != Opcodes.PUTFIELD && field.getOpcode() != Opcodes.PUTSTATIC)) {
+                    continue;
+                }
+                String target = field.getOpcode() == Opcodes.PUTSTATIC
+                        && field.desc.startsWith("L") && field.desc.endsWith(";")
+                        ? field.desc.substring(1, field.desc.length() - 1)
+                        : field.owner;
+                ClassNode targetClass = classes.get(target);
+                if (targetClass == null) {
+                    continue;
+                }
+                AbstractInsnNode cursor = previousMeaningful(field);
+                int remaining = field.getOpcode() == Opcodes.PUTSTATIC ? 1 : 32;
+                while (cursor != null && remaining-- > 0) {
+                    if (cursor instanceof VarInsnNode load && load.getOpcode() == Opcodes.ALOAD
+                            && repairLocalConstruction(load, target, targetClass)) {
+                        repairs++;
+                        break;
+                    }
+                    cursor = previousMeaningful(cursor);
+                }
+            }
+        }
+        return repairs;
+    }
+
+    private static boolean repairLocalConstruction(
+            VarInsnNode load,
+            String target,
+            ClassNode targetClass) {
+        AbstractInsnNode cursor = previousMeaningful(load);
+        for (int distance = 0; cursor != null && distance < 64; distance++) {
+            if (cursor instanceof VarInsnNode store
+                    && store.getOpcode() == Opcodes.ASTORE && store.var == load.var) {
+                AbstractInsnNode callNode = previousMeaningful(store);
+                AbstractInsnNode duplicate = previousMeaningful(callNode);
+                AbstractInsnNode createdNode = previousMeaningful(duplicate);
+                if (objectConstruction(createdNode, duplicate, callNode)) {
+                    TypeInsnNode created = (TypeInsnNode) createdNode;
+                    MethodInsnNode call = (MethodInsnNode) callNode;
+                    created.desc = target;
+                    call.owner = target;
+                    ensureDefaultConstructor(targetClass);
+                    return true;
+                }
+                return false;
+            }
+            cursor = previousMeaningful(cursor);
+        }
+        return false;
+    }
+
+    private static boolean objectConstruction(
+            AbstractInsnNode created,
+            AbstractInsnNode duplicate,
+            AbstractInsnNode call) {
+        return created instanceof TypeInsnNode type
+                && type.getOpcode() == Opcodes.NEW
+                && "java/lang/Object".equals(type.desc)
+                && duplicate != null && duplicate.getOpcode() == Opcodes.DUP
+                && call instanceof MethodInsnNode method
+                && method.getOpcode() == Opcodes.INVOKESPECIAL
+                && "<init>".equals(method.name)
+                && "java/lang/Object".equals(method.owner)
+                && "()V".equals(method.desc);
+    }
+
+    private static AbstractInsnNode previousMeaningful(AbstractInsnNode instruction) {
+        AbstractInsnNode current = instruction == null ? null : instruction.getPrevious();
+        while (current != null && current.getOpcode() < 0) {
+            current = current.getPrevious();
+        }
+        return current;
+    }
+
+    private static void ensureDefaultConstructor(ClassNode target) {
+        for (MethodNode method : target.methods) {
+            if ("<init>".equals(method.name) && "()V".equals(method.desc)) {
+                return;
+            }
+        }
+        MethodNode constructor = new MethodNode(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
+        constructor.instructions.add(new VarInsnNode(Opcodes.ALOAD, 0));
+        constructor.instructions.add(new MethodInsnNode(
+                Opcodes.INVOKESPECIAL, target.superName, "<init>", "()V", false));
+        constructor.instructions.add(new InsnNode(Opcodes.RETURN));
+        target.methods.add(constructor);
     }
 
     private static Map<String, byte[]> readEntries(Path jar) {
@@ -207,7 +498,7 @@ public final class ExtensionBytecodeRelocator {
         }
     }
 
-    private record Transformation(byte[] bytes, int repairs) {
+    private record Transformation(byte[] bytes) {
     }
 
     private static final class AbiRemapper extends Remapper {

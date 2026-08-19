@@ -21,6 +21,7 @@ import java.util.jar.JarOutputStream;
 
 final class ExtensionRuntimeCatalogSmoke {
     private static final String SOURCE_CLASS = "sample.DynamicSource";
+    private static final String FACTORY_CLASS = "sample.DynamicFactory";
     private static final String ANIME_SOURCE =
             "fr/vriege/anilib/platform/desktopextensionhost/compat/aniyomi/animesource/AnimeSource";
 
@@ -39,7 +40,7 @@ final class ExtensionRuntimeCatalogSmoke {
                     1,
                     ExtensionKind.ANIME,
                     false,
-                    List.of(SOURCE_CLASS),
+                    List.of(FACTORY_CLASS),
                     Optional.empty());
             InstalledExtension installed = new InstalledExtension(
                     metadata, directory.resolve("extension.apk"), archive);
@@ -64,6 +65,19 @@ final class ExtensionRuntimeCatalogSmoke {
     }
 
     private static void writeArchive(Path archive) throws IOException {
+        byte[] source = sourceClass();
+        byte[] factory = factoryClass();
+        try (JarOutputStream jar = new JarOutputStream(Files.newOutputStream(archive))) {
+            jar.putNextEntry(new JarEntry(SOURCE_CLASS.replace('.', '/') + ".class"));
+            jar.write(source);
+            jar.closeEntry();
+            jar.putNextEntry(new JarEntry(FACTORY_CLASS.replace('.', '/') + ".class"));
+            jar.write(factory);
+            jar.closeEntry();
+        }
+    }
+
+    private static byte[] sourceClass() {
         ClassWriter writer = new ClassWriter(0);
         String name = SOURCE_CLASS.replace('.', '/');
         writer.visit(Opcodes.V21, Opcodes.ACC_PUBLIC, name, null, "java/lang/Object",
@@ -80,11 +94,35 @@ final class ExtensionRuntimeCatalogSmoke {
         constantText(writer, "getLang", "fr");
         constantBoolean(writer, "getSupportsLatest", true);
         writer.visitEnd();
-        try (JarOutputStream jar = new JarOutputStream(Files.newOutputStream(archive))) {
-            jar.putNextEntry(new JarEntry(name + ".class"));
-            jar.write(writer.toByteArray());
-            jar.closeEntry();
-        }
+        return writer.toByteArray();
+    }
+
+    private static byte[] factoryClass() {
+        ClassWriter writer = new ClassWriter(0);
+        String name = FACTORY_CLASS.replace('.', '/');
+        writer.visit(Opcodes.V21, Opcodes.ACC_PUBLIC, name, null, "java/lang/Object", null);
+        MethodVisitor constructor = writer.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
+        constructor.visitCode();
+        constructor.visitVarInsn(Opcodes.ALOAD, 0);
+        constructor.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
+        constructor.visitInsn(Opcodes.RETURN);
+        constructor.visitMaxs(1, 1);
+        constructor.visitEnd();
+        MethodVisitor factory = writer.visitMethod(
+                Opcodes.ACC_PUBLIC, "createSources", "()Ljava/util/List;", null, null);
+        factory.visitCode();
+        factory.visitTypeInsn(Opcodes.NEW, SOURCE_CLASS.replace('.', '/'));
+        factory.visitInsn(Opcodes.DUP);
+        factory.visitMethodInsn(
+                Opcodes.INVOKESPECIAL, SOURCE_CLASS.replace('.', '/'), "<init>", "()V", false);
+        factory.visitMethodInsn(
+                Opcodes.INVOKESTATIC, "java/util/List", "of",
+                "(Ljava/lang/Object;)Ljava/util/List;", true);
+        factory.visitInsn(Opcodes.ARETURN);
+        factory.visitMaxs(2, 1);
+        factory.visitEnd();
+        writer.visitEnd();
+        return writer.toByteArray();
     }
 
     private static void constantLong(ClassWriter writer, String name, long value) {

@@ -17,7 +17,7 @@ import java.util.jar.JarOutputStream;
 final class ExtensionRelocationSmoke {
     private static final String ORIGINAL = "eu/kanade/tachiyomi/source/Source";
     private static final String RELOCATED =
-            "fr/vriege/anilib/platform/desktopengine/compat/aniyomi/source/Source";
+            "fr/vriege/anilib/platform/desktopextensionhost/compat/aniyomi/source/Source";
 
     private ExtensionRelocationSmoke() {
     }

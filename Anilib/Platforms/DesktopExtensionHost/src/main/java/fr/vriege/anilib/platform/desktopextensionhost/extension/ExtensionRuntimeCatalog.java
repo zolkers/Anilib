@@ -44,15 +44,11 @@ public final class ExtensionRuntimeCatalog {
             List<LoadedSource> sources) throws ReflectiveOperationException {
         List<Object> instances = new ArrayList<>();
         if (metadata.factoryClass().isPresent()) {
-            Object factory = instantiate(loader.loadClass(metadata.factoryClass().orElseThrow()));
-            Object result = factory.getClass().getMethod("createSources").invoke(factory);
-            if (!(result instanceof Collection<?> collection)) {
-                throw new IllegalStateException("Extension factory did not return a source collection");
-            }
-            instances.addAll(collection);
+            expandFactory(instantiate(loader.loadClass(metadata.factoryClass().orElseThrow())), instances, true);
         }
         for (String className : metadata.sourceClasses()) {
-            instances.add(instantiate(loader.loadClass(className)));
+            Object entryPoint = instantiate(loader.loadClass(className));
+            expandFactory(entryPoint, instances, false);
         }
         if (instances.isEmpty()) {
             throw new IllegalStateException("Extension produced no sources");
@@ -60,6 +56,25 @@ public final class ExtensionRuntimeCatalog {
         for (Object instance : instances) {
             sources.add(describe(metadata, Objects.requireNonNull(instance, "source instance")));
         }
+    }
+
+    private static void expandFactory(Object entryPoint, List<Object> instances, boolean required)
+            throws ReflectiveOperationException {
+        Method createSources;
+        try {
+            createSources = entryPoint.getClass().getMethod("createSources");
+        } catch (NoSuchMethodException exception) {
+            if (required) {
+                throw exception;
+            }
+            instances.add(entryPoint);
+            return;
+        }
+        Object result = createSources.invoke(entryPoint);
+        if (!(result instanceof Collection<?> collection)) {
+            throw new IllegalStateException("Extension factory did not return a source collection");
+        }
+        instances.addAll(collection);
     }
 
     private static Object instantiate(Class<?> type) throws ReflectiveOperationException {
