@@ -10,6 +10,7 @@ rootProject.name = 'anilib'
 
 include ':Anilib:Foundation'
 include ':Anilib:Framework:Backup:Api'
+include ':Anilib:Framework:Localization:Api'
 include ':Anilib:Framework:Http:Api'
 include ':Anilib:Framework:Http:Runtime'
 include ':Anilib:Framework:Http:JdkRuntime'

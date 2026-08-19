@@ -11,6 +11,7 @@ module fr.vriege.anilib.tooling.archtests {
     requires fr.vriege.anilib.framework.http.runtime;
     requires fr.vriege.anilib.framework.http.jdk.runtime;
     requires fr.vriege.anilib.framework.backup.api;
+    requires fr.vriege.anilib.framework.localization.api;
     requires fr.vriege.anilib.foundation;
     requires fr.vriege.anilib.kernel.api;
     requires fr.vriege.anilib.kernel.runtime;

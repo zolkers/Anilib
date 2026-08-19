@@ -14,6 +14,7 @@ import java.util.regex.Pattern;
 public final class LocalizationRule implements AnilibJavaRule {
     private static final Path UI_ROOT = Path.of(
             "Anilib", "Platforms", "Compose", "src", "shared", "kotlin");
+    private static final Path FEATURES_ROOT = Path.of("Anilib", "Features");
     private static final String EXPRESSION =
             "\"(?:\\\\.|[^\"\\\\])*\"(?:\\s*\\+\\s*\"(?:\\\\.|[^\"\\\\])*\")*";
     private static final Pattern UI_TEXT = Pattern.compile(
@@ -22,6 +23,10 @@ public final class LocalizationRule implements AnilibJavaRule {
             Pattern.DOTALL);
     private static final Pattern CONTENT_DESCRIPTION = Pattern.compile(
             "contentDescription\\s*=\\s*(?<expression>" + EXPRESSION + ")",
+            Pattern.DOTALL);
+    private static final Pattern SETTINGS_DESCRIPTION = Pattern.compile(
+            "(?:SettingsRow|SettingsSwitchRow)\\(\\s*" + EXPRESSION
+                    + "\\s*,\\s*(?<expression>" + EXPRESSION + ")",
             Pattern.DOTALL);
     private static final Pattern STRING = Pattern.compile("\"((?:\\\\.|[^\"\\\\])*)\"");
     private static final Set<String> UNIVERSAL = Set.of(
@@ -45,8 +50,8 @@ public final class LocalizationRule implements AnilibJavaRule {
                     "Shared UI translation catalog is missing or symbolic"));
         }
         try {
-            String translations = Files.readString(catalog, StandardCharsets.UTF_8);
             List<Diagnostic> diagnostics = new ArrayList<>();
+            String translations = readCatalogs(repository.root(), catalog, diagnostics);
             try (var paths = Files.walk(root)) {
                 for (Path file : paths.filter(path -> path.toString().endsWith(".kt")).toList()) {
                     inspect(repository.root(), file, translations, diagnostics);
@@ -56,6 +61,39 @@ public final class LocalizationRule implements AnilibJavaRule {
         } catch (IOException exception) {
             throw new UncheckedIOException("Unable to inspect shared UI localization", exception);
         }
+    }
+
+    private String readCatalogs(
+            Path repository,
+            Path platformCatalog,
+            List<Diagnostic> diagnostics) throws IOException {
+        StringBuilder translations = new StringBuilder(
+                Files.readString(platformCatalog, StandardCharsets.UTF_8));
+        Path features = repository.resolve(FEATURES_ROOT);
+        if (!Files.isDirectory(features) || Files.isSymbolicLink(features)) {
+            return translations.toString();
+        }
+        try (var featurePaths = Files.list(features)) {
+            for (Path feature : featurePaths.filter(Files::isDirectory).toList()) {
+                Path uiSources = feature.resolve(Path.of("Ui", "src", "main", "java"));
+                if (!Files.isDirectory(uiSources) || Files.isSymbolicLink(uiSources)) {
+                    continue;
+                }
+                List<Path> catalogs;
+                try (var files = Files.walk(uiSources)) {
+                    catalogs = files
+                            .filter(path -> path.getFileName().toString().endsWith("TranslationCatalog.java"))
+                            .toList();
+                }
+                if (catalogs.size() != 1) {
+                    diagnostics.add(new Diagnostic(name(), repository.relativize(uiSources), 1,
+                            "Every feature UI must provide exactly one translation catalog"));
+                    continue;
+                }
+                translations.append('\n').append(Files.readString(catalogs.getFirst(), StandardCharsets.UTF_8));
+            }
+        }
+        return translations.toString();
     }
 
     private void inspect(
@@ -71,6 +109,7 @@ public final class LocalizationRule implements AnilibJavaRule {
                     "Shared UI must use the localization-aware Text and Icon adapters"));
         }
         requireCatalogEntries(relative, content, translations, UI_TEXT, diagnostics);
+        requireCatalogEntries(relative, content, translations, SETTINGS_DESCRIPTION, diagnostics);
         requireCatalogEntries(relative, content, translations, CONTENT_DESCRIPTION, diagnostics);
     }
 

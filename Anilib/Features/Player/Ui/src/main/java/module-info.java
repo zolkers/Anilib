@@ -1,4 +1,5 @@
 module fr.vriege.anilib.feature.player.ui {
+    requires transitive fr.vriege.anilib.framework.localization.api;
     requires fr.vriege.anilib.kernel.api;
     requires fr.vriege.anilib.feature.library.api;
     requires fr.vriege.anilib.feature.source.api;

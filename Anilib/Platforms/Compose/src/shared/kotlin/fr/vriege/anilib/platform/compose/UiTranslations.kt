@@ -1,13 +1,42 @@
 package fr.vriege.anilib.platform.compose
 
+import fr.vriege.anilib.feature.applicationupdate.ui.ApplicationUpdateTranslationCatalog
+import fr.vriege.anilib.feature.backup.ui.BackupTranslationCatalog
+import fr.vriege.anilib.feature.discovery.ui.DiscoveryTranslationCatalog
+import fr.vriege.anilib.feature.downloads.ui.DownloadsTranslationCatalog
+import fr.vriege.anilib.feature.extensionrepository.ui.ExtensionRepositoryTranslationCatalog
+import fr.vriege.anilib.feature.library.ui.LibraryTranslationCatalog
+import fr.vriege.anilib.feature.player.ui.PlayerTranslationCatalog
+import fr.vriege.anilib.feature.reader.ui.ReaderTranslationCatalog
 import fr.vriege.anilib.feature.settings.LanguagePack
-import java.util.IdentityHashMap
+import fr.vriege.anilib.feature.settings.ui.SettingsTranslationCatalog
+import fr.vriege.anilib.feature.tracker.ui.TrackerTranslationCatalog
+import fr.vriege.anilib.feature.updates.ui.UpdatesTranslationCatalog
+import fr.vriege.anilib.framework.localization.Translator
 import java.util.Locale
 
 internal object UiTranslations {
+    private val featureTranslator = Translator(
+        listOf(
+            ApplicationUpdateTranslationCatalog.catalog(),
+            BackupTranslationCatalog.catalog(),
+            DiscoveryTranslationCatalog.catalog(),
+            DownloadsTranslationCatalog.catalog(),
+            ExtensionRepositoryTranslationCatalog.catalog(),
+            LibraryTranslationCatalog.catalog(),
+            PlayerTranslationCatalog.catalog(),
+            ReaderTranslationCatalog.catalog(),
+            SettingsTranslationCatalog.catalog(),
+            TrackerTranslationCatalog.catalog(),
+            UpdatesTranslationCatalog.catalog(),
+        ),
+    )
+
     fun translate(text: String, configured: LanguagePack): String {
         val language = resolve(configured)
         if (language == LanguagePack.ENGLISH || text.isBlank()) return text
+        val featureTranslation = featureTranslator.translate("fr", text)
+        if (featureTranslation != text) return featureTranslation
         translations[language]?.get(text)?.let { return it }
         return when (language) {
             LanguagePack.FRENCH -> translateFrenchDynamic(text)
@@ -24,7 +53,7 @@ internal object UiTranslations {
     }
 
     private val translations = mapOf(
-        LanguagePack.FRENCH to identityMap(
+        LanguagePack.FRENCH to translationMap(
             "Add" to "Ajouter",
             "All" to "Tous",
             "Anime" to "Anime",
@@ -450,8 +479,8 @@ internal object UiTranslations {
         ),
     )
 
-    private fun identityMap(vararg entries: Pair<String, String>): Map<String, String> =
-        IdentityHashMap<String, String>().apply { entries.forEach { put(it.first, it.second) } }
+    private fun translationMap(vararg entries: Pair<String, String>): Map<String, String> =
+        linkedMapOf(*entries)
 
     private fun translateFrenchDynamic(text: String): String {
         val exactPatterns = listOf(

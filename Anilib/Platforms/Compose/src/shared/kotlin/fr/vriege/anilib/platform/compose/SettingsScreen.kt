@@ -37,6 +37,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.TextButton
@@ -384,6 +385,7 @@ private fun SettingsDetail(
     openBrowserSettings: () -> Unit,
     goBack: () -> Unit,
 ) {
+    var choosingLanguage by remember { mutableStateOf(false) }
     Scaffold(topBar = { SettingsTopBar(destination.title, goBack) }) { padding ->
         LazyColumn(modifier = Modifier.fillMaxSize().padding(padding)) {
             when (destination) {
@@ -396,7 +398,7 @@ private fun SettingsDetail(
                     }
                     item {
                         SettingsRow("Language", languageLabel(settings.languagePack())) {
-                            presentation.setLanguagePack(settings.languagePack().next())
+                            choosingLanguage = true
                         }
                     }
                     item { SettingsHint("Start screen changes apply the next time Anilib opens.") }
@@ -546,6 +548,51 @@ private fun SettingsDetail(
             }
         }
     }
+    if (choosingLanguage) {
+        LanguageDialog(
+            selected = settings.languagePack(),
+            select = {
+                presentation.setLanguagePack(it)
+                choosingLanguage = false
+            },
+            close = { choosingLanguage = false },
+        )
+    }
+}
+
+@Composable
+private fun LanguageDialog(
+    selected: LanguagePack,
+    select: (LanguagePack) -> Unit,
+    close: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = close,
+        title = { Text("Choose language") },
+        text = {
+            Column {
+                LanguagePack.entries.forEach { language ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { select(language) }
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(
+                            selected = selected == language,
+                            onClick = { select(language) },
+                        )
+                        Column(modifier = Modifier.padding(start = 8.dp)) {
+                            Text(languageLabel(language), fontWeight = FontWeight.SemiBold)
+                            Text(languageDescription(language), style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = close) { Text("Cancel") } },
+    )
 }
 
 @Composable
@@ -896,6 +943,12 @@ private fun languageLabel(language: LanguagePack): String = when (language) {
     LanguagePack.SYSTEM -> "System language"
     LanguagePack.ENGLISH -> "English"
     LanguagePack.FRENCH -> "Français"
+}
+
+private fun languageDescription(language: LanguagePack): String = when (language) {
+    LanguagePack.SYSTEM -> "Use the device language"
+    LanguagePack.ENGLISH -> "Always display Anilib in English"
+    LanguagePack.FRENCH -> "Toujours afficher Anilib en français"
 }
 
 private fun typographyLabel(scale: TypographyScale): String = when (scale) {

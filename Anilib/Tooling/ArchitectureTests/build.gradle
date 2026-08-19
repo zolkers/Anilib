@@ -31,6 +31,7 @@ dependencies {
     implementation project(':Anilib:Framework:Http:Runtime')
     implementation project(':Anilib:Framework:Http:JdkRuntime')
     implementation project(':Anilib:Framework:Backup:Api')
+    implementation project(':Anilib:Framework:Localization:Api')
     implementation project(':Anilib:Features:Network:Api')
     implementation project(':Anilib:Features:Network:Bundle')
     implementation project(':Anilib:Features:Settings:Api')

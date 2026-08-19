@@ -31,6 +31,7 @@ kotlin {
         desktopMain {
             kotlin.srcDir('src/shared/kotlin')
             dependencies {
+                implementation project(':Anilib:Framework:Localization:Api')
                 implementation project(':Anilib:Features:Library:Api')
                 implementation project(':Anilib:Features:Library:Ui')
                 implementation project(':Anilib:Features:Discovery:Api')
@@ -67,6 +68,7 @@ kotlin {
         androidMain {
             kotlin.srcDir('src/shared/kotlin')
             dependencies {
+                implementation project(':Anilib:Framework:Localization:Api')
                 implementation project(':Anilib:Features:Library:Api')
                 implementation project(':Anilib:Features:Library:Ui')
                 implementation project(':Anilib:Features:Discovery:Api')

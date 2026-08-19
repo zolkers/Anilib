@@ -71,6 +71,7 @@ public final class ArchitectureTestMain {
         assertions += ApplicationReleaseRuleTest.run();
         assertions += SecurityBoundaryRuleTest.run();
         assertions += LocalizationRuleTest.run();
+        assertions += LocalizationTest.run();
         assertions += ExtensionRepositoryTest.run();
         assertions += ExtensionPortabilityTest.run();
         assertions += SourcePublisherTest.run();

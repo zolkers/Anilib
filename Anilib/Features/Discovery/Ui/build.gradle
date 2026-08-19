@@ -1,4 +1,5 @@
 dependencies {
+    api project(':Anilib:Framework:Localization:Api')
     implementation project(':Anilib:Foundation')
     api project(':Anilib:Kernel:Api')
     api project(':Anilib:Features:Library:Api')

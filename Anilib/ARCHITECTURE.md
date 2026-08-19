@@ -310,6 +310,14 @@ rejects, and skips adult packages unless enabled. Desktop treats its ordinary
 host connection as suitable for large transfers, while Android admits validated
 Wi-Fi and Ethernet transports.
 
+Localization is a dependency-free Framework contract rather than a platform
+dictionary. Every feature that owns a UI exports exactly one translation
+catalog from that UI module. The Compose adapter explicitly assembles the
+selected feature catalogs, uses English source messages as the fallback, and
+resolves the persisted system, English, or French choice immediately. There is
+no resource scanning or hidden registry. AnilibJava checks both visible labels
+and settings descriptions and rejects a feature UI without its own catalog.
+
 Database cleanup is coordinated by Settings without taking ownership of feature
 state. Downloads, Player, Tracker, and Updates register narrow cleanup callbacks
 during Bundle installation and unregister them during shutdown. One confirmed

@@ -2428,30 +2428,14 @@ private enum class AppSection {
 }
 
 private fun AppSection.label(language: LanguagePack): String {
-    val selected = if (language == LanguagePack.SYSTEM) {
-        when (Locale.getDefault().language.lowercase(Locale.ROOT)) {
-            "fr" -> LanguagePack.FRENCH
-            else -> LanguagePack.ENGLISH
-        }
-    } else {
-        language
+    val source = when (this) {
+        AppSection.ANIME -> "Anime"
+        AppSection.MANGA -> "Manga"
+        AppSection.UPDATES -> "Updates"
+        AppSection.BROWSE -> "Explore"
+        AppSection.MORE -> "More"
     }
-    return when (selected) {
-        LanguagePack.FRENCH -> when (this) {
-            AppSection.ANIME -> "Animé"
-            AppSection.MANGA -> "Manga"
-            AppSection.UPDATES -> "Mises à jour"
-            AppSection.BROWSE -> "Explorer"
-            AppSection.MORE -> "Plus"
-        }
-        LanguagePack.SYSTEM, LanguagePack.ENGLISH -> when (this) {
-            AppSection.ANIME -> "Anime"
-            AppSection.MANGA -> "Manga"
-            AppSection.UPDATES -> "Updates"
-            AppSection.BROWSE -> "Explore"
-            AppSection.MORE -> "More"
-        }
-    }
+    return UiTranslations.translate(source, language)
 }
 
 private fun appColorScheme(settings: SettingsSnapshot, dark: Boolean): ColorScheme {
