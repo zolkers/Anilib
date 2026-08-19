@@ -7,6 +7,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -91,9 +92,57 @@ public final class LocalizationRule implements AnilibJavaRule {
                     continue;
                 }
                 translations.append('\n').append(Files.readString(catalogs.getFirst(), StandardCharsets.UTF_8));
+                appendResourceCatalogs(repository, feature, translations, diagnostics);
             }
         }
         return translations.toString();
+    }
+
+    private static void appendResourceCatalogs(
+            Path repository,
+            Path feature,
+            StringBuilder translations,
+            List<Diagnostic> diagnostics) throws IOException {
+        Path resources = feature.resolve(Path.of("Ui", "src", "main", "resources"));
+        if (!Files.isDirectory(resources) || Files.isSymbolicLink(resources)) {
+            return;
+        }
+        List<Path> files;
+        try (var paths = Files.walk(resources)) {
+            files = paths.filter(path -> path.getFileName().toString().endsWith(".properties")).toList();
+        }
+        for (Path file : files) {
+            translations.append('\n').append(Files.readString(file, StandardCharsets.UTF_8));
+            if (file.getFileName().toString().equals("en.properties")) {
+                requireMatchingFrenchKeys(repository, file, diagnostics);
+            }
+        }
+    }
+
+    private static void requireMatchingFrenchKeys(
+            Path repository,
+            Path englishFile,
+            List<Diagnostic> diagnostics) throws IOException {
+        Path frenchFile = englishFile.resolveSibling("fr.properties");
+        if (!Files.isRegularFile(frenchFile) || Files.isSymbolicLink(frenchFile)) {
+            diagnostics.add(new Diagnostic("localization", repository.relativize(englishFile), 1,
+                    "Resource catalog must provide a regular fr.properties sibling"));
+            return;
+        }
+        Properties english = properties(englishFile);
+        Properties french = properties(frenchFile);
+        if (!english.stringPropertyNames().equals(french.stringPropertyNames())) {
+            diagnostics.add(new Diagnostic("localization", repository.relativize(frenchFile), 1,
+                    "English and French resource catalogs must contain identical keys"));
+        }
+    }
+
+    private static Properties properties(Path file) throws IOException {
+        Properties properties = new Properties();
+        try (var reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
+            properties.load(reader);
+        }
+        return properties;
     }
 
     private void inspect(

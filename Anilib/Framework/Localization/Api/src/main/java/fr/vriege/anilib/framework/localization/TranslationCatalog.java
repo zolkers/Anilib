@@ -2,83 +2,124 @@ package fr.vriege.anilib.framework.localization;
 
 import fr.vriege.anilib.foundation.component.ComponentId;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Properties;
 
-/**
- * An immutable set of French translations owned by one product component.
- *
- * <p>Source messages are the stable lookup keys and also serve as the fallback
- * text when no translation is available. Keys and translations are non-blank,
- * compared exactly, and defensively copied into an immutable map. The owner
- * identity lets {@link Translator} reject accidental duplicate catalogs from
- * the same component.</p>
- *
- * @param owner  the component that owns this catalog
- * @param french the exact source-message to French-translation mapping
- */
-public record TranslationCatalog(ComponentId owner, Map<String, String> french) {
-    /**
-     * Creates an immutable French translation catalog.
-     *
-     * @throws NullPointerException if {@code owner}, {@code french}, a source
-     *                              key, or a translation value is {@code null}
-     * @throws IllegalArgumentException if a source key or translation is blank
-     */
-    public TranslationCatalog {
-        Objects.requireNonNull(owner, "owner");
-        Objects.requireNonNull(french, "french");
-        LinkedHashMap<String, String> copy = new LinkedHashMap<>();
-        french.forEach((source, translation) -> {
-            if (source == null || source.isBlank()) {
-                throw new IllegalArgumentException("Translation source must not be blank");
-            }
-            if (translation == null || translation.isBlank()) {
-                throw new IllegalArgumentException("Translation must not be blank for " + source);
-            }
-            copy.put(source, translation);
-        });
-        french = Map.copyOf(copy);
+public final class TranslationCatalog {
+    private final ComponentId owner;
+    private final Map<String, String> english;
+    private final Map<String, String> french;
+
+    public TranslationCatalog(
+            ComponentId owner,
+            Map<String, String> english,
+            Map<String, String> french) {
+        this.owner = Objects.requireNonNull(owner, "owner");
+        this.english = validated(english, "English");
+        this.french = validated(french, "French");
+        if (!this.english.keySet().equals(this.french.keySet())) {
+            throw new IllegalArgumentException("English and French translation keys must match for " + owner);
+        }
     }
 
-    /**
-     * Creates a French catalog from a textual component identifier.
-     *
-     * @param owner    the stable owner identifier accepted by
-     *                 {@link ComponentId#of(String)}
-     * @param messages the source-message to French-translation mapping
-     * @return an immutable translation catalog
-     * @throws NullPointerException if an argument, key, or value is {@code null}
-     * @throws IllegalArgumentException if the owner identifier is invalid or a
-     *                                  message key or translation is blank
-     */
     public static TranslationCatalog french(String owner, Map<String, String> messages) {
-        return new TranslationCatalog(ComponentId.of(owner), messages);
+        Objects.requireNonNull(messages, "messages");
+        LinkedHashMap<String, String> english = new LinkedHashMap<>();
+        messages.keySet().forEach(source -> english.put(source, source));
+        return new TranslationCatalog(ComponentId.of(owner), english, messages);
     }
 
-    /**
-     * Looks up an exact source message for a language tag.
-     *
-     * <p>Any well-formed tag whose base language is French, such as {@code fr}
-     * or {@code fr-FR}, is eligible. Other languages and missing messages return
-     * an empty optional.</p>
-     *
-     * @param languageTag the non-null IETF BCP 47 language tag
-     * @param source      the non-null exact source message
-     * @return the French translation, or an empty optional when this catalog
-     *         does not apply or has no matching message
-     * @throws NullPointerException if either argument is {@code null}
-     */
+    public static TranslationCatalog resources(String owner, Class<?> anchor, String resourceRoot) {
+        Objects.requireNonNull(anchor, "anchor");
+        String root = Objects.requireNonNull(resourceRoot, "resourceRoot");
+        if (root.isBlank() || root.startsWith("/") || root.contains("..")) {
+            throw new IllegalArgumentException("resourceRoot must be a normalized classpath location");
+        }
+        return new TranslationCatalog(
+                ComponentId.of(owner),
+                load(anchor, root + "/en.properties"),
+                load(anchor, root + "/fr.properties"));
+    }
+
+    public ComponentId owner() {
+        return owner;
+    }
+
+    public Map<String, String> english() {
+        return english;
+    }
+
+    public Map<String, String> french() {
+        return french;
+    }
+
     public Optional<String> translate(String languageTag, String source) {
         Objects.requireNonNull(languageTag, "languageTag");
         Objects.requireNonNull(source, "source");
-        String language = Locale.forLanguageTag(languageTag).getLanguage();
-        if (!Locale.FRENCH.getLanguage().equals(language)) {
+        String key = key(source);
+        if (key == null) {
             return Optional.empty();
         }
-        return Optional.ofNullable(french.get(source));
+        String language = Locale.forLanguageTag(languageTag).getLanguage();
+        if (Locale.ENGLISH.getLanguage().equals(language)) {
+            return Optional.of(english.get(key));
+        }
+        if (Locale.FRENCH.getLanguage().equals(language)) {
+            return Optional.of(french.get(key));
+        }
+        return Optional.empty();
+    }
+
+    private String key(String keyOrEnglishMessage) {
+        if (english.containsKey(keyOrEnglishMessage)) {
+            return keyOrEnglishMessage;
+        }
+        for (Map.Entry<String, String> entry : english.entrySet()) {
+            if (entry.getValue().equals(keyOrEnglishMessage)) {
+                return entry.getKey();
+            }
+        }
+        return null;
+    }
+
+    private static Map<String, String> validated(Map<String, String> messages, String language) {
+        Objects.requireNonNull(messages, "messages");
+        LinkedHashMap<String, String> copy = new LinkedHashMap<>();
+        messages.forEach((key, message) -> {
+            if (key == null || key.isBlank()) {
+                throw new IllegalArgumentException(language + " translation key must not be blank");
+            }
+            if (message == null || message.isBlank()) {
+                throw new IllegalArgumentException(language + " translation must not be blank for " + key);
+            }
+            copy.put(key, message);
+        });
+        return Map.copyOf(copy);
+    }
+
+    private static Map<String, String> load(Class<?> anchor, String resource) {
+        ClassLoader loader = Objects.requireNonNull(anchor.getClassLoader(), "anchor class loader");
+        try (InputStream input = loader.getResourceAsStream(resource)) {
+            if (input == null) {
+                throw new IllegalArgumentException("Translation resource is missing: " + resource);
+            }
+            Properties properties = new Properties();
+            properties.load(new InputStreamReader(input, StandardCharsets.UTF_8));
+            LinkedHashMap<String, String> messages = new LinkedHashMap<>();
+            properties.stringPropertyNames().stream().sorted()
+                    .forEach(key -> messages.put(key, properties.getProperty(key)));
+            return Map.copyOf(messages);
+        } catch (IOException exception) {
+            throw new UncheckedIOException("Unable to read translation resource " + resource, exception);
+        }
     }
 }

@@ -1303,7 +1303,7 @@ private fun EmptyExtensions(manage: () -> Unit) {
                 "Add a compatible repository, then install an extension for this platform.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Button(onClick = manage) { Text("Browse extensions") }
+            Button(onClick = manage) { Text("extensions.browse") }
         }
     }
 }

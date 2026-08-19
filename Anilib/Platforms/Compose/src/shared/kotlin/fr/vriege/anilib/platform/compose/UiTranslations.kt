@@ -34,9 +34,13 @@ internal object UiTranslations {
 
     fun translate(text: String, configured: LanguagePack): String {
         val language = resolve(configured)
-        if (language == LanguagePack.ENGLISH || text.isBlank()) return text
-        val featureTranslation = featureTranslator.translate("fr", text)
+        if (text.isBlank()) return text
+        val featureTranslation = featureTranslator.translate(
+            if (language == LanguagePack.FRENCH) "fr" else "en",
+            text,
+        )
         if (featureTranslation != text) return featureTranslation
+        if (language == LanguagePack.ENGLISH) return text
         translations[language]?.get(text)?.let { return it }
         return when (language) {
             LanguagePack.FRENCH -> translateFrenchDynamic(text)

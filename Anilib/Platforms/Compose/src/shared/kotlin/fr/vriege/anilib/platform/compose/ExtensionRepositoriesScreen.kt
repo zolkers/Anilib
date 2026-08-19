@@ -105,7 +105,7 @@ internal fun ExtensionRepositoriesScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Extension repositories") },
+                title = { Text("repositories.title") },
                 navigationIcon = {
                     IconButton(onClick = goBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -113,10 +113,10 @@ internal fun ExtensionRepositoriesScreen(
                 },
                 actions = {
                     IconButton(onClick = ::refresh, enabled = !loading) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh repositories")
+                        Icon(Icons.Default.Refresh, contentDescription = "repositories.refresh")
                     }
                     IconButton(onClick = { adding = true }) {
-                        Icon(Icons.Default.Add, contentDescription = "Add repository")
+                        Icon(Icons.Default.Add, contentDescription = "repository.add")
                     }
                 },
             )
@@ -238,7 +238,7 @@ internal fun ExtensionDiscoveryList(
             verticalArrangement = Arrangement.Center,
         ) {
             Text("Add a repository to discover extensions.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            TextButton(onClick = manageRepositories) { Text("Manage repositories") }
+            TextButton(onClick = manageRepositories) { Text("repositories.manage") }
         }
         return
     }
@@ -281,9 +281,9 @@ internal fun ExtensionDiscoveryList(
                         val installed = apkInstalled || installedPortable != null
                         val installationStatus = when {
                             apkInstalled && extension.packageName() in activeApkPackages ->
-                                "Installed · available in Sources"
-                            apkInstalled -> "Installed · incompatible with the current desktop engine"
-                            installedPortable != null -> "Installed"
+                                "extension.status.source_active"
+                            apkInstalled -> "extension.status.desktop_incompatible"
+                            installedPortable != null -> "extension.installed"
                             else -> "Available"
                         }
                         Text(
@@ -346,7 +346,7 @@ internal fun ExtensionDiscoveryList(
                                 }
                             },
                         ) {
-                            Text(if (loadingPackage == extension.packageName()) "Installing…" else "Install")
+                            Text(if (loadingPackage == extension.packageName()) "Installing…" else "extension.install")
                         }
                     } else {
                         TextButton(
@@ -358,7 +358,7 @@ internal fun ExtensionDiscoveryList(
                                     apkInstalled,
                                 )
                             },
-                        ) { Text("Uninstall") }
+                        ) { Text("extension.uninstall") }
                     }
                 }
             }
@@ -544,7 +544,7 @@ private fun ExtensionRepositoryCatalogueScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Extension repositories") },
+                title = { Text("repositories.title") },
                 navigationIcon = {
                     IconButton(onClick = goBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -556,10 +556,10 @@ private fun ExtensionRepositoryCatalogueScreen(
                     }
                     TextButton(onClick = { trusting = true }) { Text("Trust key") }
                     IconButton(onClick = { refresh() }, enabled = !loading) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh repositories")
+                        Icon(Icons.Default.Refresh, contentDescription = "repositories.refresh")
                     }
                     IconButton(onClick = { adding = true }) {
-                        Icon(Icons.Default.Add, contentDescription = "Add repository")
+                        Icon(Icons.Default.Add, contentDescription = "repository.add")
                     }
                 },
             )
@@ -582,7 +582,7 @@ private fun ExtensionRepositoryCatalogueScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Automatic source updates", fontWeight = FontWeight.Medium)
+                        Text("settings.auto_updates.title", fontWeight = FontWeight.Medium)
                         Text(
                             "Checks every 6 hours; only the same package and signing key update silently.",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -687,7 +687,7 @@ private fun ExtensionRepositoryCatalogueScreen(
                         onValueChange = { installedQuery = it },
                         singleLine = true,
                         leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                        placeholder = { Text("Search installed extensions") },
+                        placeholder = { Text("extensions.search.installed") },
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
@@ -998,7 +998,7 @@ private fun ApkExtensionCard(
                 if (runtime.trustedCertificateSha256().isPresent) {
                     TextButton(onClick = forgetTrust) { Text("Forget trust") }
                 }
-                TextButton(onClick = uninstall) { Text("Uninstall") }
+                TextButton(onClick = uninstall) { Text("extension.uninstall") }
             }
         }
     }
@@ -1067,13 +1067,13 @@ private fun ConfirmExtensionRemovalDialog(
 ) {
     AlertDialog(
         onDismissRequest = dismiss,
-        title = { Text("Uninstall extension?") },
+        title = { Text("extension.uninstall.confirm") },
         text = {
             Text(
                 "${target.displayName} and every source provided by this extension will be removed from Anilib.",
             )
         },
-        confirmButton = { Button(onClick = confirm) { Text("Uninstall") } },
+        confirmButton = { Button(onClick = confirm) { Text("extension.uninstall") } },
         dismissButton = { TextButton(onClick = dismiss) { Text("Cancel") } },
     )
 }
@@ -1086,10 +1086,10 @@ private fun ConfirmRepositoryRemovalDialog(
 ) {
     AlertDialog(
         onDismissRequest = dismiss,
-        title = { Text("Remove repository?") },
+        title = { Text("repository.remove.confirm") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("The repository will disappear from Anilib. Installed extensions are kept.")
+                Text("repository.remove.explanation")
                 Text(repository, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         },
@@ -1199,7 +1199,7 @@ private fun ExtensionDetailScreen(
             if (blockedByAdultPolicy) {
                 item {
                     ExtensionDetailCard {
-                        Text("Adult-content policy", fontWeight = FontWeight.Medium)
+                        Text("settings.adult.title", fontWeight = FontWeight.Medium)
                         Text(
                             "This extension remains listed, but installation requires enabling adult content " +
                                 "in Settings.",
@@ -1300,7 +1300,7 @@ private fun ExtensionDetailScreen(
                         installed == null && portable -> Button(
                             onClick = install,
                             enabled = !loading && !blockedByAdultPolicy,
-                        ) { Text("Install") }
+                        ) { Text("extension.install") }
                         installed != null -> {
                             TextButton(
                                 onClick = {
@@ -1552,7 +1552,7 @@ private fun ExtensionPackageCard(
                         installed == null && portable -> Button(
                             onClick = install,
                             enabled = !busy && !blockedByAdultPolicy,
-                        ) { Text("Install") }
+                        ) { Text("extension.install") }
                         installed != null -> {
                             TextButton(onClick = {
                                 toggle(installed.state() == ExtensionInstallationState.DISABLED)
@@ -1591,7 +1591,7 @@ private fun ExtensionLanguageDialog(
 ) {
     AlertDialog(
         onDismissRequest = dismiss,
-        title = { Text("Extension languages") },
+        title = { Text("extension.languages") },
         text = {
             LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp)) {
                 items(available, key = { it }) { language ->
@@ -1675,7 +1675,7 @@ private fun InstalledEngineExtensionCard(
                     },
                 )
             }
-            TextButton(onClick = uninstall) { Text("Uninstall") }
+            TextButton(onClick = uninstall) { Text("extension.uninstall") }
         }
     }
 }
@@ -1685,7 +1685,7 @@ private fun AddRepositoryDialog(dismiss: () -> Unit, add: (String) -> Unit) {
     var url by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = dismiss,
-        title = { Text("Add repository") },
+        title = { Text("repository.add") },
         text = {
             Column {
                 Text("Paste a trusted GitHub repository URL or a direct HTTPS JSON index URL.")
