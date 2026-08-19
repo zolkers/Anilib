@@ -19,6 +19,7 @@ public final class DiscoveryTranslationCatalog {
                 Map.entry("Global search", "Recherche globale"),
                 Map.entry("Latest", "Derniers ajouts"),
                 Map.entry("Migrate", "Migrer"),
+                Map.entry("No episodes or chapters available", "Aucun épisode ou chapitre disponible"),
                 Map.entry("Popular", "Populaires"),
                 Map.entry("Quick filters", "Filtres rapides"),
                 Map.entry("Search all sources", "Rechercher dans toutes les sources"),

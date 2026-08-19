@@ -100,14 +100,10 @@ import fr.vriege.anilib.feature.source.SourcePermission
 import fr.vriege.anilib.feature.source.SourcePreferenceType
 import fr.vriege.anilib.feature.source.SourceId
 import fr.vriege.anilib.feature.source.SourceWebPage
-import fr.vriege.anilib.feature.source.SourceTitleDetails
-import fr.vriege.anilib.feature.source.SourceEpisode
-import fr.vriege.anilib.feature.source.SourceContentUnit
 import fr.vriege.anilib.framework.http.HttpCookieJar
 import fr.vriege.anilib.feature.player.ui.PlayerPresentation
-import fr.vriege.anilib.feature.player.ui.PlayerController
 import fr.vriege.anilib.feature.reader.ui.ReaderPresentation
-import fr.vriege.anilib.feature.reader.ui.ReaderController
+import fr.vriege.anilib.feature.downloads.ui.DownloadPresentation
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.Dispatchers
@@ -130,10 +126,13 @@ internal fun DiscoveryScreen(
     library: LibraryPresentation,
     reader: ReaderPresentation,
     player: PlayerPresentation,
+    downloads: DownloadPresentation,
     extensionRepositories: ExtensionRepositoryPresentation,
     apkExtensionPlatform: ApkExtensionPlatform,
     browserCookies: HttpCookieJar,
     browserRuntimeStatus: BrowserRuntimeStatus,
+    shareController: ShareController,
+    openTracking: (LibraryItemId) -> Unit,
     manageExtensions: () -> Unit,
 ) {
     var section by remember { mutableStateOf(BrowseSection.ANIME_SOURCES) }
@@ -204,6 +203,10 @@ internal fun DiscoveryScreen(
             presentation = presentation,
             reader = reader,
             player = player,
+            library = library,
+            downloads = downloads,
+            shareController = shareController,
+            openTracking = openTracking,
             openWebPage = { browserPage = it },
             navigateUp = { selectedSource = null },
         )
@@ -578,6 +581,10 @@ private fun SourceCatalogueScreen(
     presentation: DiscoveryPresentation,
     reader: ReaderPresentation,
     player: PlayerPresentation,
+    library: LibraryPresentation,
+    downloads: DownloadPresentation,
+    shareController: ShareController,
+    openTracking: (LibraryItemId) -> Unit,
     openWebPage: (SourceWebPage) -> Unit,
     navigateUp: () -> Unit,
 ) {
@@ -635,6 +642,12 @@ private fun SourceCatalogueScreen(
             presentation = presentation,
             reader = reader,
             player = player,
+            sourceName = source.displayName(),
+            sourceWebPage = sourceWebPage,
+            library = library,
+            downloads = downloads,
+            shareController = shareController,
+            openTracking = openTracking,
             openWebPage = openWebPage,
             navigateUp = { selectedItem = null },
         )
@@ -949,224 +962,6 @@ private fun CatalogueItemMenu(
                     },
                 )
             }
-        }
-    }
-}
-
-private data class SourceTitleContent(
-    val details: SourceTitleDetails,
-    val episodes: List<SourceEpisode>,
-    val chapters: List<SourceContentUnit>,
-)
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun SourceTitleScreen(
-    item: SourceCatalogueItem,
-    presentation: DiscoveryPresentation,
-    reader: ReaderPresentation,
-    player: PlayerPresentation,
-    openWebPage: (SourceWebPage) -> Unit,
-    navigateUp: () -> Unit,
-) {
-    val scope = rememberCoroutineScope()
-    val artworkEnvironment = LocalExtensionIconEnvironment.current
-    var activeReader by remember(item.id()) { mutableStateOf<ReaderController?>(null) }
-    var activePlayer by remember(item.id()) { mutableStateOf<PlayerController?>(null) }
-    var content by remember(item.id()) { mutableStateOf<Result<SourceTitleContent>?>(null) }
-    var libraryItem by remember(item.id()) {
-        mutableStateOf(presentation.libraryItem(item.id()).orElse(null))
-    }
-    var notice by remember(item.id()) { mutableStateOf<String?>(null) }
-    val webPage = remember(item.id()) { presentation.titleWebPage(item.id()).orElse(null) }
-    LaunchedEffect(item.id()) {
-        content = withContext(Dispatchers.IO) {
-            runCatching {
-                SourceTitleContent(
-                    presentation.titleDetails(item),
-                    presentation.episodes(item.id()),
-                    presentation.contentUnits(item.id()),
-                )
-            }
-        }
-    }
-    activeReader?.let { controller ->
-        DisposableEffect(controller) {
-            onDispose { controller.close() }
-        }
-        ReaderScreen(
-            controller,
-            artworkEnvironment?.decode ?: { null },
-            {},
-            { _, _ -> },
-        ) { activeReader = null }
-        return
-    }
-    activePlayer?.let { controller ->
-        DisposableEffect(controller) {
-            onDispose { controller.close() }
-        }
-        PlayerSelectionScreen(
-            controller,
-            {},
-            {},
-            {},
-            {},
-            false,
-            true,
-        ) { activePlayer = null }
-        return
-    }
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(item.title(), maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                navigationIcon = {
-                    IconButton(onClick = navigateUp) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    webPage?.let { page ->
-                        IconButton(onClick = { openWebPage(page) }) {
-                            Icon(Icons.Default.Public, contentDescription = "Open title website")
-                        }
-                    }
-                },
-            )
-        },
-    ) { padding ->
-        when (val loaded = content) {
-            null -> Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
-            else -> loaded.fold(
-                onSuccess = { value ->
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize().padding(padding),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp),
-                    ) {
-                        item {
-                            Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-                                RemoteArtwork(
-                                    value.details.thumbnail().orElse(null),
-                                    value.details.title(),
-                                    modifier = Modifier.size(width = 150.dp, height = 220.dp)
-                                        .clip(RoundedCornerShape(12.dp)),
-                                )
-                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Text(
-                                        value.details.title(),
-                                        style = MaterialTheme.typography.headlineSmall,
-                                        fontWeight = FontWeight.SemiBold,
-                                    )
-                                    Text(
-                                        value.details.status().name.lowercase().replace('_', ' '),
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                    Button(
-                                        onClick = {
-                                            scope.launch {
-                                                runCatching {
-                                                    withContext(Dispatchers.IO) {
-                                                        presentation.addToLibrary(item)
-                                                    }
-                                                }.onSuccess {
-                                                    libraryItem = it
-                                                    notice = "Added as a Library shortcut"
-                                                }.onFailure {
-                                                    notice = it.message ?: "Could not add this shortcut"
-                                                }
-                                            }
-                                        },
-                                        enabled = libraryItem == null,
-                                    ) {
-                                        Icon(
-                                            if (libraryItem == null) Icons.Default.Add else Icons.Default.Check,
-                                            contentDescription = null,
-                                        )
-                                        Spacer(Modifier.width(6.dp))
-                                        Text(if (libraryItem == null) "Add shortcut" else "In Library")
-                                    }
-                                }
-                            }
-                        }
-                        notice?.let { message -> item { Text(message, color = MaterialTheme.colorScheme.primary) } }
-                        if (value.details.description().isNotBlank()) {
-                            item { Text(value.details.description()) }
-                        }
-                        if (value.details.genres().isNotEmpty()) {
-                            item {
-                                Text(
-                                    value.details.genres().joinToString(" · "),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                        if (value.episodes.isNotEmpty()) {
-                            item { Text("Episodes", style = MaterialTheme.typography.titleLarge) }
-                            items(value.episodes, key = { it.id().toString() }) { episode ->
-                                Card(
-                                    modifier = Modifier.fillMaxWidth().clickable {
-                                        runCatching {
-                                            player.open(value.details.title(), episode.id())
-                                        }.onSuccess {
-                                            notice = null
-                                            activePlayer = it
-                                        }.onFailure {
-                                            notice = it.message ?: "The episode could not be opened"
-                                        }
-                                    },
-                                ) {
-                                    Column(Modifier.fillMaxWidth().padding(14.dp)) {
-                                        Text(episode.title(), fontWeight = FontWeight.Medium)
-                                        if (episode.episodeNumber() >= 0) {
-                                            Text(
-                                                "Episode ${episode.episodeNumber()}",
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        if (value.chapters.isNotEmpty()) {
-                            item { Text("Chapters", style = MaterialTheme.typography.titleLarge) }
-                            items(value.chapters, key = { it.id().toString() }) { chapter ->
-                                Card(
-                                    modifier = Modifier.fillMaxWidth().clickable {
-                                        runCatching {
-                                            reader.open(value.details.title(), chapter.id())
-                                        }.onSuccess {
-                                            notice = null
-                                            activeReader = it
-                                        }.onFailure {
-                                            notice = it.message ?: "The chapter could not be opened"
-                                        }
-                                    },
-                                ) {
-                                    Text(
-                                        chapter.title(),
-                                        modifier = Modifier.fillMaxWidth().padding(14.dp),
-                                        fontWeight = FontWeight.Medium,
-                                    )
-                                }
-                            }
-                        }
-                        if (value.episodes.isEmpty() && value.chapters.isEmpty()) {
-                            item { EmptyDiscovery("No episodes or chapters available") }
-                        }
-                    }
-                },
-                onFailure = { failure ->
-                    Box(Modifier.fillMaxSize().padding(padding)) {
-                        DiscoveryFailure(failure.message ?: "Unable to load this title") {
-                            content = null
-                        }
-                    }
-                },
-            )
         }
     }
 }

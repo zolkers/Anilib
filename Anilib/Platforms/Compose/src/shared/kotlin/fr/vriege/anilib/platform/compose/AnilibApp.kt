@@ -9,8 +9,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,7 +16,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -40,7 +37,6 @@ import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.CollectionsBookmark
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Explore
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Favorite
@@ -49,8 +45,6 @@ import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.NewReleases
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Public
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.SortByAlpha
@@ -69,7 +63,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -105,7 +98,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -169,11 +161,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
-
-private val dateTimeFormatter = DateTimeFormatter
-    .ofLocalizedDateTime(FormatStyle.MEDIUM)
-    .withLocale(Locale.getDefault())
-    .withZone(ZoneId.systemDefault())
 
 private data class DetailPlatform(
     val httpClient: AnilibHttpClient,
@@ -711,10 +698,13 @@ private fun AppDestination(
             presentation,
             reader,
             player,
+            downloads,
             extensionRepositories,
             apkExtensionPlatform,
             browserCookies,
             browserRuntimeStatus,
+            detailPlatform.shareController,
+            openTracking,
             manageExtensions = {
                 openSection(AppSection.MORE)
                 openMore(MoreDestination.EXTENSION_REPOSITORIES)
@@ -1789,83 +1779,39 @@ private fun DetailsPage(
     goBack: () -> Unit,
 ) {
     var editing by remember(details.id()) { mutableStateOf(false) }
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(details.title(), maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                navigationIcon = {
-                    IconButton(onClick = goBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { editing = true }) {
-                        Icon(Icons.Default.Edit, contentDescription = "Edit")
-                    }
-                    IconButton(onClick = share) {
-                        Icon(Icons.Default.Share, contentDescription = "Share")
-                    }
-                    IconButton(onClick = download, enabled = canDownload) {
-                        Icon(Icons.Outlined.Download, contentDescription = "Download")
-                    }
-                },
-            )
-        },
-        floatingActionButton = {
-            if (canWatch || canRead) {
-                ExtendedFloatingActionButton(
-                    onClick = if (canWatch) watch else read,
-                    icon = {
-                        Icon(
-                            Icons.Default.PlayArrow,
-                            contentDescription = if (canWatch) "Watch" else "Read",
-                        )
-                    },
-                    text = { Text(if (canWatch) "Watch" else "Read") },
-                )
-            }
-        },
-    ) { padding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 104.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            item { MediaDetailsHero(details, sourceName, artwork) }
-            item {
-                MediaDetailsActions(
-                    favorite = details.favorite(),
-                    episodeCount = episodes.size,
-                    chapterCount = chapters.size,
-                    canTrack = canTrack,
-                    canOpenWeb = openTitleWeb != null || openSourceWeb != null,
-                    toggleFavorite = favorite,
-                    track = track,
-                    openWeb = openTitleWeb ?: openSourceWeb ?: {},
-                )
-            }
-            item {
-                Column(Modifier.widthIn(max = 900.dp).fillMaxWidth()) {
-                    Text(
-                        details.description().ifBlank { "No description available." },
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    if (details.genres().isNotEmpty()) {
-                        MediaGenreChips(details.genres())
-                    }
-                }
-            }
-            listOfNotNull(readerError, playerError, downloadError, unitError)
-                .filter(String::isNotBlank)
-                .forEach { message ->
-                    item { Text(message, color = MaterialTheme.colorScheme.error) }
-                }
+    MediaDetailsScreen(
+        model = MediaDetailsUiModel(
+            title = details.title(),
+            authors = details.authors(),
+            status = formatEnum(details.publicationStatus()),
+            sourceName = sourceName,
+            description = details.description(),
+            genres = details.genres(),
+        ),
+        artwork = artwork,
+        favorite = details.favorite(),
+        contentLabel = if (episodes.isNotEmpty()) "${episodes.size} episodes" else "${chapters.size} chapters",
+        canTrack = canTrack,
+        canOpenWeb = openTitleWeb != null || openSourceWeb != null,
+        canDownload = canDownload,
+        primaryLabel = if (canWatch) "Watch" else "Read",
+        canOpenPrimary = canWatch || canRead,
+        errors = listOfNotNull(readerError, playerError, downloadError, unitError),
+        toggleFavorite = favorite,
+        track = track,
+        openWeb = openTitleWeb ?: openSourceWeb ?: {},
+        download = download,
+        share = share,
+        edit = { editing = true },
+        openPrimary = if (canWatch) watch else read,
+        goBack = goBack,
+    ) {
             if (chapters.isNotEmpty()) {
                 item { MediaContentHeading("${chapters.size} chapters") }
                 items(chapters, key = { it.id().value() }) { chapter ->
                     MediaUnitRow(
                         title = chapter.title(),
-                        summary = chapter.publishedAt().map(dateTimeFormatter::format).orElse("Available"),
+                        summary = chapter.publishedAt().map(mediaDateTimeFormatter::format).orElse("Available"),
                         open = read,
                         download = { downloadChapter(chapter) },
                     )
@@ -1876,7 +1822,7 @@ private fun DetailsPage(
                 items(episodes, key = { it.episode().id().value() }) { episode ->
                     val playback = episode.playback().orElse(null)
                     val metadata = listOfNotNull(
-                        episode.episode().uploadedAt().map(dateTimeFormatter::format).orElse(null),
+                        episode.episode().uploadedAt().map(mediaDateTimeFormatter::format).orElse(null),
                         episode.episode().scanlator().orElse(null),
                         playback?.let {
                             if (it.completed()) "Watched" else "${it.positionMillis() / 60_000} min watched"
@@ -1897,7 +1843,6 @@ private fun DetailsPage(
                     LibraryTitleCard(card, null, false, false, {}, { openRelated(card.id()) })
                 }
             }
-        }
     }
     if (editing) {
         EditLibraryTitleDialog(
@@ -1909,132 +1854,6 @@ private fun DetailsPage(
             },
         )
     }
-}
-
-@Composable
-private fun MediaDetailsHero(
-    details: LibraryDetails,
-    sourceName: String,
-    artwork: @Composable (Modifier) -> Unit,
-) {
-    BoxWithConstraints(Modifier.widthIn(max = 900.dp).fillMaxWidth().padding(top = 8.dp, bottom = 12.dp)) {
-        val coverWidth = if (maxWidth < 600.dp) 112.dp else 156.dp
-        val coverHeight = if (maxWidth < 600.dp) 168.dp else 232.dp
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(18.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            artwork(Modifier.width(coverWidth).height(coverHeight).clip(RoundedCornerShape(8.dp)))
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(details.title(), style = MaterialTheme.typography.headlineSmall)
-                Text(
-                    details.authors().firstOrNull()?.let { "By $it" } ?: "Unknown author",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    "${formatEnum(details.publicationStatus())} · $sourceName",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun MediaDetailsActions(
-    favorite: Boolean,
-    episodeCount: Int,
-    chapterCount: Int,
-    canTrack: Boolean,
-    canOpenWeb: Boolean,
-    toggleFavorite: () -> Unit,
-    track: () -> Unit,
-    openWeb: () -> Unit,
-) {
-    val count = if (episodeCount > 0) "$episodeCount episodes" else "$chapterCount chapters"
-    Row(
-        modifier = Modifier.widthIn(max = 720.dp).fillMaxWidth().padding(vertical = 8.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly,
-    ) {
-        MediaDetailAction(
-            if (favorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-            if (favorite) "In Library" else "Favorite",
-            true,
-            toggleFavorite,
-        )
-        MediaDetailAction(Icons.Default.History, count, false) {}
-        MediaDetailAction(Icons.Default.MoreHoriz, "Tracking", canTrack, track)
-        MediaDetailAction(Icons.Default.Public, "WebView", canOpenWeb, openWeb)
-    }
-}
-
-@Composable
-private fun MediaDetailAction(icon: ImageVector, label: String, enabled: Boolean, action: () -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(92.dp)) {
-        IconButton(onClick = action, enabled = enabled) {
-            Icon(icon, contentDescription = label)
-        }
-        Text(
-            label,
-            modifier = Modifier.fillMaxWidth().heightIn(min = 32.dp),
-            style = MaterialTheme.typography.labelMedium,
-            color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            maxLines = 2,
-        )
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun MediaGenreChips(genres: List<String>) {
-    FlowRow(
-        modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        genres.forEach { genre ->
-            FilterChip(selected = false, onClick = {}, label = { Text(genre) })
-        }
-    }
-}
-
-@Composable
-private fun MediaContentHeading(label: String) {
-    Text(
-        label,
-        modifier = Modifier.widthIn(max = 900.dp).fillMaxWidth().padding(top = 20.dp, bottom = 8.dp),
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 18.sp,
-    )
-}
-
-@Composable
-private fun MediaUnitRow(
-    title: String,
-    summary: String,
-    open: () -> Unit,
-    download: () -> Unit,
-    muted: Boolean = false,
-) {
-    Row(
-        modifier = Modifier
-            .widthIn(max = 900.dp)
-            .fillMaxWidth()
-            .clickable(onClick = open)
-            .alpha(if (muted) 0.5f else 1f)
-            .padding(vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(title, fontWeight = FontWeight.Medium)
-            Text(summary, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        IconButton(onClick = download) {
-            Icon(Icons.Outlined.Download, contentDescription = "Download $title")
-        }
-    }
-    HorizontalDivider(modifier = Modifier.widthIn(max = 900.dp).fillMaxWidth())
 }
 
 @Composable
