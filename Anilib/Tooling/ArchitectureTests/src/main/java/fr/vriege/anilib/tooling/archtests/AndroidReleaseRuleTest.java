@@ -63,6 +63,8 @@ final class AndroidReleaseRuleTest {
                     "Anilib/Platforms/Android/src/main/kotlin/fr/vriege/anilib/platform/android/MainActivity.kt");
             write(main, """
                     AndroidAniyomiSourceRuntime(this).prepare()
+                    PortableBundleLoading.DISABLED
+                    AnilibStartupScreen(
                     apkActivation.bundles
                     startupReports = apkActivation.reports
                     """);
@@ -110,11 +112,20 @@ final class AndroidReleaseRuleTest {
                     ApkExtensionRuntimeState.HOST_ABI_MISSING
                     ANIME_HOST_CLASSES MANGA_HOST_CLASSES
                     """);
+            write(main, """
+                    AndroidAniyomiSourceRuntime(this).prepare()
+                    AnilibStartupScreen(
+                    apkActivation.bundles
+                    startupReports = apkActivation.reports
+                    """);
+            check(rule.analyze(snapshot).stream()
+                            .anyMatch(diagnostic -> diagnostic.message().contains("PortableBundleLoading.DISABLED")),
+                    "Android startup must not invoke the desktop JPMS Bundle loader");
             write(sourceRuntime, "PathClassLoader preflight.report(extension) AniyomiMangaSourceAdapter.adapt");
             check(rule.analyze(snapshot).stream()
                             .anyMatch(diagnostic -> diagnostic.message().contains("AniyomiAnimeSourceAdapter.adapt")),
                     "APK activation must retain its explicit Source adapter boundary");
-            return 6;
+            return 7;
         } catch (IOException exception) {
             throw new AssertionError("Unable to run Android release rule test", exception);
         } finally {

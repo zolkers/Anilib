@@ -94,6 +94,11 @@ failures are retained by the Extension Repository capability while other valid
 Bundles continue into the immutable Kernel graph. Enable, disable, and update
 therefore take effect on the next restart.
 
+The JPMS `.jar` loader is a desktop mechanism and is never initialized on
+Android, whose runtime does not provide `java.lang.module`. Android selects
+installed APK source adapters explicitly; both paths still publish the same
+Source contracts into the same Kernel graph.
+
 Portable-source updates are a third explicit capability beside discovery and
 installation. Android and desktop compare the same opaque package identity and
 monotonic version code after repository refresh. Manual update-all still runs

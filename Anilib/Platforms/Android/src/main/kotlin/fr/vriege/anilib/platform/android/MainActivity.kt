@@ -7,12 +7,17 @@ import android.os.Bundle
 import android.os.Build
 import android.app.PictureInPictureParams
 import android.graphics.BitmapFactory
+import android.util.Log
 import android.util.Rational
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import fr.vriege.anilib.configuration.standard.PortableBundleLoading
 import fr.vriege.anilib.configuration.standard.StandardAnilib
 import fr.vriege.anilib.feature.discovery.ui.DiscoveryUiCapabilities
 import fr.vriege.anilib.feature.extensionrepository.ui.ExtensionRepositoryUiCapabilities
@@ -30,18 +35,38 @@ import fr.vriege.anilib.feature.updates.ui.UpdateUiCapabilities
 import fr.vriege.anilib.feature.applicationupdate.ui.ApplicationUpdateUiCapabilities
 import fr.vriege.anilib.framework.http.runtime.UrlConnectionHttpTransport
 import fr.vriege.anilib.platform.compose.AnilibApp
+import fr.vriege.anilib.platform.compose.AnilibStartupScreen
 import fr.vriege.anilib.platform.compose.ComposePlayerBackend
 import fr.vriege.anilib.platform.compose.BrowserRuntimeStatus
+import fr.vriege.anilib.kernel.StartedAnilib
 
 class MainActivity : ComponentActivity() {
     private var product: AutoCloseable? = null
+    private val startupState = mutableStateOf<AndroidStartupState>(AndroidStartupState.Loading)
+    private var startupAttempt = 0
     private var playerActive = false
     private var backgroundAudio = false
+    private lateinit var browserDataController: AndroidBrowserDataController
+    private lateinit var browserPlatformController: AndroidBrowserPlatformController
+    private lateinit var applicationUpdatePlatformController: AndroidApplicationUpdateController
+    private lateinit var backupImportPicker: AndroidBackupImportPicker
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        LibraryUpdateReceiver.schedule(this)
+        browserDataController = AndroidBrowserDataController(this)
+        browserPlatformController = AndroidBrowserPlatformController()
+        applicationUpdatePlatformController = AndroidApplicationUpdateController(this)
+        backupImportPicker = AndroidBackupImportPicker(this)
+        setContent {
+            when (val state = startupState.value) {
+                AndroidStartupState.Loading -> AnilibStartupScreen(null, ::startProduct)
+                is AndroidStartupState.Failed -> AnilibStartupScreen(state.message, ::startProduct)
+                is AndroidStartupState.Ready -> StartedContent(state)
+            }
+        }
+        runCatching { LibraryUpdateReceiver.schedule(this) }
+            .onFailure { failure -> Log.w(LOG_TAG, "Unable to schedule library updates", failure) }
         val packagedVersion = packageManager.getPackageInfo(packageName, 0).versionName ?: "0.1.0"
         System.setProperty("anilib.version", packagedVersion)
         if (Build.VERSION.SDK_INT >= 33 &&
@@ -49,17 +74,47 @@ class MainActivity : ComponentActivity() {
         ) {
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), NOTIFICATION_PERMISSION_REQUEST)
         }
+        startProduct()
+    }
 
-        val apkActivation = AndroidAniyomiSourceRuntime(this).prepare()
-        val started = StandardAnilib.start(
-            filesDir.toPath(),
-            UrlConnectionHttpTransport(),
-            ComposePlayerBackend(),
-            AndroidLibraryUpdateNotifier(this),
-            AndroidNetworkStatus(this),
-            apkActivation.bundles,
-        )
-        product = started
+    private fun startProduct() {
+        val attempt = ++startupAttempt
+        startupState.value = AndroidStartupState.Loading
+        Thread({
+            val result = runCatching {
+                val apkActivation = AndroidAniyomiSourceRuntime(this).prepare()
+                val started = StandardAnilib.start(
+                    filesDir.toPath(),
+                    UrlConnectionHttpTransport(),
+                    ComposePlayerBackend(),
+                    AndroidLibraryUpdateNotifier(this),
+                    AndroidNetworkStatus(this),
+                    PortableBundleLoading.DISABLED,
+                    apkActivation.bundles,
+                )
+                AndroidStartupState.Ready(started, apkActivation)
+            }
+            runOnUiThread {
+                val started = result.getOrNull()
+                if (attempt != startupAttempt || isDestroyed) {
+                    started?.product?.close()
+                    return@runOnUiThread
+                }
+                result.onSuccess { ready ->
+                    product = ready.product
+                    startupState.value = ready
+                }.onFailure { failure ->
+                    Log.e(LOG_TAG, "Anilib startup failed", failure)
+                    startupState.value = AndroidStartupState.Failed(startupFailureMessage(failure))
+                }
+            }
+        }, STARTUP_THREAD_NAME).start()
+    }
+
+    @Composable
+    private fun StartedContent(runtime: AndroidStartupState.Ready) {
+        val started = runtime.product
+        val apkActivation = runtime.apkActivation
         val presentation = started.capability(LibraryUiCapabilities.PRESENTATION)
         val discovery = started.capability(DiscoveryUiCapabilities.PRESENTATION)
         val extensionRepositories = started.capability(ExtensionRepositoryUiCapabilities.PRESENTATION)
@@ -69,53 +124,51 @@ class MainActivity : ComponentActivity() {
         val backup = started.capability(BackupUiCapabilities.PRESENTATION)
         val tracking = started.capability(TrackerUiCapabilities.PRESENTATION)
         val updates = started.capability(UpdateUiCapabilities.PRESENTATION)
-        val apkExtensionPlatform = AndroidApkExtensionPlatform(
-            this,
-            started.capability(NetworkCapabilities.HTTP_CLIENT),
-            startupReports = apkActivation.reports,
-        )
-        val browserDataController = AndroidBrowserDataController(this)
-        val browserPlatformController = AndroidBrowserPlatformController()
-        val applicationUpdatePlatformController = AndroidApplicationUpdateController(this)
-        val backupImportPicker = AndroidBackupImportPicker(this)
-        val componentCount = started.components().size
-        setContent {
-            AnilibApp(
-                presentation = presentation,
-                discovery = discovery,
-                extensionRepositories = extensionRepositories,
-                apkExtensionPlatform = apkExtensionPlatform,
-                networkMaintenance = started.capability(NetworkCapabilities.MAINTENANCE),
-                browserCookies = started.capability(NetworkCapabilities.COOKIES),
-                browserRuntimeStatus = BrowserRuntimeStatus.ready(),
-                browserDataController = browserDataController,
-                browserPlatformController = browserPlatformController,
-                settingsPresentation = started.capability(SettingsUiCapabilities.PRESENTATION),
-                reader = reader,
-                player = player,
-                downloads = downloads,
-                backup = backup,
-                backupImportPicker = backupImportPicker,
-                tracking = tracking,
-                updates = updates,
-                applicationUpdates = started.capability(ApplicationUpdateUiCapabilities.PRESENTATION),
-                applicationUpdatePlatformController = applicationUpdatePlatformController,
-                httpClient = started.capability(NetworkCapabilities.HTTP_CLIENT),
-                shareController = AndroidShareController(this),
-                pageDecoder = ::decodePage,
-                applyReaderOrientationPolicy = ::applyReaderOrientationPolicy,
-                applyPlayerOrientationPolicy = ::applyPlayerOrientationPolicy,
-                requestPlayerPictureInPicture = ::enterPlayerPictureInPicture,
-                setPlayerActive = ::setPlayerActive,
-                setPlayerBackgroundAudio = ::setPlayerBackgroundAudio,
-                enableAndroidPlayerControls = true,
-                enableDesktopPlayerControls = false,
-                componentCount = componentCount,
+        val apkExtensionPlatform = remember(started, apkActivation) {
+            AndroidApkExtensionPlatform(
+                this,
+                started.capability(NetworkCapabilities.HTTP_CLIENT),
+                startupReports = apkActivation.reports,
             )
         }
+        val componentCount = started.components().size
+        val shareController = remember(started) { AndroidShareController(this) }
+        AnilibApp(
+            presentation = presentation,
+            discovery = discovery,
+            extensionRepositories = extensionRepositories,
+            apkExtensionPlatform = apkExtensionPlatform,
+            networkMaintenance = started.capability(NetworkCapabilities.MAINTENANCE),
+            browserCookies = started.capability(NetworkCapabilities.COOKIES),
+            browserRuntimeStatus = BrowserRuntimeStatus.ready(),
+            browserDataController = browserDataController,
+            browserPlatformController = browserPlatformController,
+            settingsPresentation = started.capability(SettingsUiCapabilities.PRESENTATION),
+            reader = reader,
+            player = player,
+            downloads = downloads,
+            backup = backup,
+            backupImportPicker = backupImportPicker,
+            tracking = tracking,
+            updates = updates,
+            applicationUpdates = started.capability(ApplicationUpdateUiCapabilities.PRESENTATION),
+            applicationUpdatePlatformController = applicationUpdatePlatformController,
+            httpClient = started.capability(NetworkCapabilities.HTTP_CLIENT),
+            shareController = shareController,
+            pageDecoder = ::decodePage,
+            applyReaderOrientationPolicy = ::applyReaderOrientationPolicy,
+            applyPlayerOrientationPolicy = ::applyPlayerOrientationPolicy,
+            requestPlayerPictureInPicture = ::enterPlayerPictureInPicture,
+            setPlayerActive = ::setPlayerActive,
+            setPlayerBackgroundAudio = ::setPlayerBackgroundAudio,
+            enableAndroidPlayerControls = true,
+            enableDesktopPlayerControls = false,
+            componentCount = componentCount,
+        )
     }
 
     override fun onDestroy() {
+        startupAttempt++
         try {
             if (isFinishing) setPlayerBackgroundAudio(false)
             product?.close()
@@ -174,9 +227,34 @@ class MainActivity : ComponentActivity() {
         enterPictureInPictureMode(parameters)
     }
 
-    private companion object {
-        const val NOTIFICATION_PERMISSION_REQUEST = 104
+    private fun startupFailureMessage(failure: Throwable): String {
+        var cause = failure
+        repeat(MAX_CAUSE_DEPTH) {
+            cause = cause.cause ?: return@repeat
+        }
+        val type = cause.javaClass.simpleName.ifBlank { "Startup failure" }
+        val detail = cause.message?.lineSequence()?.firstOrNull()?.trim().orEmpty()
+        return (if (detail.isBlank()) type else "$type: $detail").take(MAX_FAILURE_LENGTH)
     }
+
+    private companion object {
+        const val LOG_TAG = "AnilibStartup"
+        const val STARTUP_THREAD_NAME = "anilib-android-startup"
+        const val NOTIFICATION_PERMISSION_REQUEST = 104
+        const val MAX_CAUSE_DEPTH = 8
+        const val MAX_FAILURE_LENGTH = 400
+    }
+}
+
+private sealed interface AndroidStartupState {
+    data object Loading : AndroidStartupState
+
+    data class Ready(
+        val product: StartedAnilib,
+        val apkActivation: AndroidApkSourceActivation,
+    ) : AndroidStartupState
+
+    data class Failed(val message: String) : AndroidStartupState
 }
 
 private fun decodePage(bytes: ByteArray): ImageBitmap? =

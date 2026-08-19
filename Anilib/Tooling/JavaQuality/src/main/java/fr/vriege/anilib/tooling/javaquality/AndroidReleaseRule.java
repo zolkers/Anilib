@@ -106,6 +106,8 @@ public final class AndroidReleaseRule implements AnilibJavaRule {
                 ANDROID_MAIN,
                 diagnostics,
                 "AndroidAniyomiSourceRuntime(this).prepare()",
+                "PortableBundleLoading.DISABLED",
+                "AnilibStartupScreen(",
                 "apkActivation.bundles",
                 "startupReports = apkActivation.reports");
         requireTokens(

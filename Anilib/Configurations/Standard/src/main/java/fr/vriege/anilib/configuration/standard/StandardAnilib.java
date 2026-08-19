@@ -116,11 +116,30 @@ public final class StandardAnilib {
             LibraryUpdateNotifier updateNotifier,
             NetworkStatus networkStatus,
             Collection<? extends AnilibPlugin> additionalPlugins) {
+        return start(
+                dataDirectory,
+                httpTransport,
+                playerBackend,
+                updateNotifier,
+                networkStatus,
+                PortableBundleLoading.ENABLED,
+                additionalPlugins);
+    }
+
+    public static StartedAnilib start(
+            Path dataDirectory,
+            HttpTransport httpTransport,
+            PlayerBackend playerBackend,
+            LibraryUpdateNotifier updateNotifier,
+            NetworkStatus networkStatus,
+            PortableBundleLoading portableBundleLoading,
+            Collection<? extends AnilibPlugin> additionalPlugins) {
         Objects.requireNonNull(dataDirectory, "dataDirectory must not be null");
         Objects.requireNonNull(httpTransport, "httpTransport must not be null");
         Objects.requireNonNull(playerBackend, "playerBackend must not be null");
         Objects.requireNonNull(updateNotifier, "updateNotifier must not be null");
         Objects.requireNonNull(networkStatus, "networkStatus must not be null");
+        Objects.requireNonNull(portableBundleLoading, "portableBundleLoading must not be null");
         Objects.requireNonNull(additionalPlugins, "additionalPlugins must not be null");
         Path libraryFile = dataDirectory.toAbsolutePath().normalize().resolve("library.anilib");
         Path localContent = dataDirectory.toAbsolutePath().normalize().resolve("local-content");
@@ -139,7 +158,9 @@ public final class StandardAnilib {
         Path readerDisplay = dataDirectory.toAbsolutePath().normalize().resolve("reader-display.properties");
         Path readerReadState = dataDirectory.toAbsolutePath().normalize().resolve("reader-read-state.properties");
         List<AnilibPlugin> plugins = new ArrayList<>();
-        ExtensionBundleSelection extensionSelection = InstalledExtensionBundles.select(extensions);
+        ExtensionBundleSelection extensionSelection = portableBundleLoading == PortableBundleLoading.ENABLED
+                ? InstalledExtensionBundles.select(extensions)
+                : new ExtensionBundleSelection(List.of(), List.of());
         plugins.add(new LibraryPlugin(libraryFile));
         plugins.add(new SourceSdkPlugin());
         plugins.add(new LocalSourcePlugin(localContent));
