@@ -25,22 +25,22 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
-final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseable {
+final class DesktopApkExtensionPlatform implements ApkExtensionPlatform, AutoCloseable {
     private final Path dataDirectory;
     private final HttpTransport transport;
     private volatile EmbeddedDesktopExtensionHost host;
-    private volatile DesktopApkEngineClient bridge;
+    private volatile DesktopExtensionSourceBridge bridge;
     private final List<AnilibPlugin> sourceBundles;
     private final Map<String, List<PluginRegistration>> dynamicRegistrations = new LinkedHashMap<>();
     private final Set<String> installedPackageNames = new LinkedHashSet<>();
     private volatile StartedAnilib started;
     private volatile String diagnostic;
 
-    private DesktopExtensionEngine(
+    private DesktopApkExtensionPlatform(
             Path dataDirectory,
             HttpTransport transport,
             EmbeddedDesktopExtensionHost host,
-            DesktopApkEngineClient bridge,
+            DesktopExtensionSourceBridge bridge,
             List<AnilibPlugin> sourceBundles,
             Set<String> installedPackages,
             String diagnostic) {
@@ -53,12 +53,12 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
         this.diagnostic = diagnostic;
     }
 
-    static DesktopExtensionEngine open(Path dataDirectory, HttpTransport transport) {
+    static DesktopApkExtensionPlatform open(Path dataDirectory, HttpTransport transport) {
         Path data = Objects.requireNonNull(dataDirectory, "dataDirectory").toAbsolutePath().normalize();
         try {
             return running(data, transport);
         } catch (RuntimeException | LinkageError exception) {
-            return new DesktopExtensionEngine(
+            return new DesktopApkExtensionPlatform(
                     data,
                     transport,
                     null,
@@ -193,7 +193,7 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
         if (available()) {
             return;
         }
-        DesktopExtensionEngine restarted = running(dataDirectory, transport);
+        DesktopApkExtensionPlatform restarted = running(dataDirectory, transport);
         host = restarted.host;
         bridge = restarted.bridge;
         installedPackageNames.clear();
@@ -201,13 +201,13 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
         diagnostic = restarted.diagnostic;
     }
 
-    private static DesktopExtensionEngine running(Path dataDirectory, HttpTransport transport) {
+    private static DesktopApkExtensionPlatform running(Path dataDirectory, HttpTransport transport) {
         EmbeddedDesktopExtensionHost host = null;
         try {
             host = EmbeddedDesktopExtensionHost.start(dataDirectory.resolve("extension-engine").resolve("data"));
             AnilibHttpClient client = request -> transport.exchange(request, request.headers());
-            DesktopApkEngineClient bridge = new AnilibDesktopApkEngineClient(new DesktopExtensionSourceBridge(
-                    URI.create("http://127.0.0.1:" + host.port() + "/"), client));
+            DesktopExtensionSourceBridge bridge = new DesktopExtensionSourceBridge(
+                    URI.create("http://127.0.0.1:" + host.port() + "/"), client);
             bridge.requireHealthy();
             List<URI> repositories = new FileExtensionRepositoryStore(
                     dataDirectory.resolve("extension-repositories.txt")).load().stream()
@@ -217,7 +217,7 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
             bridge.saveRepositories(repositories);
             List<AnilibPlugin> sources = bridge.sourceBundles();
             Set<String> installedPackages = bridge.installedPackageNames();
-            return new DesktopExtensionEngine(
+            return new DesktopApkExtensionPlatform(
                     dataDirectory,
                     transport,
                     host,

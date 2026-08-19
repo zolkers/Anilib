@@ -421,7 +421,7 @@ still needs a complete, compatible host ABI before a real installed APK can
 reach that Android path.
 
 Desktop supplies the missing ecosystem ABI through Anilib's own
-`DesktopExtensionHost` platform module behind the `DesktopApkEngineClient` port.
+`DesktopExtensionHost` platform module behind the shared `DesktopExtensionSourceBridge` adapter.
 The host is packaged with the application and starts on an ephemeral loopback
 port in the application process; no external engine download, configuration, or
 restart is required. It bounds and converts DEX archives, relocates Android and

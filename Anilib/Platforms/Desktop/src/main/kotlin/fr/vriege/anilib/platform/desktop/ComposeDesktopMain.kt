@@ -41,7 +41,7 @@ import org.jetbrains.skia.Image
 fun main(arguments: Array<String>) {
     val dataDirectory = DesktopDataDirectory.resolve()
     val transport = JdkHttpTransport()
-    val extensionEngine = DesktopExtensionEngine.open(dataDirectory, transport)
+    val extensionPlatform = DesktopApkExtensionPlatform.open(dataDirectory, transport)
     val plugins = listOf(CoverCachePlugin(dataDirectory.resolve("cache").resolve("covers")))
     val started = try {
         StandardAnilib.start(
@@ -52,16 +52,16 @@ fun main(arguments: Array<String>) {
             plugins,
         )
     } catch (failure: Throwable) {
-        extensionEngine.close()
+        extensionPlatform.close()
         throw failure
     }
-    extensionEngine.attach(started)
+    extensionPlatform.attach(started)
     if (GraphicsEnvironment.isHeadless() || arguments.contains("--headless")) {
         printHeadlessSummary(started)
         try {
             started.close()
         } finally {
-            extensionEngine.close()
+            extensionPlatform.close()
         }
         return
     }
@@ -83,7 +83,7 @@ fun main(arguments: Array<String>) {
                                 started.close()
                             } finally {
                                 try {
-                                    extensionEngine.close()
+                                    extensionPlatform.close()
                                 } finally {
                                     exitApplication()
                                 }
@@ -101,7 +101,7 @@ fun main(arguments: Array<String>) {
                     backupImportPicker = DesktopBackupImportPicker(),
                     applicationUpdatePlatformController = DesktopApplicationUpdateController(dataDirectory),
                     shareController = DesktopShareController(),
-                    extensionPlatform = extensionEngine,
+                    extensionPlatform = extensionPlatform,
                 )
             }
         }
