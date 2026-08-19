@@ -32,9 +32,9 @@ public final class SourceFormatRule implements AnilibJavaRule {
                     diagnostics.add(new Diagnostic(name(), source.path(), index + 1,
                             "Line exceeds " + MAX_LINE_LENGTH + " characters"));
                 }
-                if (line.contains("/" + "**")) {
+                if (line.contains("/" + "**") && !source.module().role().equals("API")) {
                     diagnostics.add(new Diagnostic(name(), source.path(), index + 1,
-                            "Javadoc blocks are forbidden"));
+                            "Javadoc blocks are restricted to API modules"));
                 }
             }
         }

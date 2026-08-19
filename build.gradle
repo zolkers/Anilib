@@ -48,6 +48,11 @@ subprojects {
     tasks.withType(Javadoc).configureEach {
         options.encoding = 'UTF-8'
         options.addBooleanOption('Xdoclint:all,-missing', true)
+        options.tags = [
+                'apiNote:a:API Note:',
+                'implSpec:a:Implementation Requirements:',
+                'implNote:a:Implementation Note:'
+        ]
     }
 
     tasks.withType(AbstractArchiveTask).configureEach {

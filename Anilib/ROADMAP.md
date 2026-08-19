@@ -80,7 +80,8 @@ operations, but they do not duplicate feature behavior.
   Framework/Foundation. Production code never depends on Tooling.
 - Public collaboration between features uses an API, typed capability, or typed
   contribution point. State remains owned by the feature that writes it.
-- Do not add Javadocs or KDocs. `AnilibJava` rejects them repository-wide.
+- Reserve Javadocs for public contracts in modules with `role=API`. KDocs and
+  implementation-module Javadocs remain forbidden by `AnilibJava`.
 - Do not add `eu.kanade.*` compatibility classes. Aniyomi APK support is an
   optional Android boundary; portable signed Anilib Bundles are the source ABI.
 - Source code never ships or hardcodes a third-party catalogue URL. Repository
@@ -168,7 +169,7 @@ revision and run the same fixtures on packaged Android and desktop hosts.
 - [x] reproducible MSI, DEB, DMG, and APK packaging; production Android,
   Authenticode, and Apple signing; notarization; checksums; provenance
   attestations; atomic GitHub Releases; and a shared stable update check
-- [x] repository-wide no-Javadoc/KDoc rule, conventional commits, UI audit, and
+- [x] API-only Javadoc/KDoc-free implementation rule, conventional commits, UI audit, and
   full Android/desktop verification gate
 - [x] audit all declared modules, keep every active implementation/Bundle, and
   reject future Java/Kotlin module shells through the `empty-module` quality rule
