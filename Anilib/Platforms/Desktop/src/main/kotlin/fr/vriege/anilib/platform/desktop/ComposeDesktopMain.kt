@@ -10,6 +10,7 @@ import fr.vriege.anilib.configuration.standard.StandardAnilib
 import fr.vriege.anilib.feature.covercache.bundle.CoverCachePlugin
 import fr.vriege.anilib.feature.discovery.ui.DiscoveryUiCapabilities
 import fr.vriege.anilib.feature.extensionrepository.ui.ExtensionRepositoryUiCapabilities
+import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionPlatform
 import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionPlatforms
 import fr.vriege.anilib.feature.library.ui.LibraryUiCapabilities
 import fr.vriege.anilib.feature.network.NetworkCapabilities
@@ -37,16 +38,29 @@ import org.jetbrains.skia.Image
 
 fun main() {
     val dataDirectory = DesktopDataDirectory.resolve()
-    val started = StandardAnilib.start(
-        dataDirectory,
-        JdkHttpTransport(),
-        ComposePlayerBackend(),
-        DesktopLibraryUpdateNotifier(),
-        listOf(CoverCachePlugin(dataDirectory.resolve("cache").resolve("covers"))),
-    )
+    val transport = JdkHttpTransport()
+    val extensionEngine = DesktopExtensionEngine.open(dataDirectory, transport)
+    val plugins = listOf(CoverCachePlugin(dataDirectory.resolve("cache").resolve("covers"))) +
+        extensionEngine.sourceBundles()
+    val started = try {
+        StandardAnilib.start(
+            dataDirectory,
+            transport,
+            ComposePlayerBackend(),
+            DesktopLibraryUpdateNotifier(),
+            plugins,
+        )
+    } catch (failure: Throwable) {
+        extensionEngine.close()
+        throw failure
+    }
     if (GraphicsEnvironment.isHeadless()) {
         printHeadlessSummary(started)
-        started.close()
+        try {
+            started.close()
+        } finally {
+            extensionEngine.close()
+        }
         return
     }
     val browserRuntimeStatus = DesktopBrowserRuntime.initialize(dataDirectory)
@@ -59,7 +73,11 @@ fun main() {
                     try {
                         started.close()
                     } finally {
-                        exitApplication()
+                        try {
+                            extensionEngine.close()
+                        } finally {
+                            exitApplication()
+                        }
                     }
                 }
             },
@@ -73,6 +91,7 @@ fun main() {
                 backupImportPicker = DesktopBackupImportPicker(),
                 applicationUpdatePlatformController = DesktopApplicationUpdateController(dataDirectory),
                 shareController = DesktopShareController(),
+                extensionPlatform = extensionEngine,
             )
         }
     }
@@ -87,12 +106,13 @@ internal fun DesktopAnilibContent(
     backupImportPicker: BackupImportPicker,
     applicationUpdatePlatformController: ApplicationUpdatePlatformController,
     shareController: ShareController,
+    extensionPlatform: ApkExtensionPlatform = ApkExtensionPlatforms.unavailable(),
 ) {
     AnilibApp(
         presentation = started.capability(LibraryUiCapabilities.PRESENTATION),
         discovery = started.capability(DiscoveryUiCapabilities.PRESENTATION),
         extensionRepositories = started.capability(ExtensionRepositoryUiCapabilities.PRESENTATION),
-        apkExtensionPlatform = ApkExtensionPlatforms.unavailable(),
+        apkExtensionPlatform = extensionPlatform,
         networkMaintenance = started.capability(NetworkCapabilities.MAINTENANCE),
         browserCookies = started.capability(NetworkCapabilities.COOKIES),
         browserRuntimeStatus = browserRuntimeStatus,

@@ -4,14 +4,14 @@ import java.net.URI;
 import java.util.List;
 import java.util.Locale;
 
-final class ExtensionRepositoryLocations {
+public final class ExtensionRepositoryLocations {
     private static final String GITHUB_HOST = "github.com";
     private static final String RAW_GITHUB_HOST = "raw.githubusercontent.com";
 
     private ExtensionRepositoryLocations() {
     }
 
-    static List<URI> indexCandidates(URI configuredLocation) {
+    public static List<URI> indexCandidates(URI configuredLocation) {
         URI location = AniyomiRepositoryIndexParser.requireRepositoryUri(configuredLocation);
         if (!GITHUB_HOST.equals(location.getHost().toLowerCase(Locale.ROOT))) {
             return List.of(location);

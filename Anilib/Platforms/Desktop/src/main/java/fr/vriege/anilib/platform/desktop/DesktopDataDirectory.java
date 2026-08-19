@@ -8,6 +8,10 @@ final class DesktopDataDirectory {
     }
 
     static Path resolve() {
+        String configured = System.getProperty("anilib.dataDirectory");
+        if (configured != null && !configured.isBlank()) {
+            return Path.of(configured).toAbsolutePath().normalize();
+        }
         String operatingSystem = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
         if (operatingSystem.contains("win")) {
             String localAppData = System.getenv("LOCALAPPDATA");

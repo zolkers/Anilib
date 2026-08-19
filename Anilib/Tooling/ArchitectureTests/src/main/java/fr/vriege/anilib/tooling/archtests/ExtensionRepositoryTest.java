@@ -23,6 +23,7 @@ import fr.vriege.anilib.feature.extensionrepository.runtime.FileExtensionTrustSt
 import fr.vriege.anilib.feature.extensionrepository.runtime.FileExtensionRepositoryStore;
 import fr.vriege.anilib.feature.extensionrepository.runtime.FileInstalledExtensionStore;
 import fr.vriege.anilib.feature.extensionrepository.runtime.FileExtensionUpdatePolicyStore;
+import fr.vriege.anilib.feature.extensionrepository.runtime.MiwayomiSourceBridge;
 import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionCompatibility;
 import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionPlatforms;
 import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionRuntimeReport;
@@ -45,6 +46,12 @@ import fr.vriege.anilib.feature.source.SourcePreferenceDefinition;
 import fr.vriege.anilib.feature.source.SourcePreferenceType;
 import fr.vriege.anilib.feature.source.SourceSearchRequest;
 import fr.vriege.anilib.feature.source.StreamingSource;
+import fr.vriege.anilib.feature.source.SourceCapabilities;
+import fr.vriege.anilib.feature.source.SourceRegistry;
+import fr.vriege.anilib.feature.source.bundle.SourceSdkPlugin;
+import fr.vriege.anilib.kernel.AnilibPlugin;
+import fr.vriege.anilib.kernel.StartedAnilib;
+import fr.vriege.anilib.kernel.runtime.DefaultPluginEngine;
 
 import java.io.IOException;
 import java.io.ByteArrayOutputStream;
@@ -97,7 +104,57 @@ final class ExtensionRepositoryTest {
         adaptsModernSuspendAndHosterAnimeSource(counter);
         adaptsModernMangaSource(counter);
         adaptsConfigurableAnimeSourcePreferences(counter);
+        bridgesDesktopApkSourcesThroughLoopback(counter);
         return counter.value;
+    }
+
+    private static void bridgesDesktopApkSourcesThroughLoopback(Counter counter) {
+        MiwayomiBridgeClient client = new MiwayomiBridgeClient();
+        MiwayomiSourceBridge bridge = new MiwayomiSourceBridge(URI.create("http://127.0.0.1:43127/"), client);
+        bridge.requireHealthy();
+        bridge.saveRepositories(List.of(INDEX));
+        List<AnilibPlugin> bundles = bridge.sourceBundles();
+        List<AnilibPlugin> plugins = new java.util.ArrayList<>();
+        plugins.add(new SourceSdkPlugin());
+        plugins.addAll(bundles);
+        try (StartedAnilib started = new DefaultPluginEngine().start(plugins)) {
+            SourceRegistry registry = started.capability(SourceCapabilities.REGISTRY);
+            counter.check(registry.sources().size() == 2
+                            && registry.find(fr.vriege.anilib.feature.source.SourceId.of("aniyomi.42")).isPresent()
+                            && registry.find(fr.vriege.anilib.feature.source.SourceId.of("aniyomi.43")).isPresent(),
+                    "the desktop engine must publish manga and anime APK sources as explicit Source Bundles");
+
+            CatalogueSource mangaCatalogue = (CatalogueSource) registry.find(
+                    fr.vriege.anilib.feature.source.SourceId.of("aniyomi.42")).orElseThrow();
+            SourcePage mangaPage = mangaCatalogue.popular(new SourceBrowseRequest(1, 20, List.of(), Map.of()));
+            PagedSource manga = (PagedSource) mangaCatalogue;
+            var chapters = manga.contentUnits(mangaPage.items().getFirst().id());
+            var pages = manga.pages(chapters.getFirst().id());
+            counter.check(mangaPage.items().getFirst().title().equals("Bridge Manga")
+                            && chapters.getFirst().title().equals("Chapter 1")
+                            && new String(manga.readPage(pages.getFirst()), StandardCharsets.UTF_8).equals("image"),
+                    "the desktop manga bridge must map catalogue, chapters, pages, and proxied bytes");
+
+            CatalogueSource animeCatalogue = (CatalogueSource) registry.find(
+                    fr.vriege.anilib.feature.source.SourceId.of("aniyomi.43")).orElseThrow();
+            SourcePage animePage = animeCatalogue.search(new SourceSearchRequest(
+                    "bridge",
+                    new SourceBrowseRequest(1, 20, List.of(), Map.of())));
+            StreamingSource anime = (StreamingSource) animeCatalogue;
+            var episodes = anime.episodes(animePage.items().getFirst().id());
+            var streams = anime.streams(episodes.getFirst().id());
+            counter.check(episodes.getFirst().title().equals("Episode 1")
+                            && streams.getFirst().location().getHost().equals("127.0.0.1")
+                            && streams.getFirst().format().name().equals("HLS")
+                            && streams.getFirst().subtitles().size() == 1,
+                    "the desktop anime bridge must keep streams and subtitles behind its loopback relay");
+        }
+        String installed = bridge.install(URI.create("https://repo.example/extensions/example.apk"));
+        counter.check(client.savedRepositories && client.installRequested && installed.contains("Restart Anilib"),
+                "desktop APK installation must synchronize repositories and require an explicit restart");
+        counter.expectIllegalArgument(
+                () -> new MiwayomiSourceBridge(URI.create("http://example.test:43127/"), client),
+                "the desktop APK bridge must reject non-loopback engines");
     }
 
     private static void selectsArtifactsByHostPlatform(Counter counter) {
@@ -816,6 +873,64 @@ final class ExtensionRepositoryTest {
         public HttpResponse execute(HttpRequest request) {
             lastRequest = request;
             return new HttpResponse(200, Map.of("content-type", List.of("application/json")), body, false);
+        }
+    }
+
+    private static final class MiwayomiBridgeClient implements AnilibHttpClient {
+        private boolean savedRepositories;
+        private boolean installRequested;
+
+        @Override
+        public HttpResponse execute(HttpRequest request) {
+            String path = request.uri().getPath();
+            String body = switch (path) {
+                case "/api/v1/health" -> """
+                        {"status":"ok","service":"miwayomi","mangaSources":1,"animeSources":1}
+                        """;
+                case "/api/v1/sources" -> """
+                        {"manga":[{"id":"42","name":"Manga APK","lang":"en","type":"manga","pkg":"manga.pkg"}],
+                        "anime":[{"id":"43","name":"Anime APK","lang":"fr","type":"anime","pkg":"anime.pkg"}]}
+                        """;
+                case "/api/v1/manga/42/popular" -> """
+                        {"hasNextPage":false,"mangas":[{"url":"/manga/bridge","title":"Bridge Manga",
+                        "description":"Description","thumbnail_url":"https://cdn.example/manga.jpg"}]}
+                        """;
+                case "/api/v1/manga/42/chapters" -> """
+                        {"chapters":[{"url":"/chapter/1","name":"Chapter 1","date_upload":1700000000000}]}
+                        """;
+                case "/api/v1/manga/42/pages" -> """
+                        {"pages":[{"index":0,"number":1,"url":"","imageUrl":"https://cdn.example/page.jpg"}]}
+                        """;
+                case "/api/v1/anime/43/search" -> """
+                        {"hasNextPage":false,"animes":[{"url":"/anime/bridge","title":"Bridge Anime",
+                        "description":"Description","thumbnail_url":"https://cdn.example/anime.jpg"}]}
+                        """;
+                case "/api/v1/anime/43/episodes" -> """
+                        {"episodes":[{"url":"/episode/1","name":"Episode 1","episode_number":1,
+                        "date_upload":1700000000000,"scanlator":"Team",
+                        "preview_url":"https://cdn.example/episode.jpg"}]}
+                        """;
+                case "/api/v1/anime/43/videos" -> """
+                        {"videos":[{"videoUrl":"https://cdn.example/master.m3u8","videoTitle":"1080p",
+                        "headers":{"Referer":"https://source.example/"},
+                        "subtitleTracks":[{"url":"https://cdn.example/sub.vtt","lang":"fr"}]}]}
+                        """;
+                case "/api/v1/extensions/repos" -> {
+                    savedRepositories = request.method().name().equals("POST")
+                            && new String(request.body(), StandardCharsets.UTF_8).contains(INDEX.toString());
+                    yield "{\"ok\":true}";
+                }
+                case "/api/v1/extensions/install" -> {
+                    installRequested = request.method().name().equals("POST")
+                            && new String(request.body(), StandardCharsets.UTF_8).contains("example.apk");
+                    yield "{\"ok\":true,\"name\":\"Example APK\",\"pkg\":\"example.pkg\"}";
+                }
+                case "/api/v1/proxy" -> null;
+                default -> throw new AssertionError("Unexpected desktop engine route: " + request.uri());
+            };
+            byte[] bytes = body == null ? "image".getBytes(StandardCharsets.UTF_8)
+                    : body.getBytes(StandardCharsets.UTF_8);
+            return new HttpResponse(200, Map.of("content-type", List.of("application/json")), bytes, false);
         }
     }
 

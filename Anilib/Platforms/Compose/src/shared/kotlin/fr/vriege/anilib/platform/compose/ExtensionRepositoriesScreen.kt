@@ -159,13 +159,14 @@ internal fun ExtensionRepositoriesScreen(
             installApk = if (apkExtensionPlatform.available()) {
                 { installApkExtension(apkExtensionPlatform, extension, scope, { state ->
                     loading = state
-                    operationLabel = if (state) "Handing APK to Android" else null
+                    operationLabel = if (state) apkExtensionPlatform.installProgressLabel() else null
                 }) { message, failure ->
                     error = failure
                 } }
             } else {
                 null
             },
+            installApkLabel = apkExtensionPlatform.installActionLabel(),
         )
         return
     }
@@ -201,12 +202,7 @@ internal fun ExtensionRepositoriesScreen(
             item {
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    if (apkExtensionPlatform.available()) {
-                        "Choose an extension below and select Install on Android. " +
-                            "Portable Anilib Bundles work on every platform."
-                    } else {
-                        "This device installs portable Anilib Bundles. APK-only entries require Anilib on Android."
-                    },
+                    apkExtensionPlatform.availabilityDescription(),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -357,6 +353,7 @@ internal fun ExtensionRepositoriesScreen(
                         } else {
                             null
                         },
+                        installApkLabel = apkExtensionPlatform.installActionLabel(),
                     )
                 }
             }
@@ -531,6 +528,7 @@ private fun ExtensionDetailScreen(
     toggle: (Boolean) -> Unit,
     remove: () -> Unit,
     installApk: (() -> Unit)?,
+    installApkLabel: String,
 ) {
     val portable = extension.artifacts().any {
         it.format() == ExtensionArtifactFormat.ANILIB_BUNDLE
@@ -702,7 +700,9 @@ private fun ExtensionDetailScreen(
                             it.format() == ExtensionArtifactFormat.ANIYOMI_APK
                         } && installApk != null
                     ) {
-                        Button(onClick = installApk, enabled = !loading) { Text("Install on Android") }
+                        Button(onClick = installApk, enabled = !loading) {
+                            Text(installApkLabel)
+                        }
                     }
                 }
             }
@@ -857,6 +857,7 @@ private fun ExtensionPackageCard(
     toggle: (Boolean) -> Unit,
     remove: () -> Unit,
     installApk: (() -> Unit)?,
+    installApkLabel: String,
 ) {
     Card(modifier = Modifier.fillMaxWidth().clickable(onClick = openDetails)) {
         Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.Top) {
@@ -927,7 +928,7 @@ private fun ExtensionPackageCard(
                         }
                     }
                     if (apk && installApk != null && installed == null) {
-                        Button(onClick = installApk, enabled = !busy) { Text("Install on Android") }
+                        Button(onClick = installApk, enabled = !busy) { Text(installApkLabel) }
                     }
                 }
             }

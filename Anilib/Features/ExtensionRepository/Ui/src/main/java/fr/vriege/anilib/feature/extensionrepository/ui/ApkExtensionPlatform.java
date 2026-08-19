@@ -8,6 +8,20 @@ import java.util.concurrent.CompletableFuture;
 public interface ApkExtensionPlatform {
     boolean available();
 
+    default String availabilityDescription() {
+        return available()
+                ? "APK extensions can be installed on Android. Portable Anilib Bundles work on every platform."
+                : "This device installs portable Anilib Bundles. APK execution is not configured.";
+    }
+
+    default String installActionLabel() {
+        return "Install on Android";
+    }
+
+    default String installProgressLabel() {
+        return "Handing APK to Android";
+    }
+
     default List<InstalledApkExtension> discoverInstalled() {
         return List.of();
     }
