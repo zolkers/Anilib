@@ -21,6 +21,8 @@ import java.util.jar.JarOutputStream;
 
 final class ExtensionRuntimeCatalogSmoke {
     private static final String SOURCE_CLASS = "sample.DynamicSource";
+    private static final String ANIME_SOURCE =
+            "fr/vriege/anilib/platform/desktopextensionhost/compat/aniyomi/animesource/AnimeSource";
 
     private ExtensionRuntimeCatalogSmoke() {
     }
@@ -64,7 +66,8 @@ final class ExtensionRuntimeCatalogSmoke {
     private static void writeArchive(Path archive) throws IOException {
         ClassWriter writer = new ClassWriter(0);
         String name = SOURCE_CLASS.replace('.', '/');
-        writer.visit(Opcodes.V21, Opcodes.ACC_PUBLIC, name, null, "java/lang/Object", null);
+        writer.visit(Opcodes.V21, Opcodes.ACC_PUBLIC, name, null, "java/lang/Object",
+                new String[]{ANIME_SOURCE});
         MethodVisitor constructor = writer.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
         constructor.visitCode();
         constructor.visitVarInsn(Opcodes.ALOAD, 0);
@@ -75,6 +78,7 @@ final class ExtensionRuntimeCatalogSmoke {
         constantLong(writer, "getId", 42L);
         constantText(writer, "getName", "Dynamic source");
         constantText(writer, "getLang", "fr");
+        constantBoolean(writer, "getSupportsLatest", true);
         writer.visitEnd();
         try (JarOutputStream jar = new JarOutputStream(Files.newOutputStream(archive))) {
             jar.putNextEntry(new JarEntry(name + ".class"));
@@ -98,6 +102,15 @@ final class ExtensionRuntimeCatalogSmoke {
         method.visitCode();
         method.visitLdcInsn(value);
         method.visitInsn(Opcodes.ARETURN);
+        method.visitMaxs(1, 1);
+        method.visitEnd();
+    }
+
+    private static void constantBoolean(ClassWriter writer, String name, boolean value) {
+        MethodVisitor method = writer.visitMethod(Opcodes.ACC_PUBLIC, name, "()Z", null, null);
+        method.visitCode();
+        method.visitInsn(value ? Opcodes.ICONST_1 : Opcodes.ICONST_0);
+        method.visitInsn(Opcodes.IRETURN);
         method.visitMaxs(1, 1);
         method.visitEnd();
     }
