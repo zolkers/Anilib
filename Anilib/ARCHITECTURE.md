@@ -125,9 +125,10 @@ User-Agent, and challenge-completion cookie names. The shared Compose browser
 owns navigation, verifies those cookies, and transfers the resulting session
 through the framework `HttpCookieJar`; only platform adapters select the
 engine, using Android System WebView or desktop KCEF. Browser engine types and
-lifecycle therefore remain outside Java feature code.
-Desktop rejects unsupported native KCEF targets before initialization so an
-optional WebView cannot crash or prevent the rest of the product from starting.
+lifecycle therefore remain outside Java feature code. Desktop uses KCEF's
+architecture-matched runtime on x64 and ARM64 and converts initialization
+failures into an unavailable browser status, so an optional WebView cannot
+prevent the rest of the product from starting.
 
 Browser-data maintenance follows the same outer boundary. The shared Settings
 screen invokes a small platform controller. Android clears System WebView

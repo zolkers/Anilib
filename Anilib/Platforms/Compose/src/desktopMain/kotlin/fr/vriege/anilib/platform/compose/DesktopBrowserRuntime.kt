@@ -8,11 +8,9 @@ import java.nio.file.LinkOption
 import java.nio.file.Path
 import java.nio.file.SimpleFileVisitor
 import java.nio.file.attribute.BasicFileAttributes
-import java.util.Locale
 
 object DesktopBrowserRuntime {
     fun initialize(dataDirectory: Path): BrowserRuntimeStatus {
-        unsupportedPlatformMessage()?.let { return BrowserRuntimeStatus.unavailable(it) }
         var failure: Throwable? = null
         var restartRequired = false
         return runCatching {
@@ -44,21 +42,7 @@ object DesktopBrowserRuntime {
     }
 
     fun dispose() {
-        if (unsupportedPlatformMessage() != null) {
-            return
-        }
         KCEF.disposeBlocking()
-    }
-
-    private fun unsupportedPlatformMessage(): String? {
-        val osName = System.getProperty("os.name", "").lowercase(Locale.ROOT)
-        val architecture = System.getProperty("os.arch", "").lowercase(Locale.ROOT)
-        return if (osName.contains("windows") && architecture in setOf("aarch64", "arm64")) {
-            "The embedded browser is unavailable on Windows ARM64. " +
-                "Source browsing and downloads remain available."
-        } else {
-            null
-        }
     }
 
     private fun clearPendingData(browserDirectory: Path) {
