@@ -59,7 +59,7 @@ Anilib/
   Configurations/   explicit product assembly; Standard is the main product
   Platforms/        shared Compose UI plus Android and desktop adapters
   Examples/         official portable source template
-  Tooling/          AnilibJava, architecture tests, source publisher
+  Tooling/          AnilibJava, architecture tests, portability, publisher
 ```
 
 A normal feature may contain `Api`, `Runtime`, `Ui`, and `Bundle` modules. Only
@@ -138,10 +138,11 @@ external runtime library.
 
 ### Recommended next task
 
-Start with Library display modes and category CRUD. They affect the main daily
-screen and provide reusable selection/category primitives needed by bulk
-downloads, migration, update filters, and richer statistics. Keep those changes
-inside Library until another feature needs a narrow public capability.
+Complete dual-publication validation by binding each portability report to its
+index entry and comparing APK package, version, source IDs, and permissions with
+the portable Bundle descriptor. Then, after explicit maintainer authorization,
+port the smallest representative anime and manga sources from one pinned
+revision and run the same fixtures on packaged Android and desktop hosts.
 
 ## Delivered foundation
 
@@ -168,6 +169,13 @@ inside Library until another feature needs a narrow public capability.
   attestations; atomic GitHub Releases; and a shared stable update check
 - [x] repository-wide no-Javadoc/KDoc rule, conventional commits, UI audit, and
   full Android/desktop verification gate
+- [x] audit all declared modules, keep every active implementation/Bundle, and
+  reject future Java/Kotlin module shells through the `empty-module` quality rule
+- [x] unify APK-only, Bundle-only, and dual-artifact source entries under one
+  `pkg`, with portable Bundle preference on Android and desktop
+- [x] ship the dependency-free extension portability analyzer, JSON/Markdown
+  reports, identity-preserving Anilib module scaffold, dual-artifact publisher,
+  checksums, and reusable GitHub publication workflow
 
 ## Remaining product work
 
@@ -202,6 +210,11 @@ platform-specific.
   preview, progress, cancellation, and partial-failure recovery
 - [x] run public compatibility fixtures for Anilib repository indexes that use
   the Yuzono and Keiyoushi JSON shapes without redistributing their catalogues
+- [ ] obtain maintainer authorization and validate representative anime, manga,
+  filter, preference, and multi-hoster extensions from one pinned source revision
+  as both APK and Bundle on Android, Windows, Linux, and macOS
+- [ ] bind portability reports to index entries and verify APK package, version,
+  source IDs, and permissions against Bundle metadata before dual publication
 
 ### 3. Reader
 

@@ -1,6 +1,7 @@
 # Strategie des extensions Android et Desktop
 
-Statut : proposition d'architecture
+Statut : implementation active ; phases 1, 2 et 5 livrees, phase 4 utilisable,
+validation externe de phase 3 en attente d'autorisation des mainteneurs
 
 Date : 2026-08-19
 
@@ -280,46 +281,63 @@ raison exacte d'un blocage.
 
 ### Phase 1 - Unifier le modele produit
 
-- Formaliser `pkg` comme identite de l'extension et l'artefact comme variante.
-- Conserver une seule carte lorsqu'une entree contient APK et Bundle.
-- Preferer le Bundle sur Android et Desktop.
-- Afficher clairement la matrice de disponibilite.
-- Tester les cas APK seul, Bundle seul, double artefact et entree invalide.
+- [x] Formaliser `pkg` comme identite de l'extension et l'artefact comme variante.
+- [x] Conserver une seule carte lorsqu'une entree contient APK et Bundle.
+- [x] Preferer le Bundle sur Android et Desktop.
+- [x] Afficher clairement la matrice de disponibilite.
+- [x] Tester les cas APK seul, Bundle seul, double artefact et entree invalide.
 
 ### Phase 2 - Creer l'assistant de portage
 
-- Ajouter une commande d'analyse d'un depot source Aniyomi.
-- Detecter imports Android, ABI Aniyomi, bibliotheques `compileOnly`, code natif,
+- [x] Ajouter une commande d'analyse d'un depot source Aniyomi.
+- [x] Detecter imports Android, ABI Aniyomi, bibliotheques `compileOnly`, code natif,
   WebView, preferences, torrent et acces directs au reseau ou au stockage.
-- Produire un rapport machine-readable et lisible par un mainteneur.
-- Generer un module Anilib initial qui conserve `pkg` et les IDs de sources.
-- Ne jamais modifier ni publier automatiquement le depot tiers.
+- [x] Produire un rapport machine-readable et lisible par un mainteneur.
+- [x] Generer un module Anilib initial qui conserve `pkg` et les IDs de sources.
+- [x] Ne jamais modifier ni publier automatiquement le depot tiers.
 
 ### Phase 3 - Valider sur des extensions de reference
 
-- Choisir avec autorisation plusieurs extensions : anime simple, manga simple,
+- [ ] Choisir avec autorisation plusieurs extensions : anime simple, manga simple,
   filtres, preferences et streaming multi-hebergeur.
-- Construire APK et Bundle depuis une revision unique.
-- Executer les memes fixtures sur Android, Windows, Linux et macOS.
-- Mesurer le travail manuel restant et corriger l'outil avant generalisation.
+- [ ] Construire APK et Bundle depuis une revision unique.
+- [ ] Executer les memes fixtures sur Android, Windows, Linux et macOS.
+- [ ] Mesurer le travail manuel restant et corriger l'outil avant generalisation.
 
 ### Phase 4 - Industrialiser la publication
 
-- Etendre `SourcePublisher` pour valider une entree a deux artefacts.
-- Fournir une CI reutilisable aux mainteneurs externes.
-- Signer avec la cle du mainteneur, jamais avec une cle generale d'Anilib.
-- Publier index complet/minifie, artefacts, checksums et rapport de compatibilite.
-- Refuser une publication si les IDs, versions ou permissions divergent sans
+- [x] Etendre `SourcePublisher` pour produire une entree a deux artefacts.
+- [x] Fournir une CI reutilisable aux mainteneurs externes.
+- [x] Signer avec la cle du mainteneur, jamais avec une cle generale d'Anilib.
+- [x] Publier index complet/minifie, artefacts et checksums.
+- [x] Produire separement les rapports JSON et Markdown de compatibilite.
+- [ ] Relier chaque rapport de compatibilite a son entree d'index.
+- [ ] Refuser une publication si les IDs, versions ou permissions de l'APK
+  divergent de ceux du Bundle sans
   migration explicite.
 
 ### Phase 5 - Ecosysteme Anilib natif
 
-- Documenter le template de nouvelle extension portable.
-- Permettre une extension Anilib sans APK.
-- Conserver exactement le meme catalogue, les memes ecrans et le meme mecanisme
+- [x] Documenter le template de nouvelle extension portable.
+- [x] Permettre une extension Anilib sans APK.
+- [x] Conserver exactement le meme catalogue, les memes ecrans et le meme mecanisme
   de confiance.
-- Encourager les mainteneurs a partager un noyau de logique entre adaptateurs
+- [x] Encourager les mainteneurs a partager un noyau de logique entre adaptateurs
   plutot qu'a maintenir deux scrapers independants.
+
+## Utilisation de l'assistant livre
+
+La commande suivante analyse une copie locale en lecture seule, ecrit les deux
+rapports et cree un module initial dans un dossier vide :
+
+```powershell
+.\gradlew.bat :Anilib:Tooling:ExtensionPortability:run --args="analyze C:\sources\extension --package publisher.pkg --source-ids 123,456 --output build\portability --scaffold build\ported-module --kind anime --lang fr"
+```
+
+Sans les options `--package` et `--source-ids`, l'outil tente de les detecter
+dans le depot. Les valeurs explicites restent necessaires si le build amont les
+calcule dynamiquement. L'outil ne clone, ne modifie et ne publie jamais le depot
+analyse.
 
 ## Criteres d'acceptation
 

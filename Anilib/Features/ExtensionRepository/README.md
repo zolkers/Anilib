@@ -75,6 +75,15 @@ The `apk` artifact remains Android-only. The `anilib` Bundle is the portable
 artifact used by Android and desktop after checksum, signature, compatibility,
 and installation validation. Repository discovery and artifact installation
 are separate capabilities so merely viewing an index never executes code.
+When both exist, the shared availability model selects the Bundle on Android
+and desktop; Android exposes the APK action only when no Bundle exists.
+
+`Tooling/SourcePublisher` accepts an optional `apk=<local-file.apk>` in a package
+configuration. It copies that fallback under `apk/`, emits one entry for the
+shared `pkg`, signs the Bundle, and writes `index.json`, `index.min.json`, and
+`checksums.sha256`. The reusable `source-repository-publish.yml` workflow wraps
+that publication flow for external repositories while keeping the publisher's
+private Ed25519 key in the repository secret.
 
 The active extension system belongs to Anilib: shared contracts use artifact-
 specific APK and portable Bundle terminology. `Aniyomi` names are restricted to
