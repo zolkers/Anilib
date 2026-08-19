@@ -32,6 +32,9 @@ out of process.
 | Apk Parser | 2.6.10 | Read APK manifests and extension entry points | Apache-2.0 |
 | ASM | 9.10.1 | Repair and relocate converted extension bytecode | BSD-3-Clause |
 | Kotlinx Serialization JSON | 1.9.0 | Match the metadata ABI used by source extensions | Apache-2.0 |
+| OkHttp | 5.4.0 | Provide the network ABI used by source extensions | Apache-2.0 |
+| RxJava | 1.3.8 | Provide the observable ABI used by source extensions | Apache-2.0 |
+| jsoup | 1.19.1 | Parse source catalog and detail HTML | MIT |
 
 These libraries are confined to the optional out-of-process DesktopExtensionHost.
 They never enter the shared Kernel, Features, Android application, or portable

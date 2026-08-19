@@ -56,7 +56,10 @@ public final class BuildDependencyRule implements AnilibJavaRule {
                             "'org.ow2.asm:asm:9.10.1'",
                             "'org.ow2.asm:asm-commons:9.10.1'",
                             "'org.ow2.asm:asm-tree:9.10.1'",
-                            "'org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.9.0'")));
+                            "'org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.9.0'",
+                            "'com.squareup.okhttp3:okhttp:5.4.0'",
+                            "'io.reactivex:rxjava:1.3.8'",
+                            "'org.jsoup:jsoup:1.19.1'")));
     private static final Map<String, Set<String>> ALLOWED_EXTERNAL_PLUGINS = Map.ofEntries(
             Map.entry(
                     ANDROID_BUILD,
