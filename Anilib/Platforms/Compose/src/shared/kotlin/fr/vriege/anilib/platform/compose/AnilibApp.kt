@@ -743,6 +743,7 @@ private fun AppDestination(
                 backupImportPicker,
                 { openMore(MoreDestination.BACKUP) },
                 { openMore(MoreDestination.DOWNLOADS) },
+                { openMore(MoreDestination.TRACKING) },
                 { openMore(MoreDestination.ABOUT) },
                 closeMore,
             )

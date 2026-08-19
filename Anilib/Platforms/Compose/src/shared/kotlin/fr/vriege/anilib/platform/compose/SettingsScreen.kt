@@ -15,16 +15,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.ChromeReaderMode
 import androidx.compose.material.icons.outlined.CollectionsBookmark
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Storage
@@ -36,7 +38,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -77,6 +78,7 @@ internal fun SettingsScreen(
     diagnosticExportPicker: BackupImportPicker,
     openBackup: () -> Unit,
     openDownloads: () -> Unit,
+    openTracking: () -> Unit,
     openAbout: () -> Unit,
     goBack: () -> Unit,
 ) {
@@ -131,6 +133,7 @@ internal fun SettingsScreen(
     if (selected == null) {
         SettingsHome(
             openDestination = { destination = it },
+            openTracking = openTracking,
             openAbout = openAbout,
             goBack = goBack,
         )
@@ -211,10 +214,12 @@ internal fun SettingsScreen(
 @Composable
 private fun SettingsHome(
     openDestination: (SettingsDestination) -> Unit,
+    openTracking: () -> Unit,
     openAbout: () -> Unit,
     goBack: () -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
+    var searching by remember { mutableStateOf(false) }
     val general = settingMatches(query, "General", "Language start screen navigation")
     val appearance = settingMatches(query, "Appearance", "Theme colors typography navigation")
     val privacy = settingMatches(query, "Content and privacy", "Adult incognito history")
@@ -222,21 +227,41 @@ private fun SettingsHome(
     val reader = settingMatches(query, "Reader", "Reading mode controls display navigation")
     val player = settingMatches(query, "Player", "Playback decoder audio subtitles gestures")
     val downloads = settingMatches(query, "Downloads", "Wi-Fi queue storage offline")
+    val tracking = settingMatches(query, "Tracking", "AniList Kitsu progress synchronization services")
     val advanced = settingMatches(query, "Data and storage", "Cookies cache WebView database cleanup")
     val about = settingMatches(query, "About", "Version licences diagnostics update channel")
     Scaffold(
-        topBar = { SettingsTopBar("Settings", goBack) },
+        topBar = {
+            TopAppBar(
+                title = {
+                    if (!searching) Text("Settings") else OutlinedTextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        placeholder = { Text("Search settings") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                },
+                navigationIcon = {
+                    IconButton(onClick = goBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = {
+                        if (searching) query = ""
+                        searching = !searching
+                    }) {
+                        Icon(
+                            if (searching) Icons.Outlined.Close else Icons.Outlined.Search,
+                            contentDescription = if (searching) "Close search" else "Search settings",
+                        )
+                    }
+                },
+            )
+        },
     ) { padding ->
         LazyColumn(modifier = Modifier.fillMaxSize().padding(padding)) {
-            item {
-                OutlinedTextField(
-                    value = query,
-                    onValueChange = { query = it },
-                    label = { Text("Search settings") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 10.dp),
-                )
-            }
             if (general || appearance || privacy) {
                 item { SettingsSection("Application") }
                 item {
@@ -268,7 +293,7 @@ private fun SettingsHome(
                     }
                 }
             }
-            if (library || reader || player || downloads) {
+            if (library || reader || player || downloads || tracking) {
                 item { SettingsSection("Library and media") }
                 item {
                     SettingsGroup {
@@ -302,6 +327,14 @@ private fun SettingsHome(
                                 "Network policy and download queue",
                                 { openDestination(SettingsDestination.DOWNLOADS) },
                                 Icons.Outlined.Download,
+                            )
+                        }
+                        if (tracking) {
+                            SettingsRow(
+                                "Tracking",
+                                "Link AniList, Kitsu, and synchronize progress",
+                                openTracking,
+                                Icons.Outlined.Person,
                             )
                         }
                     }
@@ -726,23 +759,16 @@ private fun SettingsTopBar(title: String, goBack: () -> Unit) {
 private fun SettingsSection(label: String) {
     Text(
         label,
-        color = MaterialTheme.colorScheme.primary,
+        color = MaterialTheme.colorScheme.secondary,
         style = MaterialTheme.typography.labelLarge,
         fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 22.dp, bottom = 10.dp),
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 18.dp, bottom = 8.dp),
     )
 }
 
 @Composable
 private fun SettingsGroup(content: @Composable ColumnScope.() -> Unit) {
-    Surface(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        tonalElevation = 1.dp,
-    ) {
-        Column(content = content)
-    }
+    Column(modifier = Modifier.fillMaxWidth(), content = content)
 }
 
 @Composable
@@ -756,7 +782,7 @@ private fun SettingsRow(
         modifier = Modifier
             .fillMaxWidth()
             .then(if (action == null) Modifier else Modifier.clickable(onClick = action))
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         val leadingIcon = icon ?: if (action != null) Icons.Outlined.Settings else null
@@ -765,12 +791,12 @@ private fun SettingsRow(
             Spacer(Modifier.width(16.dp))
         }
         Column(modifier = Modifier.weight(1f)) {
-            Text(title, fontWeight = FontWeight.Medium)
+            Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
             Spacer(Modifier.height(3.dp))
             Text(
                 summary,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodySmall,
             )
         }
         if (action != null) {
@@ -806,17 +832,17 @@ private fun SettingsSwitchRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onCheckedChange(!checked) }
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         SettingsIcon(icon)
         Spacer(Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
-            Text(title, fontWeight = FontWeight.Medium)
+            Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
             Spacer(Modifier.height(3.dp))
             Text(summary, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        Switch(checked = checked, onCheckedChange = null)
     }
 }
 
@@ -832,19 +858,13 @@ private fun SettingsSwitchRow(
 
 @Composable
 private fun SettingsIcon(icon: ImageVector) {
-    Surface(
-        modifier = Modifier.size(40.dp),
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.primaryContainer,
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(
-                icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.size(22.dp),
-            )
-        }
+    Box(modifier = Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(24.dp),
+        )
     }
 }
 

@@ -19,6 +19,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -38,7 +39,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.outlined.Sync
 import fr.vriege.anilib.feature.library.LibraryItemId
 import fr.vriege.anilib.feature.library.MediaKind
 import fr.vriege.anilib.feature.tracker.TrackerAccount
@@ -67,6 +72,7 @@ internal fun TrackerAccountsScreen(
 ) {
     var revision by remember { mutableStateOf(0) }
     var login by remember { mutableStateOf<TrackerAccount?>(null) }
+    var logout by remember { mutableStateOf<TrackerAccount?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     ObserveTracking(presentation) { revision++ }
     val accounts = remember(revision) { presentation.accounts() }
@@ -90,26 +96,42 @@ internal fun TrackerAccountsScreen(
             error = error,
         )
     }
+    logout?.let { account ->
+        AlertDialog(
+            onDismissRequest = { logout = null },
+            title = { Text("Disconnect ${account.descriptor().name()}?") },
+            text = { Text("Local progress stays on this device, but synchronization with the service stops.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    runCatching { presentation.logout(account.descriptor().id()) }
+                        .onSuccess {
+                            error = null
+                            logout = null
+                            revision++
+                        }
+                        .onFailure { error = it.message ?: "Unable to sign out." }
+                }) { Text("Disconnect") }
+            },
+            dismissButton = { TextButton(onClick = { logout = null }) { Text("Cancel") } },
+        )
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Tracking") },
-                navigationIcon = { TextButton(onClick = goBack) { Text("Back") } },
+                navigationIcon = {
+                    IconButton(onClick = goBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
             )
         },
     ) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            item {
-                Text(
-                    text = "Tracking services",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
-                )
-            }
+            item { TrackerSectionHeader("Synchronization") }
             item {
                 TrackerSyncSettings(
                     preferences = preferences,
@@ -144,13 +166,7 @@ internal fun TrackerAccountsScreen(
                 }
             }
             if (conflicts.isNotEmpty()) {
-                item {
-                    Text(
-                        "Synchronization conflicts",
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-                    )
-                }
+                item { TrackerSectionHeader("Synchronization conflicts") }
                 items(conflicts, key = { conflictKey(it) }) { conflict ->
                     TrackerConflictCard(
                         conflict = conflict,
@@ -178,6 +194,7 @@ internal fun TrackerAccountsScreen(
                     )
                 }
             }
+            if (accounts.isNotEmpty()) item { TrackerSectionHeader("Services") }
             items(accounts, key = { it.descriptor().id().value() }) { account ->
                 TrackerAccountRow(
                     account = account,
@@ -186,8 +203,7 @@ internal fun TrackerAccountsScreen(
                         if (account.authenticated()
                             && account.descriptor().authentication() != TrackerAuthentication.NONE
                         ) {
-                            runCatching { presentation.logout(account.descriptor().id()) }
-                                .onFailure { error = it.message ?: "Unable to sign out." }
+                            logout = account
                         } else if (account.descriptor().authentication() != TrackerAuthentication.NONE) {
                             login = account
                         }
@@ -218,7 +234,7 @@ private fun TrackerAccountRow(account: TrackerAccount, activate: () -> Unit) {
         else -> "Sign in"
     }
     Row(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = activate).padding(24.dp),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = activate).padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         TrackerProviderIcon(account)
@@ -229,7 +245,11 @@ private fun TrackerAccountRow(account: TrackerAccount, activate: () -> Unit) {
             Text(summary, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         if (account.authenticated() && authentication != TrackerAuthentication.NONE) {
-            Text("Sign out", color = MaterialTheme.colorScheme.error)
+            Icon(
+                Icons.Default.CheckCircle,
+                contentDescription = "Connected",
+                tint = Color(0xFF4CAF50),
+            )
         }
     }
 }
@@ -240,7 +260,7 @@ private fun TrackerProviderIcon(account: TrackerAccount) {
     Box(
         modifier = Modifier
             .size(44.dp)
-            .clip(CircleShape)
+            .clip(RoundedCornerShape(12.dp))
             .background(Color(0xFF000000 or icon.colorRgb().toLong())),
         contentAlignment = Alignment.Center,
     ) {
@@ -254,44 +274,77 @@ private fun TrackerSyncSettings(
     synchronize: () -> Unit,
     save: (TrackerSyncPreferences) -> Unit,
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+    TrackerPreferenceRow(
+        title = "Automatic synchronization",
+        summary = "Refresh linked titles after library activity and sign-in.",
+        action = { save(preferences.withAutomatic(!preferences.automatic())) },
+        trailing = { Switch(checked = preferences.automatic(), onCheckedChange = null) },
+    )
+    TrackerPreferenceRow(
+        title = "Synchronization direction",
+        summary = readableEnum(preferences.direction()),
+        action = {
+            save(preferences.withDirection(nextValue(TrackerSyncDirection.entries, preferences.direction())))
+        },
+    )
+    TrackerPreferenceRow(
+        title = "When both sides changed",
+        summary = readableEnum(preferences.conflictPolicy()),
+        action = {
+            save(
+                preferences.withConflictPolicy(
+                    nextValue(TrackerConflictPolicy.entries, preferences.conflictPolicy()),
+                ),
+            )
+        },
+    )
+    TrackerPreferenceRow(
+        title = "Synchronize now",
+        summary = "Push and pull progress for every linked title.",
+        action = synchronize,
+        trailing = {
+            Icon(Icons.Outlined.Sync, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        },
+    )
+}
+
+@Composable
+private fun TrackerSectionHeader(label: String) {
+    Text(
+        label,
+        color = MaterialTheme.colorScheme.secondary,
+        style = MaterialTheme.typography.labelLarge,
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 18.dp, bottom = 8.dp),
+    )
+}
+
+@Composable
+private fun TrackerPreferenceRow(
+    title: String,
+    summary: String,
+    action: () -> Unit,
+    trailing: @Composable () -> Unit = {},
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = action).padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Automatic synchronization", fontWeight = FontWeight.Medium)
-                    Text(
-                        "Refresh bound titles after library activity and account sign-in.",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Switch(
-                    checked = preferences.automatic(),
-                    onCheckedChange = { save(preferences.withAutomatic(it)) },
-                )
-            }
-            Spacer(Modifier.height(8.dp))
-            Text("Direction", style = MaterialTheme.typography.labelLarge)
-            EnumChoiceRow(
-                values = TrackerSyncDirection.entries,
-                selected = preferences.direction(),
-                label = ::readableEnum,
-                choose = { save(preferences.withDirection(it)) },
+        Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+            Spacer(Modifier.height(3.dp))
+            Text(
+                summary,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(Modifier.height(8.dp))
-            Text("When both sides changed", style = MaterialTheme.typography.labelLarge)
-            EnumChoiceRow(
-                values = TrackerConflictPolicy.entries,
-                selected = preferences.conflictPolicy(),
-                label = ::readableEnum,
-                choose = { save(preferences.withConflictPolicy(it)) },
-            )
-            TextButton(onClick = synchronize) { Text("Synchronize now") }
         }
+        trailing()
     }
 }
+
+private fun <T> nextValue(values: List<T>, current: T): T =
+    values[(values.indexOf(current) + 1).mod(values.size)]
 
 @Composable
 private fun <T> EnumChoiceRow(
@@ -395,6 +448,7 @@ internal fun TitleTrackingScreen(
 ) {
     var revision by remember(itemId) { mutableStateOf(0) }
     var searching by remember { mutableStateOf<TrackerAccount?>(null) }
+    var login by remember { mutableStateOf<TrackerAccount?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     ObserveTracking(presentation) { revision++ }
     val accounts = remember(revision, kind) {
@@ -410,6 +464,24 @@ internal fun TitleTrackingScreen(
                 revision++
             }
             .onFailure { error = it.message ?: "Tracking operation failed." }
+    }
+
+    login?.let { account ->
+        TrackerLoginDialog(
+            account = account,
+            dismiss = { login = null },
+            submit = { credentials ->
+                runCatching { presentation.authenticate(account.descriptor().id(), credentials) }
+                    .onSuccess {
+                        error = null
+                        login = null
+                        revision++
+                        searching = account
+                    }
+                    .onFailure { error = it.message ?: "Unable to sign in." }
+            },
+            error = error,
+        )
     }
 
     searching?.let { account ->
@@ -463,7 +535,8 @@ internal fun TitleTrackingScreen(
                         ) {
                             searching = account
                         } else {
-                            error = "Sign in to ${account.descriptor().name()} from More > Tracking first."
+                            error = null
+                            login = account
                         }
                     }
                 } else {

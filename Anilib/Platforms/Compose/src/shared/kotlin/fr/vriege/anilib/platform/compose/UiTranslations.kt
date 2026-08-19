@@ -35,7 +35,9 @@ internal object UiTranslations {
             "Categories" to "Catégories",
             "Check for updates" to "Rechercher des mises à jour",
             "Close" to "Fermer",
+            "Connected" to "Connecté",
             "Delete" to "Supprimer",
+            "Disconnect" to "Déconnecter",
             "Description" to "Description",
             "Download" to "Télécharger",
             "Downloads" to "Téléchargements",
@@ -46,6 +48,8 @@ internal object UiTranslations {
             "Filters" to "Filtres",
             "Help" to "Aide",
             "History" to "Historique",
+            "Local progress stays on this device, but synchronization with the service stops." to
+                "La progression locale reste sur cet appareil, mais la synchronisation avec le service s’arrête.",
             "Import" to "Importer",
             "Language" to "Langue",
             "Library" to "Bibliothèque",
