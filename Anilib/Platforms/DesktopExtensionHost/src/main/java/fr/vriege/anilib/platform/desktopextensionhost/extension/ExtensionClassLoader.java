@@ -1,15 +1,32 @@
 package fr.vriege.anilib.platform.desktopextensionhost.extension;
 
+import java.io.IOException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Path;
+import java.util.Collections;
+import java.util.Enumeration;
+import java.util.LinkedHashSet;
 
 final class ExtensionClassLoader extends URLClassLoader {
     private static final String COMPATIBILITY_PACKAGE =
             "fr.vriege.anilib.platform.desktopextensionhost.compat.";
 
-    ExtensionClassLoader(Path archive) throws java.net.MalformedURLException {
-        super(new URL[]{archive.toUri().toURL()}, ExtensionClassLoader.class.getClassLoader());
+    ExtensionClassLoader(Path archive, Path apk) throws java.net.MalformedURLException {
+        super(new URL[]{archive.toUri().toURL(), apk.toUri().toURL()}, ExtensionClassLoader.class.getClassLoader());
+    }
+
+    @Override
+    public URL getResource(String name) {
+        URL resource = findResource(name);
+        return resource != null ? resource : getParent().getResource(name);
+    }
+
+    @Override
+    public Enumeration<URL> getResources(String name) throws IOException {
+        LinkedHashSet<URL> resources = new LinkedHashSet<>(Collections.list(findResources(name)));
+        resources.addAll(Collections.list(getParent().getResources(name)));
+        return Collections.enumeration(resources);
     }
 
     @Override

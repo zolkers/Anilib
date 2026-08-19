@@ -11,6 +11,8 @@ import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
@@ -24,6 +26,8 @@ final class ExtensionRuntimeCatalogSmoke {
     private static final String FACTORY_CLASS = "sample.DynamicFactory";
     private static final String ANIME_SOURCE =
             "fr/vriege/anilib/platform/desktopextensionhost/compat/aniyomi/animesource/AnimeSource";
+    private static final String TRANSLATION_RESOURCE = "assets/i18n/messages_en.properties";
+    private static final String TRANSLATION = "search=Search\n";
 
     private ExtensionRuntimeCatalogSmoke() {
     }
@@ -32,7 +36,9 @@ final class ExtensionRuntimeCatalogSmoke {
         Path directory = Files.createTempDirectory("anilib-extension-runtime-");
         try {
             Path archive = directory.resolve("extension.jar");
+            Path apk = directory.resolve("extension.apk");
             writeArchive(archive);
+            writeApk(apk);
             ExtensionApkMetadata metadata = new ExtensionApkMetadata(
                     "org.example.dynamic",
                     "Dynamic",
@@ -43,7 +49,7 @@ final class ExtensionRuntimeCatalogSmoke {
                     List.of(FACTORY_CLASS),
                     Optional.empty());
             InstalledExtension installed = new InstalledExtension(
-                    metadata, directory.resolve("extension.apk"), archive);
+                    metadata, apk, archive);
             ExtensionRuntimeCatalog catalog = new ExtensionRuntimeCatalog(new ExtensionRegistry(directory));
             try (ExtensionRuntimeCatalog.Snapshot snapshot = catalog.discover(List.of(installed))) {
                 if (!snapshot.failures().isEmpty() || snapshot.sources().size() != 1) {
@@ -54,12 +60,30 @@ final class ExtensionRuntimeCatalogSmoke {
                         || !source.language().equals("fr") || source.kind() != ExtensionKind.ANIME) {
                     throw new IllegalStateException("Dynamic source descriptor is invalid: " + source);
                 }
+                verifyApkResource(source);
             }
         } finally {
             try (var paths = Files.walk(directory)) {
                 for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) {
                     Files.deleteIfExists(path);
                 }
+            }
+        }
+    }
+
+    private static void writeApk(Path apk) throws IOException {
+        try (JarOutputStream jar = new JarOutputStream(Files.newOutputStream(apk))) {
+            jar.putNextEntry(new JarEntry(TRANSLATION_RESOURCE));
+            jar.write(TRANSLATION.getBytes(StandardCharsets.UTF_8));
+            jar.closeEntry();
+        }
+    }
+
+    private static void verifyApkResource(LoadedSource source) throws IOException {
+        ClassLoader loader = source.instance().getClass().getClassLoader();
+        try (InputStream input = loader.getResourceAsStream(TRANSLATION_RESOURCE)) {
+            if (input == null || !new String(input.readAllBytes(), StandardCharsets.UTF_8).equals(TRANSLATION)) {
+                throw new IllegalStateException("Extension APK resources are not visible to converted classes");
             }
         }
     }

@@ -47,7 +47,7 @@ public final class ExtensionRuntimeCatalog implements AutoCloseable {
                 if (validateCompatibility) {
                     abiVerifier.requireCompatible(extension.archive());
                 }
-                ExtensionClassLoader loader = new ExtensionClassLoader(extension.archive());
+                ExtensionClassLoader loader = new ExtensionClassLoader(extension.archive(), extension.apk());
                 loaders.add(loader);
                 load(extension.metadata(), loader, sources, validateCompatibility);
             } catch (LinkageError | ReflectiveOperationException | IOException | RuntimeException failure) {

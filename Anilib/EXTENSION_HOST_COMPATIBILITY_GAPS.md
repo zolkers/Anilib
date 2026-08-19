@@ -98,27 +98,22 @@ The video path already demonstrates the required direction by invoking the
 suspend `getVideoList` operation. Details, episodes, chapters, and pages do not
 yet use an equivalent capability-aware dispatcher.
 
-## Manga failure: what is and is not known
+## Manga failure: confirmed resource-loading mismatch
 
-The manga response contains only `NullPointerException`; the server currently
-discards the stack trace, causal chain, operation name, extension package, and
-source ID. Consequently, the exact null value is not yet proven.
+The complete causal chain identifies the null value. MangaDex creates its
+translation bundle through `ClassLoader.getResourceAsStream` and expects files
+such as `assets/i18n/messages_en.properties` to remain reachable from the
+installed APK. The desktop loader previously exposed only the DEX-to-JAR output,
+which contains converted classes but not the APK assets. The missing stream was
+then passed to `InputStreamReader`, producing the observed
+`NullPointerException` during `mangaDetailsParse`.
 
-The main candidates to verify are:
-
-- invocation of an inherited compatibility method instead of the extension's
-  modern operation;
-- creation of an `SManga` containing only its URL when the extension expects
-  additional catalogue fields;
-- a missing Android context, preference, dependency-injection, serialization,
-  coroutine, or networking ABI value;
-- conversion of a Kotlin/DEX call site whose nullability or default-argument
-  contract is not reproduced by the Java host;
-- an extension helper whose required host implementation still returns null.
-
-These are investigation targets, not established root causes. The first fix
-must improve diagnostics and capture the complete causal chain before changing
-unrelated UI or persistence code.
+Aniyomi keeps the original APK as the extension's code/resource path. The
+desktop host now mirrors that boundary: converted classes remain first in the
+isolated child-first loader, while the original installed APK is retained as a
+second loader URL for resources. A network-free regression test loads a
+synthetic `assets/i18n/messages_en.properties` file through an extension class
+to prevent this failure from returning.
 
 ## Why the current smoke test did not catch this
 
@@ -269,6 +264,7 @@ Anilib/Platforms/DesktopExtensionHost/src/test/
 - [x] complete catalogue models survive the desktop bridge;
 - [x] full root-cause diagnostics and stable application errors are retained;
 - [x] unsupported host ABI symbols are rejected during source discovery;
+- [x] extension-owned APK assets are visible to converted extension classes;
 - [x] the opt-in regression harness covers details, units, pages, episodes, and videos;
 - [ ] Anime-Sama detail-to-episode execution works;
 - [ ] MangaDex detail-to-chapter execution works;
