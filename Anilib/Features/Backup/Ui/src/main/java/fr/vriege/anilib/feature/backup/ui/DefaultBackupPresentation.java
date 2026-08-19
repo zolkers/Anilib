@@ -67,6 +67,22 @@ public final class DefaultBackupPresentation implements BackupPresentation {
     }
 
     @Override
+    public BackupImportPreview inspectImport(Path path) {
+        RuntimeException anilibFailure;
+        try {
+            return BackupImportPreview.anilib(service.inspect(path));
+        } catch (RuntimeException failure) {
+            anilibFailure = failure;
+        }
+        try {
+            return BackupImportPreview.aniyomi(service.inspectAniyomi(path));
+        } catch (RuntimeException failure) {
+            failure.addSuppressed(anilibFailure);
+            throw failure;
+        }
+    }
+
+    @Override
     public AniyomiBackupInspection inspectAniyomi(Path path) {
         return service.inspectAniyomi(path);
     }

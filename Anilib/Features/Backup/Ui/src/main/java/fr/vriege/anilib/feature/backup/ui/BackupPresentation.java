@@ -31,6 +31,8 @@ public interface BackupPresentation {
 
     BackupInspection inspect(Path path);
 
+    BackupImportPreview inspectImport(Path path);
+
     AniyomiBackupInspection inspectAniyomi(Path path);
 
     BackupRestoreResult restore(Path path);

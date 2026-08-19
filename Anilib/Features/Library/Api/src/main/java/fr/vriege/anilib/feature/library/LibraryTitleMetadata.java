@@ -46,11 +46,14 @@ public record LibraryTitleMetadata(
     private static List<String> validatedPeople(List<String> people, String name) {
         Preconditions.requireNonNull(people, name);
         List<String> copy = List.copyOf(people);
-        if (copy.stream().anyMatch(String::isBlank)) {
-            throw new IllegalArgumentException(name + " must not contain blank values");
-        }
-        if (new HashSet<>(copy).size() != copy.size()) {
-            throw new IllegalArgumentException(name + " must not contain duplicate values");
+        HashSet<String> unique = copy.size() > 1 ? new HashSet<>(copy.size()) : null;
+        for (String person : copy) {
+            if (person.isBlank()) {
+                throw new IllegalArgumentException(name + " must not contain blank values");
+            }
+            if (unique != null && !unique.add(person)) {
+                throw new IllegalArgumentException(name + " must not contain duplicate values");
+            }
         }
         return copy;
     }

@@ -38,6 +38,7 @@ import fr.vriege.anilib.feature.source.SourceContentUnit
 import fr.vriege.anilib.feature.source.SourceEpisode
 import fr.vriege.anilib.feature.source.SourceTitleDetails
 import fr.vriege.anilib.feature.source.SourceWebPage
+import fr.vriege.anilib.feature.source.SourcePublicationStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -46,6 +47,7 @@ private data class SourceMediaDetails(
     val details: SourceTitleDetails,
     val episodes: List<SourceEpisode>,
     val chapters: List<SourceContentUnit>,
+    val failures: List<String>,
 )
 
 @Composable
@@ -78,6 +80,8 @@ internal fun SourceTitleScreen(
         )
     }
     var notice by remember(item.id()) { mutableStateOf<String?>(null) }
+    var operationNotice by remember(item.id()) { mutableStateOf<String?>(null) }
+    var playbackNotice by remember(item.id()) { mutableStateOf<String?>(null) }
     val webPage = remember(item.id(), sourceWebPage) {
         presentation.titleWebPage(item.id()).orElse(sourceWebPage)
     }
@@ -85,13 +89,23 @@ internal fun SourceTitleScreen(
     CrashSafeLaunchedEffect(item.id(), requestRevision) {
         loaded = withContext(Dispatchers.IO) {
             runCatching {
+                val details = runCatching { presentation.titleDetails(item) }
+                val episodes = runCatching { presentation.episodes(item.id()) }
+                val chapters = runCatching { presentation.contentUnits(item.id()) }
+                val failures = listOfNotNull(
+                    details.exceptionOrNull()?.let { "Title details: ${sourceFailureMessage(it)}" },
+                    episodes.exceptionOrNull()?.let { "Episodes: ${sourceFailureMessage(it)}" },
+                    chapters.exceptionOrNull()?.let { "Chapters: ${sourceFailureMessage(it)}" },
+                )
                 SourceMediaDetails(
-                    presentation.titleDetails(item),
-                    presentation.episodes(item.id()),
-                    presentation.contentUnits(item.id()),
+                    details.getOrElse { catalogueDetails(item) },
+                    episodes.getOrDefault(emptyList()),
+                    chapters.getOrDefault(emptyList()),
+                    failures,
                 )
             }
         }
+        operationNotice = loaded?.getOrNull()?.failures?.takeIf { it.isNotEmpty() }?.joinToString("\n")
     }
 
     activeReader?.let { controller ->
@@ -105,7 +119,6 @@ internal fun SourceTitleScreen(
         return
     }
     activePlayer?.let { controller ->
-        DisposableEffect(controller) { onDispose { controller.close() } }
         PlayerSelectionScreen(
             controller,
             {},
@@ -116,6 +129,17 @@ internal fun SourceTitleScreen(
             true,
         ) { activePlayer = null }
         return
+    }
+
+    operationNotice?.let { message ->
+        UiNoticeDialog(UiNoticeKind.ERROR, message, { operationNotice = null }) {
+            operationNotice = null
+            loaded = null
+            requestRevision++
+        }
+    }
+    playbackNotice?.let { message ->
+        UiNoticeDialog(UiNoticeKind.ERROR, message, { playbackNotice = null })
     }
 
     when (val result = loaded) {
@@ -129,21 +153,33 @@ internal fun SourceTitleScreen(
                 }
 
                 fun openEpisode(episode: SourceEpisode) {
-                    runCatching { player.open(content.details.title(), episode.id()) }
-                        .onSuccess {
+                    scope.launch {
+                        withContext(Dispatchers.IO) {
+                            runCatching { player.open(content.details.title(), episode.id()) }
+                        }.onSuccess {
                             notice = null
+                            playbackNotice = null
                             activePlayer = it
+                        }.onFailure {
+                            notice = null
+                            playbackNotice = it.message ?: "The episode could not be opened"
                         }
-                        .onFailure { notice = it.message ?: "The episode could not be opened" }
+                    }
                 }
 
                 fun openChapter(chapter: SourceContentUnit) {
-                    runCatching { reader.open(content.details.title(), chapter.id()) }
-                        .onSuccess {
+                    scope.launch {
+                        withContext(Dispatchers.IO) {
+                            runCatching { reader.open(content.details.title(), chapter.id()) }
+                        }.onSuccess {
                             notice = null
+                            playbackNotice = null
                             activeReader = it
+                        }.onFailure {
+                            notice = null
+                            playbackNotice = it.message ?: "The chapter could not be opened"
                         }
-                        .onFailure { notice = it.message ?: "The chapter could not be opened" }
+                    }
                 }
 
                 val hasEpisodes = content.episodes.isNotEmpty()
@@ -185,7 +221,7 @@ internal fun SourceTitleScreen(
                                 next
                             }.onSuccess {
                                 favorite = it
-                                notice = if (it) "Added to Library" else "Removed from favorites"
+                                notice = null
                             }.onFailure { notice = it.message ?: "Favorite could not be updated" }
                         }
                     },
@@ -300,6 +336,21 @@ internal fun SourceTitleScreen(
         )
     }
 }
+
+private fun catalogueDetails(item: SourceCatalogueItem): SourceTitleDetails = SourceTitleDetails(
+    item.id(),
+    item.title(),
+    item.description(),
+    emptyList(),
+    emptyList(),
+    emptyList(),
+    SourcePublicationStatus.UNKNOWN,
+    item.thumbnail(),
+    item.contentKind(),
+)
+
+private fun sourceFailureMessage(failure: Throwable): String =
+    failure.message?.takeIf { it.isNotBlank() } ?: "The source operation could not be completed"
 
 @Composable
 private fun SourceMediaLoading(title: String, navigateUp: () -> Unit) {

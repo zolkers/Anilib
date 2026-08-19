@@ -9,7 +9,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 
 internal class AndroidBackupImportPicker(private val activity: ComponentActivity) : BackupImportPicker {
-    private val importDirectory = activity.cacheDir.toPath().resolve("aniyomi-imports").normalize()
+    private val importDirectory = activity.cacheDir.toPath().resolve("backup-imports").normalize()
     private var selectedCallback: ((Path) -> Unit)? = null
     private var failureCallback: ((String) -> Unit)? = null
     private var exportPath: Path? = null
@@ -111,7 +111,7 @@ internal class AndroidBackupImportPicker(private val activity: ComponentActivity
 
     private fun materialize(uri: android.net.Uri): Path {
         Files.createDirectories(importDirectory)
-        val target = Files.createTempFile(importDirectory, "aniyomi-backup-", ".proto.gz")
+        val target = Files.createTempFile(importDirectory, "backup-import-", ".bin")
         try {
             activity.contentResolver.openInputStream(uri).use { input ->
                 requireNotNull(input) { "The selected backup cannot be opened." }
@@ -123,7 +123,7 @@ internal class AndroidBackupImportPicker(private val activity: ComponentActivity
                         if (read < 0) break
                         total += read
                         if (total > MAX_INPUT_BYTES) {
-                            throw IOException("Aniyomi backup exceeds the 256 MB input limit")
+                            throw IOException("Backup exceeds the 256 MB input limit")
                         }
                         output.write(buffer, 0, read)
                     }

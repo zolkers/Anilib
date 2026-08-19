@@ -10,7 +10,16 @@ import java.nio.file.SimpleFileVisitor
 import java.nio.file.attribute.BasicFileAttributes
 
 object DesktopBrowserRuntime {
+    @Volatile
+    private var cachedStatus: BrowserRuntimeStatus? = null
+
+    @Volatile
+    private var initializationAttempted = false
+
+    @Synchronized
     fun initialize(dataDirectory: Path): BrowserRuntimeStatus {
+        cachedStatus?.let { return it }
+        initializationAttempted = true
         var failure: Throwable? = null
         var restartRequired = false
         return runCatching {
@@ -38,11 +47,16 @@ object DesktopBrowserRuntime {
             }
         }.getOrElse {
             BrowserRuntimeStatus.unavailable(it.message ?: "The desktop browser engine could not start.")
-        }
+        }.also { cachedStatus = it }
     }
 
+    @Synchronized
     fun dispose() {
-        KCEF.disposeBlocking()
+        if (initializationAttempted) {
+            KCEF.disposeBlocking()
+            initializationAttempted = false
+            cachedStatus = null
+        }
     }
 
     private fun clearPendingData(browserDirectory: Path) {

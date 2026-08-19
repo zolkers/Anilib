@@ -100,6 +100,9 @@ final class DiscoveryTest {
                     "catalogue sources must be grouped in deterministic language order");
             counter.check(presentation.sourceSections(SourceContentKind.MANGA).size() == 2,
                     "the shared presentation must expose language sections");
+            counter.check(presentation.enabledSourceLanguages(SourceContentKind.MANGA)
+                            .equals(Set.of("en", "und")),
+                    "default source languages must retain local content and English without enabling every locale");
             counter.check(discovery.source(REMOTE_SOURCE).orElseThrow().languageTag().equals("en")
                             && presentation.source(REMOTE_SOURCE).orElseThrow()
                                     .displayName().equals("Remote catalogue"),

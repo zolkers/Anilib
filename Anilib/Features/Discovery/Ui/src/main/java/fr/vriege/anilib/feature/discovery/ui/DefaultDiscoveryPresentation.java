@@ -28,6 +28,7 @@ import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -116,11 +117,7 @@ public final class DefaultDiscoveryPresentation implements DiscoveryPresentation
         }
         Map<SourceContentKind, Set<String>> languages = new EnumMap<>(SourceContentKind.class);
         languages.putAll(current.enabledLanguages());
-        if (selected.size() == available.size()) {
-            languages.remove(kind);
-        } else {
-            languages.put(kind, Set.copyOf(selected));
-        }
+        languages.put(kind, Set.copyOf(selected));
         browsePreferences.save(new DiscoveryBrowsePreferences(
                 languages,
                 current.pinnedSources(),
@@ -302,11 +299,28 @@ public final class DefaultDiscoveryPresentation implements DiscoveryPresentation
         List<String> available = availableSourceLanguages(contentKind);
         Set<String> configured = preferences.enabledLanguages(contentKind);
         if (configured.isEmpty()) {
-            return Set.copyOf(available);
+            return defaultLanguages(available);
         }
         Set<String> retained = new LinkedHashSet<>(configured);
         retained.retainAll(available);
-        return retained.isEmpty() ? Set.copyOf(available) : Set.copyOf(retained);
+        return retained.isEmpty() ? defaultLanguages(available) : Set.copyOf(retained);
+    }
+
+    private static Set<String> defaultLanguages(List<String> available) {
+        Set<String> selected = new LinkedHashSet<>();
+        addIfAvailable(selected, available, "und");
+        addIfAvailable(selected, available, normalizeLanguage(Locale.getDefault().getLanguage()));
+        addIfAvailable(selected, available, "en");
+        if (selected.isEmpty() && !available.isEmpty()) {
+            selected.add(available.getFirst());
+        }
+        return Set.copyOf(selected);
+    }
+
+    private static void addIfAvailable(Set<String> selected, List<String> available, String language) {
+        if (!language.isEmpty() && available.contains(language)) {
+            selected.add(language);
+        }
     }
 
     private static String normalizeLanguage(String languageTag) {

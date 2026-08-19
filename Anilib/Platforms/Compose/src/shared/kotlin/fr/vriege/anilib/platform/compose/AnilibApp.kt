@@ -139,6 +139,7 @@ import fr.vriege.anilib.feature.source.SourceId
 import fr.vriege.anilib.feature.reader.ui.ReaderController
 import fr.vriege.anilib.feature.reader.ui.ReaderPresentation
 import fr.vriege.anilib.feature.reader.ReaderOrientationPolicy
+import fr.vriege.anilib.feature.player.ui.PlayerController
 import fr.vriege.anilib.feature.player.ui.PlayerPresentation
 import fr.vriege.anilib.feature.player.PlayerOrientationPolicy
 import fr.vriege.anilib.feature.tracker.ui.TrackerPresentation
@@ -170,6 +171,11 @@ private data class DetailPlatform(
 private data class HistoryContentKey(
     val libraryItemId: LibraryItemId,
     val contentId: String,
+)
+
+private data class PendingPlayerRequest(
+    val token: Any,
+    val title: String,
 )
 
 @Composable
@@ -215,8 +221,8 @@ fun AnilibApp(
     var destination by remember { mutableStateOf(navigator.state()) }
     var section by remember { mutableStateOf(initialSettings.startScreen().appSection()) }
     var activeReader by remember { mutableStateOf<ReaderController?>(null) }
-    var activePlayerTitle by remember { mutableStateOf<LibraryItemId?>(null) }
-    var activePlayerEpisode by remember { mutableStateOf<SourceEpisodeId?>(null) }
+    var activePlayer by remember { mutableStateOf<PlayerController?>(null) }
+    var pendingPlayer by remember { mutableStateOf<PendingPlayerRequest?>(null) }
     var activeTrackingTitle by remember { mutableStateOf<LibraryItemId?>(null) }
     var readerError by remember { mutableStateOf<String?>(null) }
     var playerError by remember { mutableStateOf<String?>(null) }
@@ -270,26 +276,26 @@ fun AnilibApp(
         LocalLanguagePack provides settings.languagePack(),
         LocalUiFailureHandler provides handleUiFailure,
     ) {
+        val scope = rememberCrashSafeCoroutineScope()
         MaterialTheme(colorScheme = appColorScheme(settings, useDarkTheme)) {
             Surface(modifier = Modifier.fillMaxSize()) {
-            val controller = activeReader
-            val playerTitle = activePlayerTitle
+            val readerController = activeReader
+            val playerController = activePlayer
+            val playerRequest = pendingPlayer
             val trackingTitle = activeTrackingTitle
-            if (controller != null) {
-                DisposableEffect(controller) {
-                    onDispose { controller.close() }
+            if (readerController != null) {
+                DisposableEffect(readerController) {
+                    onDispose { readerController.close() }
                 }
                 ReaderScreen(
-                    controller,
+                    readerController,
                     pageDecoder,
                     applyReaderOrientationPolicy,
                     downloads::enqueue,
                 ) { activeReader = null }
-            } else if (playerTitle != null) {
-                EpisodeScreen(
-                    player,
-                    playerTitle,
-                    activePlayerEpisode,
+            } else if (playerController != null) {
+                PlayerSelectionScreen(
+                    playerController,
                     applyPlayerOrientationPolicy,
                     requestPlayerPictureInPicture,
                     setPlayerActive,
@@ -297,8 +303,11 @@ fun AnilibApp(
                     enableAndroidPlayerControls,
                     enableDesktopPlayerControls,
                 ) {
-                    activePlayerTitle = null
-                    activePlayerEpisode = null
+                    activePlayer = null
+                }
+            } else if (playerRequest != null) {
+                PlayerLoadingScreen(playerRequest.title) {
+                    pendingPlayer = null
                 }
             } else if (trackingTitle != null) {
                 val details = presentation.details(trackingTitle).orElse(null)
@@ -316,12 +325,14 @@ fun AnilibApp(
                 }
             } else {
                 val openReader: (LibraryItemId) -> Unit = { id ->
-                    runCatching { reader.open(id) }
-                        .onSuccess {
-                            readerError = null
-                            activeReader = it
-                        }
-                        .onFailure { readerError = it.message ?: "The reader could not be opened." }
+                    scope.launch {
+                        withContext(Dispatchers.IO) { runCatching { reader.open(id) } }
+                            .onSuccess {
+                                readerError = null
+                                activeReader = it
+                            }
+                            .onFailure { readerError = it.message ?: "The reader could not be opened." }
+                    }
                 }
                 val enqueueDownload: (LibraryItemId) -> Unit = { id ->
                     runCatching { downloads.enqueue(id) }
@@ -329,15 +340,39 @@ fun AnilibApp(
                         .onFailure { downloadError = it.message ?: "The download could not be queued." }
                 }
                 val openPlayer: (LibraryItemId, SourceEpisodeId?) -> Unit = { id, episodeId ->
-                    runCatching {
-                        check(player.canOpen(id)) { "This title no longer has a streaming source." }
-                    }
-                        .onSuccess {
-                            playerError = null
-                            activePlayerEpisode = episodeId
-                            activePlayerTitle = id
+                    val request = PendingPlayerRequest(
+                        token = Any(),
+                        title = presentation.details(id).orElse(null)?.title() ?: "Player",
+                    )
+                    pendingPlayer = request
+                    scope.launch {
+                        withContext(Dispatchers.IO) {
+                            runCatching {
+                                check(player.canOpen(id)) { "This title no longer has a streaming source." }
+                                val selectedEpisode = episodeId ?: player.episodes(id)
+                                    .firstOrNull()
+                                    ?.episode()
+                                    ?.id()
+                                    ?: error("No episodes are available from this source.")
+                                player.open(id, selectedEpisode)
+                            }
                         }
-                        .onFailure { playerError = it.message ?: "The episode list could not be opened." }
+                            .onSuccess {
+                                if (pendingPlayer?.token === request.token) {
+                                    playerError = null
+                                    activePlayer = it
+                                    pendingPlayer = null
+                                } else {
+                                    it.close()
+                                }
+                            }
+                            .onFailure {
+                                if (pendingPlayer?.token === request.token) {
+                                    pendingPlayer = null
+                                    playerError = it.message ?: "The episode could not be opened."
+                                }
+                            }
+                    }
                 }
                 BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                     val useNavigationRail = when (settings.navigationStyle()) {
@@ -374,7 +409,6 @@ fun AnilibApp(
                             openReader,
                             readerError,
                             openPlayer,
-                            playerError,
                             enqueueDownload,
                             downloadError,
                             { activeTrackingTitle = it },
@@ -411,7 +445,6 @@ fun AnilibApp(
                             openReader,
                             readerError,
                             openPlayer,
-                            playerError,
                             enqueueDownload,
                             downloadError,
                             { activeTrackingTitle = it },
@@ -430,8 +463,8 @@ fun AnilibApp(
                     returnToLibrary = {
                         runCatching { activeReader?.close() }
                         activeReader = null
-                        activePlayerTitle = null
-                        activePlayerEpisode = null
+                        activePlayer = null
+                        pendingPlayer = null
                         activeTrackingTitle = null
                         moreDestination = null
                         navigate(LibraryNavigator::openLibrary)
@@ -441,6 +474,9 @@ fun AnilibApp(
                         recoveredFailure = null
                     },
                 )
+            }
+            playerError?.let { message ->
+                UiNoticeDialog(UiNoticeKind.ERROR, message, dismiss = { playerError = null })
             }
         }
     }
@@ -475,7 +511,6 @@ private fun ExpandedShell(
     openReader: (LibraryItemId) -> Unit,
     readerError: String?,
     openPlayer: (LibraryItemId, SourceEpisodeId?) -> Unit,
-    playerError: String?,
     enqueueDownload: (LibraryItemId) -> Unit,
     downloadError: String?,
     openTracking: (LibraryItemId) -> Unit,
@@ -515,7 +550,6 @@ private fun ExpandedShell(
                 openReader,
                 readerError,
                 openPlayer,
-                playerError,
                 enqueueDownload,
                 downloadError,
                 openTracking,
@@ -556,7 +590,6 @@ private fun CompactShell(
     openReader: (LibraryItemId) -> Unit,
     readerError: String?,
     openPlayer: (LibraryItemId, SourceEpisodeId?) -> Unit,
-    playerError: String?,
     enqueueDownload: (LibraryItemId) -> Unit,
     downloadError: String?,
     openTracking: (LibraryItemId) -> Unit,
@@ -594,7 +627,6 @@ private fun CompactShell(
                 openReader,
                 readerError,
                 openPlayer,
-                playerError,
                 enqueueDownload,
                 downloadError,
                 openTracking,
@@ -680,7 +712,6 @@ private fun AppDestination(
     openReader: (LibraryItemId) -> Unit,
     readerError: String?,
     openPlayer: (LibraryItemId, SourceEpisodeId?) -> Unit,
-    playerError: String?,
     enqueueDownload: (LibraryItemId) -> Unit,
     downloadError: String?,
     openTracking: (LibraryItemId) -> Unit,
@@ -707,7 +738,6 @@ private fun AppDestination(
                 openReader,
                 readerError,
                 openPlayer,
-                playerError,
                 enqueueDownload,
                 downloadError,
                 openTracking,
@@ -715,7 +745,6 @@ private fun AppDestination(
             else -> LibraryPageContent(
                 presentation,
                 discovery,
-                player,
                 downloads,
                 if (section == AppSection.ANIME) MediaKind.ANIME else MediaKind.MANGA,
                 navigate,
@@ -746,7 +775,7 @@ private fun AppDestination(
                 player,
                 openReader,
                 openPlayer,
-                readerError ?: playerError,
+                readerError,
                 closeMore,
             ) { row, transition ->
                 navigate(transition)
@@ -803,7 +832,6 @@ private fun AppDestination(
 private fun LibraryPageContent(
     presentation: LibraryPresentation,
     discovery: DiscoveryPresentation,
-    player: PlayerPresentation,
     downloads: DownloadPresentation,
     kind: MediaKind,
     navigate: ((LibraryNavigator) -> Unit) -> Unit,
@@ -844,28 +872,6 @@ private fun LibraryPageContent(
             }
         }
         .toList()
-    val titleIds = titles.map { it.id() }
-    var remainingEpisodes by remember(player) {
-        mutableStateOf<Map<LibraryItemId, Int>>(emptyMap())
-    }
-    CrashSafeLaunchedEffect(player, kind, titleIds) {
-        if (kind != MediaKind.ANIME) {
-            remainingEpisodes = emptyMap()
-            return@CrashSafeLaunchedEffect
-        }
-        remainingEpisodes = remainingEpisodes.filterKeys(titleIds::contains)
-        titleIds.forEach { id ->
-            runCatching {
-                withContext(Dispatchers.IO) {
-                    player.episodes(id).count { episode ->
-                        !episode.playback().map { it.completed() }.orElse(false)
-                    }
-                }
-            }.onSuccess { count ->
-                remainingEpisodes = remainingEpisodes + (id to count)
-            }
-        }
-    }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -1051,7 +1057,7 @@ private fun LibraryPageContent(
                         gridItems(titles, key = { it.id().value() }) { card ->
                             LibraryCoverCard(
                                 card,
-                                remainingEpisodes[card.id()],
+                                null,
                                 card.id() in selected,
                                 selectionMode,
                                 { selected = selected.toggle(card.id()) },
@@ -1064,7 +1070,7 @@ private fun LibraryPageContent(
                         items(titles, key = { it.id().value() }) { card ->
                             LibraryTitleCard(
                                 card,
-                                remainingEpisodes[card.id()],
+                                null,
                                 card.id() in selected,
                                 selectionMode,
                                 { selected = selected.toggle(card.id()) },
@@ -1428,13 +1434,18 @@ private fun HistoryPage(
     var contentLabels by remember(reader, player) {
         mutableStateOf<Map<HistoryContentKey, String>>(emptyMap())
     }
+    var episodeIds by remember(player) {
+        mutableStateOf<Map<HistoryContentKey, SourceEpisodeId>>(emptyMap())
+    }
     CrashSafeLaunchedEffect(reader, player, kind, history) {
         val rows = history.entries().filter { it.kind() == kind }
-        contentLabels = withContext(Dispatchers.IO) {
+        val content = withContext(Dispatchers.IO) {
             val labels = mutableMapOf<HistoryContentKey, String>()
+            val resolvedEpisodeIds = mutableMapOf<HistoryContentKey, SourceEpisodeId>()
             rows.groupBy { it.libraryItemId() }.forEach { (libraryItemId, titleRows) ->
                 if (kind == MediaKind.ANIME) {
                     runCatching { player.episodes(libraryItemId) }.getOrDefault(emptyList()).forEach { episode ->
+                        val key = HistoryContentKey(libraryItemId, episode.episode().id().value())
                         val fallbackPosition = titleRows
                             .filter { it.contentId() == episode.episode().id().value() }
                             .maxOfOrNull { it.position() }
@@ -1442,8 +1453,8 @@ private fun HistoryPage(
                         val position = episode.playback()
                             .map { it.positionMillis() }
                             .orElse(fallbackPosition)
-                        labels[HistoryContentKey(libraryItemId, episode.episode().id().value())] =
-                            "${episode.episode().title()} · ${formatHistoryDuration(position)}"
+                        labels[key] = "${episode.episode().title()} · ${formatHistoryDuration(position)}"
+                        resolvedEpisodeIds[key] = episode.episode().id()
                     }
                 } else {
                     runCatching { reader.contentUnits(libraryItemId) }.getOrDefault(emptyList()).forEach { unit ->
@@ -1451,8 +1462,10 @@ private fun HistoryPage(
                     }
                 }
             }
-            labels
+            labels to resolvedEpisodeIds
         }
+        contentLabels = content.first
+        episodeIds = content.second
     }
     val entries = history.entries().filter {
         val contentLabel = contentLabels[HistoryContentKey(it.libraryItemId(), it.contentId())]
@@ -1557,7 +1570,10 @@ private fun HistoryPage(
                                 contentLabels[HistoryContentKey(row.libraryItemId(), row.contentId())],
                                 resume = {
                                     if (row.kind() == MediaKind.ANIME) {
-                                        openPlayer(row.libraryItemId(), null)
+                                        openPlayer(
+                                            row.libraryItemId(),
+                                            episodeIds[HistoryContentKey(row.libraryItemId(), row.contentId())],
+                                        )
                                     } else {
                                         openReader(row.libraryItemId())
                                     }
@@ -1684,7 +1700,6 @@ private fun DetailsDestination(
     openReader: (LibraryItemId) -> Unit,
     readerError: String?,
     openPlayer: (LibraryItemId, SourceEpisodeId?) -> Unit,
-    playerError: String?,
     enqueueDownload: (LibraryItemId) -> Unit,
     downloadError: String?,
     openTracking: (LibraryItemId) -> Unit,
@@ -1754,7 +1769,6 @@ private fun DetailsDestination(
             canDownload = runCatching { downloads.canEnqueue(details.id()) }.getOrDefault(false),
             canTrack = true,
             readerError = readerError,
-            playerError = playerError,
             downloadError = downloadError,
             read = { openReader(details.id()) },
             watch = { openPlayer(details.id(), null) },
@@ -1808,7 +1822,6 @@ private fun DetailsPage(
     canDownload: Boolean,
     canTrack: Boolean,
     readerError: String?,
-    playerError: String?,
     downloadError: String?,
     read: () -> Unit,
     watch: () -> Unit,
@@ -1846,7 +1859,7 @@ private fun DetailsPage(
         canDownload = canDownload,
         primaryLabel = if (canWatch) "Watch" else "Read",
         canOpenPrimary = canWatch || canRead,
-        errors = listOfNotNull(readerError, playerError, downloadError, unitError),
+        errors = listOfNotNull(readerError, downloadError, unitError),
         toggleFavorite = favorite,
         track = track,
         openWeb = openTitleWeb ?: openSourceWeb ?: {},

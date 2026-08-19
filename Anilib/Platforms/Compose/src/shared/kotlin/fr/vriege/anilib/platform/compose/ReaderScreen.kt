@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -42,6 +43,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -74,7 +76,13 @@ import fr.vriege.anilib.feature.reader.ReaderScaleMode
 import fr.vriege.anilib.feature.reader.ui.ReaderController
 import fr.vriege.anilib.feature.source.SourceContentUnit
 import fr.vriege.anilib.feature.source.SourceContentUnitId
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
+
+private const val READER_CONTROLS_HIDE_DELAY_MILLIS = 3_500L
 
 @Composable
 internal fun ReaderScreen(
@@ -84,6 +92,7 @@ internal fun ReaderScreen(
     downloadContent: (LibraryItemId, SourceContentUnitId) -> Unit,
     closeReader: () -> Unit,
 ) {
+    val scope = rememberCrashSafeCoroutineScope()
     var revision by remember(controller) { mutableIntStateOf(0) }
     var controlsVisible by remember(controller) { mutableStateOf(true) }
     var zoomed by remember(controller) { mutableStateOf(false) }
@@ -96,18 +105,56 @@ internal fun ReaderScreen(
     var display by remember(controller) { mutableStateOf(controller.display()) }
     var titleDisplayOverride by remember(controller) { mutableStateOf(controller.hasDisplayOverride()) }
     var readContentIds by remember(controller) { mutableStateOf(controller.readContentIds()) }
+    var contentUnits by remember(controller) { mutableStateOf<List<SourceContentUnit>?>(null) }
+    var decodedPage by remember(controller) { mutableStateOf<Result<ImageBitmap>?>(null) }
+    var decodedAdjacentPage by remember(controller) { mutableStateOf<Result<ImageBitmap>?>(null) }
+    var readerBusy by remember(controller) { mutableStateOf(false) }
     val snapshot = remember(controller, revision) { controller.snapshot() }
-    val contentUnits = remember(controller, revision) {
-        runCatching { controller.contentUnits() }.getOrDefault(emptyList())
+    CrashSafeLaunchedEffect(controller, snapshot.contentUnit().id()) {
+        contentUnits = null
+        contentUnits = withContext(Dispatchers.IO) {
+            runCatching { controller.contentUnits() }.getOrDefault(emptyList())
+        }
     }
-    val decodedPage = remember(controller, snapshot.currentPageIndex()) {
-        runCatching { pageDecoder(controller.currentPage()) }
+    CrashSafeLaunchedEffect(
+        controller,
+        snapshot.contentUnit().id(),
+        snapshot.currentPageIndex(),
+        display.dualPage(),
+        revision,
+    ) {
+        decodedPage = null
+        decodedAdjacentPage = null
+        val pageIndex = snapshot.currentPageIndex()
+        val loadAdjacent = display.dualPage() && pageIndex + 1 < snapshot.pageCount()
+        val pages = withContext(Dispatchers.IO) {
+            val primary = runCatching {
+                requireNotNull(pageDecoder(controller.page(pageIndex))) { "Unsupported page image format" }
+            }
+            val adjacent = if (loadAdjacent) {
+                runCatching {
+                    requireNotNull(pageDecoder(controller.page(pageIndex + 1))) {
+                        "Unsupported adjacent page image format"
+                    }
+                }
+            } else {
+                null
+            }
+            primary to adjacent
+        }
+        decodedPage = pages.first
+        decodedAdjacentPage = pages.second
     }
-    val decodedAdjacentPage = remember(controller, snapshot.currentPageIndex(), display.dualPage()) {
-        if (display.dualPage() && snapshot.currentPageIndex() + 1 < snapshot.pageCount()) {
-            runCatching { pageDecoder(controller.page(snapshot.currentPageIndex() + 1)) }
-        } else {
-            null
+    CrashSafeLaunchedEffect(
+        controlsVisible,
+        settingsMenu,
+        chapterMenu,
+        readerMenu,
+        snapshot.currentPageIndex(),
+    ) {
+        if (controlsVisible && !settingsMenu && !chapterMenu && !readerMenu) {
+            delay(READER_CONTROLS_HIDE_DELAY_MILLIS)
+            controlsVisible = false
         }
     }
     DisposableEffect(display.orientationPolicy(), applyOrientationPolicy) {
@@ -156,10 +203,35 @@ internal fun ReaderScreen(
     }
 
     fun openContentUnit(contentUnitId: SourceContentUnitId) {
-        controller.openContentUnit(contentUnitId)
-        splitSecondHalf = false
-        actionMessage = null
-        revision++
+        if (readerBusy) return
+        scope.launch {
+            readerBusy = true
+            withContext(Dispatchers.IO) { runCatching { controller.openContentUnit(contentUnitId) } }
+                .onSuccess {
+                    splitSecondHalf = false
+                    actionMessage = null
+                    revision++
+                }
+                .onFailure { actionMessage = it.message ?: "The chapter could not be opened." }
+            readerBusy = false
+        }
+    }
+
+    fun moveContentUnit(next: Boolean) {
+        if (readerBusy) return
+        scope.launch {
+            readerBusy = true
+            withContext(Dispatchers.IO) {
+                runCatching { if (next) controller.nextContentUnit() else controller.previousContentUnit() }
+            }.onSuccess { moved ->
+                if (moved) {
+                    splitSecondHalf = false
+                    actionMessage = null
+                    revision++
+                }
+            }.onFailure { actionMessage = it.message ?: "The chapter could not be opened." }
+            readerBusy = false
+        }
     }
 
     fun setRead(contentUnitId: SourceContentUnitId, read: Boolean) {
@@ -200,7 +272,7 @@ internal fun ReaderScreen(
             },
     ) {
         val reducedMotion = LocalReducedMotion.current
-        decodedPage.getOrNull()?.let { image ->
+        decodedPage?.getOrNull()?.let { image ->
             val frame = ReaderPageFrame(
                 image,
                 decodedAdjacentPage?.getOrNull(),
@@ -224,7 +296,11 @@ internal fun ReaderScreen(
                     splitSecondHalf = current.splitSecondHalf,
                 )
             }
-        } ?: ReaderPageError(decodedPage.exceptionOrNull()?.message) { revision++ }
+        } ?: if (decodedPage == null) {
+            ReaderPageLoading()
+        } else {
+            ReaderPageError(decodedPage?.exceptionOrNull()?.message) { revision++ }
+        }
 
         ReaderTapZones(
             direction = snapshot.direction(),
@@ -244,14 +320,9 @@ internal fun ReaderScreen(
             ReaderBottomBar(
                 pageIndex = snapshot.currentPageIndex(),
                 pageCount = snapshot.pageCount(),
-                direction = snapshot.direction(),
                 goToPage = { index ->
                     controller.goToPage(index)
                     splitSecondHalf = false
-                    revision++
-                },
-                changeDirection = { direction ->
-                    controller.setDirection(direction)
                     revision++
                 },
                 splitSecondHalf = splitSecondHalf,
@@ -264,6 +335,7 @@ internal fun ReaderScreen(
             ReaderSettingsDialog(
                 interactions = interactions,
                 display = display,
+                direction = snapshot.direction(),
                 titleOverride = titleDisplayOverride,
                 updateInteractions = {
                     controller.setInteractions(it)
@@ -273,6 +345,11 @@ internal fun ReaderScreen(
                     controller.setDisplay(it, titleDisplayOverride)
                     display = it
                     splitSecondHalf = false
+                },
+                updateDirection = {
+                    controller.setDirection(it)
+                    splitSecondHalf = false
+                    revision++
                 },
                 setTitleOverride = { enabled ->
                     if (enabled) {
@@ -289,7 +366,8 @@ internal fun ReaderScreen(
         }
         if (chapterMenu) {
             ReaderChapterDialog(
-                units = contentUnits,
+                units = contentUnits.orEmpty(),
+                loading = contentUnits == null,
                 current = snapshot.contentUnit().id(),
                 readContentIds = readContentIds,
                 open = {
@@ -307,11 +385,11 @@ internal fun ReaderScreen(
                 read = readContentIds.contains(snapshot.contentUnit().id().value()),
                 message = actionMessage,
                 previousChapter = {
-                    if (controller.previousContentUnit()) revision++
+                    moveContentUnit(false)
                     readerMenu = false
                 },
                 nextChapter = {
-                    if (controller.nextContentUnit()) revision++
+                    moveContentUnit(true)
                     readerMenu = false
                 },
                 setRead = { setRead(snapshot.contentUnit().id(), it) },
@@ -326,6 +404,14 @@ internal fun ReaderScreen(
                 },
                 close = { readerMenu = false },
             )
+        }
+        if (readerBusy) {
+            Box(
+                modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.36f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(color = Color.White)
+            }
         }
     }
 }
@@ -582,6 +668,7 @@ private enum class InteractionSlot(val label: String) {
 @Composable
 private fun ReaderChapterDialog(
     units: List<SourceContentUnit>,
+    loading: Boolean,
     current: SourceContentUnitId,
     readContentIds: Set<String>,
     open: (SourceContentUnitId) -> Unit,
@@ -593,7 +680,14 @@ private fun ReaderChapterDialog(
         onDismissRequest = close,
         title = { Text("Chapters") },
         text = {
-            if (units.isEmpty()) {
+            if (loading) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(96.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator()
+                }
+            } else if (units.isEmpty()) {
                 Text("No chapter list is available.")
             } else {
                 LazyColumn(modifier = Modifier.heightIn(max = 520.dp)) {
@@ -658,9 +752,11 @@ private fun ReaderMenuDialog(
 private fun ReaderSettingsDialog(
     interactions: ReaderInteractionPreferences,
     display: ReaderDisplayPreferences,
+    direction: ReadingDirection,
     titleOverride: Boolean,
     updateInteractions: (ReaderInteractionPreferences) -> Unit,
     updateDisplay: (ReaderDisplayPreferences) -> Unit,
+    updateDirection: (ReadingDirection) -> Unit,
     setTitleOverride: (Boolean) -> Unit,
     close: () -> Unit,
 ) {
@@ -673,6 +769,11 @@ private fun ReaderSettingsDialog(
                 item {
                     TextButton(onClick = { setTitleOverride(!titleOverride) }) {
                         Text("Apply to this title: ${enabledLabel(titleOverride)}")
+                    }
+                }
+                item {
+                    TextButton(onClick = { updateDirection(nextDirection(direction)) }) {
+                        Text("Reading mode: ${direction.name.replace('_', ' ').lowercase()}")
                     }
                 }
                 item {
@@ -932,6 +1033,11 @@ private fun nextOrientation(value: ReaderOrientationPolicy): ReaderOrientationPo
     return values[(value.ordinal + 1) % values.size]
 }
 
+private fun nextDirection(value: ReadingDirection): ReadingDirection {
+    val values = ReadingDirection.entries
+    return values[(value.ordinal + 1) % values.size]
+}
+
 private fun enabledLabel(value: Boolean) = if (value) "on" else "off"
 
 private fun interaction(
@@ -990,14 +1096,13 @@ private fun horizontalAction(
 private fun ReaderBottomBar(
     pageIndex: Int,
     pageCount: Int,
-    direction: ReadingDirection,
     goToPage: (Int) -> Unit,
-    changeDirection: (ReadingDirection) -> Unit,
     splitSecondHalf: Boolean,
     dualPage: Boolean,
     splitPages: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    var sliderValue by remember(pageIndex, pageCount) { mutableFloatStateOf(pageIndex.toFloat()) }
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -1007,8 +1112,9 @@ private fun ReaderBottomBar(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Default.ChevronLeft, contentDescription = null, tint = Color.White)
             Slider(
-                value = pageIndex.toFloat(),
-                onValueChange = { goToPage(it.roundToInt()) },
+                value = sliderValue,
+                onValueChange = { sliderValue = it },
+                onValueChangeFinished = { goToPage(sliderValue.roundToInt()) },
                 valueRange = 0f..(pageCount - 1).coerceAtLeast(1).toFloat(),
                 steps = (pageCount - 2).coerceAtLeast(0),
                 enabled = pageCount > 1,
@@ -1017,20 +1123,16 @@ private fun ReaderBottomBar(
             Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.White)
         }
         Text(
-            text = readerPageLabel(pageIndex, pageCount, splitSecondHalf, dualPage, splitPages),
+            text = readerPageLabel(
+                sliderValue.roundToInt(),
+                pageCount,
+                splitSecondHalf,
+                dualPage,
+                splitPages,
+            ),
             color = Color.White,
             modifier = Modifier.align(Alignment.CenterHorizontally),
         )
-        Spacer(Modifier.height(4.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-        ) {
-            DirectionButton("LTR", ReadingDirection.LEFT_TO_RIGHT, direction, changeDirection)
-            DirectionButton("RTL", ReadingDirection.RIGHT_TO_LEFT, direction, changeDirection)
-            DirectionButton("Vertical", ReadingDirection.VERTICAL, direction, changeDirection)
-            DirectionButton("Webtoon", ReadingDirection.WEBTOON, direction, changeDirection)
-        }
     }
 }
 
@@ -1047,22 +1149,6 @@ private fun readerPageLabel(
 }
 
 @Composable
-private fun DirectionButton(
-    label: String,
-    value: ReadingDirection,
-    selected: ReadingDirection,
-    changeDirection: (ReadingDirection) -> Unit,
-) {
-    TextButton(onClick = { changeDirection(value) }) {
-        Text(
-            label,
-            color = if (value == selected) Color(0xFF90CAF9) else Color.White,
-            fontWeight = if (value == selected) FontWeight.Bold else FontWeight.Normal,
-        )
-    }
-}
-
-@Composable
 private fun ReaderPageError(message: String?, retry: () -> Unit) {
     Column(
         modifier = Modifier.fillMaxSize().padding(32.dp),
@@ -1076,5 +1162,12 @@ private fun ReaderPageError(message: String?, retry: () -> Unit) {
         }
         Spacer(Modifier.height(10.dp))
         TextButton(onClick = retry) { Text("Retry", color = Color.White) }
+    }
+}
+
+@Composable
+private fun ReaderPageLoading() {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        CircularProgressIndicator(color = Color.White)
     }
 }

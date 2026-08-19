@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.IntStream;
 
 final class PerformanceBudgetTest {
@@ -21,6 +22,11 @@ final class PerformanceBudgetTest {
     private static final long LARGE_LIBRARY_FILE_BUDGET = 32L * 1024L * 1024L;
 
     private PerformanceBudgetTest() {
+    }
+
+    public static void main(String[] arguments) {
+        int assertions = run();
+        System.out.println("Performance audit: " + assertions + " assertions passed.");
     }
 
     static int run() {
@@ -46,7 +52,8 @@ final class PerformanceBudgetTest {
             long write = measure(() -> catalog.replaceAll(items));
             counter.check(write <= LARGE_LIBRARY_WRITE_BUDGET.toNanos(),
                     "10,000-title atomic write exceeded " + LARGE_LIBRARY_WRITE_BUDGET);
-            counter.check(size(file) <= LARGE_LIBRARY_FILE_BUDGET,
+            long fileSize = size(file);
+            counter.check(fileSize <= LARGE_LIBRARY_FILE_BUDGET,
                     "10,000-title catalog exceeded its disk budget");
 
             Holder<FileLibraryCatalog> reopened = new Holder<>();
@@ -56,6 +63,13 @@ final class PerformanceBudgetTest {
             counter.check(reopened.value.snapshot().size() == LARGE_LIBRARY_SIZE
                             && reopened.value.snapshot().getFirst().title().equals("Performance title 00001"),
                     "large-library reopen and deterministic display sort must retain every title");
+            System.out.printf(
+                    Locale.ROOT,
+                    "Performance metrics: startup=%.2f ms, write-10000=%.2f ms, reopen-10000=%.2f ms, file=%.2f MiB%n",
+                    milliseconds(startup),
+                    milliseconds(write),
+                    milliseconds(reopen),
+                    fileSize / (1024.0D * 1024.0D));
             return counter.value;
         } finally {
             deleteDirectory(directory);
@@ -66,6 +80,10 @@ final class PerformanceBudgetTest {
         long started = System.nanoTime();
         action.run();
         return System.nanoTime() - started;
+    }
+
+    private static double milliseconds(long nanoseconds) {
+        return nanoseconds / 1_000_000.0D;
     }
 
     private static long size(Path file) {

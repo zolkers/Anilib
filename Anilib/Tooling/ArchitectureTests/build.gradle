@@ -76,3 +76,21 @@ tasks.named('run') {
     systemProperty 'anilib.example.source.configuration', project(':Anilib:Examples:SourceTemplate')
             .file('source-publisher.properties').absolutePath
 }
+
+tasks.register('performanceAudit', JavaExec) {
+    group = 'verification'
+    description = 'Profiles the headless startup and 10,000-title performance budgets without opening the app.'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.runtimeClasspath
+    mainModule = application.mainModule
+    mainClass = 'fr.vriege.anilib.tooling.archtests.PerformanceBudgetTest'
+    def recording = layout.buildDirectory.file('reports/performance/anilib-headless-budget.jfr')
+    outputs.file(recording)
+    outputs.upToDateWhen { false }
+    doFirst {
+        File output = recording.get().asFile
+        output.parentFile.mkdirs()
+        output.delete()
+        jvmArgs "-XX:StartFlightRecording=filename=${output.absolutePath},settings=profile,dumponexit=true"
+    }
+}

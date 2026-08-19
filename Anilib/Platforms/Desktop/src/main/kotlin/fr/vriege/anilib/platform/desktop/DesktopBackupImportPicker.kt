@@ -13,7 +13,7 @@ import java.nio.file.StandardCopyOption
 internal class DesktopBackupImportPicker : BackupImportPicker {
     override fun choose(onSelected: (Path) -> Unit, onFailure: (String) -> Unit) {
         runCatching {
-            val dialog = FileDialog(null as Frame?, "Import Aniyomi backup", FileDialog.LOAD)
+            val dialog = FileDialog(null as Frame?, "Import Anilib or Aniyomi backup", FileDialog.LOAD)
             try {
                 dialog.isVisible = true
                 val file = dialog.file ?: return

@@ -58,15 +58,18 @@ import fr.vriege.anilib.feature.network.NetworkPolicy
 import fr.vriege.anilib.feature.settings.SettingsSnapshot
 import fr.vriege.anilib.feature.settings.DiagnosticResetArea
 import fr.vriege.anilib.feature.settings.DiagnosticResetPlan
+import fr.vriege.anilib.feature.settings.DiagnosticSnapshot
 import fr.vriege.anilib.feature.settings.BrowserPolicy
 import fr.vriege.anilib.feature.settings.LanguagePack
 import fr.vriege.anilib.feature.settings.ThemeMode
 import fr.vriege.anilib.feature.settings.TypographyScale
 import fr.vriege.anilib.feature.settings.ui.SettingsPresentation
-import kotlinx.coroutines.launch
 import java.net.URI
 import java.time.Duration
 import java.util.Optional
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -104,8 +107,10 @@ internal fun SettingsScreen(
                 }
             }
             MaintenanceAction.CACHE -> {
-                maintenance.clearResponseCache()
-                result = action.result
+                scope.launch {
+                    withContext(Dispatchers.IO) { maintenance.clearResponseCache() }
+                    result = action.result
+                }
             }
             MaintenanceAction.BROWSER_DATA -> scope.launch {
                 val browserCookiesCleared = runCatching { browserCookies.removeAllCookies() }.isSuccess
@@ -119,11 +124,13 @@ internal fun SettingsScreen(
                 }
             }
             MaintenanceAction.UNUSED_DATA -> {
-                val cleanup = presentation.cleanUnusedData()
-                result = if (cleanup.totalRemoved() == 0) {
-                    "Database is already clean."
-                } else {
-                    "Removed ${cleanup.totalRemoved()} unused database entries."
+                scope.launch {
+                    val cleanup = withContext(Dispatchers.IO) { presentation.cleanUnusedData() }
+                    result = if (cleanup.totalRemoved() == 0) {
+                        "Database is already clean."
+                    } else {
+                        "Removed ${cleanup.totalRemoved()} unused database entries."
+                    }
                 }
             }
         }
@@ -200,9 +207,11 @@ internal fun SettingsScreen(
             },
             confirmButton = {
                 TextButton(onClick = {
-                    presentation.executeReset(plan)
-                    resetPlan = null
-                    diagnosticsDialog = false
+                    scope.launch {
+                        withContext(Dispatchers.IO) { presentation.executeReset(plan) }
+                        resetPlan = null
+                        diagnosticsDialog = false
+                    }
                 }) { Text("Reset") }
             },
             dismissButton = { TextButton(onClick = { resetPlan = null }) { Text("Cancel") } },
@@ -661,56 +670,73 @@ private fun DiagnosticsDialog(
     close: () -> Unit,
 ) {
     var revision by remember { mutableStateOf(0) }
-    val snapshot = remember(presentation, revision) { presentation.diagnostics() }
+    var snapshot by remember(presentation) { mutableStateOf<DiagnosticSnapshot?>(null) }
     var feedback by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCrashSafeCoroutineScope()
+    CrashSafeLaunchedEffect(presentation, revision) {
+        snapshot = withContext(Dispatchers.IO) { presentation.diagnostics() }
+    }
     AlertDialog(
         onDismissRequest = close,
         title = { Text("Storage and diagnostics") },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                Text("${formatDiagnosticBytes(snapshot.totalBytes())} in ${snapshot.totalFiles()} files")
-                Text(snapshot.dataDirectory().toString(), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                snapshot.storage().forEach { usage ->
-                    SettingsRow(
-                        usage.area(),
-                        "${formatDiagnosticBytes(usage.bytes())} · ${usage.files()} files",
-                    )
-                }
-                SettingsSection("Reports")
-                if (snapshot.reports().isEmpty()) {
-                    SettingsHint("No log or crash report is available.")
+                val current = snapshot
+                if (current == null) {
+                    SettingsHint(UiTranslations.translate("Loading…", LocalLanguagePack.current))
                 } else {
-                    snapshot.reports().forEach { report ->
+                    Text("${formatDiagnosticBytes(current.totalBytes())} in ${current.totalFiles()} files")
+                    Text(current.dataDirectory().toString(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    current.storage().forEach { usage ->
                         SettingsRow(
-                            report.name(),
-                            "${report.type().name.lowercase()} · ${formatDiagnosticBytes(report.bytes())}",
+                            usage.area(),
+                            "${formatDiagnosticBytes(usage.bytes())} · ${usage.files()} files",
                         )
+                    }
+                    SettingsSection("Reports")
+                    if (current.reports().isEmpty()) {
+                        SettingsHint("No log or crash report is available.")
+                    } else {
+                        current.reports().forEach { report ->
+                            SettingsRow(
+                                report.name(),
+                                "${report.type().name.lowercase()} · ${formatDiagnosticBytes(report.bytes())}",
+                            )
+                        }
                     }
                 }
                 TextButton(onClick = {
-                    runCatching { presentation.exportDiagnostics() }
-                        .onSuccess { archive ->
+                    scope.launch {
+                        runCatching {
+                            withContext(Dispatchers.IO) { presentation.exportDiagnostics() }
+                        }.onSuccess { archive ->
                             exportPicker.export(
                                 archive,
                                 { feedback = "Diagnostics exported" },
                                 { feedback = it },
                             )
-                        }
-                        .onFailure { feedback = it.message ?: "Diagnostics export failed" }
+                        }.onFailure { feedback = it.message ?: "Diagnostics export failed" }
+                    }
                 }) { Text("Export diagnostics") }
                 TextButton(onClick = {
-                    requestReset(
-                        presentation.planReset(
-                            setOf(
-                                DiagnosticResetArea.NETWORK_CACHE,
-                                DiagnosticResetArea.LOGS,
-                                DiagnosticResetArea.CRASH_REPORTS,
-                            ),
-                        ),
-                    )
+                    scope.launch {
+                        requestReset(withContext(Dispatchers.IO) {
+                            presentation.planReset(
+                                setOf(
+                                    DiagnosticResetArea.NETWORK_CACHE,
+                                    DiagnosticResetArea.LOGS,
+                                    DiagnosticResetArea.CRASH_REPORTS,
+                                ),
+                            )
+                        })
+                    }
                 }) { Text("Clear cache and reports") }
                 TextButton(onClick = {
-                    requestReset(presentation.planReset(setOf(DiagnosticResetArea.SETTINGS)))
+                    scope.launch {
+                        requestReset(withContext(Dispatchers.IO) {
+                            presentation.planReset(setOf(DiagnosticResetArea.SETTINGS))
+                        })
+                    }
                 }) { Text("Reset settings") }
                 feedback?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
             }

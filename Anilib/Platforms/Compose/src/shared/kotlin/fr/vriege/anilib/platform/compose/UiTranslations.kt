@@ -108,6 +108,24 @@ internal object UiTranslations {
             "Share" to "Partager",
             "Statistics" to "Statistiques",
             "Something went wrong" to "Une erreur est survenue",
+            "This extension does not support this operation on desktop" to
+                "Cette extension ne prend pas en charge cette opération sur ordinateur",
+            "The source website could not complete the request" to
+                "Le site de la source n’a pas pu traiter la demande",
+            "The extension could not read the source response" to
+                "L’extension n’a pas pu lire la réponse de la source",
+            "This extension is not compatible with the desktop host" to
+                "Cette extension n’est pas compatible avec l’hôte de bureau",
+            "The desktop extension host could not complete the request" to
+                "L’hôte d’extensions de bureau n’a pas pu traiter la demande",
+            "The source operation could not be completed" to
+                "L’opération de la source n’a pas pu être effectuée",
+            "Episode contains no playable streams" to
+                "Cet épisode ne contient aucun flux vidéo lisible",
+            "The episode could not be opened" to
+                "L’épisode n’a pas pu être ouvert",
+            "The chapter could not be opened" to
+                "Le chapitre n’a pas pu être ouvert",
             "Tracking" to "Suivi",
             "Updates" to "Mises à jour",
             "Watch" to "Regarder",
@@ -208,7 +226,9 @@ internal object UiTranslations {
             "GitHub repository or index URL" to "URL du dépôt GitHub ou de l’index",
             "HTTP proxy (optional)" to "Proxy HTTP (facultatif)",
             "HTTPS endpoint" to "Point d’accès HTTPS",
-            "Import Aniyomi backup" to "Importer une sauvegarde Aniyomi",
+            "Import backup" to "Importer une sauvegarde",
+            "Anilib and Aniyomi formats are detected automatically." to
+                "Les formats Anilib et Aniyomi sont détectés automatiquement.",
             "Import Aniyomi backup?" to "Importer la sauvegarde Aniyomi ?",
             "Included content" to "Contenu inclus",
             "Install" to "Installer",
@@ -255,6 +275,7 @@ internal object UiTranslations {
             "Popular" to "Populaires",
             "Preferred audio language" to "Langue audio préférée",
             "Preferred subtitle language" to "Langue de sous-titres préférée",
+            "Resolving playable streams…" to "Recherche des flux vidéo lisibles…",
             "Previous" to "Précédent",
             "Previous chapter" to "Chapitre précédent",
             "Private entry" to "Entrée privée",
@@ -523,6 +544,12 @@ internal object UiTranslations {
             text.startsWith("Quality: ") -> "Qualité : " + text.removePrefix("Quality: ")
             text.startsWith("Decoder: ") -> "Décodeur : " + text.removePrefix("Decoder: ")
             text.startsWith("Subtitles: ") -> "Sous-titres : " + text.removePrefix("Subtitles: ")
+            text.startsWith("Title details: ") ->
+                "Détails du titre : " + translateSourceFailure(text.removePrefix("Title details: "))
+            text.startsWith("Episodes: ") ->
+                "Épisodes : " + translateSourceFailure(text.removePrefix("Episodes: "))
+            text.startsWith("Chapters: ") ->
+                "Chapitres : " + translateSourceFailure(text.removePrefix("Chapters: "))
             text.startsWith("Scale: ") -> "Échelle : " + text.removePrefix("Scale: ")
             text.startsWith("Rotation: ") -> "Rotation : " + text.removePrefix("Rotation: ")
             text.startsWith("Transition: ") -> "Transition : " + text.removePrefix("Transition: ")
@@ -558,6 +585,17 @@ internal object UiTranslations {
             text.startsWith("Actions for ") -> "Actions pour " + text.removePrefix("Actions for ")
             text.endsWith(" artwork") -> "Illustration de " + text.removeSuffix(" artwork")
             else -> text
+        }
+    }
+
+    private fun translateSourceFailure(text: String): String {
+        val marker = ". Diagnostic ID: "
+        val message = text.substringBefore(marker)
+        val translated = translations[LanguagePack.FRENCH]?.get(message) ?: message
+        return if (marker in text) {
+            "$translated. Identifiant de diagnostic : ${text.substringAfter(marker)}"
+        } else {
+            translated
         }
     }
 }

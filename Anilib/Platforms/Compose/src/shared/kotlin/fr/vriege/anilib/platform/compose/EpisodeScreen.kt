@@ -1,9 +1,11 @@
 package fr.vriege.anilib.platform.compose
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -19,10 +22,10 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -36,12 +39,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import fr.vriege.anilib.feature.library.LibraryItemId
-import fr.vriege.anilib.feature.player.EpisodeSnapshot
 import fr.vriege.anilib.feature.player.PlaybackState
 import fr.vriege.anilib.feature.player.PlayerOrientationPolicy
 import fr.vriege.anilib.feature.player.PlayerDecoderPolicy
@@ -49,169 +51,7 @@ import fr.vriege.anilib.feature.player.PlayerPreferences
 import fr.vriege.anilib.feature.player.PlayerQualityPolicy
 import fr.vriege.anilib.feature.player.PlayerSubtitlePolicy
 import fr.vriege.anilib.feature.player.ui.PlayerController
-import fr.vriege.anilib.feature.player.ui.PlayerPresentation
-import fr.vriege.anilib.feature.source.SourceEpisodeId
 import java.util.Optional
-import kotlin.math.roundToInt
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-internal fun EpisodeScreen(
-    presentation: PlayerPresentation,
-    libraryItemId: LibraryItemId,
-    initialEpisodeId: SourceEpisodeId?,
-    applyOrientationPolicy: (PlayerOrientationPolicy) -> Unit,
-    requestPictureInPicture: () -> Unit,
-    setPlayerActive: (Boolean) -> Unit,
-    setBackgroundAudio: (Boolean) -> Unit,
-    enableAndroidControls: Boolean,
-    enableDesktopControls: Boolean,
-    goBack: () -> Unit,
-) {
-    var revision by remember(presentation, libraryItemId) { mutableIntStateOf(0) }
-    val initialOpen = remember(presentation, libraryItemId, initialEpisodeId) {
-        initialEpisodeId?.let { runCatching { presentation.open(libraryItemId, it) } }
-    }
-    var activeController by remember(presentation, libraryItemId, initialEpisodeId) {
-        mutableStateOf(initialOpen?.getOrNull())
-    }
-    var error by remember(presentation, libraryItemId, initialEpisodeId) {
-        mutableStateOf(initialOpen?.exceptionOrNull()?.message)
-    }
-    var query by remember(libraryItemId) { mutableStateOf("") }
-    var unwatchedOnly by remember(libraryItemId) { mutableStateOf(false) }
-    DisposableEffect(presentation, libraryItemId) {
-        val registration = presentation.observe { revision++ }
-        onDispose {
-            runCatching { registration.close() }
-            activeController?.close()
-        }
-    }
-    val controller = activeController
-    if (controller != null) {
-        PlayerSelectionScreen(
-            controller,
-            applyOrientationPolicy,
-            requestPictureInPicture,
-            setPlayerActive,
-            setBackgroundAudio,
-            enableAndroidControls,
-            enableDesktopControls,
-        ) {
-            if (initialEpisodeId == null) activeController = null else goBack()
-        }
-        return
-    }
-    val episodesResult = remember(presentation, libraryItemId, revision) {
-        runCatching { presentation.episodes(libraryItemId) }
-    }
-    val episodes = episodesResult.getOrDefault(emptyList())
-    val visibleEpisodes = episodes.filter { episode ->
-        (query.isBlank() || episode.episode().title().contains(query, ignoreCase = true)) &&
-            (!unwatchedOnly || !episode.playback().map { it.completed() }.orElse(false))
-    }
-    val loadError = episodesResult.exceptionOrNull()?.message
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Episodes") },
-                navigationIcon = {
-                    IconButton(onClick = goBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-            )
-        },
-    ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp)) {
-            Text(
-                "${episodes.size} episodes",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(vertical = 10.dp),
-            )
-            OutlinedTextField(
-                value = query,
-                onValueChange = { query = it },
-                label = { Text("Search episodes") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            FilterChip(
-                selected = unwatchedOnly,
-                onClick = { unwatchedOnly = !unwatchedOnly },
-                label = { Text("Unwatched") },
-                modifier = Modifier.padding(vertical = 6.dp),
-            )
-            (error ?: loadError)?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-            if (episodes.isEmpty() && loadError == null) {
-                EmptyPage("No episodes are available from this source.")
-            } else if (visibleEpisodes.isEmpty() && loadError == null) {
-                EmptyPage("No episodes match the active filters.")
-            } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    items(visibleEpisodes, key = { it.episode().id().toString() }) { episode ->
-                        EpisodeCard(episode) {
-                            runCatching {
-                                presentation.open(libraryItemId, episode.episode().id())
-                            }.onSuccess {
-                                error = null
-                                activeController = it
-                            }.onFailure {
-                                error = it.message ?: "The episode could not be opened."
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun EpisodeCard(episode: EpisodeSnapshot, open: () -> Unit) {
-    val playback = episode.playback().orElse(null)
-    val watched = playback?.completed() == true
-    Card(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = open),
-        colors = CardDefaults.cardColors(
-            containerColor = if (watched) {
-                MaterialTheme.colorScheme.surfaceContainerLow
-            } else {
-                MaterialTheme.colorScheme.surfaceContainer
-            },
-        ),
-    ) {
-        Column(modifier = Modifier.fillMaxWidth().alpha(if (watched) 0.55f else 1f).padding(16.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(episode.episode().title(), fontWeight = FontWeight.SemiBold)
-                    Text(
-                        episodeMetadata(episode),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                if (watched) {
-                    Text("Watched", color = MaterialTheme.colorScheme.primary)
-                }
-            }
-            val completion = playback?.completion()?.orElse(-1.0) ?: -1.0
-            if (completion >= 0.0) {
-                LinearProgressIndicator(
-                    progress = { completion.toFloat() },
-                    modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
-                )
-            }
-            if (playback != null && !playback.completed()) {
-                Text(
-                    "Resume at ${formatDuration(playback.positionMillis())}",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 6.dp),
-                )
-            }
-        }
-    }
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -366,6 +206,36 @@ internal fun PlayerSelectionScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun PlayerLoadingScreen(title: String, goBack: () -> Unit) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(title) },
+                navigationIcon = {
+                    IconButton(onClick = goBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        Column(
+            modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Box(
+                modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Color.Black),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(color = Color.White)
+            }
+            Text("Resolving playable streams…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
 @Composable
 private fun PlayerPreferenceDialog(
     controller: PlayerController,
@@ -514,20 +384,6 @@ private fun PlayerSessionError(message: String, goBack: () -> Unit) {
         }
     }
 }
-
-private fun episodeMetadata(snapshot: EpisodeSnapshot): String {
-    val episode = snapshot.episode()
-    val number = if (episode.episodeNumber() < 0) {
-        "Episode"
-    } else {
-        "Episode ${formatEpisodeNumber(episode.episodeNumber())}"
-    }
-    val scanlator = episode.scanlator().map { " | $it" }.orElse("")
-    return number + scanlator
-}
-
-private fun formatEpisodeNumber(number: Double): String =
-    if (number % 1.0 == 0.0) number.roundToInt().toString() else number.toString()
 
 private fun playbackLabel(state: PlaybackState): String = when {
     state.completed() -> "Watched"

@@ -12,7 +12,9 @@ import fr.vriege.anilib.feature.backup.BackupService;
 import fr.vriege.anilib.feature.backup.AniyomiBackupImportResult;
 import fr.vriege.anilib.feature.backup.AniyomiBackupInspection;
 import fr.vriege.anilib.feature.backup.runtime.DefaultBackupService;
+import fr.vriege.anilib.feature.backup.ui.BackupImportFormat;
 import fr.vriege.anilib.feature.backup.ui.BackupUiCapabilities;
+import fr.vriege.anilib.feature.backup.ui.DefaultBackupPresentation;
 import fr.vriege.anilib.feature.discovery.runtime.DiscoveryBackupCodec;
 import fr.vriege.anilib.feature.discovery.runtime.FileSourcePreferenceStore;
 import fr.vriege.anilib.feature.library.LibraryCapabilities;
@@ -122,6 +124,9 @@ final class BackupTest {
                     library,
                     Clock.fixed(BACKUP_TIME, ZoneOffset.UTC))) {
                 AniyomiBackupInspection inspection = backups.inspectAniyomi(source);
+                counter.check(new DefaultBackupPresentation(backups).inspectImport(source).format()
+                                == BackupImportFormat.ANIYOMI,
+                        "unified backup import must automatically detect an Aniyomi archive");
                 counter.check(inspection.mangaCount() == 1 && inspection.animeCount() == 1,
                         "Aniyomi preview must count manga and anime independently");
                 counter.check(inspection.categoryCount() == 2,
@@ -200,6 +205,9 @@ final class BackupTest {
                 counter.check(application.capability(BackupUiCapabilities.PRESENTATION)
                                 .backups().size() == 1,
                         "shared Backup presentation must expose local archives");
+                counter.check(application.capability(BackupUiCapabilities.PRESENTATION)
+                                .inspectImport(backupPath).format() == BackupImportFormat.ANILIB,
+                        "unified backup import must automatically detect a native Anilib archive");
 
                 library.save(rename(original, "Changed after backup"));
                 library.save(extra);

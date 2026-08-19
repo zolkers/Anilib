@@ -70,6 +70,9 @@ import java.net.URI
 import java.time.LocalDate
 import java.util.Optional
 import java.util.OptionalDouble
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -83,6 +86,7 @@ internal fun TrackerAccountsScreen(
     var webAuthorization by remember { mutableStateOf<Pair<TrackerAccount, TrackerAuthorization>?>(null) }
     var logout by remember { mutableStateOf<TrackerAccount?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCrashSafeCoroutineScope()
     ObserveTracking(presentation) { revision++ }
     val accounts = remember(revision) { presentation.accounts() }
     val preferences = remember(revision) { presentation.syncPreferences() }
@@ -111,13 +115,17 @@ internal fun TrackerAccountsScreen(
             account = account,
             dismiss = { login = null },
             submit = { credentials ->
-                runCatching { presentation.authenticate(account.descriptor().id(), credentials) }
-                    .onSuccess {
+                scope.launch {
+                    runCatching {
+                        withContext(Dispatchers.IO) {
+                            presentation.authenticate(account.descriptor().id(), credentials)
+                        }
+                    }.onSuccess {
                         error = null
                         login = null
                         revision++
-                    }
-                    .onFailure { error = it.message ?: "Unable to sign in." }
+                    }.onFailure { error = it.message ?: "Unable to sign in." }
+                }
             },
             error = error,
         )
@@ -129,13 +137,17 @@ internal fun TrackerAccountsScreen(
             text = { Text("Local progress stays on this device, but synchronization with the service stops.") },
             confirmButton = {
                 TextButton(onClick = {
-                    runCatching { presentation.logout(account.descriptor().id()) }
-                        .onSuccess {
+                    scope.launch {
+                        runCatching {
+                            withContext(Dispatchers.IO) {
+                                presentation.logout(account.descriptor().id())
+                            }
+                        }.onSuccess {
                             error = null
                             logout = null
                             revision++
-                        }
-                        .onFailure { error = it.message ?: "Unable to sign out." }
+                        }.onFailure { error = it.message ?: "Unable to sign out." }
+                    }
                 }) { Text("Disconnect") }
             },
             dismissButton = { TextButton(onClick = { logout = null }) { Text("Cancel") } },
@@ -162,23 +174,30 @@ internal fun TrackerAccountsScreen(
                 TrackerSyncSettings(
                     preferences = preferences,
                     synchronize = {
-                        runCatching { presentation.synchronizeAll() }
-                            .onSuccess {
+                        scope.launch {
+                            runCatching {
+                                withContext(Dispatchers.IO) { presentation.synchronizeAll() }
+                            }.onSuccess {
                                 syncSummary = syncSummary(it)
                                 error = null
                                 revision++
-                            }
-                            .onFailure { error = it.message ?: "Synchronization failed." }
+                            }.onFailure { error = it.message ?: "Synchronization failed." }
+                        }
                     },
                     save = {
-                        runCatching { presentation.saveSyncPreferences(it) }
-                            .onSuccess {
+                        val replacement = it
+                        scope.launch {
+                            runCatching {
+                                withContext(Dispatchers.IO) {
+                                    presentation.saveSyncPreferences(replacement)
+                                }
+                            }.onSuccess {
                                 error = null
                                 revision++
-                            }
-                            .onFailure { failure ->
+                            }.onFailure { failure ->
                                 error = failure.message ?: "Unable to save synchronization preferences."
                             }
+                        }
                     },
                 )
             }
@@ -197,16 +216,22 @@ internal fun TrackerAccountsScreen(
                     TrackerConflictCard(
                         conflict = conflict,
                         resolve = { resolution ->
-                            runCatching {
-                                presentation.resolveConflict(
-                                    conflict.localEntry().libraryItemId(),
-                                    conflict.localEntry().trackerId(),
-                                    resolution,
-                                )
-                            }.onSuccess {
-                                error = null
-                                revision++
-                            }.onFailure { error = it.message ?: "Unable to resolve synchronization conflict." }
+                            scope.launch {
+                                runCatching {
+                                    withContext(Dispatchers.IO) {
+                                        presentation.resolveConflict(
+                                            conflict.localEntry().libraryItemId(),
+                                            conflict.localEntry().trackerId(),
+                                            resolution,
+                                        )
+                                    }
+                                }.onSuccess {
+                                    error = null
+                                    revision++
+                                }.onFailure {
+                                    error = it.message ?: "Unable to resolve synchronization conflict."
+                                }
+                            }
                         },
                     )
                 }
@@ -231,9 +256,14 @@ internal fun TrackerAccountsScreen(
                         ) {
                             logout = account
                         } else if (account.descriptor().authentication() == TrackerAuthentication.OAUTH) {
-                            runCatching { presentation.beginAuthorization(account.descriptor().id()) }
-                                .onSuccess { webAuthorization = account to it }
-                                .onFailure { error = it.message ?: "Unable to open provider sign-in." }
+                            scope.launch {
+                                runCatching {
+                                    withContext(Dispatchers.IO) {
+                                        presentation.beginAuthorization(account.descriptor().id())
+                                    }
+                                }.onSuccess { webAuthorization = account to it }
+                                    .onFailure { error = it.message ?: "Unable to open provider sign-in." }
+                            }
                         } else if (account.descriptor().authentication() != TrackerAuthentication.NONE) {
                             login = account
                         }
@@ -482,6 +512,7 @@ internal fun TitleTrackingScreen(
     var login by remember { mutableStateOf<TrackerAccount?>(null) }
     var webAuthorization by remember { mutableStateOf<Pair<TrackerAccount, TrackerAuthorization>?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCrashSafeCoroutineScope()
     ObserveTracking(presentation) { revision++ }
     val accounts = remember(revision, kind) {
         presentation.accounts().filter { it.descriptor().supportedKinds().contains(kind) }
@@ -490,12 +521,14 @@ internal fun TitleTrackingScreen(
         presentation.entries(itemId).associateBy(TrackerEntry::trackerId)
     }
     val action: (() -> Unit) -> Unit = { operation ->
-        runCatching(operation)
-            .onSuccess {
-                error = null
-                revision++
-            }
-            .onFailure { error = it.message ?: "Tracking operation failed." }
+        scope.launch {
+            runCatching { withContext(Dispatchers.IO) { operation() } }
+                .onSuccess {
+                    error = null
+                    revision++
+                }
+                .onFailure { error = it.message ?: "Tracking operation failed." }
+        }
     }
 
     webAuthorization?.let { (account, authorization) ->
@@ -523,14 +556,18 @@ internal fun TitleTrackingScreen(
             account = account,
             dismiss = { login = null },
             submit = { credentials ->
-                runCatching { presentation.authenticate(account.descriptor().id(), credentials) }
-                    .onSuccess {
+                scope.launch {
+                    runCatching {
+                        withContext(Dispatchers.IO) {
+                            presentation.authenticate(account.descriptor().id(), credentials)
+                        }
+                    }.onSuccess {
                         error = null
                         login = null
                         revision++
                         searching = account
-                    }
-                    .onFailure { error = it.message ?: "Unable to sign in." }
+                    }.onFailure { error = it.message ?: "Unable to sign in." }
+                }
             },
             error = error,
         )
@@ -588,9 +625,14 @@ internal fun TitleTrackingScreen(
                             searching = account
                         } else if (account.descriptor().authentication() == TrackerAuthentication.OAUTH) {
                             error = null
-                            runCatching { presentation.beginAuthorization(account.descriptor().id()) }
-                                .onSuccess { webAuthorization = account to it }
-                                .onFailure { error = it.message ?: "Unable to open provider sign-in." }
+                            scope.launch {
+                                runCatching {
+                                    withContext(Dispatchers.IO) {
+                                        presentation.beginAuthorization(account.descriptor().id())
+                                    }
+                                }.onSuccess { webAuthorization = account to it }
+                                    .onFailure { error = it.message ?: "Unable to open provider sign-in." }
+                            }
                         } else {
                             error = null
                             login = account
@@ -825,6 +867,7 @@ private fun TrackerSearchScreen(
     var results by remember { mutableStateOf<List<TrackerSearchResult>>(emptyList()) }
     var selected by remember { mutableStateOf<TrackerSearchResult?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCrashSafeCoroutineScope()
     selected?.let { result ->
         AlertDialog(
             onDismissRequest = { selected = null },
@@ -842,9 +885,12 @@ private fun TrackerSearchScreen(
             },
             confirmButton = {
                 Button(onClick = {
-                    runCatching { presentation.bind(itemId, result) }
-                        .onSuccess { bound() }
-                        .onFailure { error = it.message ?: "Unable to add tracking." }
+                    scope.launch {
+                        runCatching {
+                            withContext(Dispatchers.IO) { presentation.bind(itemId, result) }
+                        }.onSuccess { bound() }
+                            .onFailure { error = it.message ?: "Unable to add tracking." }
+                    }
                 }) { Text("Add tracking") }
             },
             dismissButton = { TextButton(onClick = { selected = null }) { Text("Cancel") } },
@@ -870,12 +916,16 @@ private fun TrackerSearchScreen(
             Button(
                 enabled = query.isNotBlank(),
                 onClick = {
-                    runCatching { presentation.search(account.descriptor().id(), query, kind) }
-                        .onSuccess {
+                    scope.launch {
+                        runCatching {
+                            withContext(Dispatchers.IO) {
+                                presentation.search(account.descriptor().id(), query, kind)
+                            }
+                        }.onSuccess {
                             results = it
                             error = null
-                        }
-                        .onFailure { error = it.message ?: "Search failed." }
+                        }.onFailure { error = it.message ?: "Search failed." }
+                    }
                 },
             ) {
                 Text("Search")
@@ -911,8 +961,21 @@ private fun TrackerAuthorizationScreen(
     authorized: () -> Unit,
     failed: (String) -> Unit,
 ) {
-    if (!runtimeStatus.available) {
-        BrowserUnavailable(runtimeStatus.message, close)
+    var resolvedRuntime by remember(runtimeStatus) {
+        mutableStateOf(runtimeStatus.currentOrNull())
+    }
+    CrashSafeLaunchedEffect(runtimeStatus) {
+        if (resolvedRuntime == null) {
+            resolvedRuntime = withContext(Dispatchers.IO) { runtimeStatus.resolve() }
+        }
+    }
+    val currentRuntime = resolvedRuntime
+    if (currentRuntime == null) {
+        BrowserInitializing(close)
+        return
+    }
+    if (!currentRuntime.available) {
+        BrowserUnavailable(currentRuntime.message, close)
         return
     }
     val policy = LocalBrowserPolicy.current
@@ -923,19 +986,25 @@ private fun TrackerAuthorizationScreen(
     }
     var completing by remember(authorization) { mutableStateOf(false) }
     var localError by remember(authorization) { mutableStateOf<String?>(null) }
+    val scope = rememberCrashSafeCoroutineScope()
     val intercept: (String) -> Boolean = { value ->
         val callback = runCatching { URI.create(value) }.getOrNull()
         val accepted = callback != null && authorization.accepts(callback)
         if (accepted && !completing) {
             completing = true
-            runCatching { presentation.completeAuthorization(account.descriptor().id(), callback) }
-                .onSuccess { authorized() }
-                .onFailure {
-                    val message = it.message ?: "Provider sign-in failed."
-                    localError = message
-                    failed(message)
-                    completing = false
-                }
+            scope.launch {
+                runCatching {
+                    withContext(Dispatchers.IO) {
+                        presentation.completeAuthorization(account.descriptor().id(), callback)
+                    }
+                }.onSuccess { authorized() }
+                    .onFailure {
+                        val message = it.message ?: "Provider sign-in failed."
+                        localError = message
+                        failed(message)
+                        completing = false
+                    }
+            }
         }
         accepted
     }

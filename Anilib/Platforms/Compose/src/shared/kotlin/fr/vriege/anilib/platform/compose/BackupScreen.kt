@@ -45,12 +45,17 @@ import fr.vriege.anilib.feature.backup.BackupContentOption
 import fr.vriege.anilib.feature.backup.BackupPolicy
 import fr.vriege.anilib.feature.backup.BackupSchedule
 import fr.vriege.anilib.feature.backup.AniyomiBackupInspection
+import fr.vriege.anilib.feature.backup.ui.BackupImportFormat
+import fr.vriege.anilib.feature.backup.ui.BackupImportPreview
 import fr.vriege.anilib.feature.backup.ui.BackupPresentation
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
 import java.nio.file.Path
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private val backupDateFormatter = DateTimeFormatter
     .ofLocalizedDateTime(FormatStyle.MEDIUM)
@@ -64,58 +69,66 @@ internal fun BackupScreen(
     importPicker: BackupImportPicker,
     goBack: () -> Unit,
 ) {
+    val scope = rememberCrashSafeCoroutineScope()
     var revision by remember(presentation) { mutableIntStateOf(0) }
     var message by remember(presentation) { mutableStateOf<String?>(null) }
     var error by remember(presentation) { mutableStateOf<String?>(null) }
     var pendingRestore by remember(presentation) { mutableStateOf<BackupInspection?>(null) }
-    var pendingAniyomiImport by remember(presentation) { mutableStateOf<AniyomiBackupInspection?>(null) }
+    var pendingImport by remember(presentation) { mutableStateOf<BackupImportPreview?>(null) }
+    var importBusy by remember(presentation) { mutableStateOf(false) }
     var pendingDelete by remember(presentation) { mutableStateOf<BackupFileSnapshot?>(null) }
     var editingPolicy by remember(presentation) { mutableStateOf(false) }
     DisposableEffect(presentation) {
         val registration = presentation.observe { revision++ }
         onDispose { runCatching { registration.close() } }
     }
-    val pendingAniyomiPath = pendingAniyomiImport?.path()
-    DisposableEffect(pendingAniyomiPath) {
-        onDispose { pendingAniyomiPath?.let(importPicker::release) }
+    val pendingImportPath = pendingImport?.path()
+    DisposableEffect(pendingImportPath) {
+        onDispose { pendingImportPath?.let(importPicker::release) }
     }
     val backups = remember(presentation, revision) { presentation.backups() }
     val policy = remember(presentation, revision) { presentation.policy() }
     val contentOptions = remember(presentation, revision) { presentation.contentOptions() }
 
     val createBackup = {
-        runCatching { presentation.createBackup() }
-            .onSuccess {
-                message = "Backup created: ${it.path().fileName}"
-                error = null
-            }
-            .onFailure {
-                error = it.message ?: "Backup creation failed."
-                message = null
-            }
+        scope.launch {
+            withContext(Dispatchers.IO) { runCatching { presentation.createBackup() } }
+                .onSuccess {
+                    message = "Backup created: ${it.path().fileName}"
+                    error = null
+                }
+                .onFailure {
+                    error = it.message ?: "Backup creation failed."
+                    message = null
+                }
+        }
         Unit
     }
     val requestRestore: (BackupFileSnapshot) -> Unit = { backup ->
-        runCatching { presentation.inspect(backup.path()) }
-            .onSuccess {
-                pendingRestore = it
-                error = null
-            }
-            .onFailure { error = it.message ?: "Backup inspection failed." }
+        scope.launch {
+            withContext(Dispatchers.IO) { runCatching { presentation.inspect(backup.path()) } }
+                .onSuccess {
+                    pendingRestore = it
+                    error = null
+                }
+                .onFailure { error = it.message ?: "Backup inspection failed." }
+        }
     }
-    val chooseAniyomiBackup = {
+    val chooseBackup = {
         importPicker.choose(
             { path ->
-                runCatching { presentation.inspectAniyomi(path) }
-                    .onSuccess {
-                        pendingAniyomiImport = it
-                        error = null
-                    }
-                    .onFailure {
-                        importPicker.release(path)
-                        error = it.message ?: "Aniyomi backup inspection failed."
-                        message = null
-                    }
+                scope.launch {
+                    withContext(Dispatchers.IO) { runCatching { presentation.inspectImport(path) } }
+                        .onSuccess {
+                            pendingImport = it
+                            error = null
+                        }
+                        .onFailure {
+                            importPicker.release(path)
+                            error = "The selected file is not a supported Anilib or Aniyomi backup."
+                            message = null
+                        }
+                }
             },
             { failure ->
                 error = failure
@@ -153,12 +166,19 @@ internal fun BackupScreen(
             }
             Spacer(Modifier.height(12.dp))
             OutlinedButton(
-                onClick = chooseAniyomiBackup,
+                onClick = chooseBackup,
+                enabled = pendingImport == null && !importBusy,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Icon(Icons.Default.UploadFile, contentDescription = null)
-                Text("Import Aniyomi backup", modifier = Modifier.padding(start = 6.dp))
+                Text("Import backup", modifier = Modifier.padding(start = 6.dp))
             }
+            Text(
+                "Anilib and Aniyomi formats are detected automatically.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp),
+            )
             Text(
                 presentation.backupDirectory().toString(),
                 style = MaterialTheme.typography.bodySmall,
@@ -202,17 +222,19 @@ internal fun BackupScreen(
             inspection = inspection,
             dismiss = { pendingRestore = null },
             confirm = {
-                runCatching { presentation.restore(inspection.path()) }
-                    .onSuccess {
-                        message = "Restored ${it.entryCount()} entries from " +
-                            "${it.restoredSections().size} sections."
-                        error = null
-                    }
-                    .onFailure {
-                        error = it.message ?: "Backup restore failed."
-                        message = null
-                    }
                 pendingRestore = null
+                scope.launch {
+                    withContext(Dispatchers.IO) { runCatching { presentation.restore(inspection.path()) } }
+                        .onSuccess {
+                            message = "Restored ${it.entryCount()} entries from " +
+                                "${it.restoredSections().size} sections."
+                            error = null
+                        }
+                        .onFailure {
+                            error = it.message ?: "Backup restore failed."
+                            message = null
+                        }
+                }
             },
         )
     }
@@ -222,34 +244,65 @@ internal fun BackupScreen(
             options = contentOptions,
             dismiss = { editingPolicy = false },
             save = { replacement ->
-                runCatching { presentation.savePolicy(replacement) }
-                    .onSuccess {
+                scope.launch {
+                    runCatching {
+                        withContext(Dispatchers.IO) { presentation.savePolicy(replacement) }
+                    }.onSuccess {
                         message = "Backup policy saved."
                         error = null
                         editingPolicy = false
-                    }
-                    .onFailure { error = it.message ?: "Unable to save backup policy." }
+                    }.onFailure { error = it.message ?: "Unable to save backup policy." }
+                }
             },
         )
     }
-    pendingAniyomiImport?.let { inspection ->
-        AniyomiImportDialog(
-            inspection = inspection,
-            dismiss = { pendingAniyomiImport = null },
-            confirm = {
-                runCatching { presentation.importAniyomi(inspection.path()) }
-                    .onSuccess {
-                        message = "Imported ${it.importedCount()} titles " +
-                            "(${it.createdCount()} new, ${it.updatedCount()} updated)."
-                        error = null
+    pendingImport?.let { preview ->
+        when (preview.format()) {
+            BackupImportFormat.ANILIB -> RestoreDialog(
+                inspection = preview.anilib().orElseThrow(),
+                enabled = !importBusy,
+                dismiss = { if (!importBusy) pendingImport = null },
+                confirm = {
+                    importBusy = true
+                    scope.launch {
+                        withContext(Dispatchers.IO) {
+                            runCatching { presentation.restore(preview.path()) }
+                        }.onSuccess {
+                            message = "Restored ${it.entryCount()} entries from " +
+                                "${it.restoredSections().size} sections."
+                            error = null
+                        }.onFailure {
+                            error = it.message ?: "Backup restore failed."
+                            message = null
+                        }
+                        importBusy = false
+                        pendingImport = null
                     }
-                    .onFailure {
-                        error = it.message ?: "Aniyomi backup import failed."
-                        message = null
+                },
+            )
+            BackupImportFormat.ANIYOMI -> AniyomiImportDialog(
+                inspection = preview.aniyomi().orElseThrow(),
+                enabled = !importBusy,
+                dismiss = { if (!importBusy) pendingImport = null },
+                confirm = {
+                    importBusy = true
+                    scope.launch {
+                        withContext(Dispatchers.IO) {
+                            runCatching { presentation.importAniyomi(preview.path()) }
+                        }.onSuccess {
+                            message = "Imported ${it.importedCount()} titles " +
+                                "(${it.createdCount()} new, ${it.updatedCount()} updated)."
+                            error = null
+                        }.onFailure {
+                            error = it.message ?: "Aniyomi backup import failed."
+                            message = null
+                        }
+                        importBusy = false
+                        pendingImport = null
                     }
-                pendingAniyomiImport = null
-            },
-        )
+                },
+            )
+        }
     }
     pendingDelete?.let { backup ->
         AlertDialog(
@@ -259,13 +312,15 @@ internal fun BackupScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        runCatching { presentation.delete(backup.path()) }
-                            .onSuccess {
+                        pendingDelete = null
+                        scope.launch {
+                            runCatching {
+                                withContext(Dispatchers.IO) { presentation.delete(backup.path()) }
+                            }.onSuccess {
                                 message = "Backup deleted."
                                 error = null
-                            }
-                            .onFailure { error = it.message ?: "Backup deletion failed." }
-                        pendingDelete = null
+                            }.onFailure { error = it.message ?: "Backup deletion failed." }
+                        }
                     },
                 ) { Text("Delete") }
             },
@@ -405,6 +460,7 @@ private fun RestoreDialog(
     inspection: BackupInspection,
     dismiss: () -> Unit,
     confirm: () -> Unit,
+    enabled: Boolean = true,
 ) {
     AlertDialog(
         onDismissRequest = dismiss,
@@ -419,8 +475,8 @@ private fun RestoreDialog(
                 }
             }
         },
-        confirmButton = { TextButton(onClick = confirm) { Text("Restore") } },
-        dismissButton = { TextButton(onClick = dismiss) { Text("Cancel") } },
+        confirmButton = { TextButton(onClick = confirm, enabled = enabled) { Text("Restore") } },
+        dismissButton = { TextButton(onClick = dismiss, enabled = enabled) { Text("Cancel") } },
     )
 }
 
@@ -429,6 +485,7 @@ private fun AniyomiImportDialog(
     inspection: AniyomiBackupInspection,
     dismiss: () -> Unit,
     confirm: () -> Unit,
+    enabled: Boolean = true,
 ) {
     AlertDialog(
         onDismissRequest = dismiss,
@@ -451,8 +508,8 @@ private fun AniyomiImportDialog(
                 }
             }
         },
-        confirmButton = { TextButton(onClick = confirm) { Text("Import") } },
-        dismissButton = { TextButton(onClick = dismiss) { Text("Cancel") } },
+        confirmButton = { TextButton(onClick = confirm, enabled = enabled) { Text("Import") } },
+        dismissButton = { TextButton(onClick = dismiss, enabled = enabled) { Text("Cancel") } },
     )
 }
 

@@ -11,6 +11,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -36,8 +37,10 @@ import fr.vriege.anilib.framework.http.HttpCookieJar
 import fr.vriege.anilib.feature.source.SourceWebPage
 import fr.vriege.anilib.feature.settings.BrowserPolicy
 import java.net.URI
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 internal val LocalBrowserPolicy = staticCompositionLocalOf { BrowserPolicy.defaults() }
 
@@ -50,8 +53,21 @@ internal fun BrowserScreen(
     close: () -> Unit,
     challengeComplete: () -> Unit = close,
 ) {
-    if (!runtimeStatus.available) {
-        BrowserUnavailable(runtimeStatus.message, close)
+    var resolvedRuntime by remember(runtimeStatus) {
+        mutableStateOf(runtimeStatus.currentOrNull())
+    }
+    CrashSafeLaunchedEffect(runtimeStatus) {
+        if (resolvedRuntime == null) {
+            resolvedRuntime = withContext(Dispatchers.IO) { runtimeStatus.resolve() }
+        }
+    }
+    val currentRuntime = resolvedRuntime
+    if (currentRuntime == null) {
+        BrowserInitializing(close)
+        return
+    }
+    if (!currentRuntime.available) {
+        BrowserUnavailable(currentRuntime.message, close)
         return
     }
     val uri = page.location()
@@ -214,6 +230,32 @@ internal fun BrowserScreen(
                 onCreated = platformBridge.onCreated,
                 modifier = Modifier.fillMaxSize(),
             )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun BrowserInitializing(close: () -> Unit) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(UiTranslations.translate("Loading…", LocalLanguagePack.current))
+                },
+                navigationIcon = {
+                    IconButton(onClick = close) {
+                        Icon(Icons.Default.Close, contentDescription = "Close browser")
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        androidx.compose.foundation.layout.Box(
+            modifier = Modifier.fillMaxSize().padding(padding),
+            contentAlignment = androidx.compose.ui.Alignment.Center,
+        ) {
+            CircularProgressIndicator()
         }
     }
 }

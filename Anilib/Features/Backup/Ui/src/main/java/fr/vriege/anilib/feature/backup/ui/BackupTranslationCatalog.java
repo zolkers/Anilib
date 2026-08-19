@@ -19,7 +19,9 @@ public final class BackupTranslationCatalog {
                 Map.entry("Delete backup?", "Supprimer la sauvegarde ?"),
                 Map.entry("Export", "Exporter"),
                 Map.entry("Import", "Importer"),
-                Map.entry("Import Aniyomi backup", "Importer une sauvegarde Aniyomi"),
+                Map.entry("Import backup", "Importer une sauvegarde"),
+                Map.entry("Anilib and Aniyomi formats are detected automatically.",
+                        "Les formats Anilib et Aniyomi sont détectés automatiquement."),
                 Map.entry("Protect or import your library", "Protéger ou importer votre bibliothèque"),
                 Map.entry("Restore", "Restaurer"),
                 Map.entry("Restore backup?", "Restaurer la sauvegarde ?")

@@ -65,7 +65,9 @@ fun main(arguments: Array<String>) {
         }
         return
     }
-    val browserRuntimeStatus = DesktopBrowserRuntime.initialize(dataDirectory)
+    val browserRuntimeStatus = BrowserRuntimeStatus.deferred {
+        DesktopBrowserRuntime.initialize(dataDirectory)
+    }
     val crashShield = DesktopUiCrashShield.install(
         started.capability(SettingsCapabilities.DIAGNOSTICS),
     )

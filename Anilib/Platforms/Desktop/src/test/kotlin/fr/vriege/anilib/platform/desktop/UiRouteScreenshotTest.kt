@@ -142,12 +142,8 @@ class UiRouteScreenshotTest {
                 waitForText("First episode")
                 captureStable("Anime details with local episodes")
                 onNodeWithContentDescription("Watch").performClick()
-                waitForText("First episode")
-                captureStable("Episode catalogue")
-                onNodeWithText("First episode").performClick()
                 waitForText("No media backend is available.")
                 captureStable("Player session")
-                goBack()
                 goBack()
                 goBack()
 

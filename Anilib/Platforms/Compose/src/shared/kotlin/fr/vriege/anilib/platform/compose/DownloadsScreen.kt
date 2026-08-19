@@ -53,10 +53,14 @@ import fr.vriege.anilib.feature.downloads.ui.DownloadPresentation
 import fr.vriege.anilib.feature.library.LibraryItemId
 import java.nio.file.Path
 import java.util.Locale
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun DownloadsScreen(presentation: DownloadPresentation, goBack: () -> Unit) {
+    val scope = rememberCrashSafeCoroutineScope()
     var revision by remember(presentation) { mutableIntStateOf(0) }
     var commandError by remember(presentation) { mutableStateOf<String?>(null) }
     var filter by remember(presentation) { mutableStateOf(DownloadFilter.ALL) }
@@ -74,9 +78,11 @@ internal fun DownloadsScreen(presentation: DownloadPresentation, goBack: () -> U
     val queue = remember(presentation, revision) { presentation.queue() }
     val jobs = queue.jobs().filter(filter::accepts)
     val command: (() -> Unit) -> Unit = { action ->
-        runCatching(action)
-            .onSuccess { commandError = null }
-            .onFailure { commandError = it.message ?: "Download command failed." }
+        scope.launch {
+            runCatching { withContext(Dispatchers.IO) { action() } }
+                .onSuccess { commandError = null }
+                .onFailure { commandError = it.message ?: "Download command failed." }
+        }
     }
 
     Scaffold(
@@ -200,13 +206,15 @@ internal fun DownloadsScreen(presentation: DownloadPresentation, goBack: () -> U
                 command { presentation.changeStorageLocation(Path.of(location)) }
             },
             repair = {
-                runCatching { presentation.repairIndex() }
-                    .onSuccess { result ->
-                        repairMessage = "Index repaired: ${result.repairedJobs()} jobs, " +
-                            "${result.orphanedDirectoriesRemoved()} orphans, " +
-                            formatBytes(result.indexedBytes())
-                    }
-                    .onFailure { commandError = it.message ?: "Index repair failed." }
+                scope.launch {
+                    runCatching { withContext(Dispatchers.IO) { presentation.repairIndex() } }
+                        .onSuccess { result ->
+                            repairMessage = "Index repaired: ${result.repairedJobs()} jobs, " +
+                                "${result.orphanedDirectoriesRemoved()} orphans, " +
+                                formatBytes(result.indexedBytes())
+                        }
+                        .onFailure { commandError = it.message ?: "Index repair failed." }
+                }
             },
             close = { storageDialog = false },
         )
@@ -222,17 +230,24 @@ internal fun DownloadsScreen(presentation: DownloadPresentation, goBack: () -> U
                 error
             },
             synchronize = {
-                runCatching { presentation.synchronizeAutomaticDownloads() }
-                    .onSuccess { result ->
+                scope.launch {
+                    runCatching {
+                        withContext(Dispatchers.IO) {
+                            presentation.synchronizeAutomaticDownloads()
+                        }
+                    }.onSuccess { result ->
                         repairMessage = "Automatic downloads: ${result.enqueuedJobs()} queued, " +
                             "${result.removedJobs()} cleaned, ${result.failures().size} failed"
-                    }
-                    .onFailure { commandError = it.message ?: "Automatic download scan failed." }
+                    }.onFailure { commandError = it.message ?: "Automatic download scan failed." }
+                }
             },
             clean = {
-                runCatching { presentation.cleanAutomaticDownloads() }
-                    .onSuccess { removed -> repairMessage = "$removed downloads cleaned" }
-                    .onFailure { commandError = it.message ?: "Download cleanup failed." }
+                scope.launch {
+                    runCatching {
+                        withContext(Dispatchers.IO) { presentation.cleanAutomaticDownloads() }
+                    }.onSuccess { removed -> repairMessage = "$removed downloads cleaned" }
+                        .onFailure { commandError = it.message ?: "Download cleanup failed." }
+                }
             },
             close = { automationDialog = false },
         )

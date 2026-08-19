@@ -41,7 +41,6 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -112,18 +111,13 @@ internal fun PlayerVideoSurface(
         }
     }
     CrashSafeLaunchedEffect(bridge, player) {
-        while (!player.hasMedia && player.error == null) withFrameNanos { }
+        while (!player.hasMedia && player.error == null) delay(50L)
         bridge.resumeWhenReady()
     }
     CrashSafeLaunchedEffect(bridge, player.isPlaying) {
-        var lastPersistence = 0L
-        while (true) {
-            withFrameNanos { frameTime ->
-                if (frameTime - lastPersistence >= PROGRESS_INTERVAL_MILLIS * 1_000_000L) {
-                    persistProgress(controller, bridge)
-                    lastPersistence = frameTime
-                }
-            }
+        while (player.isPlaying) {
+            delay(PROGRESS_INTERVAL_MILLIS)
+            persistProgress(controller, bridge)
         }
     }
     CrashSafeLaunchedEffect(
@@ -142,7 +136,7 @@ internal fun PlayerVideoSurface(
     }
 
     fun revealControls() {
-        controlsVisible = true
+        if (!controlsVisible) controlsVisible = true
         controlsActivity++
     }
 
@@ -213,7 +207,11 @@ internal fun PlayerVideoSurface(
             .pointerInput(locked) {
                 awaitPointerEventScope {
                     while (true) {
-                        if (awaitPointerEvent().type == PointerEventType.Move && !locked) {
+                        if (
+                            awaitPointerEvent().type == PointerEventType.Move &&
+                            !locked &&
+                            !controlsVisible
+                        ) {
                             revealControls()
                         }
                     }

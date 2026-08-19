@@ -1,13 +1,14 @@
 package fr.vriege.anilib.foundation.validation;
 
-import java.util.Objects;
-
 public final class Preconditions {
     private Preconditions() {
     }
 
     public static <T> T requireNonNull(T value, String name) {
-        return Objects.requireNonNull(value, name + " must not be null");
+        if (value == null) {
+            throw new NullPointerException(name + " must not be null");
+        }
+        return value;
     }
 
     public static String requireNonBlank(String value, String name) {

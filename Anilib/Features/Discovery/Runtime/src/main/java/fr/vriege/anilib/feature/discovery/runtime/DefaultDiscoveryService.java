@@ -212,7 +212,7 @@ public final class DefaultDiscoveryService implements DiscoveryService {
                 .orElseThrow(() -> new IllegalArgumentException("Source is not installed: " + item.id().sourceId()));
         if (source instanceof DetailedSource detailedSource) {
             return Objects.requireNonNull(
-                    detailedSource.details(item.id()), "detailed source returned null details");
+                    detailedSource.details(item), "detailed source returned null details");
         }
         return new SourceTitleDetails(
                 item.id(), item.title(), item.description(), List.of(), List.of(), List.of(),
