@@ -19,6 +19,7 @@ public final class DesktopExtensionHostSmoke {
     public static void main(String[] arguments) throws Exception {
         ExtensionRelocationSmoke.verify();
         ExtensionRuntimeCatalogSmoke.verify();
+        ExtensionSourceModelSmoke.verify();
         Path data = Files.createTempDirectory("anilib-desktop-extension-host-");
         try (DesktopExtensionHostServer server = DesktopExtensionHostServer.open(
                 InetAddress.getLoopbackAddress(), 0, data)) {

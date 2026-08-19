@@ -55,7 +55,8 @@ public final class BuildDependencyRule implements AnilibJavaRule {
                             "'net.dongliu:apk-parser:2.6.10'",
                             "'org.ow2.asm:asm:9.10.1'",
                             "'org.ow2.asm:asm-commons:9.10.1'",
-                            "'org.ow2.asm:asm-tree:9.10.1'")));
+                            "'org.ow2.asm:asm-tree:9.10.1'",
+                            "'org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.9.0'")));
     private static final Map<String, Set<String>> ALLOWED_EXTERNAL_PLUGINS = Map.ofEntries(
             Map.entry(
                     ANDROID_BUILD,

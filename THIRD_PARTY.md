@@ -31,6 +31,7 @@ out of process.
 | dex2jar | 2.4.38 | Convert extension DEX bytecode into JVM classes | Apache-2.0 |
 | Apk Parser | 2.6.10 | Read APK manifests and extension entry points | Apache-2.0 |
 | ASM | 9.10.1 | Repair and relocate converted extension bytecode | BSD-3-Clause |
+| Kotlinx Serialization JSON | 1.9.0 | Match the metadata ABI used by source extensions | Apache-2.0 |
 
 These libraries are confined to the optional out-of-process DesktopExtensionHost.
 They never enter the shared Kernel, Features, Android application, or portable
