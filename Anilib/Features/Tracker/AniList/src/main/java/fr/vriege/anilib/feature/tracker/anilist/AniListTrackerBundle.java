@@ -14,15 +14,20 @@ import java.util.Set;
 
 public final class AniListTrackerBundle implements AnilibPlugin {
     private static final TrackerId TRACKER_ID = TrackerId.of("anilist");
-    private final TrackerExtensionPlugin delegate = new TrackerExtensionPlugin(
-            new TrackerExtensionManifest(
-                    ComponentDescriptor.of("tracker.anilist", "AniList tracker", "1.0.0"),
-                    TRACKER_ID,
-                    Set.of(TrackerPermission.NETWORK),
-                    Set.of(TrackerNetworkOrigin.of("https", "graphql.anilist.co"))),
-            context -> new AniListTracker(context.httpClient()));
+    private final TrackerExtensionPlugin delegate;
 
     public AniListTrackerBundle() {
+        this("");
+    }
+
+    public AniListTrackerBundle(String clientId) {
+        delegate = new TrackerExtensionPlugin(
+                new TrackerExtensionManifest(
+                        ComponentDescriptor.of("tracker.anilist", "AniList tracker", "1.0.0"),
+                        TRACKER_ID,
+                        Set.of(TrackerPermission.NETWORK),
+                        Set.of(TrackerNetworkOrigin.of("https", "graphql.anilist.co"))),
+                context -> new AniListTracker(context.httpClient(), clientId));
     }
 
     @Override

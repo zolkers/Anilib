@@ -71,7 +71,10 @@ internal fun BrowserScreen(
     var challengeSolved by remember(page) { mutableStateOf(page.completionCookies().isEmpty()) }
     var challengeChecked by remember(page) { mutableStateOf(false) }
     var platformMessage by remember(page) { mutableStateOf<String?>(null) }
-    val platformBridge = platformController.rememberBridge(policy) { platformMessage = it }
+    val platformBridge = platformController.rememberBridge(
+        policy = policy,
+        report = { platformMessage = it },
+    )
     LaunchedEffect(uri, state.cookieManager) {
         seedCookies(uri, initialHeaders, state.cookieManager)
     }
@@ -205,7 +208,7 @@ internal fun BrowserScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun BrowserUnavailable(message: String, close: () -> Unit) {
+internal fun BrowserUnavailable(message: String, close: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(

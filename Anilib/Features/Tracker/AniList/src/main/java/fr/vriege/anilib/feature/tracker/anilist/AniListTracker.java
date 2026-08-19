@@ -4,6 +4,7 @@ import fr.vriege.anilib.feature.library.LibraryItem;
 import fr.vriege.anilib.feature.library.MediaKind;
 import fr.vriege.anilib.feature.tracker.Tracker;
 import fr.vriege.anilib.feature.tracker.TrackerAuthentication;
+import fr.vriege.anilib.feature.tracker.TrackerAuthorization;
 import fr.vriege.anilib.feature.tracker.TrackerCredentials;
 import fr.vriege.anilib.feature.tracker.TrackerDescriptor;
 import fr.vriege.anilib.feature.tracker.TrackerEntry;
@@ -19,6 +20,8 @@ import fr.vriege.anilib.framework.http.HttpMethod;
 import fr.vriege.anilib.framework.http.HttpRequest;
 
 import java.net.URI;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
@@ -31,9 +34,12 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.Set;
+import java.util.UUID;
 
 public final class AniListTracker implements Tracker {
     private static final URI ENDPOINT = URI.create("https://graphql.anilist.co/");
+    private static final URI AUTHORIZE_ENDPOINT = URI.create("https://anilist.co/api/v2/oauth/authorize");
+    private static final URI CALLBACK = URI.create("anilib://oauth/anilist");
     private static final TrackerId ID = TrackerId.of("anilist");
     private static final TrackerDescriptor DESCRIPTOR = new TrackerDescriptor(
             ID,
@@ -41,7 +47,7 @@ public final class AniListTracker implements Tracker {
             new TrackerIcon("A", 0x02A9FF),
             TrackerSdk.API_VERSION,
             Set.of(MediaKind.ANIME, MediaKind.MANGA),
-            TrackerAuthentication.TOKEN,
+            TrackerAuthentication.OAUTH,
             List.of(
                     TrackerStatus.WATCHING,
                     TrackerStatus.READING,
@@ -58,11 +64,18 @@ public final class AniListTracker implements Tracker {
             + "startedAt { year month day } completedAt { year month day } "
             + "media { id type episodes chapters siteUrl title { userPreferred } }";
     private final AnilibHttpClient client;
+    private final String clientId;
     private String token;
     private String accountName = "";
+    private String authorizationState;
 
     public AniListTracker(AnilibHttpClient client) {
+        this(client, "");
+    }
+
+    public AniListTracker(AnilibHttpClient client, String clientId) {
         this.client = Objects.requireNonNull(client, "client must not be null");
+        this.clientId = Objects.requireNonNull(clientId, "clientId must not be null").strip();
     }
 
     @Override
@@ -83,8 +96,8 @@ public final class AniListTracker implements Tracker {
     @Override
     public void authenticate(TrackerCredentials credentials) {
         TrackerCredentials value = Objects.requireNonNull(credentials, "credentials must not be null");
-        if (value.authentication() != TrackerAuthentication.TOKEN) {
-            throw new TrackerException("AniList requires a personal access token");
+        if (value.authentication() != TrackerAuthentication.OAUTH) {
+            throw new TrackerException("AniList requires an OAuth authorization result");
         }
         token = value.secret();
         try {
@@ -98,9 +111,47 @@ public final class AniListTracker implements Tracker {
     }
 
     @Override
+    public Optional<TrackerAuthorization> beginAuthorization() {
+        if (clientId.isBlank()) {
+            return Optional.empty();
+        }
+        authorizationState = UUID.randomUUID().toString();
+        String query = "client_id=" + encode(clientId)
+                + "&redirect_uri=" + encode(CALLBACK.toASCIIString())
+                + "&response_type=token&state=" + encode(authorizationState);
+        return Optional.of(new TrackerAuthorization(URI.create(AUTHORIZE_ENDPOINT + "?" + query), CALLBACK));
+    }
+
+    @Override
+    public void completeAuthorization(URI callbackUri) {
+        TrackerAuthorization authorization = new TrackerAuthorization(AUTHORIZE_ENDPOINT, CALLBACK);
+        URI callback = Objects.requireNonNull(callbackUri, "callbackUri must not be null");
+        if (!authorization.accepts(callback)) {
+            throw new TrackerException("AniList returned an unexpected OAuth callback");
+        }
+        Map<String, String> values = new LinkedHashMap<>(parameters(callback.getRawQuery()));
+        parameters(callback.getRawFragment()).forEach(values::putIfAbsent);
+        String expectedState = authorizationState;
+        authorizationState = null;
+        if (expectedState == null || !expectedState.equals(values.get("state"))) {
+            throw new TrackerException("AniList OAuth state did not match the active login");
+        }
+        String oauthError = values.get("error");
+        if (oauthError != null) {
+            throw new TrackerException("AniList authorization failed: " + oauthError);
+        }
+        String accessToken = values.get("access_token");
+        if (accessToken == null || accessToken.isBlank()) {
+            throw new TrackerException("AniList authorization did not return an access token");
+        }
+        authenticate(TrackerCredentials.oauthResult(accessToken));
+    }
+
+    @Override
     public void logout() {
         token = null;
         accountName = "";
+        authorizationState = null;
     }
 
     @Override
@@ -315,6 +366,30 @@ public final class AniListTracker implements Tracker {
 
     private static Optional<URI> uri(Object value) {
         return TrackerJson.optionalString(value).map(URI::create);
+    }
+
+    private static Map<String, String> parameters(String raw) {
+        Map<String, String> values = new LinkedHashMap<>();
+        if (raw == null || raw.isBlank()) {
+            return values;
+        }
+        for (String pair : raw.split("&")) {
+            int separator = pair.indexOf('=');
+            String name = decode(separator < 0 ? pair : pair.substring(0, separator));
+            String value = decode(separator < 0 ? "" : pair.substring(separator + 1));
+            if (!name.isBlank()) {
+                values.putIfAbsent(name, value);
+            }
+        }
+        return values;
+    }
+
+    private static String encode(String value) {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8);
+    }
+
+    private static String decode(String value) {
+        return URLDecoder.decode(value, StandardCharsets.UTF_8);
     }
 
     private static Instant instant(Object value) {

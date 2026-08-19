@@ -19,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import com.multiplatform.webview.web.AccompanistWebChromeClient
+import com.multiplatform.webview.web.AccompanistWebViewClient
 import com.multiplatform.webview.web.PlatformWebViewParams
 import fr.vriege.anilib.feature.settings.BrowserPolicy
 import fr.vriege.anilib.platform.compose.BrowserPlatformBridge
@@ -26,7 +27,11 @@ import fr.vriege.anilib.platform.compose.BrowserPlatformController
 
 class AndroidBrowserPlatformController : BrowserPlatformController {
     @Composable
-    override fun rememberBridge(policy: BrowserPolicy, report: (String) -> Unit): BrowserPlatformBridge {
+    override fun rememberBridge(
+        policy: BrowserPolicy,
+        report: (String) -> Unit,
+        interceptNavigation: (String) -> Boolean,
+    ): BrowserPlatformBridge {
         val pendingFiles = remember { arrayOfNulls<ValueCallback<Array<Uri>>>(1) }
         val chooser = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
             pendingFiles[0]?.onReceiveValue(uris.toTypedArray())
@@ -100,8 +105,21 @@ class AndroidBrowserPlatformController : BrowserPlatformController {
                 }
             }
         }
-        return remember(policy, chromeClient) {
-            BrowserPlatformBridge(PlatformWebViewParams(chromeClient = chromeClient)) { webView ->
+        val webViewClient = remember(interceptNavigation) {
+            object : AccompanistWebViewClient() {
+                override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean =
+                    request?.let { interceptNavigation(it.url.toString()) } == true
+                        || super.shouldOverrideUrlLoading(view, request)
+
+                @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
+                override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean =
+                    interceptNavigation(url) || super.shouldOverrideUrlLoading(view, url)
+            }
+        }
+        return remember(policy, chromeClient, webViewClient) {
+            BrowserPlatformBridge(
+                PlatformWebViewParams(client = webViewClient, chromeClient = chromeClient),
+            ) { webView ->
                 webView.settings.setSupportMultipleWindows(policy.popupsEnabled())
                 webView.settings.javaScriptCanOpenWindowsAutomatically = policy.popupsEnabled()
                 webView.setDownloadListener { url, userAgent, contentDisposition, mimeType, _ ->

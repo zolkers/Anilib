@@ -301,6 +301,7 @@ fun AnilibApp(
                 } else {
                     TitleTrackingScreen(
                         presentation = tracking,
+                        browserRuntimeStatus = browserRuntimeStatus,
                         itemId = trackingTitle,
                         title = details.title(),
                         kind = details.kind(),
@@ -722,7 +723,7 @@ private fun AppDestination(
             }
             MoreDestination.DOWNLOADS -> DownloadsScreen(downloads, closeMore)
             MoreDestination.BACKUP -> BackupScreen(backup, backupImportPicker, closeMore)
-            MoreDestination.TRACKING -> TrackerAccountsScreen(tracking, closeMore)
+            MoreDestination.TRACKING -> TrackerAccountsScreen(tracking, browserRuntimeStatus, closeMore)
             MoreDestination.CATEGORIES -> CategoriesScreen(presentation, closeMore)
             MoreDestination.STATISTICS -> StatisticsScreen(
                 presentation,

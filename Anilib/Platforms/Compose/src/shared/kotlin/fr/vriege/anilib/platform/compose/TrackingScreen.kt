@@ -20,6 +20,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -28,6 +29,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,11 +45,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.Sync
+import com.multiplatform.webview.web.LoadingState
+import com.multiplatform.webview.web.WebView
+import com.multiplatform.webview.web.rememberWebViewState
 import fr.vriege.anilib.feature.library.LibraryItemId
 import fr.vriege.anilib.feature.library.MediaKind
 import fr.vriege.anilib.feature.tracker.TrackerAccount
 import fr.vriege.anilib.feature.tracker.TrackerAuthentication
+import fr.vriege.anilib.feature.tracker.TrackerAuthorization
 import fr.vriege.anilib.feature.tracker.TrackerCredentials
 import fr.vriege.anilib.feature.tracker.TrackerConflictPolicy
 import fr.vriege.anilib.feature.tracker.TrackerConflictResolution
@@ -60,6 +67,7 @@ import fr.vriege.anilib.feature.tracker.TrackerSyncDirection
 import fr.vriege.anilib.feature.tracker.TrackerSyncPreferences
 import fr.vriege.anilib.feature.tracker.TrackerSyncReport
 import fr.vriege.anilib.feature.tracker.ui.TrackerPresentation
+import java.net.URI
 import java.time.LocalDate
 import java.util.Optional
 import java.util.OptionalDouble
@@ -68,10 +76,12 @@ import java.util.OptionalDouble
 @Composable
 internal fun TrackerAccountsScreen(
     presentation: TrackerPresentation,
+    browserRuntimeStatus: BrowserRuntimeStatus,
     goBack: () -> Unit,
 ) {
     var revision by remember { mutableStateOf(0) }
     var login by remember { mutableStateOf<TrackerAccount?>(null) }
+    var webAuthorization by remember { mutableStateOf<Pair<TrackerAccount, TrackerAuthorization>?>(null) }
     var logout by remember { mutableStateOf<TrackerAccount?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     ObserveTracking(presentation) { revision++ }
@@ -79,6 +89,23 @@ internal fun TrackerAccountsScreen(
     val preferences = remember(revision) { presentation.syncPreferences() }
     val conflicts = remember(revision) { presentation.conflicts() }
     var syncSummary by remember { mutableStateOf<String?>(null) }
+
+    webAuthorization?.let { (account, authorization) ->
+        TrackerAuthorizationScreen(
+            account = account,
+            authorization = authorization,
+            presentation = presentation,
+            runtimeStatus = browserRuntimeStatus,
+            close = { webAuthorization = null },
+            authorized = {
+                webAuthorization = null
+                error = null
+                revision++
+            },
+            failed = { error = it },
+        )
+        return
+    }
 
     login?.let { account ->
         TrackerLoginDialog(
@@ -204,6 +231,10 @@ internal fun TrackerAccountsScreen(
                             && account.descriptor().authentication() != TrackerAuthentication.NONE
                         ) {
                             logout = account
+                        } else if (account.descriptor().authentication() == TrackerAuthentication.OAUTH) {
+                            runCatching { presentation.beginAuthorization(account.descriptor().id()) }
+                                .onSuccess { webAuthorization = account to it }
+                                .onFailure { error = it.message ?: "Unable to open provider sign-in." }
                         } else if (account.descriptor().authentication() != TrackerAuthentication.NONE) {
                             login = account
                         }
@@ -229,7 +260,7 @@ private fun TrackerAccountRow(account: TrackerAccount, activate: () -> Unit) {
     val summary = when {
         authentication == TrackerAuthentication.NONE -> "Ready"
         account.authenticated() -> account.accountName().ifBlank { "Signed in" }
-        authentication == TrackerAuthentication.OAUTH -> "Connect with authorization code"
+        authentication == TrackerAuthentication.OAUTH -> "Sign in on ${account.descriptor().name()}"
         authentication == TrackerAuthentication.TOKEN -> "Connect with access token"
         else -> "Sign in"
     }
@@ -441,6 +472,7 @@ private fun TrackerLoginDialog(
 @Composable
 internal fun TitleTrackingScreen(
     presentation: TrackerPresentation,
+    browserRuntimeStatus: BrowserRuntimeStatus,
     itemId: LibraryItemId,
     title: String,
     kind: MediaKind,
@@ -449,6 +481,7 @@ internal fun TitleTrackingScreen(
     var revision by remember(itemId) { mutableStateOf(0) }
     var searching by remember { mutableStateOf<TrackerAccount?>(null) }
     var login by remember { mutableStateOf<TrackerAccount?>(null) }
+    var webAuthorization by remember { mutableStateOf<Pair<TrackerAccount, TrackerAuthorization>?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     ObserveTracking(presentation) { revision++ }
     val accounts = remember(revision, kind) {
@@ -464,6 +497,26 @@ internal fun TitleTrackingScreen(
                 revision++
             }
             .onFailure { error = it.message ?: "Tracking operation failed." }
+    }
+
+    webAuthorization?.let { (account, authorization) ->
+        TrackerAuthorizationScreen(
+            account = account,
+            authorization = authorization,
+            presentation = presentation,
+            runtimeStatus = browserRuntimeStatus,
+            close = { webAuthorization = null },
+            authorized = {
+                webAuthorization = null
+                error = null
+                revision++
+                searching = presentation.accounts().firstOrNull {
+                    it.descriptor().id() == account.descriptor().id()
+                }
+            },
+            failed = { error = it },
+        )
+        return
     }
 
     login?.let { account ->
@@ -534,6 +587,11 @@ internal fun TitleTrackingScreen(
                             || account.descriptor().authentication() == TrackerAuthentication.NONE
                         ) {
                             searching = account
+                        } else if (account.descriptor().authentication() == TrackerAuthentication.OAUTH) {
+                            error = null
+                            runCatching { presentation.beginAuthorization(account.descriptor().id()) }
+                                .onSuccess { webAuthorization = account to it }
+                                .onFailure { error = it.message ?: "Unable to open provider sign-in." }
                         } else {
                             error = null
                             login = account
@@ -839,6 +897,93 @@ private fun TrackerSearchScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TrackerAuthorizationScreen(
+    account: TrackerAccount,
+    authorization: TrackerAuthorization,
+    presentation: TrackerPresentation,
+    runtimeStatus: BrowserRuntimeStatus,
+    close: () -> Unit,
+    authorized: () -> Unit,
+    failed: (String) -> Unit,
+) {
+    if (!runtimeStatus.available) {
+        BrowserUnavailable(runtimeStatus.message, close)
+        return
+    }
+    val policy = LocalBrowserPolicy.current
+    val state = rememberWebViewState(authorization.authorizationUri().toString()) {
+        isJavaScriptEnabled = true
+        androidWebSettings.domStorageEnabled = true
+        desktopWebSettings.disablePopupWindows = false
+    }
+    var completing by remember(authorization) { mutableStateOf(false) }
+    var localError by remember(authorization) { mutableStateOf<String?>(null) }
+    val intercept: (String) -> Boolean = { value ->
+        val callback = runCatching { URI.create(value) }.getOrNull()
+        val accepted = callback != null && authorization.accepts(callback)
+        if (accepted && !completing) {
+            completing = true
+            runCatching { presentation.completeAuthorization(account.descriptor().id(), callback) }
+                .onSuccess { authorized() }
+                .onFailure {
+                    val message = it.message ?: "Provider sign-in failed."
+                    localError = message
+                    failed(message)
+                    completing = false
+                }
+        }
+        accepted
+    }
+    val platformBridge = LocalBrowserPlatformController.current.rememberBridge(
+        policy = policy,
+        report = { localError = it },
+        interceptNavigation = intercept,
+    )
+    LaunchedEffect(state.lastLoadedUrl) {
+        state.lastLoadedUrl?.let(intercept)
+    }
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Sign in to ${account.descriptor().name()}") },
+                navigationIcon = {
+                    IconButton(onClick = close) {
+                        Icon(Icons.Default.Close, contentDescription = "Close browser")
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+            val loading = state.loadingState
+            if (loading is LoadingState.Loading || completing) {
+                LinearProgressIndicator(
+                    progress = {
+                        if (loading is LoadingState.Loading) loading.progress else 1f
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            localError?.let {
+                Text(
+                    text = it,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+            }
+            WebView(
+                state = state,
+                captureBackPresses = true,
+                platformWebViewParams = platformBridge.parameters,
+                onCreated = platformBridge.onCreated,
+                modifier = Modifier.fillMaxSize(),
+            )
         }
     }
 }

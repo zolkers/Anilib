@@ -239,10 +239,12 @@ filesystem, reflection, Network, and Kernel import bans used for source
 extensions. Core stores no credentials. It atomically persists only remote
 title mirrors and owns their versioned `tracking` backup section. Android and
 desktop share the same account settings, search, binding, and editing surfaces.
-Optional first-party AniList and Kitsu Bundles use this same boundary: AniList
-performs token-authenticated GraphQL operations only at `graphql.anilist.co`,
-while Kitsu performs its password OAuth and JSON:API lifecycle only at
-`kitsu.io`. Neither Bundle is selected by Standard or persists its session.
+Optional first-party AniList and Kitsu Bundles use this same boundary. AniList
+starts its provider-owned OAuth website in the shared WebView, validates the
+`anilib://oauth/anilist` callback and state, then performs authenticated GraphQL
+operations only at `graphql.anilist.co`. Kitsu performs its password OAuth and
+JSON:API lifecycle only at `kitsu.io`. Standard selects both Bundles, but no
+Bundle persists its session.
 Tracker Core atomically stores synchronization direction, automatic mode,
 conflict policy, and pending-local markers beside its mirror. Library activity
 triggers a serialized refresh only when automatic synchronization is enabled.

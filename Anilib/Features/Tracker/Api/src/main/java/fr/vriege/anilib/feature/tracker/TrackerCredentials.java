@@ -28,4 +28,8 @@ public record TrackerCredentials(TrackerAuthentication authentication, String id
     public static TrackerCredentials authorizationCode(String code) {
         return new TrackerCredentials(TrackerAuthentication.OAUTH, "", code);
     }
+
+    public static TrackerCredentials oauthResult(String result) {
+        return new TrackerCredentials(TrackerAuthentication.OAUTH, "", result);
+    }
 }

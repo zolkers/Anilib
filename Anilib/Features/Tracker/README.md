@@ -11,7 +11,8 @@ An installed tracker exposes its authentication method, supported media kinds,
 statuses, score scale, date support, and private-entry support. The shared UI
 then provides:
 
-- sign-in and sign-out for password, token, and OAuth-code adapters;
+- provider-website OAuth with automatic callback handling, plus sign-in and
+  sign-out for password and token adapters;
 - remote title search and explicit binding;
 - status, fractional progress, score, start date, finish date, and privacy;
 - remote refresh and confirmed adapter-owned removal;
@@ -32,8 +33,9 @@ and their latest non-secret state.
 Anilib includes two provider Bundles selected explicitly by the Standard
 product:
 
-- AniList uses a personal access token, GraphQL title search, and complete
-  list-entry create, update, refresh, and delete mutations;
+- AniList opens its official OAuth website, consumes the validated callback
+  automatically, then provides GraphQL title search and complete list-entry
+  create, update, refresh, and delete mutations;
 - Kitsu uses its username/password OAuth token flow and JSON:API title search
   plus complete library-entry create, update, refresh, and delete operations.
 
@@ -41,6 +43,12 @@ Both providers keep credentials and access tokens in memory only. Their Bundle
 manifests restrict HTTP access to the single exact provider origin, and fixture
 tests exercise their full authentication and entry lifecycle without requiring
 live accounts.
+
+The Standard product reads AniList's public OAuth client identifier from the
+`anilib.tracker.anilist.client-id` JVM property or the
+`ANILIB_ANILIST_CLIENT_ID` environment variable. The registered provider
+application must use the exact callback URI `anilib://oauth/anilist`; no client
+secret belongs in either application.
 
 Synchronization preferences and pending local changes are written atomically
 beside the tracking mirror. Remote refresh timestamps let the newest-wins policy

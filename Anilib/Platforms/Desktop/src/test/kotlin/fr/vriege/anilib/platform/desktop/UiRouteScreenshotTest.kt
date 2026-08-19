@@ -294,6 +294,7 @@ class UiRouteScreenshotTest {
             override fun rememberBridge(
                 policy: BrowserPolicy,
                 report: (String) -> Unit,
+                interceptNavigation: (String) -> Boolean,
             ) = BrowserPlatformBridge(null) { }
         }
 

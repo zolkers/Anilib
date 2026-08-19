@@ -4,6 +4,7 @@ import fr.vriege.anilib.configuration.standard.StandardAnilib;
 import fr.vriege.anilib.feature.library.LibraryItem;
 import fr.vriege.anilib.feature.library.MediaKind;
 import fr.vriege.anilib.feature.tracker.TrackerCapabilities;
+import fr.vriege.anilib.feature.tracker.TrackerAuthorization;
 import fr.vriege.anilib.feature.tracker.TrackerCredentials;
 import fr.vriege.anilib.feature.tracker.TrackerEntry;
 import fr.vriege.anilib.feature.tracker.TrackerSearchResult;
@@ -17,6 +18,8 @@ import fr.vriege.anilib.framework.http.HttpResponse;
 import fr.vriege.anilib.kernel.StartedAnilib;
 
 import java.io.IOException;
+import java.net.URI;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -68,10 +71,19 @@ final class FirstPartyTrackerTest {
                 json("{\"data\":{\"SaveMediaListEntry\":" + aniListEntry("CURRENT", 3, 8) + "}}"),
                 json("{\"data\":{\"MediaList\":" + aniListEntry("CURRENT", 3, 8) + "}}"),
                 json("{\"data\":{\"DeleteMediaListEntry\":{\"deleted\":true}}}"));
-        AniListTracker tracker = new AniListTracker(client);
-        tracker.authenticate(TrackerCredentials.token("token-value"));
+        AniListTracker tracker = new AniListTracker(client, "1234");
+        TrackerAuthorization authorization = tracker.beginAuthorization().orElseThrow();
+        String state = queryParameter(authorization.authorizationUri().getRawQuery(), "state");
+        counter.check(authorization.authorizationUri().getHost().equals("anilist.co")
+                        && queryParameter(authorization.authorizationUri().getRawQuery(), "client_id").equals("1234")
+                        && queryParameter(
+                                authorization.authorizationUri().getRawQuery(),
+                                "response_type").equals("token"),
+                "AniList login must begin on its official OAuth website");
+        tracker.completeAuthorization(URI.create(
+                authorization.callbackUri() + "#access_token=token-value&state=" + state));
         counter.check(tracker.isAuthenticated() && tracker.accountName().equals("alice"),
-                "AniList token authentication must resolve the signed-in Viewer");
+                "AniList OAuth callback must resolve the signed-in Viewer automatically");
         LibraryItem item = LibraryItem.create("Fixture anime", MediaKind.ANIME);
         TrackerSearchResult result = tracker.search("Fixture", MediaKind.ANIME).getFirst();
         TrackerEntry bound = tracker.bind(item, result);
@@ -161,6 +173,17 @@ final class FirstPartyTrackerTest {
                 Map.of("content-type", List.of("application/json")),
                 value.getBytes(StandardCharsets.UTF_8),
                 false);
+    }
+
+    private static String queryParameter(String query, String name) {
+        for (String parameter : query.split("&")) {
+            int separator = parameter.indexOf('=');
+            String key = URLDecoder.decode(parameter.substring(0, separator), StandardCharsets.UTF_8);
+            if (key.equals(name)) {
+                return URLDecoder.decode(parameter.substring(separator + 1), StandardCharsets.UTF_8);
+            }
+        }
+        throw new AssertionError("Missing OAuth parameter: " + name);
     }
 
     private static Path temporaryDirectory() {

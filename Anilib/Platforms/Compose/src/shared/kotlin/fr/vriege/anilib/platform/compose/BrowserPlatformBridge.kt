@@ -16,6 +16,7 @@ interface BrowserPlatformController {
     fun rememberBridge(
         policy: BrowserPolicy,
         report: (String) -> Unit,
+        interceptNavigation: (String) -> Boolean = { false },
     ): BrowserPlatformBridge
 }
 
@@ -26,6 +27,7 @@ internal val LocalBrowserPlatformController =
             override fun rememberBridge(
                 policy: BrowserPolicy,
                 report: (String) -> Unit,
+                interceptNavigation: (String) -> Boolean,
             ) = BrowserPlatformBridge(null) { }
         }
     }

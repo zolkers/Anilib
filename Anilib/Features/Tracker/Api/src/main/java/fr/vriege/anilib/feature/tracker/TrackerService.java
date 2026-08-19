@@ -3,6 +3,7 @@ package fr.vriege.anilib.feature.tracker;
 import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.library.MediaKind;
 
+import java.net.URI;
 import java.util.Collection;
 import java.util.List;
 
@@ -10,6 +11,10 @@ public interface TrackerService {
     List<TrackerAccount> accounts();
 
     void authenticate(TrackerId trackerId, TrackerCredentials credentials);
+
+    TrackerAuthorization beginAuthorization(TrackerId trackerId);
+
+    void completeAuthorization(TrackerId trackerId, URI callbackUri);
 
     void logout(TrackerId trackerId);
 

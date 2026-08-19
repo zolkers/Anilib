@@ -3,6 +3,7 @@ package fr.vriege.anilib.feature.tracker.ui;
 import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.library.MediaKind;
 import fr.vriege.anilib.feature.tracker.TrackerAccount;
+import fr.vriege.anilib.feature.tracker.TrackerAuthorization;
 import fr.vriege.anilib.feature.tracker.TrackerCredentials;
 import fr.vriege.anilib.feature.tracker.TrackerConflictResolution;
 import fr.vriege.anilib.feature.tracker.TrackerEntry;
@@ -12,12 +13,17 @@ import fr.vriege.anilib.feature.tracker.TrackerSyncConflict;
 import fr.vriege.anilib.feature.tracker.TrackerSyncPreferences;
 import fr.vriege.anilib.feature.tracker.TrackerSyncReport;
 
+import java.net.URI;
 import java.util.List;
 
 public interface TrackerPresentation {
     List<TrackerAccount> accounts();
 
     void authenticate(TrackerId trackerId, TrackerCredentials credentials);
+
+    TrackerAuthorization beginAuthorization(TrackerId trackerId);
+
+    void completeAuthorization(TrackerId trackerId, URI callbackUri);
 
     void logout(TrackerId trackerId);
 

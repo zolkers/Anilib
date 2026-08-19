@@ -14,15 +14,30 @@ import org.cef.callback.CefFileDialogCallback
 import org.cef.handler.CefDialogHandler
 import org.cef.handler.CefDownloadHandlerAdapter
 import org.cef.handler.CefLifeSpanHandlerAdapter
+import org.cef.handler.CefRequestHandlerAdapter
+import org.cef.network.CefRequest
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.Vector
 
 class DesktopBrowserPlatformController : BrowserPlatformController {
     @Composable
-    override fun rememberBridge(policy: BrowserPolicy, report: (String) -> Unit): BrowserPlatformBridge =
-        remember(policy) {
+    override fun rememberBridge(
+        policy: BrowserPolicy,
+        report: (String) -> Unit,
+        interceptNavigation: (String) -> Boolean,
+    ): BrowserPlatformBridge =
+        remember(policy, interceptNavigation) {
             BrowserPlatformBridge(PlatformWebViewParams()) { browser ->
+                browser.client.addRequestHandler(object : CefRequestHandlerAdapter() {
+                    override fun onBeforeBrowse(
+                        cefBrowser: CefBrowser,
+                        frame: CefFrame,
+                        request: CefRequest,
+                        userGesture: Boolean,
+                        isRedirect: Boolean,
+                    ): Boolean = interceptNavigation(request.url)
+                })
                 if (!policy.fileChooserEnabled()) {
                     browser.client.addDialogHandler(object : CefDialogHandler {
                         override fun onFileDialog(

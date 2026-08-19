@@ -6,6 +6,7 @@ import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.library.MediaKind;
 import fr.vriege.anilib.feature.tracker.Tracker;
 import fr.vriege.anilib.feature.tracker.TrackerAccount;
+import fr.vriege.anilib.feature.tracker.TrackerAuthorization;
 import fr.vriege.anilib.feature.tracker.TrackerAuthentication;
 import fr.vriege.anilib.feature.tracker.TrackerCredentials;
 import fr.vriege.anilib.feature.tracker.TrackerConflictPolicy;
@@ -22,6 +23,7 @@ import fr.vriege.anilib.feature.tracker.TrackerSyncDirection;
 import fr.vriege.anilib.feature.tracker.TrackerSyncPreferences;
 import fr.vriege.anilib.feature.tracker.TrackerSyncReport;
 
+import java.net.URI;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -89,6 +91,30 @@ public final class DefaultTrackerService implements TrackerService, AutoCloseabl
             throw new TrackerException("Credentials do not match " + tracker.descriptor().authentication());
         }
         tracker.authenticate(value);
+        if (!tracker.isAuthenticated()) {
+            throw new TrackerException("Tracker did not establish an authenticated session");
+        }
+        notifyListeners();
+        queueAutomaticSynchronization();
+    }
+
+    @Override
+    public TrackerAuthorization beginAuthorization(TrackerId trackerId) {
+        Tracker tracker = tracker(trackerId);
+        if (tracker.descriptor().authentication() != TrackerAuthentication.OAUTH) {
+            throw new TrackerException("Tracker does not use web authorization: " + trackerId);
+        }
+        return tracker.beginAuthorization().orElseThrow(
+                () -> new TrackerException("OAuth is not configured for " + tracker.descriptor().name()));
+    }
+
+    @Override
+    public void completeAuthorization(TrackerId trackerId, URI callbackUri) {
+        Tracker tracker = tracker(trackerId);
+        if (tracker.descriptor().authentication() != TrackerAuthentication.OAUTH) {
+            throw new TrackerException("Tracker does not use web authorization: " + trackerId);
+        }
+        tracker.completeAuthorization(Objects.requireNonNull(callbackUri, "callbackUri must not be null"));
         if (!tracker.isAuthenticated()) {
             throw new TrackerException("Tracker did not establish an authenticated session");
         }

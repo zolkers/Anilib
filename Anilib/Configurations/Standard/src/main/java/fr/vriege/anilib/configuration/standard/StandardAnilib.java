@@ -174,7 +174,9 @@ public final class StandardAnilib {
         plugins.add(new DownloadPlugin(downloads));
         plugins.add(new PlayerPlugin(playbackState, playerPreferences, playerBackend));
         plugins.add(new TrackerPlugin(trackingState));
-        plugins.add(new AniListTrackerBundle());
+        plugins.add(new AniListTrackerBundle(oauthClientId(
+                "anilib.tracker.anilist.client-id",
+                "ANILIB_ANILIST_CLIENT_ID")));
         plugins.add(new KitsuTrackerBundle());
         plugins.add(new UpdatePlugin(updateState, updateNotifier));
         plugins.add(ApplicationUpdatePlugin.currentRuntime(
@@ -188,5 +190,13 @@ public final class StandardAnilib {
         plugins.addAll(extensionSelection.bundles());
         plugins.addAll(additionalPlugins);
         return new DefaultPluginEngine().start(List.copyOf(plugins));
+    }
+
+    private static String oauthClientId(String property, String environment) {
+        String configured = System.getProperty(property, "").strip();
+        if (!configured.isEmpty()) {
+            return configured;
+        }
+        return Objects.requireNonNullElse(System.getenv(environment), "").strip();
     }
 }
