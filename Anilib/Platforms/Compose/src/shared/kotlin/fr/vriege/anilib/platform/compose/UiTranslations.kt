@@ -78,6 +78,7 @@ internal object UiTranslations {
             "Filters" to "Filtres",
             "Help" to "Aide",
             "History" to "Historique",
+            "Information" to "Information",
             "Local progress stays on this device, but synchronization with the service stops." to
                 "La progression locale reste sur cet appareil, mais la synchronisation avec le service s’arrête.",
             "Import" to "Importer",
@@ -86,6 +87,7 @@ internal object UiTranslations {
             "Loading…" to "Chargement…",
             "Manga" to "Manga",
             "More" to "Plus",
+            "OK" to "OK",
             "Next" to "Suivant",
             "Privacy" to "Confidentialité",
             "Project" to "Projet",
@@ -101,6 +103,7 @@ internal object UiTranslations {
             "Settings" to "Paramètres",
             "Share" to "Partager",
             "Statistics" to "Statistiques",
+            "Something went wrong" to "Une erreur est survenue",
             "Tracking" to "Suivi",
             "Updates" to "Mises à jour",
             "Watch" to "Regarder",

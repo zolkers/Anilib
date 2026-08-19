@@ -80,6 +80,38 @@ internal fun CrashRecoveryDialog(
     )
 }
 
+internal enum class UiNoticeKind {
+    INFO,
+    ERROR,
+}
+
+@Composable
+internal fun UiNoticeDialog(
+    kind: UiNoticeKind,
+    message: String,
+    dismiss: () -> Unit,
+    retry: (() -> Unit)? = null,
+) {
+    AlertDialog(
+        onDismissRequest = dismiss,
+        title = { Text(if (kind == UiNoticeKind.ERROR) "Something went wrong" else "Information") },
+        text = { Text(message) },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    dismiss()
+                    retry?.invoke()
+                },
+            ) { Text(if (retry == null) "OK" else "Retry") }
+        },
+        dismissButton = {
+            if (retry != null) {
+                TextButton(onClick = dismiss) { Text("Close") }
+            }
+        },
+    )
+}
+
 internal fun uiFailureMessage(failure: Throwable): String {
     var cause = failure
     repeat(MAX_CAUSE_DEPTH) {

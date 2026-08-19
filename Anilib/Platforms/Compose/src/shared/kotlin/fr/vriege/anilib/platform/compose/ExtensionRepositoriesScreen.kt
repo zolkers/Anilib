@@ -136,7 +136,6 @@ internal fun ExtensionRepositoriesScreen(
                     }
                 }
             }
-            error?.let { message -> item { ExtensionFailure(message, ::refresh) } }
             if (view.repositories().isEmpty() && !loading) {
                 item { EmptyPage("No extension repository configured.") }
             } else {
@@ -173,6 +172,14 @@ internal fun ExtensionRepositoriesScreen(
                 runCatching { presentation.remove(repository) }
                     .onFailure { error = it.message ?: "Repository removal failed." }
             },
+        )
+    }
+    error?.let { message ->
+        UiNoticeDialog(
+            kind = UiNoticeKind.ERROR,
+            message = message,
+            dismiss = { error = null },
+            retry = ::refresh,
         )
     }
 }
@@ -246,16 +253,6 @@ internal fun ExtensionDiscoveryList(
                 }
             }
         }
-        error?.let { value -> item { ExtensionFailure(value, null) } }
-        message?.let { value ->
-            item {
-                Text(
-                    value,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                )
-            }
-        }
         if (!refreshing && packages.isEmpty()) {
             item { EmptyPage("No ${kind.name.lowercase()} extension found in the configured repositories.") }
         }
@@ -285,7 +282,7 @@ internal fun ExtensionDiscoveryList(
                         val installationStatus = when {
                             apkInstalled && extension.packageName() in activeApkPackages ->
                                 "Installed · available in Sources"
-                            apkInstalled -> "Installed · no compatible source activated"
+                            apkInstalled -> "Installed · incompatible with the current desktop engine"
                             installedPortable != null -> "Installed"
                             else -> "Available"
                         }
@@ -403,6 +400,12 @@ internal fun ExtensionDiscoveryList(
                 }
             },
         )
+    }
+    error?.let { value ->
+        UiNoticeDialog(UiNoticeKind.ERROR, value, dismiss = { error = null })
+    }
+    message?.let { value ->
+        UiNoticeDialog(UiNoticeKind.INFO, value, dismiss = { message = null })
     }
 }
 
