@@ -3,8 +3,11 @@ package fr.vriege.anilib.platform.desktopextensionhost.server;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import fr.vriege.anilib.platform.desktopextensionhost.extension.ExtensionDownloadClient;
+import fr.vriege.anilib.platform.desktopextensionhost.extension.ExtensionKind;
 import fr.vriege.anilib.platform.desktopextensionhost.extension.ExtensionRegistry;
+import fr.vriege.anilib.platform.desktopextensionhost.extension.ExtensionRuntimeCatalog;
 import fr.vriege.anilib.platform.desktopextensionhost.extension.InstalledExtension;
+import fr.vriege.anilib.platform.desktopextensionhost.extension.LoadedSource;
 import fr.vriege.anilib.platform.desktopextensionhost.protocol.DesktopExtensionHostProtocol;
 
 import java.io.IOException;
@@ -26,6 +29,7 @@ public final class DesktopExtensionHostServer implements AutoCloseable {
     private final HttpServer server;
     private final ExecutorService executor;
     private final ExtensionRegistry extensionRegistry;
+    private final ExtensionRuntimeCatalog runtimeCatalog;
     private final ExtensionDownloadClient downloadClient;
 
     private DesktopExtensionHostServer(
@@ -33,11 +37,13 @@ public final class DesktopExtensionHostServer implements AutoCloseable {
             HttpServer server,
             ExecutorService executor,
             ExtensionRegistry extensionRegistry,
+            ExtensionRuntimeCatalog runtimeCatalog,
             ExtensionDownloadClient downloadClient) {
         this.dataDirectory = dataDirectory;
         this.server = server;
         this.executor = executor;
         this.extensionRegistry = extensionRegistry;
+        this.runtimeCatalog = runtimeCatalog;
         this.downloadClient = downloadClient;
     }
 
@@ -53,8 +59,14 @@ public final class DesktopExtensionHostServer implements AutoCloseable {
         try {
             HttpServer server = HttpServer.create(new InetSocketAddress(bindAddress, port), 0);
             ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
+            ExtensionRegistry registry = new ExtensionRegistry(data);
             DesktopExtensionHostServer result = new DesktopExtensionHostServer(
-                    data, server, executor, new ExtensionRegistry(data), new ExtensionDownloadClient());
+                    data,
+                    server,
+                    executor,
+                    registry,
+                    new ExtensionRuntimeCatalog(registry),
+                    new ExtensionDownloadClient());
             result.configure();
             server.setExecutor(executor);
             return result;
@@ -92,7 +104,9 @@ public final class DesktopExtensionHostServer implements AutoCloseable {
         });
         server.createContext(DesktopExtensionHostProtocol.SOURCES_PATH, exchange -> safely(exchange, () -> {
             if (ExtensionHostHttpExchange.requireGet(exchange)) {
-                ExtensionHostHttpExchange.json(exchange, 200, "{\"manga\":[],\"anime\":[]}");
+                try (ExtensionRuntimeCatalog.Snapshot snapshot = runtimeCatalog.discover()) {
+                    ExtensionHostHttpExchange.json(exchange, 200, sourcesJson(snapshot));
+                }
             }
         }));
         server.createContext(
@@ -167,6 +181,25 @@ public final class DesktopExtensionHostServer implements AutoCloseable {
                     + ExtensionHostHttpExchange.jsonString(metadata.kind().name().toLowerCase(Locale.ROOT))
                     + ",\"nsfw\":" + metadata.adult() + '}';
         }).toList()) + "]}";
+    }
+
+    private static String sourcesJson(ExtensionRuntimeCatalog.Snapshot snapshot) {
+        List<String> manga = new java.util.ArrayList<>();
+        List<String> anime = new java.util.ArrayList<>();
+        for (LoadedSource source : snapshot.sources()) {
+            String value = "{\"id\":" + ExtensionHostHttpExchange.jsonString(Long.toUnsignedString(source.id()))
+                    + ",\"name\":" + ExtensionHostHttpExchange.jsonString(source.name())
+                    + ",\"lang\":" + ExtensionHostHttpExchange.jsonString(source.language())
+                    + ",\"pkg\":" + ExtensionHostHttpExchange.jsonString(source.packageName()) + '}';
+            (source.kind() == ExtensionKind.MANGA ? manga : anime).add(value);
+        }
+        String failures = String.join(",", snapshot.failures().entrySet().stream()
+                .map(entry -> ExtensionHostHttpExchange.jsonString(entry.getKey()) + ':'
+                        + ExtensionHostHttpExchange.jsonString(entry.getValue()))
+                .toList());
+        return "{\"manga\":[" + String.join(",", manga)
+                + "],\"anime\":[" + String.join(",", anime)
+                + "],\"failures\":{" + failures + "}}";
     }
 
     private static void safely(HttpExchange exchange, Runnable action) {

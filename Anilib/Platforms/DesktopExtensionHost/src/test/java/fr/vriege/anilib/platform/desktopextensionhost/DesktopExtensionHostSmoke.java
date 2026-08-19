@@ -18,6 +18,7 @@ public final class DesktopExtensionHostSmoke {
 
     public static void main(String[] arguments) throws Exception {
         ExtensionRelocationSmoke.verify();
+        ExtensionRuntimeCatalogSmoke.verify();
         Path data = Files.createTempDirectory("anilib-desktop-extension-host-");
         try (DesktopExtensionHostServer server = DesktopExtensionHostServer.open(
                 InetAddress.getLoopbackAddress(), 0, data)) {
@@ -32,6 +33,7 @@ public final class DesktopExtensionHostSmoke {
             }
             verifyGet(server, DesktopExtensionHostProtocol.INSTALLED_EXTENSIONS_PATH, "\"extensions\":[]");
             verifyGet(server, DesktopExtensionHostProtocol.SOURCES_PATH, "\"anime\":[]");
+            verifyGet(server, DesktopExtensionHostProtocol.CAPABILITIES_PATH, "\"sourceCatalogue\":true");
             HttpResponse<String> rejected = HttpClient.newHttpClient().send(
                     HttpRequest.newBuilder(endpoint(server, DesktopExtensionHostProtocol.UNINSTALL_EXTENSION_PATH))
                             .header("content-type", "application/json")

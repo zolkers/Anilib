@@ -8,7 +8,7 @@ record DesktopExtensionHostCapabilities(
         boolean preferences) {
 
     static DesktopExtensionHostCapabilities bootstrap() {
-        return new DesktopExtensionHostCapabilities(false, false, false, false, false);
+        return new DesktopExtensionHostCapabilities(true, true, false, false, false);
     }
 
     String toJson() {
