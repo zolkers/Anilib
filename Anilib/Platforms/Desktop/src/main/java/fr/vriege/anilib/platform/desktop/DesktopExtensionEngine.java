@@ -49,7 +49,7 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
     private final Path dataDirectory;
     private final Path engineDirectory;
     private final HttpTransport transport;
-    private volatile MiwayomiSourceBridge bridge;
+    private volatile DesktopApkEngineClient bridge;
     private volatile ProcessHandle process;
     private final List<AnilibPlugin> sourceBundles;
     private final Map<String, List<PluginRegistration>> dynamicRegistrations = new LinkedHashMap<>();
@@ -61,7 +61,7 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
             Path dataDirectory,
             Path engineDirectory,
             HttpTransport transport,
-            MiwayomiSourceBridge bridge,
+            DesktopApkEngineClient bridge,
             ProcessHandle process,
             List<AnilibPlugin> sourceBundles,
             Set<String> installedPackages,
@@ -105,6 +105,7 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
                 return running;
             }
             Path runtimeJar = prepareRuntimeCopy(engineDirectory, approvedJar, expectedSha256);
+            repairConvertedExtensions(engineDirectory, runtimeJar);
             return start(data, engineDirectory, runtimeJar, transport);
         } catch (RuntimeException exception) {
             return unavailable(
@@ -174,12 +175,20 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
         return CompletableFuture.supplyAsync(() -> {
             ensureAvailable();
             bridge.install(artifact);
+            installedPackageNames.add(extensionPackage.packageName());
             int activated = activateNewSources();
             if (activated == 0) {
-                bridge.uninstall(extensionPackage.packageName());
-                installedPackageNames.remove(extensionPackage.packageName());
+                Path convertedJar = convertedExtensionJar(artifact);
+                int repairs = repairWhileStopped(convertedJar);
+                if (repairs > 0) {
+                    activated = activateNewSources();
+                }
+            }
+            if (activated == 0) {
                 throw new IllegalStateException(
-                        extensionPackage.displayName() + " could not activate a compatible manga or anime source");
+                        extensionPackage.displayName() + " is installed, but this APK generation is not yet "
+                                + "compatible with the current desktop engine. The APK was kept so a future "
+                                + "engine update can activate it.");
             }
             return extensionPackage.displayName() + " installed. " + activated
                     + " source(s) added immediately to Browse.";
@@ -240,24 +249,28 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
 
     @Override
     public void close() {
-        if (process == null || !process.isAlive()) {
-            clearRuntimeState(engineDirectory, process);
+        stopProcess(process);
+    }
+
+    private void stopProcess(ProcessHandle running) {
+        if (running == null || !running.isAlive()) {
+            clearRuntimeState(engineDirectory, running);
             return;
         }
-        process.destroy();
+        running.destroy();
         try {
-            process.onExit().get(5, TimeUnit.SECONDS);
+            running.onExit().get(5, TimeUnit.SECONDS);
         } catch (java.util.concurrent.TimeoutException exception) {
-            if (process.isAlive()) {
-                process.destroyForcibly();
+            if (running.isAlive()) {
+                running.destroyForcibly();
             }
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
-            process.destroyForcibly();
+            running.destroyForcibly();
         } catch (java.util.concurrent.ExecutionException exception) {
-            process.destroyForcibly();
+            running.destroyForcibly();
         } finally {
-            clearRuntimeState(engineDirectory, process);
+            clearRuntimeState(engineDirectory, running);
         }
     }
 
@@ -280,6 +293,63 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
         diagnostic = started.diagnostic;
     }
 
+    private synchronized void restartEngine() {
+        stopProcess(process);
+        process = null;
+        Properties properties = load(engineDirectory.resolve("engine.properties"));
+        Path approvedJar = approvedJar(engineDirectory, properties);
+        String expectedSha256 = expectedSha256(properties);
+        requireChecksum(approvedJar, expectedSha256);
+        Path runtimeJar = prepareRuntimeCopy(engineDirectory, approvedJar, expectedSha256);
+        DesktopExtensionEngine restarted = start(dataDirectory, engineDirectory, runtimeJar, transport);
+        bridge = restarted.bridge;
+        process = restarted.process;
+        installedPackageNames.clear();
+        installedPackageNames.addAll(restarted.installedPackageNames);
+        diagnostic = restarted.diagnostic;
+    }
+
+    private synchronized int repairWhileStopped(Path convertedJar) {
+        stopProcess(process);
+        process = null;
+        int repairs = 0;
+        RuntimeException repairFailure = null;
+        try {
+            repairs = JvmExtensionBytecodeRepair.repair(
+                    convertedJar,
+                    engineDirectory.resolve("runtime").resolve("engine-runtime.jar"));
+        } catch (RuntimeException exception) {
+            repairFailure = exception;
+        }
+        try {
+            restartEngine();
+        } catch (RuntimeException restartFailure) {
+            if (repairFailure != null) {
+                restartFailure.addSuppressed(repairFailure);
+            }
+            throw restartFailure;
+        }
+        if (repairFailure != null) {
+            throw repairFailure;
+        }
+        return repairs;
+    }
+
+    private Path convertedExtensionJar(URI artifact) {
+        String path = artifact.getPath();
+        String fileName = path == null ? "" : Path.of(path).getFileName().toString();
+        if (!fileName.toLowerCase(Locale.ROOT).endsWith(".apk")) {
+            throw new IllegalStateException("Installed APK URL does not expose a stable file name");
+        }
+        String jarName = fileName.substring(0, fileName.length() - 4) + ".jar";
+        Path extensions = engineDirectory.resolve("data").resolve("extensions").toAbsolutePath().normalize();
+        Path converted = extensions.resolve(jarName).normalize();
+        if (!extensions.equals(converted.getParent())) {
+            throw new IllegalStateException("Converted extension path escaped the engine directory");
+        }
+        return converted;
+    }
+
     private static DesktopExtensionEngine start(
             Path dataDirectory,
             Path engineDirectory,
@@ -292,9 +362,9 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
             try {
                 process = launch(engineDirectory, runtimeJar, port);
                 AnilibHttpClient client = request -> transport.exchange(request, request.headers());
-                MiwayomiSourceBridge bridge = new MiwayomiSourceBridge(
+                DesktopApkEngineClient bridge = new MiwayomiDesktopApkEngineClient(new MiwayomiSourceBridge(
                         URI.create("http://127.0.0.1:" + port + "/"),
-                        client);
+                        client));
                 ProcessHandle processHandle = process.toHandle();
                 awaitHealthy(bridge, processHandle);
                 writeRuntimeState(engineDirectory, processHandle, port, runtimeJar);
@@ -355,8 +425,8 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
                 return null;
             }
             AnilibHttpClient client = request -> transport.exchange(request, request.headers());
-            MiwayomiSourceBridge bridge = new MiwayomiSourceBridge(
-                    URI.create("http://127.0.0.1:" + port + "/"), client);
+            DesktopApkEngineClient bridge = new MiwayomiDesktopApkEngineClient(new MiwayomiSourceBridge(
+                    URI.create("http://127.0.0.1:" + port + "/"), client));
             bridge.requireHealthy();
             List<URI> repositories = new FileExtensionRepositoryStore(
                     dataDirectory.resolve("extension-repositories.txt")).load().stream()
@@ -482,7 +552,7 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
         }
     }
 
-    private static void awaitHealthy(MiwayomiSourceBridge bridge, ProcessHandle process) {
+    private static void awaitHealthy(DesktopApkEngineClient bridge, ProcessHandle process) {
         long deadline = System.nanoTime() + START_TIMEOUT.toNanos();
         RuntimeException failure = null;
         while (System.nanoTime() < deadline) {
@@ -532,6 +602,21 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
             return runtimeJar;
         } catch (IOException exception) {
             throw new UncheckedIOException("Unable to prepare isolated engine copy", exception);
+        }
+    }
+
+    private static void repairConvertedExtensions(Path engineDirectory, Path runtimeJar) {
+        Path extensions = engineDirectory.resolve("data").resolve("extensions");
+        if (!Files.isDirectory(extensions, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(extensions)) {
+            return;
+        }
+        try (var files = Files.list(extensions)) {
+            files.filter(path -> path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".jar"))
+                    .filter(path -> Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS))
+                    .filter(path -> !Files.isSymbolicLink(path))
+                    .forEach(path -> JvmExtensionBytecodeRepair.repair(path, runtimeJar));
+        } catch (IOException exception) {
+            throw new UncheckedIOException("Unable to inspect converted desktop extensions", exception);
         }
     }
 

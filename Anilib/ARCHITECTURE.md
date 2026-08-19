@@ -417,10 +417,13 @@ still needs a complete, compatible host ABI before a real installed APK can
 reach that Android path.
 
 Desktop supplies the missing ecosystem ABI only through an optional external
-JVM sidecar. Selecting an APK install explicitly authorizes Anilib to download
-the pinned Apache-2.0 Miwayomi release from its official GitHub asset; the
-platform adapter bounds its size, verifies its exact SHA-256, rejects links,
-persists the verified selection, and launches a disposable copy with a reduced environment on
+JVM sidecar selected behind Anilib's `DesktopApkEngineClient` port. The default
+provider currently provisions the pinned Apache-2.0 Miwayomi release from its
+official GitHub asset; it is a replaceable platform adapter, not a Source,
+Feature, Kernel, or product-configuration dependency. Selecting an APK install
+explicitly authorizes its download. The platform adapter bounds its size,
+verifies its exact SHA-256, rejects links, persists the verified selection, and
+launches a disposable copy with a reduced environment on
 `127.0.0.1`, waits for a typed health response, synchronizes user-owned repository
 URLs, and owns process shutdown. Extension Repository Runtime maps the loopback
 protocol into ordinary explicit Source Bundles with the original unsigned
@@ -432,16 +435,20 @@ registered immediately without changing the product capability graph. Portable A
 remain the preferred signed, dependency-free cross-platform format.
 
 The official sidecar checksum is verified before Anilib prepares its disposable
-runtime copy. A narrow desktop-owned compatibility step then aligns the sidecar's
-QuickJs close contract with current anime extensions. Windows ARM64 additionally
+runtime copy. A narrow provider-owned compatibility step then aligns the sidecar's
+QuickJs close contract, supplies the versioned `AppInfo` host contract, and repairs
+known invalid JVM construction metadata emitted by DEX converters for current
+R8 extensions. Repairs retain JVM bytecode verification and are applied only to
+the isolated converted JAR; the downloaded APK remains unchanged. Windows ARM64 additionally
 selects GraalJS's pure-Java fallback because the pinned sidecar publishes native
 Truffle resources for Windows x64 only. The downloaded artifact and installed APK
 remain unchanged, while the temporary runtime works on both Windows architectures.
 
-Anilib deliberately does not synthesize `eu.kanade.*` host classes or copy the
-Aniyomi dependency graph into its own process merely to make arbitrary APK bytecode link. APKs whose
-preflight finds a missing host ABI remain disabled with a visible report. This
-keeps Android compatibility optional and prevents it from becoming a hidden
+Anilib does not copy the Aniyomi dependency graph into its own process merely to
+make arbitrary APK bytecode link. A desktop engine provider may expose audited,
+versioned host-ABI shims only inside its sidecar runtime. APKs whose provider
+still lacks an ABI contract remain installed but disabled with a visible report.
+This keeps Android compatibility optional and prevents it from becoming a hidden
 dependency of the portable Source SDK used by both products.
 
 ## External dependency policy

@@ -10,6 +10,7 @@ import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Base64;
 import java.util.Map;
 
 final class MiwayomiRuntimePatcher {
@@ -17,6 +18,24 @@ final class MiwayomiRuntimePatcher {
     private static final String QUICK_JS_CLASS = "/app/cash/quickjs/QuickJs.class";
     private static final String AUTO_CLOSEABLE = "java/lang/AutoCloseable";
     private static final String CLOSEABLE = "java/io/Closeable";
+    private static final String APP_INFO_CLASS = "/eu/kanade/tachiyomi/AppInfo.class";
+    private static final byte[] APP_INFO_BYTES = Base64.getDecoder().decode(
+            "yv66vgAAADQALwoAAgADBwAEDAAFAAYBABBqYXZhL2xhbmcvT2JqZWN0AQAGPGluaXQ+AQADKClW"
+                    + "CAAIAQAOQW5pbGliIERlc2t0b3AHAAoBABBqYXZhL2xhbmcvU3RyaW5nCAAMAQAKaW1hZ2UvanBl"
+                    + "ZwgADgEACWltYWdlL3BuZwgAEAEACWltYWdlL2dpZggAEgEACmltYWdlL3dlYnAIABQBAAppbWFn"
+                    + "ZS9hdmlmCgAWABcHABgMABkAGgEAEGphdmEvdXRpbC9BcnJheXMBAAZhc0xpc3QBACUoW0xqYXZh"
+                    + "L2xhbmcvT2JqZWN0OylMamF2YS91dGlsL0xpc3Q7BwAcAQAbZXUva2FuYWRlL3RhY2hpeW9taS9B"
+                    + "cHBJbmZvCgAbAAMJABsAHwwAIAAhAQAISU5TVEFOQ0UBAB1MZXUva2FuYWRlL3RhY2hpeW9taS9B"
+                    + "cHBJbmZvOwEABENvZGUBAA9MaW5lTnVtYmVyVGFibGUBAA5nZXRWZXJzaW9uQ29kZQEAAygpSQEA"
+                    + "DmdldFZlcnNpb25OYW1lAQAUKClMamF2YS9sYW5nL1N0cmluZzsBABpnZXRTdXBwb3J0ZWRJbWFn"
+                    + "ZU1pbWVUeXBlcwEAEigpTGphdmEvdXRpbC9MaXN0OwEACVNpZ25hdHVyZQEAJigpTGphdmEvdXRp"
+                    + "bC9MaXN0PExqYXZhL2xhbmcvU3RyaW5nOz47AQAIPGNsaW5pdD4BAApTb3VyY2VGaWxlAQAMQXBw"
+                    + "SW5mby5qYXZhADEAGwACAAAAAQAZACAAIQAAAAUAAgAFAAYAAQAiAAAAIQABAAEAAAAFKrcAAbEA"
+                    + "AAABACMAAAAKAAIAAAAJAAQACgABACQAJQABACIAAAAaAAEAAQAAAAIErAAAAAEAIwAAAAYAAQAA"
+                    + "AA0AAQAmACcAAQAiAAAAGwABAAEAAAADEgewAAAAAQAjAAAABgABAAAAEQABACgAKQACACIAAAA5"
+                    + "AAQAAQAAACEIvQAJWQMSC1NZBBINU1kFEg9TWQYSEVNZBxITU7gAFbAAAAABACMAAAAGAAEAAAAV"
+                    + "ACoAAAACACsACAAsAAYAAQAiAAAAIwACAAAAAAALuwAbWbcAHbMAHrEAAAABACMAAAAGAAEAAAAH"
+                    + "AAEALQAAAAIALg==");
 
     private MiwayomiRuntimePatcher() {
     }
@@ -28,6 +47,9 @@ final class MiwayomiRuntimePatcher {
                 throw new IllegalStateException("Miwayomi runtime does not contain its QuickJs compatibility class");
             }
             Files.write(quickJs, replaceInterface(Files.readAllBytes(quickJs)));
+            Path appInfo = archive.getPath(APP_INFO_CLASS);
+            Files.createDirectories(appInfo.getParent());
+            Files.write(appInfo, APP_INFO_BYTES);
         } catch (IOException exception) {
             throw new UncheckedIOException("Unable to apply the Miwayomi compatibility patch", exception);
         }
