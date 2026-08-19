@@ -50,14 +50,14 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-public final class MiwayomiSourceBridge {
+public final class DesktopExtensionSourceBridge {
     private static final SourceApiVersion REQUIRED_API = new SourceApiVersion(1, 8);
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(45);
 
     private final URI baseUri;
     private final AnilibHttpClient client;
 
-    public MiwayomiSourceBridge(URI baseUri, AnilibHttpClient client) {
+    public DesktopExtensionSourceBridge(URI baseUri, AnilibHttpClient client) {
         this.baseUri = requireLoopback(baseUri);
         this.client = Preconditions.requireNonNull(client, "client");
     }
@@ -66,7 +66,7 @@ public final class MiwayomiSourceBridge {
         Map<String, Object> health = object(get("/api/v1/health", Map.of()));
         String service = text(health, "service");
         if (!"ok".equals(text(health, "status"))
-                || !("miwayomi".equals(service) || "anilib-desktop-extension-host".equals(service))) {
+                || !"anilib-desktop-extension-host".equals(service)) {
             throw new IllegalStateException("Extension engine returned an unexpected health response");
         }
     }
@@ -96,7 +96,7 @@ public final class MiwayomiSourceBridge {
         List<URI> values = List.copyOf(Preconditions.requireNonNull(repositories, "repositories"));
         String body = "{\"repos\":[" + String.join(",", values.stream()
                 .map(URI::toASCIIString)
-                .map(MiwayomiSourceBridge::jsonString)
+                .map(DesktopExtensionSourceBridge::jsonString)
                 .toList()) + "]}";
         object(post("/api/v1/extensions/repos", body));
     }
@@ -158,7 +158,7 @@ public final class MiwayomiSourceBridge {
                 language,
                 Set.of(kind),
                 REQUIRED_API);
-        return new RemoteSource(numericId, descriptor);
+        return new RemoteSource(numericId, descriptor, webUri(value.get("baseUrl")));
     }
 
     private SourcePage catalogue(RemoteSource source, String operation, int page, String query) {
@@ -223,25 +223,7 @@ public final class MiwayomiSourceBridge {
     }
 
     private Optional<URI> homePage(RemoteSource source) {
-        Map<String, Object> document = object(get(
-                "/api/v1/sources/" + encode(source.remoteId) + "/prefs", Map.of()));
-        Object raw = document.get("prefs");
-        if (!(raw instanceof List<?> values)) {
-            return Optional.empty();
-        }
-        for (Object entry : values) {
-            Map<String, Object> preference = object(entry);
-            String identity = (optionalText(preference, "key").orElse("") + " "
-                    + optionalText(preference, "title").orElse("") + " "
-                    + optionalText(preference, "summary").orElse("")).toLowerCase(Locale.ROOT);
-            if (identity.contains("url") || identity.contains("domain") || identity.contains("host")) {
-                Optional<URI> location = webUri(preference.get("value"));
-                if (location.isPresent()) {
-                    return location;
-                }
-            }
-        }
-        return Optional.empty();
+        return source.homePage;
     }
 
     private Optional<URI> titlePage(RemoteSource source, SourceCatalogueItemId itemId) {
@@ -510,7 +492,7 @@ public final class MiwayomiSourceBridge {
         return Map.copyOf(result);
     }
 
-    private record RemoteSource(String remoteId, SourceDescriptor descriptor) {
+    private record RemoteSource(String remoteId, SourceDescriptor descriptor, Optional<URI> homePage) {
     }
 
     private final class MangaBridge implements CatalogueSource, DetailedSource, PagedSource, WebSource {
@@ -527,13 +509,13 @@ public final class MiwayomiSourceBridge {
 
         @Override
         public URI homePage() {
-            return MiwayomiSourceBridge.this.homePage(source)
+            return DesktopExtensionSourceBridge.this.homePage(source)
                     .orElseThrow(() -> new IllegalStateException("Desktop APK source has no discoverable web URL"));
         }
 
         @Override
         public Optional<URI> titlePage(SourceCatalogueItemId itemId) {
-            return MiwayomiSourceBridge.this.titlePage(source, itemId);
+            return DesktopExtensionSourceBridge.this.titlePage(source, itemId);
         }
 
         @Override
@@ -561,12 +543,12 @@ public final class MiwayomiSourceBridge {
 
         @Override
         public List<SourcePreferenceDefinition> preferences() {
-            return MiwayomiSourceBridge.this.preferences(source);
+            return DesktopExtensionSourceBridge.this.preferences(source);
         }
 
         @Override
         public SourceTitleDetails details(SourceCatalogueItemId itemId) {
-            return MiwayomiSourceBridge.this.details(source, itemId);
+            return DesktopExtensionSourceBridge.this.details(source, itemId);
         }
 
         @Override
@@ -630,13 +612,13 @@ public final class MiwayomiSourceBridge {
 
         @Override
         public URI homePage() {
-            return MiwayomiSourceBridge.this.homePage(source)
+            return DesktopExtensionSourceBridge.this.homePage(source)
                     .orElseThrow(() -> new IllegalStateException("Desktop APK source has no discoverable web URL"));
         }
 
         @Override
         public Optional<URI> titlePage(SourceCatalogueItemId itemId) {
-            return MiwayomiSourceBridge.this.titlePage(source, itemId);
+            return DesktopExtensionSourceBridge.this.titlePage(source, itemId);
         }
 
         @Override
@@ -664,12 +646,12 @@ public final class MiwayomiSourceBridge {
 
         @Override
         public List<SourcePreferenceDefinition> preferences() {
-            return MiwayomiSourceBridge.this.preferences(source);
+            return DesktopExtensionSourceBridge.this.preferences(source);
         }
 
         @Override
         public SourceTitleDetails details(SourceCatalogueItemId itemId) {
-            return MiwayomiSourceBridge.this.details(source, itemId);
+            return DesktopExtensionSourceBridge.this.details(source, itemId);
         }
 
         @Override

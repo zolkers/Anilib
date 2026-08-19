@@ -367,15 +367,15 @@ La strategie est consideree livree lorsque :
 
 - une URL de depot affiche une seule fiche par `pkg` ;
 - une extension double artefact s'installe comme Bundle sur Android et Desktop ;
-- une extension APK seule reste installable sur Android et sur Desktop lorsque
-  son moteur local epingle est configure ;
+- une extension APK seule reste installable sur Android et sur Desktop sans
+  moteur tiers a configurer ;
 - bibliotheque, historique, favoris et migration conservent les memes IDs de
   sources entre APK et Bundle ;
 - une mise a jour ne peut pas changer silencieusement d'editeur ;
 - aucun APK, DEX ou code de catalogue n'est execute pendant la decouverte ;
 - les tests de contrat passent sur Android, Windows, Linux et macOS ;
-- l'application n'embarque ni emulateur Android ni ABI Aniyomi factice dans son
-  coeur portable ; le moteur de compatibilite reste un processus facultatif.
+- l'application n'embarque pas d'emulateur Android ; l'ABI de compatibilite
+  reste confinee au module de plateforme `DesktopExtensionHost`.
 
 ## Risques restant a assumer
 
@@ -392,14 +392,14 @@ preferable a une promesse « tous les APK fonctionnent » impossible a garantir.
 ## Conclusion
 
 La meilleure solution combine **un catalogue unifie, un Bundle natif recommande
-et un moteur APK Desktop isole**. Anilib peut ainsi utiliser immediatement les
+et l'hote APK Desktop d'Anilib**. Anilib peut ainsi utiliser immediatement les
 depots existants sans attendre leurs mainteneurs, tout en conservant une voie
 plus legere, signee et reproductible pour les sources Anilib natives.
 
 La conversion et l'ABI de compatibilite restent moins fiables qu'un Bundle natif.
-Elles sont donc confinees au sidecar, jamais fusionnees au Kernel ou aux Features.
-Le portage au moment du build reste la cible de qualite ; le sidecar resout le
-besoin immediat quand ce portage n'arrivera pas.
+Elles sont donc confinees a l'adaptateur de plateforme, jamais fusionnees au
+Kernel ou aux Features. Le portage au moment du build reste la cible de qualite ;
+l'hote integre couvre le besoin immediat sans intervention des mainteneurs.
 
 ## References
 
@@ -409,4 +409,3 @@ besoin immediat quand ce portage n'arrivera pas.
 - [Depot officiel Aniyomi](https://github.com/aniyomiorg/aniyomi)
 - [Guide officiel de creation des extensions Aniyomi](https://github.com/aniyomiorg/aniyomi-extensions/blob/master/CONTRIBUTING.md)
 - [Depot historique officiel des extensions Aniyomi](https://github.com/aniyomiorg/aniyomi-extensions)
-- [Moteur JVM Miwayomi utilise comme sidecar](https://github.com/miwayomi/miwayomi)

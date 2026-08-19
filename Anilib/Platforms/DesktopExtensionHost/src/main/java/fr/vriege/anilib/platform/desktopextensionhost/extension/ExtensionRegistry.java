@@ -7,12 +7,14 @@ import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
+import java.util.jar.JarFile;
 
 public final class ExtensionRegistry {
     private final Path directory;
@@ -64,7 +66,16 @@ public final class ExtensionRegistry {
         }
         try {
             Files.deleteIfExists(file(metadata.packageName(), ".jar"));
-            Files.deleteIfExists(file(metadata.packageName(), ".apk"));
+            try (Stream<Path> files = Files.list(directory)) {
+                for (Path apk : files.filter(ExtensionRegistry::apkFile).toList()) {
+                    try {
+                        if (metadataReader.read(apk).packageName().equals(metadata.packageName())) {
+                            Files.deleteIfExists(apk);
+                        }
+                    } catch (IllegalArgumentException ignored) {
+                    }
+                }
+            }
             return true;
         } catch (IOException exception) {
             throw new UncheckedIOException("Unable to uninstall extension", exception);
@@ -79,9 +90,9 @@ public final class ExtensionRegistry {
     }
 
     public synchronized List<InstalledExtension> installed() {
-        List<InstalledExtension> result = new ArrayList<>();
+        Map<String, InstalledExtension> result = new LinkedHashMap<>();
         try (Stream<Path> files = Files.list(directory)) {
-            for (Path apk : files.filter(path -> path.getFileName().toString().endsWith(".apk"))
+            for (Path apk : files.filter(ExtensionRegistry::apkFile)
                     .sorted(Comparator.comparing(path -> path.getFileName().toString()))
                     .toList()) {
                 if (!Files.isRegularFile(apk, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(apk)) {
@@ -92,15 +103,56 @@ public final class ExtensionRegistry {
                     Path archive = file(metadata.packageName(), ".jar");
                     if (Files.isRegularFile(archive, LinkOption.NOFOLLOW_LINKS)
                             && !Files.isSymbolicLink(archive)) {
-                        result.add(new InstalledExtension(metadata, apk, archive));
+                        result.put(metadata.packageName(), new InstalledExtension(metadata, apk, archive));
                     }
                 } catch (IllegalArgumentException ignored) {
                     // A damaged entry is quarantined by omission; it cannot take down the engine.
                 }
             }
-            return List.copyOf(result);
+            return List.copyOf(result.values());
         } catch (IOException exception) {
             throw new UncheckedIOException("Unable to list installed extensions", exception);
+        }
+    }
+
+    public synchronized int prepareInstalledArchives() {
+        int prepared = 0;
+        try (Stream<Path> files = Files.list(directory)) {
+            Map<String, Path> apks = new LinkedHashMap<>();
+            for (Path apk : files.filter(ExtensionRegistry::apkFile).sorted().toList()) {
+                if (!Files.isRegularFile(apk, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(apk)) {
+                    continue;
+                }
+                try {
+                    ExtensionApkMetadata metadata = metadataReader.read(apk);
+                    apks.putIfAbsent(metadata.packageName(), apk);
+                } catch (IllegalArgumentException ignored) {
+                }
+            }
+            for (Map.Entry<String, Path> entry : apks.entrySet()) {
+                if (!preparedArchive(file(entry.getKey(), ".jar"))) {
+                    install(entry.getValue());
+                    prepared++;
+                }
+            }
+            return prepared;
+        } catch (IOException exception) {
+            throw new UncheckedIOException("Unable to prepare installed extensions", exception);
+        }
+    }
+
+    private static boolean apkFile(Path path) {
+        return path.getFileName().toString().toLowerCase(java.util.Locale.ROOT).endsWith(".apk");
+    }
+
+    private static boolean preparedArchive(Path archive) {
+        if (!Files.isRegularFile(archive, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(archive)) {
+            return false;
+        }
+        try (JarFile jar = new JarFile(archive.toFile())) {
+            return jar.getJarEntry("META-INF/anilib-desktop-extension.properties") != null;
+        } catch (IOException exception) {
+            return false;
         }
     }
 

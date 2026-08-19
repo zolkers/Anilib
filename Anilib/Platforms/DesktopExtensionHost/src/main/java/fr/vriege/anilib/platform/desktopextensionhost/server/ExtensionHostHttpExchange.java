@@ -181,8 +181,11 @@ final class ExtensionHostHttpExchange {
     }
 
     static void json(HttpExchange exchange, int status, String document) {
-        byte[] body = document.getBytes(StandardCharsets.UTF_8);
-        exchange.getResponseHeaders().set("Content-Type", JSON_CONTENT_TYPE);
+        bytes(exchange, status, JSON_CONTENT_TYPE, document.getBytes(StandardCharsets.UTF_8));
+    }
+
+    static void bytes(HttpExchange exchange, int status, String contentType, byte[] body) {
+        exchange.getResponseHeaders().set("Content-Type", contentType);
         exchange.getResponseHeaders().set("Cache-Control", "no-store");
         exchange.getResponseHeaders().set("X-Content-Type-Options", "nosniff");
         try {

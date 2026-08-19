@@ -12,6 +12,8 @@ public final class DesktopExtensionHostProtocol {
     public static final String EXTENSION_REPOSITORIES_PATH = "/api/v1/extensions/repos";
     public static final String MANGA_PATH = "/api/v1/manga/";
     public static final String ANIME_PATH = "/api/v1/anime/";
+    public static final String SOURCE_PATH = "/api/v1/sources/";
+    public static final String PROXY_PATH = "/api/v1/proxy";
 
     private DesktopExtensionHostProtocol() {
     }

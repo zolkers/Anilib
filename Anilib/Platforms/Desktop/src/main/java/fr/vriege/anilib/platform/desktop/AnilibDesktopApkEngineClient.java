@@ -1,16 +1,16 @@
 package fr.vriege.anilib.platform.desktop;
 
-import fr.vriege.anilib.feature.extensionrepository.runtime.MiwayomiSourceBridge;
+import fr.vriege.anilib.feature.extensionrepository.runtime.DesktopExtensionSourceBridge;
 import fr.vriege.anilib.kernel.AnilibPlugin;
 
 import java.net.URI;
 import java.util.List;
 import java.util.Set;
 
-final class MiwayomiDesktopApkEngineClient implements DesktopApkEngineClient {
-    private final MiwayomiSourceBridge bridge;
+final class AnilibDesktopApkEngineClient implements DesktopApkEngineClient {
+    private final DesktopExtensionSourceBridge bridge;
 
-    MiwayomiDesktopApkEngineClient(MiwayomiSourceBridge bridge) {
+    AnilibDesktopApkEngineClient(DesktopExtensionSourceBridge bridge) {
         this.bridge = bridge;
     }
 

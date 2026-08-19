@@ -10,6 +10,7 @@ module fr.vriege.anilib.platform.desktopextensionhost {
     requires transitive okhttp3;
     requires transitive org.jsoup;
 
+    exports fr.vriege.anilib.platform.desktopextensionhost;
     exports fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi;
     exports fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource;
     exports fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model;

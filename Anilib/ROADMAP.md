@@ -178,12 +178,13 @@ revision and run the same fixtures on packaged Android and desktop hosts.
 - [x] ship the dependency-free extension portability analyzer, JSON/Markdown
   reports, identity-preserving Anilib module scaffold, dual-artifact publisher,
   checksums, and reusable GitHub publication workflow
-- [x] execute existing manga and anime APK sources on desktop through an optional
-  checksum-pinned sidecar, explicit hot-installed leaf Source Bundles, loopback-only
-  catalogue/details/preferences/chapter/page/episode/stream adapters, and repository sync
-- [x] provision the pinned desktop compatibility sidecar on the first explicit
-  APK installation, with bounded download, official release URL, SHA-256
-  verification, atomic configuration, and no manual `engine.properties` step
+- [x] execute existing manga and anime APK sources on desktop through Anilib's
+  bundled extension host, explicit hot-installed leaf Source Bundles, loopback-only
+  catalogue/details/preferences/chapter/page/episode/stream adapters, media proxy,
+  WebView URLs, and repository sync
+- [x] embed the extension host in the desktop process, migrate previously installed
+  APKs automatically, activate sources without restart, and remove the transitional
+  external sidecar download and configuration path
 
 ## Remaining product work
 

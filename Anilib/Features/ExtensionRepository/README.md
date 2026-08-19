@@ -52,15 +52,15 @@ Installed portable Bundles and platform APKs are grouped ahead of the
 available catalogue and can be searched by extension, package, source, or
 language. Removal always requires confirmation. Portable artifacts are deleted
 from Anilib's managed store, Android delegates APK removal to the system package
-installer, and desktop uses Miwayomi's persistent uninstall endpoint. Dynamic
+installer, and desktop uses Anilib's embedded extension-host uninstall endpoint. Dynamic
 sources are detached immediately; sources selected during startup disappear on
 the next restart. Removing a repository is a separate confirmed action and
 keeps extensions already installed from it.
 
 The shared UI makes artifact support explicit. Android shows an `Install on
 Android` action for APK entries and hands the HTTPS artifact to the system
-package installer. Desktop exposes `Install for desktop` when its optional APK
-engine is configured; a compatible APK activates its new Source Bundles
+package installer. Desktop exposes `Install for desktop` through its bundled
+Anilib host; a compatible APK activates its new Source Bundles
 immediately, while an APK that yields no executable source is rolled back and
 reported as failed. Signed portable Anilib Bundles keep
 the ordinary `Install` action on both platforms. Pinning updates the

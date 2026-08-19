@@ -23,7 +23,7 @@ import fr.vriege.anilib.feature.extensionrepository.runtime.FileExtensionTrustSt
 import fr.vriege.anilib.feature.extensionrepository.runtime.FileExtensionRepositoryStore;
 import fr.vriege.anilib.feature.extensionrepository.runtime.FileInstalledExtensionStore;
 import fr.vriege.anilib.feature.extensionrepository.runtime.FileExtensionUpdatePolicyStore;
-import fr.vriege.anilib.feature.extensionrepository.runtime.MiwayomiSourceBridge;
+import fr.vriege.anilib.feature.extensionrepository.runtime.DesktopExtensionSourceBridge;
 import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionCompatibility;
 import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionPlatforms;
 import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionRuntimeReport;
@@ -113,8 +113,9 @@ final class ExtensionRepositoryTest {
     }
 
     private static void bridgesDesktopApkSourcesThroughLoopback(Counter counter) {
-        MiwayomiBridgeClient client = new MiwayomiBridgeClient();
-        MiwayomiSourceBridge bridge = new MiwayomiSourceBridge(URI.create("http://127.0.0.1:43127/"), client);
+        DesktopExtensionBridgeClient client = new DesktopExtensionBridgeClient();
+        DesktopExtensionSourceBridge bridge = new DesktopExtensionSourceBridge(
+                URI.create("http://127.0.0.1:43127/"), client);
         bridge.requireHealthy();
         bridge.saveRepositories(List.of(INDEX));
         Set<String> installedPackages = bridge.installedPackageNames();
@@ -170,7 +171,7 @@ final class ExtensionRepositoryTest {
                         && installed.contains("installed for desktop") && uninstalled.contains("uninstalled"),
                 "desktop APK installation and removal must use the engine's persistent extension lifecycle");
         counter.expectIllegalArgument(
-                () -> new MiwayomiSourceBridge(URI.create("http://example.test:43127/"), client),
+                () -> new DesktopExtensionSourceBridge(URI.create("http://example.test:43127/"), client),
                 "the desktop APK bridge must reject non-loopback engines");
     }
 
@@ -1021,7 +1022,7 @@ final class ExtensionRepositoryTest {
         }
     }
 
-    private static final class MiwayomiBridgeClient implements AnilibHttpClient {
+    private static final class DesktopExtensionBridgeClient implements AnilibHttpClient {
         private boolean savedRepositories;
         private boolean installRequested;
         private boolean uninstallRequested;
@@ -1031,11 +1032,13 @@ final class ExtensionRepositoryTest {
             String path = request.uri().getPath();
             String body = switch (path) {
                 case "/api/v1/health" -> """
-                        {"status":"ok","service":"miwayomi","mangaSources":1,"animeSources":1}
+                        {"status":"ok","service":"anilib-desktop-extension-host","mangaSources":1,"animeSources":1}
                         """;
                 case "/api/v1/sources" -> """
-                        {"manga":[{"id":"42","name":"Manga APK","lang":"en","type":"manga","pkg":"manga.pkg"}],
-                        "anime":[{"id":"43","name":"Anime APK","lang":"fr","type":"anime","pkg":"anime.pkg"}]}
+                        {"manga":[{"id":"42","name":"Manga APK","lang":"en","type":"manga","pkg":"manga.pkg",
+                        "baseUrl":"https://manga.example/"}],
+                        "anime":[{"id":"43","name":"Anime APK","lang":"fr","type":"anime","pkg":"anime.pkg",
+                        "baseUrl":"https://anime.example/"}]}
                         """;
                 case "/api/v1/manga/42/popular" -> """
                         {"hasNextPage":false,"mangas":[{"url":"/manga/bridge","title":"Bridge Manga",

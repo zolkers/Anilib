@@ -11,9 +11,8 @@ import java.util.List;
 public final class DesktopReleaseRule implements AnilibJavaRule {
     private static final Path ROOT_BUILD = Path.of("build.gradle");
     private static final Path DESKTOP_BUILD = Path.of("Anilib", "Platforms", "Desktop", "build.gradle");
-    private static final Path DESKTOP_ENGINE = Path.of(
-            "Anilib", "Platforms", "Desktop", "src", "main", "java", "fr", "vriege", "anilib",
-            "platform", "desktop", "DesktopExtensionEngineInstaller.java");
+    private static final Path DESKTOP_HOST_BUILD =
+            Path.of("Anilib", "Platforms", "DesktopExtensionHost", "build.gradle");
     private static final Path WORKFLOW = Path.of(".github", "workflows", "desktop-release.yml");
 
     public DesktopReleaseRule() {
@@ -45,19 +44,19 @@ public final class DesktopReleaseRule implements AnilibJavaRule {
                 "anilibPackageVersion",
                 "upgradeUuid =",
                 "bundleID = 'fr.vriege.anilib'",
+                "project(':Anilib:Platforms:DesktopExtensionHost')",
+                "includeAllModules = true",
                 "licenseFile.set(rootProject.file('LICENSE'))",
                 "writeDesktopReleaseChecksums",
                 "MessageDigest.getInstance('SHA-256')");
         requireTokens(
                 repository,
-                DESKTOP_ENGINE,
+                DESKTOP_HOST_BUILD,
                 diagnostics,
-                "miwayomi/miwayomi/releases/download/v0.2.9/miwayomi-all.jar",
-                "475b95dabaaca9f283263a5eafa12bec3580b658caae70407ae227ae4fa0e9b7",
-                "SIZE_BYTES = 102_140_165L",
-                "HttpClient.Redirect.NORMAL",
-                "Files.createTempFile",
-                "StandardCopyOption.ATOMIC_MOVE");
+                "dex-translator:2.4.38",
+                "apk-parser:2.6.10",
+                "kotlinx-coroutines-core-jvm:1.10.2",
+                "okhttp:5.4.0");
         requireTokens(
                 repository,
                 WORKFLOW,

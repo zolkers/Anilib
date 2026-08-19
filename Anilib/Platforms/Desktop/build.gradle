@@ -39,6 +39,7 @@ dependencies {
     implementation project(':Anilib:Features:ApplicationUpdate:Api')
     implementation project(':Anilib:Kernel:Api')
     implementation project(':Anilib:Platforms:Compose')
+    implementation project(':Anilib:Platforms:DesktopExtensionHost')
     implementation compose.desktop.currentOs
     implementation 'io.github.kevinnzou:compose-webview-multiplatform:2.0.3'
     testImplementation 'org.jetbrains.kotlin:kotlin-test:2.4.10'

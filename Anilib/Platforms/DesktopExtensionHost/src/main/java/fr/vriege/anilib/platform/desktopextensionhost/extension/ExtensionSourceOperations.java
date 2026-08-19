@@ -10,6 +10,7 @@ import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.source.mode
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.source.model.SManga;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.net.URI;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
@@ -28,6 +29,7 @@ import okhttp3.Response;
 
 public final class ExtensionSourceOperations {
     private static final Duration SUSPEND_TIMEOUT = Duration.ofSeconds(45);
+    private static final int MAX_PROXY_BYTES = 64 * 1024 * 1024;
     private final ExtensionRuntimeCatalog catalog;
 
     public ExtensionSourceOperations(ExtensionRuntimeCatalog catalog) {
@@ -136,10 +138,54 @@ public final class ExtensionSourceOperations {
         });
     }
 
+    public ProxiedResource proxy(long sourceId, String url) {
+        URI location = URI.create(url);
+        if (!("http".equalsIgnoreCase(location.getScheme()) || "https".equalsIgnoreCase(location.getScheme()))
+                || location.getHost() == null) {
+            throw new IllegalArgumentException("Proxy URL must be absolute HTTP(S)");
+        }
+        return withAnySource(sourceId, source -> {
+            OkHttpClient client = result(invoke(source, "getClient"), OkHttpClient.class);
+            okhttp3.Headers headers = result(invoke(source, "getHeaders"), okhttp3.Headers.class);
+            Request request = new Request.Builder().url(location.toString()).headers(headers).build();
+            try (Response response = client.newCall(request).execute()) {
+                if (!response.isSuccessful()) {
+                    throw new IllegalStateException("Source resource failed with HTTP " + response.code());
+                }
+                okhttp3.ResponseBody body = Objects.requireNonNull(response.body(), "Source resource has no body");
+                long length = body.contentLength();
+                if (length > MAX_PROXY_BYTES) {
+                    throw new IllegalStateException("Source resource exceeds the proxy size limit");
+                }
+                try (java.io.InputStream input = body.byteStream()) {
+                    byte[] bytes = input.readNBytes(MAX_PROXY_BYTES + 1);
+                    if (bytes.length > MAX_PROXY_BYTES) {
+                        throw new IllegalStateException("Source resource exceeds the proxy size limit");
+                    }
+                    String contentType = body.contentType() == null
+                            ? "application/octet-stream" : body.contentType().toString();
+                    return new ProxiedResource(bytes, contentType);
+                }
+            } catch (java.io.IOException exception) {
+                throw new java.io.UncheckedIOException("Source resource request failed", exception);
+            }
+        });
+    }
+
     private <T> T withSource(long sourceId, ExtensionKind kind, SourceOperation<T> operation) {
         try (ExtensionRuntimeCatalog.Snapshot snapshot = catalog.discover()) {
             LoadedSource loaded = snapshot.sources().stream()
                     .filter(source -> source.id() == sourceId && source.kind() == kind)
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("Source is not installed"));
+            return operation.apply(loaded.instance());
+        }
+    }
+
+    private <T> T withAnySource(long sourceId, SourceOperation<T> operation) {
+        try (ExtensionRuntimeCatalog.Snapshot snapshot = catalog.discover()) {
+            LoadedSource loaded = snapshot.sources().stream()
+                    .filter(source -> source.id() == sourceId)
                     .findFirst()
                     .orElseThrow(() -> new IllegalArgumentException("Source is not installed"));
             return operation.apply(loaded.instance());
@@ -279,5 +325,17 @@ public final class ExtensionSourceOperations {
     @FunctionalInterface
     private interface SourceOperation<T> {
         T apply(Object source);
+    }
+
+    public record ProxiedResource(byte[] body, String contentType) {
+        public ProxiedResource {
+            body = body.clone();
+            contentType = Objects.requireNonNull(contentType, "contentType");
+        }
+
+        @Override
+        public byte[] body() {
+            return body.clone();
+        }
     }
 }

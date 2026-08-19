@@ -74,6 +74,7 @@ public final class DesktopExtensionHostServer implements AutoCloseable {
             HttpServer server = HttpServer.create(new InetSocketAddress(bindAddress, port), 0);
             ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
             ExtensionRegistry registry = new ExtensionRegistry(data);
+            registry.prepareInstalledArchives();
             ExtensionRuntimeCatalog catalog = new ExtensionRuntimeCatalog(registry);
             DesktopExtensionHostServer result = new DesktopExtensionHostServer(
                     data,
@@ -171,6 +172,39 @@ public final class DesktopExtensionHostServer implements AutoCloseable {
                 exchange -> safely(exchange, () -> handleManga(exchange)));
         server.createContext(DesktopExtensionHostProtocol.ANIME_PATH,
                 exchange -> safely(exchange, () -> handleAnime(exchange)));
+        server.createContext(DesktopExtensionHostProtocol.SOURCE_PATH,
+                exchange -> safely(exchange, () -> handleSource(exchange)));
+        server.createContext(DesktopExtensionHostProtocol.PROXY_PATH,
+                exchange -> safely(exchange, () -> handleProxy(exchange)));
+    }
+
+    private void handleSource(HttpExchange exchange) {
+        String path = exchange.getRequestURI().getPath();
+        String[] segments = path.substring(DesktopExtensionHostProtocol.SOURCE_PATH.length()).split("/", -1);
+        if (segments.length != 2 || !"prefs".equals(segments[1])) {
+            throw new IllegalArgumentException("Invalid source operation path");
+        }
+        parseSourceId(segments[0]);
+        if ("GET".equals(exchange.getRequestMethod())) {
+            ExtensionHostHttpExchange.json(exchange, 200, "{\"prefs\":[]}");
+        } else if ("POST".equals(exchange.getRequestMethod())) {
+            ExtensionHostHttpExchange.body(exchange);
+            ExtensionHostHttpExchange.json(exchange, 200, "{\"ok\":true}");
+        } else {
+            exchange.getResponseHeaders().set("Allow", "GET, POST");
+            ExtensionHostHttpExchange.json(exchange, 405, "{\"error\":\"method_not_allowed\"}");
+        }
+    }
+
+    private void handleProxy(HttpExchange exchange) {
+        if (!ExtensionHostHttpExchange.requireGet(exchange)) {
+            return;
+        }
+        Map<String, String> query = ExtensionHostHttpExchange.query(exchange);
+        long sourceId = parseSourceId(required(query, "sourceId"));
+        ExtensionSourceOperations.ProxiedResource resource =
+                sourceOperations.proxy(sourceId, required(query, "url"));
+        ExtensionHostHttpExchange.bytes(exchange, 200, resource.contentType(), resource.body());
     }
 
     private void handleManga(HttpExchange exchange) {
@@ -213,8 +247,12 @@ public final class DesktopExtensionHostServer implements AutoCloseable {
         if (segments.length != 2 || segments[0].isBlank() || segments[1].isBlank()) {
             throw new IllegalArgumentException("Invalid source operation path");
         }
+        return new Route(parseSourceId(segments[0]), segments[1]);
+    }
+
+    private static long parseSourceId(String value) {
         try {
-            return new Route(Long.parseUnsignedLong(segments[0]), segments[1]);
+            return Long.parseUnsignedLong(value);
         } catch (NumberFormatException exception) {
             throw new IllegalArgumentException("Source id is not an unsigned 64-bit integer", exception);
         }
@@ -375,7 +413,8 @@ public final class DesktopExtensionHostServer implements AutoCloseable {
             String value = "{\"id\":" + ExtensionHostHttpExchange.jsonString(Long.toUnsignedString(source.id()))
                     + ",\"name\":" + ExtensionHostHttpExchange.jsonString(source.name())
                     + ",\"lang\":" + ExtensionHostHttpExchange.jsonString(source.language())
-                    + ",\"pkg\":" + ExtensionHostHttpExchange.jsonString(source.packageName()) + '}';
+                    + ",\"pkg\":" + ExtensionHostHttpExchange.jsonString(source.packageName())
+                    + ",\"baseUrl\":" + json(sourceBaseUrl(source.instance())) + '}';
             (source.kind() == ExtensionKind.MANGA ? manga : anime).add(value);
         }
         String failures = String.join(",", snapshot.failures().entrySet().stream()
@@ -385,6 +424,19 @@ public final class DesktopExtensionHostServer implements AutoCloseable {
         return "{\"manga\":[" + String.join(",", manga)
                 + "],\"anime\":[" + String.join(",", anime)
                 + "],\"failures\":{" + failures + "}}";
+    }
+
+    private static String sourceBaseUrl(Object source) {
+        for (String method : List.of("getHomeUrl", "getBaseUrl")) {
+            try {
+                Object value = source.getClass().getMethod(method).invoke(source);
+                if (value instanceof String url && !url.isBlank()) {
+                    return url;
+                }
+            } catch (ReflectiveOperationException ignored) {
+            }
+        }
+        return null;
     }
 
     private static void safely(HttpExchange exchange, Runnable action) {

@@ -420,33 +420,27 @@ the installed signer against current trust before invoking APK code. The app
 still needs a complete, compatible host ABI before a real installed APK can
 reach that Android path.
 
-Desktop supplies the missing ecosystem ABI only through an optional external
-JVM sidecar selected behind Anilib's `DesktopApkEngineClient` port. The default
-provider currently provisions the pinned Apache-2.0 Miwayomi release from its
-official GitHub asset; it is a replaceable platform adapter, not a Source,
-Feature, Kernel, or product-configuration dependency. Selecting an APK install
-explicitly authorizes its download. The platform adapter bounds its size,
-verifies its exact SHA-256, rejects links, persists the verified selection, and
-launches a disposable copy with a reduced environment on
-`127.0.0.1`, waits for a typed health response, synchronizes user-owned repository
-URLs, and owns process shutdown. Extension Repository Runtime maps the loopback
-protocol into ordinary explicit Source Bundles with the original unsigned
-numeric source identity. Catalogue, chapters, pages, episodes, videos, subtitles,
-HLS, and DASH are relayed through that boundary; neither engine classes nor APK
-bytecode enter Anilib's classpath. The desktop adapter converts every discovered
-source into an explicit leaf Bundle, so an APK installed during a session can be
-registered immediately without changing the product capability graph. Portable Anilib Bundles
-remain the preferred signed, dependency-free cross-platform format.
+Desktop supplies the missing ecosystem ABI through Anilib's own
+`DesktopExtensionHost` platform module behind the `DesktopApkEngineClient` port.
+The host is packaged with the application and starts on an ephemeral loopback
+port in the application process; no external engine download, configuration, or
+restart is required. It bounds and converts DEX archives, relocates Android and
+Aniyomi ABI references into platform-owned facades, uses an isolated class loader
+per installed package, and retains package failures without stopping Anilib.
+Extension Repository Runtime maps its loopback protocol into explicit Source
+Bundles with the original unsigned numeric source identity. Catalogue, search,
+details, chapters, pages, episodes, videos, subtitles, HLS, and DASH cross that
+boundary. Newly installed sources are registered immediately, while old APKs in
+the former desktop data layout are converted automatically on the next start.
 
-The official sidecar checksum is verified before Anilib prepares its disposable
-runtime copy. A narrow provider-owned compatibility step then aligns the sidecar's
-QuickJs close contract, supplies the versioned `AppInfo` host contract, and repairs
-known invalid JVM construction metadata emitted by DEX converters for current
-R8 extensions. Repairs retain JVM bytecode verification and are applied only to
-the isolated converted JAR; the downloaded APK remains unchanged. Windows ARM64 additionally
-selects GraalJS's pure-Java fallback because the pinned sidecar publishes native
-Truffle resources for Windows x64 only. The downloaded artifact and installed APK
-remain unchanged, while the temporary runtime works on both Windows architectures.
+The compatibility layer supplies Android build/clock, networking, parsing,
+preferences, coroutine, serialization, and source-model contracts required by
+current Keiyoushi and Yuzono extensions. Its converter repairs known invalid JVM
+constructor and enum metadata emitted by DEX tools while retaining JVM bytecode
+verification and leaving the downloaded APK unchanged. Real opt-in smoke tests
+install and query MangaDex and Anime-Sama APKs. Portable signed Anilib Bundles
+remain the native format, but their publication is not required to use an
+existing APK repository on desktop.
 
 Anilib does not copy the Aniyomi dependency graph into its own process merely to
 make arbitrary APK bytecode link. A desktop engine provider may expose audited,
