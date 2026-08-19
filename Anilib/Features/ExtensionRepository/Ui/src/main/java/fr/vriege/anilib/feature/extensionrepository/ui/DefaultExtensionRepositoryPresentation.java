@@ -57,16 +57,14 @@ public final class DefaultExtensionRepositoryPresentation
     @Override
     public ExtensionRepositoryView snapshot() {
         ExtensionBrowsePreferences preferences = browsePreferences.snapshot();
-        List<ExtensionPackageMetadata> visiblePackages = service.packages().stream()
-                .filter(this::visible)
-                .toList();
-        List<String> languages = visiblePackages.stream()
+        List<ExtensionPackageMetadata> availablePackages = service.packages();
+        List<String> languages = availablePackages.stream()
                 .map(ExtensionPackageMetadata::languageTag)
                 .distinct()
                 .sorted()
                 .toList();
         Set<String> enabledLanguages = effectiveLanguages(preferences, languages);
-        List<ExtensionPackageMetadata> filteredPackages = visiblePackages.stream()
+        List<ExtensionPackageMetadata> filteredPackages = availablePackages.stream()
                 .filter(extension -> enabledLanguages.contains(extension.languageTag()))
                 .sorted(Comparator
                         .comparing((ExtensionPackageMetadata extension) ->
@@ -87,7 +85,6 @@ public final class DefaultExtensionRepositoryPresentation
                             repository,
                             java.util.Optional.of(snapshot.fetchedAt()),
                             (int) snapshot.packages().stream()
-                                    .filter(this::visible)
                                     .filter(extension -> enabledLanguages.contains(extension.languageTag()))
                                     .count(),
                             snapshot.failure()));
@@ -98,6 +95,7 @@ public final class DefaultExtensionRepositoryPresentation
                 installation.installed(),
                 updates.availableUpdates(),
                 updates.automaticUpdatesEnabled(),
+                settings.snapshot().showAdultContent(),
                 languages,
                 enabledLanguages,
                 preferences.pinnedPackages(),
@@ -145,7 +143,6 @@ public final class DefaultExtensionRepositoryPresentation
         String language = normalizeLanguage(languageTag);
         ExtensionBrowsePreferences current = browsePreferences.snapshot();
         List<String> available = service.packages().stream()
-                .filter(this::visible)
                 .map(ExtensionPackageMetadata::languageTag)
                 .distinct()
                 .sorted()
@@ -238,10 +235,6 @@ public final class DefaultExtensionRepositoryPresentation
             throw new IllegalStateException("Unable to close extension update observation", exception);
         }
         executor.shutdownNow();
-    }
-
-    private boolean visible(ExtensionPackageMetadata extensionPackage) {
-        return !extensionPackage.adult() || settings.snapshot().showAdultContent();
     }
 
     private static Set<String> effectiveLanguages(

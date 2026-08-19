@@ -243,6 +243,7 @@ internal fun ExtensionDiscoveryList(
                 it.packageName() == extension.packageName()
             }
             val apkInstalled = extension.packageName() in installedApkPackages
+            val blockedByAdultPolicy = extension.adult() && !view.adultContentEnabled()
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
@@ -268,10 +269,16 @@ internal fun ExtensionDiscoveryList(
                                 MaterialTheme.colorScheme.onSurfaceVariant
                             },
                         )
+                        if (blockedByAdultPolicy) {
+                            Text(
+                                "18+ · enable adult content in Settings to install",
+                                color = MaterialTheme.colorScheme.tertiary,
+                            )
+                        }
                     }
                     if (!apkInstalled && installedPortable == null) {
                         Button(
-                            enabled = loadingPackage == null,
+                            enabled = loadingPackage == null && !blockedByAdultPolicy,
                             onClick = {
                                 loadingPackage = extension.packageName()
                                 error = null
@@ -396,6 +403,7 @@ private fun ExtensionRepositoryCatalogueScreen(
             installed = installed,
             apkInstalled = extension.packageName() in installedApkPackages,
             trustedKeyIds = view.trustedKeyIds().toSet(),
+            adultContentEnabled = view.adultContentEnabled(),
             pinned = extension.packageName() in view.pinnedPackages(),
             loading = loading,
             operationLabel = operationLabel,
@@ -594,6 +602,7 @@ private fun ExtensionRepositoryCatalogueScreen(
                         installed = installed,
                         apkInstalled = extension.packageName() in installedApkPackages,
                         pinned = extension.packageName() in view.pinnedPackages(),
+                        adultContentEnabled = view.adultContentEnabled(),
                         busy = loading,
                         openDetails = { selectedExtension = extension },
                         togglePinned = { pinned ->
@@ -803,6 +812,7 @@ private fun ExtensionDetailScreen(
     installed: InstalledExtensionPackage?,
     apkInstalled: Boolean,
     trustedKeyIds: Set<String>,
+    adultContentEnabled: Boolean,
     pinned: Boolean,
     loading: Boolean,
     operationLabel: String?,
@@ -820,6 +830,7 @@ private fun ExtensionDetailScreen(
     val portable = extension.artifacts().any {
         it.format() == ExtensionArtifactFormat.ANILIB_BUNDLE
     }
+    val blockedByAdultPolicy = extension.adult() && !adultContentEnabled
     Scaffold(
         topBar = {
             TopAppBar(
@@ -871,6 +882,18 @@ private fun ExtensionDetailScreen(
                 }
             }
             error?.let { message -> item { ExtensionFailure(message, retry) } }
+            if (blockedByAdultPolicy) {
+                item {
+                    ExtensionDetailCard {
+                        Text("Adult-content policy", fontWeight = FontWeight.Medium)
+                        Text(
+                            "This extension remains listed, but installation requires enabling adult content " +
+                                "in Settings.",
+                            color = MaterialTheme.colorScheme.tertiary,
+                        )
+                    }
+                }
+            }
             item { SectionTitle("Versions") }
             item {
                 ExtensionDetailCard {
@@ -962,7 +985,7 @@ private fun ExtensionDetailScreen(
                     when {
                         installed == null && portable -> Button(
                             onClick = install,
-                            enabled = !loading,
+                            enabled = !loading && !blockedByAdultPolicy,
                         ) { Text("Install") }
                         installed != null -> {
                             TextButton(
@@ -987,7 +1010,7 @@ private fun ExtensionDetailScreen(
                             it.format() == ExtensionArtifactFormat.ANIYOMI_APK
                         } && installApk != null
                     ) {
-                        Button(onClick = installApk, enabled = !loading) {
+                        Button(onClick = installApk, enabled = !loading && !blockedByAdultPolicy) {
                             Text(installApkLabel)
                         }
                     }
@@ -1137,6 +1160,7 @@ private fun ExtensionPackageCard(
     installed: InstalledExtensionPackage?,
     apkInstalled: Boolean,
     pinned: Boolean,
+    adultContentEnabled: Boolean,
     busy: Boolean,
     openDetails: () -> Unit,
     togglePinned: (Boolean) -> Unit,
@@ -1147,6 +1171,7 @@ private fun ExtensionPackageCard(
     installApk: (() -> Unit)?,
     installApkLabel: String,
 ) {
+    val blockedByAdultPolicy = extension.adult() && !adultContentEnabled
     Card(modifier = Modifier.fillMaxWidth().clickable(onClick = openDetails)) {
         Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.Top) {
             ExtensionIcon(extension.icon().orElse(null), extension.displayName())
@@ -1182,6 +1207,13 @@ private fun ExtensionPackageCard(
                         + if (extension.adult()) " · 18+" else "",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                if (blockedByAdultPolicy) {
+                    Text(
+                        "Listed · enable adult content in Settings to install",
+                        color = MaterialTheme.colorScheme.tertiary,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
                 val availability = ExtensionPlatformAvailability.from(extension)
                 val portable = availability.desktop()
                 val apk = availability.androidArtifact().map {
@@ -1203,7 +1235,10 @@ private fun ExtensionPackageCard(
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     when {
-                        installed == null && portable -> Button(onClick = install, enabled = !busy) { Text("Install") }
+                        installed == null && portable -> Button(
+                            onClick = install,
+                            enabled = !busy && !blockedByAdultPolicy,
+                        ) { Text("Install") }
                         installed != null -> {
                             TextButton(onClick = {
                                 toggle(installed.state() == ExtensionInstallationState.DISABLED)
@@ -1223,7 +1258,9 @@ private fun ExtensionPackageCard(
                         }
                     }
                     if (apk && installApk != null && installed == null && !apkInstalled) {
-                        Button(onClick = installApk, enabled = !busy) { Text(installApkLabel) }
+                        Button(onClick = installApk, enabled = !busy && !blockedByAdultPolicy) {
+                            Text(installApkLabel)
+                        }
                     }
                 }
             }

@@ -40,6 +40,14 @@ published languages are visible by default. At least one available language
 must remain enabled, and pinned packages are ordered before the rest without
 changing repository metadata.
 
+The catalogue always lists every package published by the configured indexes,
+including packages carrying an adult-content warning. The shared screen marks
+those entries as `18+`; while the adult-content setting is disabled they remain
+searchable and inspectable, but their installation actions stay disabled. This
+keeps repository discovery complete without bypassing the user's content
+policy. Platform lists remain lazy, so a catalogue containing thousands of
+entries does not eagerly create every card.
+
 The shared UI makes artifact support explicit. Android shows an `Install on
 Android` action for APK entries and hands the HTTPS artifact to the system
 package installer. Desktop exposes `Install for desktop` when its optional APK

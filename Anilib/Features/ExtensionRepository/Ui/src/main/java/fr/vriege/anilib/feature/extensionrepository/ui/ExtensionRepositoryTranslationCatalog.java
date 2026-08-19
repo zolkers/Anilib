@@ -10,7 +10,10 @@ public final class ExtensionRepositoryTranslationCatalog {
 
     public static TranslationCatalog catalog() {
         return TranslationCatalog.french("feature.extension-repository", Map.ofEntries(
+                Map.entry("18+ · enable adult content in Settings to install",
+                        "18+ · activez le contenu adulte dans les paramètres pour installer"),
                 Map.entry("Add repository", "Ajouter un dépôt"),
+                Map.entry("Adult-content policy", "Politique de contenu adulte"),
                 Map.entry("Automatic source updates", "Mises à jour automatiques des sources"),
                 Map.entry("Browse extensions", "Parcourir les extensions"),
                 Map.entry("Extension actions", "Actions de l’extension"),
@@ -25,7 +28,13 @@ public final class ExtensionRepositoryTranslationCatalog {
                 Map.entry("Retry the source as soon as all completion cookies exist",
                         "Réessayer la source dès que tous les cookies de validation sont présents"),
                 Map.entry("Search anime extensions", "Rechercher des extensions d’anime"),
-                Map.entry("Search manga extensions", "Rechercher des extensions de manga")
+                Map.entry("Search manga extensions", "Rechercher des extensions de manga"),
+                Map.entry("This extension remains listed, but installation requires enabling adult content "
+                                + "in Settings.",
+                        "Cette extension reste affichée, mais son installation nécessite d’activer le contenu adulte "
+                                + "dans les paramètres."),
+                Map.entry("Listed · enable adult content in Settings to install",
+                        "Affichée · activez le contenu adulte dans les paramètres pour installer")
         ));
     }
 }

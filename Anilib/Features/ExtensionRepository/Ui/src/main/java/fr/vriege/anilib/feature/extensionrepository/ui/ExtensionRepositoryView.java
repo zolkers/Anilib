@@ -14,6 +14,7 @@ public record ExtensionRepositoryView(
         List<InstalledExtensionPackage> installed,
         List<ExtensionUpdateCandidate> updates,
         boolean automaticUpdatesEnabled,
+        boolean adultContentEnabled,
         List<String> availableLanguages,
         Set<String> enabledLanguages,
         Set<String> pinnedPackages,
