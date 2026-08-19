@@ -35,6 +35,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,6 +47,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import fr.vriege.anilib.feature.extensionrepository.ExtensionArtifactFormat
+import fr.vriege.anilib.feature.extensionrepository.ExtensionContentKind
 import fr.vriege.anilib.feature.extensionrepository.ExtensionPlatformAvailability
 import fr.vriege.anilib.feature.extensionrepository.ExtensionInstallationState
 import fr.vriege.anilib.feature.extensionrepository.ExtensionPackageMetadata
@@ -67,6 +69,259 @@ import kotlinx.coroutines.withContext
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ExtensionRepositoriesScreen(
+    presentation: ExtensionRepositoryPresentation,
+    goBack: () -> Unit,
+) {
+    var view by remember { mutableStateOf(presentation.snapshot()) }
+    var adding by remember { mutableStateOf(false) }
+    var loading by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+
+    DisposableEffect(presentation) {
+        val observation = presentation.observe { view = presentation.snapshot() }
+        onDispose { observation.close() }
+    }
+
+    fun refresh() {
+        if (loading) return
+        loading = true
+        error = null
+        scope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) { presentation.refreshAll().get() }
+            }.onSuccess { view = it }
+                .onFailure { failure ->
+                    error = failure.cause?.message ?: failure.message ?: "Repository refresh failed."
+                }
+            loading = false
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        if (view.repositories().isNotEmpty()) refresh()
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Extension repositories") },
+                navigationIcon = {
+                    IconButton(onClick = goBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = ::refresh, enabled = !loading) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Refresh repositories")
+                    }
+                    IconButton(onClick = { adding = true }) {
+                        Icon(Icons.Default.Add, contentDescription = "Add repository")
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            if (loading) {
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        horizontalArrangement = Arrangement.Center,
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                }
+            }
+            error?.let { message -> item { ExtensionFailure(message, ::refresh) } }
+            if (view.repositories().isEmpty() && !loading) {
+                item { EmptyPage("No extension repository configured.") }
+            } else {
+                items(view.repositories(), key = { it.indexUri().toString() }) { repository ->
+                    RepositoryCard(repository) {
+                        runCatching { presentation.remove(repository.indexUri().toString()) }
+                            .onFailure { error = it.message ?: "Repository removal failed." }
+                    }
+                }
+            }
+            item { Spacer(Modifier.height(16.dp)) }
+        }
+    }
+
+    if (adding) {
+        AddRepositoryDialog(
+            dismiss = { adding = false },
+            add = { url ->
+                runCatching { presentation.add(url) }
+                    .onSuccess {
+                        adding = false
+                        view = presentation.snapshot()
+                        refresh()
+                    }
+                    .onFailure { error = it.message ?: "Invalid repository URL." }
+            },
+        )
+    }
+}
+
+@Composable
+internal fun ExtensionDiscoveryList(
+    presentation: ExtensionRepositoryPresentation,
+    apkExtensionPlatform: ApkExtensionPlatform,
+    kind: ExtensionContentKind,
+    query: String,
+    manageRepositories: () -> Unit,
+) {
+    var view by remember { mutableStateOf(presentation.snapshot()) }
+    var installedApkPackages by remember(apkExtensionPlatform) {
+        mutableStateOf(runCatching(apkExtensionPlatform::installedPackageNames).getOrDefault(emptySet()))
+    }
+    var loadingPackage by remember { mutableStateOf<String?>(null) }
+    var refreshing by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf<String?>(null) }
+    var error by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+
+    DisposableEffect(presentation) {
+        val observation = presentation.observe { view = presentation.snapshot() }
+        onDispose { observation.close() }
+    }
+    LaunchedEffect(Unit) {
+        if (view.repositories().isNotEmpty() && view.packages().isEmpty()) {
+            refreshing = true
+            runCatching { withContext(Dispatchers.IO) { presentation.refreshAll().get() } }
+                .onSuccess { view = it }
+                .onFailure { error = it.cause?.message ?: it.message }
+            refreshing = false
+        }
+    }
+
+    val packages = view.packages().filter { extension ->
+        (extension.contentKind() == kind || extension.contentKind() == ExtensionContentKind.MIXED) &&
+            (query.isBlank() || extension.displayName().contains(query, ignoreCase = true))
+    }
+    if (view.repositories().isEmpty()) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text("Add a repository to discover extensions.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            TextButton(onClick = manageRepositories) { Text("Manage repositories") }
+        }
+        return
+    }
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        if (refreshing) {
+            item {
+                Row(Modifier.fillMaxWidth().padding(20.dp), horizontalArrangement = Arrangement.Center) {
+                    CircularProgressIndicator()
+                }
+            }
+        }
+        error?.let { value -> item { ExtensionFailure(value, null) } }
+        message?.let { value ->
+            item {
+                Text(
+                    value,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                )
+            }
+        }
+        if (!refreshing && packages.isEmpty()) {
+            item { EmptyPage("No ${kind.name.lowercase()} extension found in the configured repositories.") }
+        }
+        items(packages, key = { it.packageName() }) { extension ->
+            val installedPortable = view.installed().firstOrNull {
+                it.packageName() == extension.packageName()
+            }
+            val apkInstalled = extension.packageName() in installedApkPackages
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    ExtensionIcon(extension.icon().orElse(null), extension.displayName())
+                    Spacer(Modifier.width(14.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(extension.displayName(), fontWeight = FontWeight.Medium)
+                        Text(
+                            "${extension.languageTag()} · ${extension.versionName()}",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        val installed = apkInstalled || installedPortable != null
+                        Text(
+                            if (installed) "Installed · available in Sources" else "Available",
+                            color = if (installed) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                        )
+                    }
+                    if (!apkInstalled && installedPortable == null) {
+                        Button(
+                            enabled = loadingPackage == null,
+                            onClick = {
+                                loadingPackage = extension.packageName()
+                                error = null
+                                message = null
+                                val hasPortable = extension.artifacts().any {
+                                    it.format() == ExtensionArtifactFormat.ANILIB_BUNDLE
+                                }
+                                if (hasPortable) {
+                                    scope.launch {
+                                        runCatching {
+                                            withContext(Dispatchers.IO) { presentation.install(extension).get() }
+                                        }.onSuccess {
+                                            view = it
+                                            message = "${extension.displayName()} installed."
+                                        }.onFailure { failure ->
+                                            error = failure.cause?.message ?: failure.message
+                                        }
+                                        loadingPackage = null
+                                    }
+                                } else {
+                                    installApkExtension(
+                                        apkExtensionPlatform,
+                                        extension,
+                                        scope,
+                                        { busy -> if (!busy) loadingPackage = null },
+                                    ) { feedback, failure ->
+                                        error = failure
+                                        message = feedback
+                                        if (failure == null) {
+                                            installedApkPackages = runCatching(
+                                                apkExtensionPlatform::installedPackageNames,
+                                            ).getOrDefault(installedApkPackages)
+                                        }
+                                    }
+                                }
+                            },
+                        ) {
+                            Text(if (loadingPackage == extension.packageName()) "Installing…" else "Install")
+                        }
+                    }
+                }
+            }
+        }
+        item { Spacer(Modifier.height(16.dp)) }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ExtensionRepositoryCatalogueScreen(
     presentation: ExtensionRepositoryPresentation,
     apkExtensionPlatform: ApkExtensionPlatform,
     goBack: () -> Unit,

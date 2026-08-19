@@ -34,17 +34,24 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.CollectionsBookmark
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.NewReleases
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.SortByAlpha
 import androidx.compose.material.icons.outlined.Assessment
 import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material.icons.outlined.Category
@@ -68,6 +75,8 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.Tab
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -643,7 +652,9 @@ private fun AppDestination(
     closeMore: () -> Unit,
 ) {
     when (section) {
-        AppSection.LIBRARY -> when (destination.page()) {
+        AppSection.ANIME,
+        AppSection.MANGA,
+        -> when (destination.page()) {
             LibraryPage.DETAILS -> DetailsDestination(
                 presentation,
                 discovery,
@@ -668,26 +679,18 @@ private fun AppDestination(
                 presentation,
                 discovery,
                 downloads,
-                componentCount,
+                if (section == AppSection.ANIME) MediaKind.ANIME else MediaKind.MANGA,
                 navigate,
             )
         }
         AppSection.UPDATES -> UpdatesScreen(updates, downloads)
-        AppSection.HISTORY -> HistoryPage(
-            presentation,
-            openReader,
-            openPlayer,
-            readerError ?: playerError,
-        ) { transition ->
-            navigate(transition)
-            openSection(AppSection.LIBRARY)
-        }
         AppSection.BROWSE -> DiscoveryScreen(
             discovery,
             presentation,
             reader,
             player,
             extensionRepositories,
+            apkExtensionPlatform,
             browserCookies,
             browserRuntimeStatus,
             manageExtensions = {
@@ -696,6 +699,16 @@ private fun AppDestination(
             },
         )
         AppSection.MORE -> when (moreDestination) {
+            MoreDestination.HISTORY -> HistoryPage(
+                presentation,
+                openReader,
+                openPlayer,
+                readerError ?: playerError,
+                closeMore,
+            ) { row, transition ->
+                navigate(transition)
+                openSection(if (row.kind() == MediaKind.ANIME) AppSection.ANIME else AppSection.MANGA)
+            }
             MoreDestination.DOWNLOADS -> DownloadsScreen(downloads, closeMore)
             MoreDestination.BACKUP -> BackupScreen(backup, backupImportPicker, closeMore)
             MoreDestination.TRACKING -> TrackerAccountsScreen(tracking, closeMore)
@@ -709,7 +722,6 @@ private fun AppDestination(
             )
             MoreDestination.EXTENSION_REPOSITORIES -> ExtensionRepositoriesScreen(
                 extensionRepositories,
-                apkExtensionPlatform,
                 closeMore,
             )
             MoreDestination.SETTINGS -> SettingsScreen(
@@ -729,6 +741,7 @@ private fun AppDestination(
                 settings,
                 settingsPresentation::setIncognitoMode,
                 downloads,
+                { openMore(MoreDestination.HISTORY) },
                 { openMore(MoreDestination.DOWNLOADS) },
                 { openMore(MoreDestination.BACKUP) },
                 { openMore(MoreDestination.TRACKING) },
@@ -747,13 +760,13 @@ private fun LibraryPageContent(
     presentation: LibraryPresentation,
     discovery: DiscoveryPresentation,
     downloads: DownloadPresentation,
-    componentCount: Int,
+    kind: MediaKind,
     navigate: ((LibraryNavigator) -> Unit) -> Unit,
 ) {
     var revision by remember(presentation) { mutableStateOf(0) }
     val overview = remember(presentation, revision) { presentation.library() }
     var query by remember { mutableStateOf("") }
-    var kind by remember { mutableStateOf<MediaKind?>(null) }
+    var searching by remember { mutableStateOf(false) }
     var category by remember(presentation) {
         mutableStateOf(overview.displayPreferences().defaultCategory().orElse(null))
     }
@@ -776,7 +789,7 @@ private fun LibraryPageContent(
     val titles = overview.titles()
         .asSequence()
         .filter { query.isBlank() || it.title().contains(query, ignoreCase = true) }
-        .filter { kind == null || it.kind() == kind }
+        .filter { it.kind() == kind }
         .filter { !favoritesOnly || it.favorite() }
         .filter {
             when (category) {
@@ -789,15 +802,32 @@ private fun LibraryPageContent(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Library") },
-                actions = {
-                    androidx.compose.material3.TextButton(onClick = {
-                        selectionMode = !selectionMode
-                        if (!selectionMode) selected = emptySet()
-                    }) {
-                        Text(if (selectionMode) "Done" else "Select")
+                title = {
+                    if (searching) {
+                        OutlinedTextField(
+                            value = query,
+                            onValueChange = { query = it },
+                            placeholder = { Text("Search ${kind.name.lowercase()}") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    } else {
+                        Text(if (kind == MediaKind.ANIME) "Anime" else "Manga")
                     }
-                    androidx.compose.material3.TextButton(onClick = {
+                },
+                actions = {
+                    IconButton(onClick = {
+                        searching = !searching
+                        if (!searching) query = ""
+                    }) {
+                        Icon(Icons.Default.Search, contentDescription = "Search library")
+                    }
+                    IconButton(onClick = {
+                        update { presentation.setSort(overview.displayPreferences().sort().next()) }
+                    }) {
+                        Icon(Icons.Default.SortByAlpha, contentDescription = "Sort library")
+                    }
+                    IconButton(onClick = {
                         update {
                             presentation.setDisplayMode(
                                 if (overview.displayPreferences().mode() == LibraryDisplayMode.GRID) {
@@ -808,19 +838,20 @@ private fun LibraryPageContent(
                             )
                         }
                     }) {
-                        Text(if (overview.displayPreferences().mode() == LibraryDisplayMode.GRID) "Grid" else "List")
+                        Icon(
+                            if (overview.displayPreferences().mode() == LibraryDisplayMode.GRID) {
+                                Icons.AutoMirrored.Filled.ViewList
+                            } else {
+                                Icons.Default.GridView
+                            },
+                            contentDescription = "Change library layout",
+                        )
                     }
-                    androidx.compose.material3.TextButton(onClick = {
-                        update {
-                            presentation.setDisplayDensity(overview.displayPreferences().density().next())
-                        }
+                    IconButton(onClick = {
+                        selectionMode = !selectionMode
+                        if (!selectionMode) selected = emptySet()
                     }) {
-                        Text(overview.displayPreferences().density().label())
-                    }
-                    androidx.compose.material3.TextButton(onClick = {
-                        update { presentation.setSort(overview.displayPreferences().sort().next()) }
-                    }) {
-                        Text(overview.displayPreferences().sort().label())
+                        Icon(Icons.Default.MoreVert, contentDescription = "Select library titles")
                     }
                 },
             )
@@ -829,7 +860,6 @@ private fun LibraryPageContent(
         Column(
             modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 24.dp),
         ) {
-            Text(librarySummary(overview), color = MaterialTheme.colorScheme.onSurfaceVariant)
             error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             if (selectionMode) {
                 Row(
@@ -882,29 +912,10 @@ private fun LibraryPageContent(
                     ) { Text("Delete") }
                 }
             }
-            Spacer(Modifier.height(12.dp))
-            OutlinedTextField(
-                value = query,
-                onValueChange = { query = it },
-                label = { Text("Search your library") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
             Row(
                 modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                FilterChip(selected = kind == null, onClick = { kind = null }, label = { Text("All") })
-                FilterChip(
-                    selected = kind == MediaKind.ANIME,
-                    onClick = { kind = MediaKind.ANIME },
-                    label = { Text("Anime") },
-                )
-                FilterChip(
-                    selected = kind == MediaKind.MANGA,
-                    onClick = { kind = MediaKind.MANGA },
-                    label = { Text("Manga") },
-                )
                 FilterChip(
                     selected = favoritesOnly,
                     onClick = { favoritesOnly = !favoritesOnly },
@@ -945,16 +956,11 @@ private fun LibraryPageContent(
                 }
             }
             Spacer(Modifier.height(8.dp))
-            if (overview.titles().isEmpty()) {
-                EmptyPage("Your library is empty. Add shortcuts from Browse to keep your titles here.")
+            if (overview.titles().none { it.kind() == kind }) {
+                EmptyPage("Add shortcuts from Explore to keep your ${kind.name.lowercase()} here.")
             } else if (titles.isEmpty()) {
                 EmptyPage("No titles match the active library filters.")
             } else {
-                Text(
-                    text = "$componentCount feature bundles active",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = 8.dp),
-                )
                 if (overview.displayPreferences().mode() == LibraryDisplayMode.GRID) {
                     LazyVerticalGrid(
                         columns = GridCells.Adaptive(overview.displayPreferences().density().minimumCardWidth()),
@@ -1263,38 +1269,47 @@ private fun LibraryCoverCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth().clickable(onClick = if (selectionMode) select else openDetails),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
-        Column {
-            Box {
-                RemoteArtwork(
-                    card.artwork().orElse(null),
-                    card.title(),
-                    modifier = Modifier.fillMaxWidth().aspectRatio(0.68f),
-                )
-                if (selectionMode) {
-                    Checkbox(
-                        checked = selected,
-                        onCheckedChange = { select() },
-                        modifier = Modifier.align(Alignment.TopStart),
-                    )
-                }
-            }
-            Column(Modifier.fillMaxWidth().padding(10.dp)) {
+        Box {
+            RemoteArtwork(
+                card.artwork().orElse(null),
+                card.title(),
+                modifier = Modifier.fillMaxWidth().aspectRatio(0.68f),
+            )
+            Surface(
+                color = Color.Black.copy(alpha = 0.72f),
+                modifier = Modifier.fillMaxWidth().align(Alignment.BottomCenter),
+            ) {
                 Text(
                     card.title(),
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
+                    color = Color.White,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 9.dp),
                 )
-                Text(
-                    cardMetadata(card),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.bodySmall,
+            }
+            if (selectionMode) {
+                Checkbox(
+                    checked = selected,
+                    onCheckedChange = { select() },
+                    modifier = Modifier.align(Alignment.TopStart),
                 )
+            }
+            card.progress().orElse(null)?.let { value ->
+                Surface(
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    shape = RoundedCornerShape(bottomEnd = 8.dp),
+                    modifier = Modifier.align(Alignment.TopEnd),
+                ) {
+                    Text(
+                        value.position().toString(),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    )
+                }
             }
         }
     }
@@ -1307,62 +1322,103 @@ private fun HistoryPage(
     openReader: (LibraryItemId) -> Unit,
     openPlayer: (LibraryItemId) -> Unit,
     resumeError: String?,
-    navigate: ((LibraryNavigator) -> Unit) -> Unit,
+    goBack: () -> Unit,
+    navigate: (LibraryHistoryRow, (LibraryNavigator) -> Unit) -> Unit,
 ) {
     var revision by remember { mutableStateOf(0) }
     val history = remember(revision) { presentation.history() }
+    val cards = remember(revision) { presentation.library().titles().associateBy { it.id() } }
     var query by remember { mutableStateOf("") }
-    var kind by remember { mutableStateOf<MediaKind?>(null) }
+    var searching by remember { mutableStateOf(false) }
+    var kind by remember { mutableStateOf(MediaKind.ANIME) }
     val entries = history.entries().filter {
-        (kind == null || it.kind() == kind) &&
+        it.kind() == kind &&
             (query.isBlank() || it.title().contains(query, ignoreCase = true) ||
                 it.contentId().contains(query, ignoreCase = true))
     }
     val groups = entries.groupBy { row ->
         row.openedAt().atZone(ZoneId.systemDefault()).toLocalDate()
     }
-    Scaffold(topBar = { TopAppBar(title = { Text("History") }) }) { padding ->
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    if (searching) {
+                        OutlinedTextField(
+                            value = query,
+                            onValueChange = { query = it },
+                            placeholder = { Text("Search history") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    } else {
+                        Text("History")
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = goBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = {
+                        searching = !searching
+                        if (!searching) query = ""
+                    }) {
+                        Icon(Icons.Default.Search, contentDescription = "Search history")
+                    }
+                    IconButton(
+                        enabled = history.entries().any { it.kind() == kind },
+                        onClick = {
+                            history.entries().filter { it.kind() == kind }.forEach { row ->
+                                presentation.removeHistoryEntry(
+                                    row.libraryItemId(),
+                                    row.contentId(),
+                                    row.openedAt(),
+                                )
+                            }
+                            revision++
+                        },
+                    ) {
+                        Icon(Icons.Default.DeleteSweep, contentDescription = "Clear history")
+                    }
+                },
+            )
+        },
+    ) { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 24.dp),
+            modifier = Modifier.fillMaxSize().padding(padding),
         ) {
-            Text(
-                text = "${history.entries().size} recent entries",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(12.dp))
-            OutlinedTextField(
-                value = query,
-                onValueChange = { query = it },
-                label = { Text("Search history") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                FilterChip(kind == null, { kind = null }, label = { Text("All") })
-                FilterChip(kind == MediaKind.ANIME, { kind = MediaKind.ANIME }, label = {
-                    Text("Anime")
-                })
-                FilterChip(kind == MediaKind.MANGA, { kind = MediaKind.MANGA }, label = {
-                    Text("Manga")
-                })
+            PrimaryTabRow(selectedTabIndex = if (kind == MediaKind.ANIME) 0 else 1) {
+                Tab(
+                    selected = kind == MediaKind.ANIME,
+                    onClick = { kind = MediaKind.ANIME },
+                    text = { Text("Anime") },
+                )
+                Tab(
+                    selected = kind == MediaKind.MANGA,
+                    onClick = { kind = MediaKind.MANGA },
+                    text = { Text("Manga") },
+                )
             }
-            resumeError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-            Spacer(Modifier.height(12.dp))
+            resumeError?.let {
+                Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp))
+            }
             if (history.entries().isEmpty()) {
                 EmptyPage("Titles you open will appear here.")
             } else if (entries.isEmpty()) {
                 EmptyPage("No history entries match your search.")
             } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                LazyColumn(
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 18.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
                     groups.forEach { (date, rows) ->
                         item(key = "history-date-$date") {
                             Text(
                                 historyDateLabel(date),
                                 fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
                             )
                         }
                         items(
@@ -1373,6 +1429,7 @@ private fun HistoryPage(
                         ) { row ->
                             HistoryCard(
                                 row,
+                                cards[row.libraryItemId()],
                                 resume = {
                                     if (row.kind() == MediaKind.ANIME) {
                                         openPlayer(row.libraryItemId())
@@ -1388,8 +1445,13 @@ private fun HistoryPage(
                                     )
                                     revision++
                                 },
-                                openDetails = {
-                                    navigate { it.openDetails(row.libraryItemId()) }
+                                toggleFavorite = {
+                                    val favorite = cards[row.libraryItemId()]?.favorite() == true
+                                    presentation.setFavorite(setOf(row.libraryItemId()), !favorite)
+                                    revision++
+                                },
+                                openDetails = { transition ->
+                                    navigate(row, transition)
                                 },
                             )
                         }
@@ -1403,31 +1465,49 @@ private fun HistoryPage(
 @Composable
 private fun HistoryCard(
     row: LibraryHistoryRow,
+    card: LibraryCard?,
     resume: () -> Unit,
     remove: () -> Unit,
-    openDetails: () -> Unit,
+    toggleFavorite: () -> Unit,
+    openDetails: ((LibraryNavigator) -> Unit) -> Unit,
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = openDetails),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable {
+            openDetails { it.openDetails(row.libraryItemId()) }
+        }.padding(vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(18.dp)) {
-            Text(row.title(), fontWeight = FontWeight.SemiBold, fontSize = 17.sp)
-            Spacer(Modifier.height(5.dp))
+        RemoteArtwork(
+            card?.artwork()?.orElse(null),
+            row.title(),
+            modifier = Modifier.width(56.dp).height(82.dp).clip(RoundedCornerShape(6.dp)),
+        )
+        Spacer(Modifier.width(14.dp))
+        Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = "${formatEnum(row.kind())} | ${row.contentId()} | Position ${row.position()}",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                row.title(),
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = dateTimeFormatter.format(row.openedAt()),
+                text = "${row.contentId()} · ${dateTimeFormatter.format(row.openedAt())}",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                androidx.compose.material3.TextButton(onClick = resume) {
-                    Text(if (row.kind() == MediaKind.ANIME) "Watch" else "Read")
-                }
-                androidx.compose.material3.TextButton(onClick = remove) { Text("Remove") }
+            androidx.compose.material3.TextButton(onClick = resume) {
+                Text(if (row.kind() == MediaKind.ANIME) "Resume" else "Continue")
             }
+        }
+        IconButton(onClick = toggleFavorite) {
+            Icon(
+                if (card?.favorite() == true) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                contentDescription = "Toggle favorite",
+            )
+        }
+        IconButton(onClick = remove) {
+            Icon(Icons.Default.Delete, contentDescription = "Remove history entry")
         }
     }
 }
@@ -1974,6 +2054,7 @@ private fun MorePage(
     settings: SettingsSnapshot,
     setIncognitoMode: (Boolean) -> Unit,
     downloads: DownloadPresentation,
+    openHistory: () -> Unit,
     openDownloads: () -> Unit,
     openBackup: () -> Unit,
     openTracking: () -> Unit,
@@ -2014,6 +2095,12 @@ private fun MorePage(
             item { MoreSection("Library") }
             item {
                 MoreGroup {
+                    MoreRow(
+                        "History",
+                        "Recently watched episodes and read chapters",
+                        Icons.Default.History,
+                        openHistory,
+                    )
                     MoreRow(
                         "Download queue",
                         if (pendingDownloads == 0) "No pending downloads" else "$pendingDownloads pending downloads",
@@ -2207,9 +2294,9 @@ private fun formatEnum(value: Enum<*>): String = value.name
     .replaceFirstChar(Char::uppercase)
 
 private enum class AppSection {
-    LIBRARY,
+    ANIME,
+    MANGA,
     UPDATES,
-    HISTORY,
     BROWSE,
     MORE,
 }
@@ -2225,17 +2312,17 @@ private fun AppSection.label(language: LanguagePack): String {
     }
     return when (selected) {
         LanguagePack.FRENCH -> when (this) {
-            AppSection.LIBRARY -> "Bibliothèque"
+            AppSection.ANIME -> "Animé"
+            AppSection.MANGA -> "Manga"
             AppSection.UPDATES -> "Mises à jour"
-            AppSection.HISTORY -> "Historique"
-            AppSection.BROWSE -> "Parcourir"
+            AppSection.BROWSE -> "Explorer"
             AppSection.MORE -> "Plus"
         }
         LanguagePack.SYSTEM, LanguagePack.ENGLISH -> when (this) {
-            AppSection.LIBRARY -> "Library"
+            AppSection.ANIME -> "Anime"
+            AppSection.MANGA -> "Manga"
             AppSection.UPDATES -> "Updates"
-            AppSection.HISTORY -> "History"
-            AppSection.BROWSE -> "Browse"
+            AppSection.BROWSE -> "Explore"
             AppSection.MORE -> "More"
         }
     }
@@ -2268,14 +2355,15 @@ private fun appColorScheme(settings: SettingsSnapshot, dark: Boolean): ColorSche
 }
 
 private fun StartScreen.appSection(): AppSection = when (this) {
-    StartScreen.LIBRARY -> AppSection.LIBRARY
+    StartScreen.LIBRARY -> AppSection.ANIME
     StartScreen.UPDATES -> AppSection.UPDATES
-    StartScreen.HISTORY -> AppSection.HISTORY
+    StartScreen.HISTORY -> AppSection.MORE
     StartScreen.BROWSE -> AppSection.BROWSE
     StartScreen.MORE -> AppSection.MORE
 }
 
 private enum class MoreDestination {
+    HISTORY,
     DOWNLOADS,
     BACKUP,
     TRACKING,
@@ -2287,9 +2375,9 @@ private enum class MoreDestination {
 }
 
 private fun AppSection.icon(): ImageVector = when (this) {
-    AppSection.LIBRARY -> Icons.Default.CollectionsBookmark
+    AppSection.ANIME -> Icons.Default.PlayArrow
+    AppSection.MANGA -> Icons.Default.CollectionsBookmark
     AppSection.UPDATES -> Icons.Default.NewReleases
-    AppSection.HISTORY -> Icons.Default.History
     AppSection.BROWSE -> Icons.Default.Explore
     AppSection.MORE -> Icons.Default.MoreHoriz
 }

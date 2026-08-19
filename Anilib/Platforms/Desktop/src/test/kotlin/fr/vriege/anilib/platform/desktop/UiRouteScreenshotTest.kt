@@ -125,7 +125,8 @@ class UiRouteScreenshotTest {
                     }
                 }
 
-                captureStable("Library")
+                captureStable("Anime library")
+                visitPrimary("Manga")
                 onNodeWithText("Acceptance manga").performClick()
                 waitForContentDescription("Read")
                 captureStable("Manga details with local chapters")
@@ -135,6 +136,7 @@ class UiRouteScreenshotTest {
                 onNodeWithContentDescription("Close reader").performClick()
                 goBack()
 
+                visitPrimary("Anime")
                 onNodeWithText("Acceptance anime").performClick()
                 waitForContentDescription("Watch")
                 waitForText("First episode")
@@ -150,9 +152,8 @@ class UiRouteScreenshotTest {
                 goBack()
 
                 visitPrimary("Updates")
-                visitPrimary("History")
-                onNodeWithText("Browse").performClick()
-                captureStable("Browse landing and sources")
+                onNodeWithText("Explore").performClick()
+                captureStable("Explore landing and sources")
                 onNodeWithText("Languages").performClick()
                 waitForText("Source languages")
                 onNodeWithText("Done").performClick()
@@ -167,11 +168,11 @@ class UiRouteScreenshotTest {
                     onNodeWithText(tab).performClick()
                     captureStable(tab)
                     if (tab == "Anime extensions") {
-                        onNodeWithText("Browse extensions").performClick()
+                        onNodeWithText("Manage repositories").performClick()
                         waitForText("Extension repositories")
                         captureStable("Extension installation entry point")
                         goBack()
-                        onNodeWithText("Browse").performClick()
+                        onNodeWithText("Explore").performClick()
                     }
                     if (tab == "Manga sources") {
                         onNodeWithText("Acceptance web").performClick()
@@ -191,6 +192,7 @@ class UiRouteScreenshotTest {
 
                 onNodeWithText("More").performClick()
                 captureStable("More hub")
+                visitMore("History", "History")
                 visitMore("Download queue", "Downloads")
                 visitMore("Backup and restore", "Backup and restore")
                 visitMore("Tracking", "Tracking")

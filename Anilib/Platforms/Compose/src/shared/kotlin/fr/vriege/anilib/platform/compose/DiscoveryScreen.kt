@@ -81,6 +81,7 @@ import fr.vriege.anilib.feature.extensionrepository.ExtensionContentKind
 import fr.vriege.anilib.feature.extensionrepository.ExtensionPackageMetadata
 import fr.vriege.anilib.feature.extensionrepository.ExtensionUpdateCandidate
 import fr.vriege.anilib.feature.extensionrepository.ui.ExtensionRepositoryPresentation
+import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionPlatform
 import fr.vriege.anilib.feature.library.MediaKind
 import fr.vriege.anilib.feature.library.LibraryItemId
 import fr.vriege.anilib.feature.library.ui.LibraryCard
@@ -129,6 +130,7 @@ internal fun DiscoveryScreen(
     reader: ReaderPresentation,
     player: PlayerPresentation,
     extensionRepositories: ExtensionRepositoryPresentation,
+    apkExtensionPlatform: ApkExtensionPlatform,
     browserCookies: HttpCookieJar,
     browserRuntimeStatus: BrowserRuntimeStatus,
     manageExtensions: () -> Unit,
@@ -286,21 +288,16 @@ internal fun DiscoveryScreen(
             if (globalSearch && globalQuery.isNotBlank() && section.sourceTab()) {
                 GlobalSearchContent(presentation, section.kind!!, globalQuery)
             } else if (globalSearch && section.extensionTab()) {
-                ExtensionList(
-                    presentation.extensions(section.kind!!),
-                    globalQuery,
-                    updatesBySource,
-                    packagesBySource,
-                    extensionView.pinnedPackages(),
-                    updatingSources,
-                    togglePinned = { extension ->
-                        extensionRepositories.setPinned(
-                            extension.packageName(),
-                            extension.packageName() !in extensionView.pinnedPackages(),
-                        )
+                ExtensionDiscoveryList(
+                    extensionRepositories,
+                    apkExtensionPlatform,
+                    if (section.kind == SourceContentKind.ANIME) {
+                        ExtensionContentKind.ANIME
+                    } else {
+                        ExtensionContentKind.MANGA
                     },
-                    update = ::updateSource,
-                    manage = manageExtensions,
+                    globalQuery,
+                    manageExtensions,
                 )
             } else {
                 when (section) {
@@ -345,37 +342,19 @@ internal fun DiscoveryScreen(
                             update = ::updateSource,
                         )
                     }
-                    BrowseSection.ANIME_EXTENSIONS -> ExtensionList(
-                        presentation.extensions(SourceContentKind.ANIME),
+                    BrowseSection.ANIME_EXTENSIONS -> ExtensionDiscoveryList(
+                        extensionRepositories,
+                        apkExtensionPlatform,
+                        ExtensionContentKind.ANIME,
                         "",
-                        updatesBySource,
-                        packagesBySource,
-                        extensionView.pinnedPackages(),
-                        updatingSources,
-                        togglePinned = { extension ->
-                            extensionRepositories.setPinned(
-                                extension.packageName(),
-                                extension.packageName() !in extensionView.pinnedPackages(),
-                            )
-                        },
-                        update = ::updateSource,
-                        manage = manageExtensions,
+                        manageExtensions,
                     )
-                    BrowseSection.MANGA_EXTENSIONS -> ExtensionList(
-                        presentation.extensions(SourceContentKind.MANGA),
+                    BrowseSection.MANGA_EXTENSIONS -> ExtensionDiscoveryList(
+                        extensionRepositories,
+                        apkExtensionPlatform,
+                        ExtensionContentKind.MANGA,
                         "",
-                        updatesBySource,
-                        packagesBySource,
-                        extensionView.pinnedPackages(),
-                        updatingSources,
-                        togglePinned = { extension ->
-                            extensionRepositories.setPinned(
-                                extension.packageName(),
-                                extension.packageName() !in extensionView.pinnedPackages(),
-                            )
-                        },
-                        update = ::updateSource,
-                        manage = manageExtensions,
+                        manageExtensions,
                     )
                     BrowseSection.MIGRATE_ANIME -> MigrationContent(
                         SourceContentKind.ANIME,
