@@ -83,11 +83,9 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
@@ -206,6 +204,7 @@ fun AnilibApp(
     enableDesktopPlayerControls: Boolean,
     componentCount: Int,
     darkTheme: Boolean = isSystemInDarkTheme(),
+    reportUiFailure: (Throwable) -> Unit = {},
 ) {
     val detailPlatform = remember(httpClient, shareController, pageDecoder) {
         DetailPlatform(httpClient, shareController, pageDecoder)
@@ -223,6 +222,15 @@ fun AnilibApp(
     var downloadError by remember { mutableStateOf<String?>(null) }
     var moreDestination by remember { mutableStateOf<MoreDestination?>(null) }
     var settings by remember(settingsPresentation) { mutableStateOf(initialSettings) }
+    var recoveredFailure by remember { mutableStateOf<String?>(null) }
+    val handleUiFailure: (Throwable) -> Unit = remember(reportUiFailure) {
+        { failure ->
+            reportRecoverable(failure) { recoverable ->
+                runCatching { reportUiFailure(recoverable) }
+                recoveredFailure = uiFailureMessage(recoverable)
+            }
+        }
+    }
     DisposableEffect(settingsPresentation) {
         val observation = settingsPresentation.observe { settings = it }
         onDispose { observation.close() }
@@ -259,6 +267,7 @@ fun AnilibApp(
         LocalExtensionIconEnvironment provides ExtensionIconEnvironment(httpClient, pageDecoder),
         LocalReducedMotion provides settings.reducedMotion(),
         LocalLanguagePack provides settings.languagePack(),
+        LocalUiFailureHandler provides handleUiFailure,
     ) {
         MaterialTheme(colorScheme = appColorScheme(settings, useDarkTheme)) {
             Surface(modifier = Modifier.fillMaxSize()) {
@@ -412,9 +421,28 @@ fun AnilibApp(
                     }
                 }
             }
+            }
+            recoveredFailure?.let { message ->
+                CrashRecoveryDialog(
+                    message = message,
+                    continueApplication = { recoveredFailure = null },
+                    returnToLibrary = {
+                        runCatching { activeReader?.close() }
+                        activeReader = null
+                        activePlayerTitle = null
+                        activePlayerEpisode = null
+                        activeTrackingTitle = null
+                        moreDestination = null
+                        navigate(LibraryNavigator::openLibrary)
+                        if (section != AppSection.ANIME && section != AppSection.MANGA) {
+                            section = AppSection.ANIME
+                        }
+                        recoveredFailure = null
+                    },
+                )
+            }
         }
     }
-}
 }
 
 @Composable
@@ -819,10 +847,10 @@ private fun LibraryPageContent(
     var remainingEpisodes by remember(player) {
         mutableStateOf<Map<LibraryItemId, Int>>(emptyMap())
     }
-    LaunchedEffect(player, kind, titleIds) {
+    CrashSafeLaunchedEffect(player, kind, titleIds) {
         if (kind != MediaKind.ANIME) {
             remainingEpisodes = emptyMap()
-            return@LaunchedEffect
+            return@CrashSafeLaunchedEffect
         }
         remainingEpisodes = remainingEpisodes.filterKeys(titleIds::contains)
         titleIds.forEach { id ->
@@ -1132,7 +1160,7 @@ private fun BulkMigrationDialog(
     var targetSource by remember(cards) { mutableStateOf<SourceId?>(null) }
     var loading by remember(cards) { mutableStateOf(false) }
     var error by remember(cards) { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
+    val scope = rememberCrashSafeCoroutineScope()
     val current = cards.getOrNull(index)
     if (current == null) {
         completed()
@@ -1384,7 +1412,7 @@ private fun HistoryPage(
     var contentLabels by remember(reader, player) {
         mutableStateOf<Map<HistoryContentKey, String>>(emptyMap())
     }
-    LaunchedEffect(reader, player, kind, history) {
+    CrashSafeLaunchedEffect(reader, player, kind, history) {
         val rows = history.entries().filter { it.kind() == kind }
         contentLabels = withContext(Dispatchers.IO) {
             val labels = mutableMapOf<HistoryContentKey, String>()
@@ -1663,7 +1691,7 @@ private fun DetailsDestination(
     if (details == null) {
         MissingDetails { navigate(LibraryNavigator::openLibrary) }
     } else {
-        androidx.compose.runtime.LaunchedEffect(details.id(), revision) {
+        CrashSafeLaunchedEffect(details.id(), revision) {
             unitError = null
             if (details.kind() == MediaKind.ANIME) {
                 runCatching { withContext(Dispatchers.IO) { player.episodes(details.id()) } }
@@ -1861,13 +1889,13 @@ private fun MediaArtwork(details: LibraryDetails, platform: DetailPlatform, modi
     val location = details.artwork().orElse(null)
     var image by remember(location) { mutableStateOf<ImageBitmap?>(null) }
     var failed by remember(location) { mutableStateOf(false) }
-    androidx.compose.runtime.LaunchedEffect(location) {
+    CrashSafeLaunchedEffect(location) {
         image = null
         failed = false
         if (location == null || !(location.scheme.equals("http", true)
                     || location.scheme.equals("https", true))) {
             failed = location != null
-            return@LaunchedEffect
+            return@CrashSafeLaunchedEffect
         }
         runCatching {
             withContext(Dispatchers.IO) {

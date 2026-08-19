@@ -60,12 +60,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -146,7 +144,7 @@ internal fun DiscoveryScreen(
     var browserPage by remember { mutableStateOf<SourceWebPage?>(null) }
     var extensionRevision by remember { mutableIntStateOf(0) }
     var updatingSources by remember { mutableStateOf<Set<SourceId>>(emptySet()) }
-    val scope = rememberCoroutineScope()
+    val scope = rememberCrashSafeCoroutineScope()
     DisposableEffect(extensionRepositories) {
         val observation = extensionRepositories.observe { extensionRevision++ }
         onDispose { runCatching { observation.close() } }
@@ -345,7 +343,7 @@ internal fun DiscoveryScreen(
                         val sectionsResult = remember(section, sourceBrowseRevision, extensionRevision) {
                             runCatching { presentation.sourceSections(section.kind!!) }
                         }
-                        LaunchedEffect(sectionsResult) {
+                        CrashSafeLaunchedEffect(sectionsResult) {
                             sectionsResult.exceptionOrNull()?.let {
                                 browseError = it.message ?: "Sources could not be loaded."
                             }
@@ -597,7 +595,7 @@ private fun SourceCatalogueScreen(
     openWebPage: (SourceWebPage) -> Unit,
     navigateUp: () -> Unit,
 ) {
-    val scope = rememberCoroutineScope()
+    val scope = rememberCrashSafeCoroutineScope()
     var selectedItem by remember(source.id()) { mutableStateOf<SourceCatalogueItem?>(null) }
     var selectedListing by remember(source.id(), listing) { mutableStateOf(listing) }
     var query by remember(source.id()) { mutableStateOf("") }
@@ -623,7 +621,7 @@ private fun SourceCatalogueScreen(
     var result by remember(source.id(), selectedListing, query, page, filterValues, preferenceRevision) {
         mutableStateOf<Result<SourcePage>?>(null)
     }
-    LaunchedEffect(
+    CrashSafeLaunchedEffect(
         source.id(),
         selectedListing,
         query,
@@ -1112,7 +1110,7 @@ private fun GlobalSearchContent(
     var result by remember(kind, query) {
         mutableStateOf<Result<Map<SourceId, SourcePage>>?>(null)
     }
-    LaunchedEffect(kind, query, revision) {
+    CrashSafeLaunchedEffect(kind, query, revision) {
         result = null
         result = withContext(Dispatchers.IO) {
             runCatching { presentation.globalSearch(kind, query, 10) }
@@ -1352,7 +1350,7 @@ private fun MigrationContent(
     val mediaKind = if (kind == SourceContentKind.ANIME) MediaKind.ANIME else MediaKind.MANGA
     val titles = library.library().titles().filter { it.kind() == mediaKind }
     val targets = presentation.sourceSections(kind).flatMap { it.sources() }
-    val scope = rememberCoroutineScope()
+    val scope = rememberCrashSafeCoroutineScope()
     val cancellation = remember(kind) { AtomicBoolean(false) }
     var selectedIds by remember(kind) { mutableStateOf<Set<LibraryItemId>>(emptySet()) }
     var selectedTarget by remember(kind) { mutableStateOf<SourceDescriptor?>(null) }

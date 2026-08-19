@@ -64,6 +64,7 @@ internal object UiTranslations {
             "Categories" to "Catégories",
             "Check for updates" to "Rechercher des mises à jour",
             "Close" to "Fermer",
+            "Continue" to "Continuer",
             "Connected" to "Connecté",
             "Delete" to "Supprimer",
             "Disconnect" to "Déconnecter",
@@ -92,6 +93,7 @@ internal object UiTranslations {
             "Remove" to "Retirer",
             "Restore" to "Restaurer",
             "Retry" to "Réessayer",
+            "Return to library" to "Retourner à la bibliothèque",
             "Save" to "Enregistrer",
             "Search" to "Rechercher",
             "Search anime extensions" to "Rechercher des extensions dâ€™anime",
@@ -354,6 +356,9 @@ internal object UiTranslations {
             "Delete backup" to "Supprimer la sauvegarde",
             "About" to "À propos",
             "About Anilib" to "À propos d’Anilib",
+            "Anilib recovered from an error" to "Anilib a récupéré après une erreur",
+            "A diagnostic report was saved. You can continue or return to the library." to
+                "Un rapport de diagnostic a été enregistré. Vous pouvez continuer ou retourner à la bibliothèque.",
             "Accent color" to "Couleur d’accentuation",
             "An episode is completed automatically at this percentage" to
                 "Un épisode est automatiquement marqué comme vu à ce pourcentage",

@@ -19,11 +19,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -68,7 +66,7 @@ internal fun BrowserScreen(
         desktopWebSettings.disablePopupWindows = !policy.popupsEnabled()
     }
     val navigator = rememberWebViewNavigator()
-    val scope = rememberCoroutineScope()
+    val scope = rememberCrashSafeCoroutineScope()
     var challengeSolved by remember(page) { mutableStateOf(page.completionCookies().isEmpty()) }
     var challengeChecked by remember(page) { mutableStateOf(false) }
     var platformMessage by remember(page) { mutableStateOf<String?>(null) }
@@ -76,10 +74,10 @@ internal fun BrowserScreen(
         policy = policy,
         report = { platformMessage = it },
     )
-    LaunchedEffect(uri, state.cookieManager) {
+    CrashSafeLaunchedEffect(uri, state.cookieManager) {
         seedCookies(uri, initialHeaders, state.cookieManager)
     }
-    LaunchedEffect(state.loadingState, policy.automaticChallengeRetry()) {
+    CrashSafeLaunchedEffect(state.loadingState, policy.automaticChallengeRetry()) {
         if (state.loadingState is LoadingState.Finished
             && policy.automaticChallengeRetry()
             && page.completionCookies().isNotEmpty()

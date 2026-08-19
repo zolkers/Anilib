@@ -34,7 +34,6 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -112,11 +111,11 @@ internal fun PlayerVideoSurface(
             bridge.detach(player)
         }
     }
-    LaunchedEffect(bridge, player) {
+    CrashSafeLaunchedEffect(bridge, player) {
         while (!player.hasMedia && player.error == null) withFrameNanos { }
         bridge.resumeWhenReady()
     }
-    LaunchedEffect(bridge, player.isPlaying) {
+    CrashSafeLaunchedEffect(bridge, player.isPlaying) {
         var lastPersistence = 0L
         while (true) {
             withFrameNanos { frameTime ->
@@ -127,7 +126,7 @@ internal fun PlayerVideoSurface(
             }
         }
     }
-    LaunchedEffect(
+    CrashSafeLaunchedEffect(
         bridge,
         controlsVisible,
         controlsActivity,

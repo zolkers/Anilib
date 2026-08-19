@@ -16,6 +16,7 @@ import fr.vriege.anilib.feature.library.ui.LibraryUiCapabilities
 import fr.vriege.anilib.feature.network.NetworkCapabilities
 import fr.vriege.anilib.feature.reader.ui.ReaderUiCapabilities
 import fr.vriege.anilib.feature.settings.ui.SettingsUiCapabilities
+import fr.vriege.anilib.feature.settings.SettingsCapabilities
 import fr.vriege.anilib.feature.player.ui.PlayerUiCapabilities
 import fr.vriege.anilib.feature.downloads.ui.DownloadUiCapabilities
 import fr.vriege.anilib.feature.backup.ui.BackupUiCapabilities
@@ -64,36 +65,47 @@ fun main() {
         return
     }
     val browserRuntimeStatus = DesktopBrowserRuntime.initialize(dataDirectory)
-    application {
-        Window(
-            onCloseRequest = {
-                try {
-                    DesktopBrowserRuntime.dispose()
-                } finally {
+    val crashShield = DesktopUiCrashShield.install(
+        started.capability(SettingsCapabilities.DIAGNOSTICS),
+    )
+    try {
+        application {
+            Window(
+                onCloseRequest = {
                     try {
-                        started.close()
+                        DesktopBrowserRuntime.dispose()
                     } finally {
                         try {
-                            extensionEngine.close()
+                            crashShield.close()
                         } finally {
-                            exitApplication()
+                            try {
+                                started.close()
+                            } finally {
+                                try {
+                                    extensionEngine.close()
+                                } finally {
+                                    exitApplication()
+                                }
+                            }
                         }
                     }
-                }
-            },
-            title = "Anilib",
-        ) {
-            DesktopAnilibContent(
-                started = started,
-                browserRuntimeStatus = browserRuntimeStatus,
-                browserDataController = DesktopBrowserDataController(dataDirectory),
-                browserPlatformController = DesktopBrowserPlatformController(),
-                backupImportPicker = DesktopBackupImportPicker(),
-                applicationUpdatePlatformController = DesktopApplicationUpdateController(dataDirectory),
-                shareController = DesktopShareController(),
-                extensionPlatform = extensionEngine,
-            )
+                },
+                title = "Anilib",
+            ) {
+                DesktopAnilibContent(
+                    started = started,
+                    browserRuntimeStatus = browserRuntimeStatus,
+                    browserDataController = DesktopBrowserDataController(dataDirectory),
+                    browserPlatformController = DesktopBrowserPlatformController(),
+                    backupImportPicker = DesktopBackupImportPicker(),
+                    applicationUpdatePlatformController = DesktopApplicationUpdateController(dataDirectory),
+                    shareController = DesktopShareController(),
+                    extensionPlatform = extensionEngine,
+                )
+            }
         }
+    } finally {
+        crashShield.close()
     }
 }
 
@@ -140,6 +152,14 @@ internal fun DesktopAnilibContent(
         enableDesktopPlayerControls = true,
         componentCount = started.components().size,
         darkTheme = desktopDarkTheme(),
+        reportUiFailure = { failure ->
+            runCatching {
+                started.capability(SettingsCapabilities.DIAGNOSTICS).recordCrash(
+                    "Recovered Compose UI failure",
+                    failure.stackTraceToString(),
+                )
+            }
+        },
     )
 }
 

@@ -16,12 +16,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -65,7 +63,7 @@ internal fun SourceTitleScreen(
     openWebPage: (SourceWebPage) -> Unit,
     navigateUp: () -> Unit,
 ) {
-    val scope = rememberCoroutineScope()
+    val scope = rememberCrashSafeCoroutineScope()
     val artworkEnvironment = LocalExtensionIconEnvironment.current
     var activeReader by remember(item.id()) { mutableStateOf<ReaderController?>(null) }
     var activePlayer by remember(item.id()) { mutableStateOf<PlayerController?>(null) }
@@ -84,7 +82,7 @@ internal fun SourceTitleScreen(
         presentation.titleWebPage(item.id()).orElse(sourceWebPage)
     }
 
-    LaunchedEffect(item.id(), requestRevision) {
+    CrashSafeLaunchedEffect(item.id(), requestRevision) {
         loaded = withContext(Dispatchers.IO) {
             runCatching {
                 SourceMediaDetails(

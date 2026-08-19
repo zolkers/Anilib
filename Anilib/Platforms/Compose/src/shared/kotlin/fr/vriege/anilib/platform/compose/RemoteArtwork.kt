@@ -8,7 +8,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,10 +33,10 @@ internal fun RemoteArtwork(
     val environment = LocalExtensionIconEnvironment.current
     var image by remember(uri, environment) { mutableStateOf<ImageBitmap?>(null) }
     var failed by remember(uri, environment) { mutableStateOf(false) }
-    LaunchedEffect(uri, environment) {
+    CrashSafeLaunchedEffect(uri, environment) {
         image = null
         failed = false
-        if (uri == null || environment == null) return@LaunchedEffect
+        if (uri == null || environment == null) return@CrashSafeLaunchedEffect
         runCatching {
             withContext(Dispatchers.IO) {
                 val response = environment.httpClient.execute(

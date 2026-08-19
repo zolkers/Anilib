@@ -24,11 +24,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
@@ -338,7 +336,7 @@ internal fun StatisticsScreen(
         mutableStateOf<StatisticsSnapshot?>(null)
     }
     var error by remember(library, discovery, player, tracking) { mutableStateOf<String?>(null) }
-    LaunchedEffect(library, discovery, player, tracking) {
+    CrashSafeLaunchedEffect(library, discovery, player, tracking) {
         runCatching {
             withContext(Dispatchers.IO) {
                 statisticsSnapshot(library, discovery, player, tracking, Instant.now())
@@ -555,7 +553,7 @@ internal fun AboutScreen(
     var installing by remember(updates) { mutableStateOf(false) }
     var downloadedBytes by remember(updates) { mutableStateOf(0L) }
     var updateMessage by remember(updates) { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
+    val scope = rememberCrashSafeCoroutineScope()
     val uriHandler = LocalUriHandler.current
     val platformController = LocalApplicationUpdatePlatformController.current
     val available = snapshot.availableRelease().orElse(null)

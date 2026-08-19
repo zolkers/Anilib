@@ -36,11 +36,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -78,7 +76,7 @@ internal fun ExtensionRepositoriesScreen(
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var pendingRepositoryRemoval by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
+    val scope = rememberCrashSafeCoroutineScope()
 
     DisposableEffect(presentation) {
         val observation = presentation.observe { view = presentation.snapshot() }
@@ -100,7 +98,7 @@ internal fun ExtensionRepositoriesScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
+    CrashSafeLaunchedEffect(Unit) {
         if (view.repositories().isNotEmpty()) refresh()
     }
 
@@ -200,13 +198,13 @@ internal fun ExtensionDiscoveryList(
     var message by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var pendingRemoval by remember { mutableStateOf<ExtensionRemovalRequest?>(null) }
-    val scope = rememberCoroutineScope()
+    val scope = rememberCrashSafeCoroutineScope()
 
     DisposableEffect(presentation) {
         val observation = presentation.observe { view = presentation.snapshot() }
         onDispose { observation.close() }
     }
-    LaunchedEffect(Unit) {
+    CrashSafeLaunchedEffect(Unit) {
         if (view.repositories().isNotEmpty() && view.packages().isEmpty()) {
             refreshing = true
             runCatching { withContext(Dispatchers.IO) { presentation.refreshAll().get() } }
@@ -428,7 +426,7 @@ private fun ExtensionRepositoryCatalogueScreen(
     var installedQuery by remember { mutableStateOf("") }
     var pendingRemoval by remember { mutableStateOf<ExtensionRemovalRequest?>(null) }
     var pendingRepositoryRemoval by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
+    val scope = rememberCrashSafeCoroutineScope()
     var pendingApkTrust by remember { mutableStateOf<InstalledApkExtension?>(null) }
     var installedApkExtensions by remember(apkExtensionPlatform) {
         mutableStateOf(runCatching(apkExtensionPlatform::discoverInstalled).getOrDefault(emptyList()))

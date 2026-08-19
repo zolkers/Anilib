@@ -26,6 +26,7 @@ import fr.vriege.anilib.feature.library.ui.LibraryUiCapabilities
 import fr.vriege.anilib.feature.reader.ui.ReaderUiCapabilities
 import fr.vriege.anilib.feature.reader.ReaderOrientationPolicy
 import fr.vriege.anilib.feature.settings.ui.SettingsUiCapabilities
+import fr.vriege.anilib.feature.settings.SettingsCapabilities
 import fr.vriege.anilib.feature.player.ui.PlayerUiCapabilities
 import fr.vriege.anilib.feature.player.PlayerOrientationPolicy
 import fr.vriege.anilib.feature.downloads.ui.DownloadUiCapabilities
@@ -165,6 +166,15 @@ class MainActivity : ComponentActivity() {
             enableAndroidPlayerControls = true,
             enableDesktopPlayerControls = false,
             componentCount = componentCount,
+            reportUiFailure = { failure ->
+                Log.e(LOG_TAG, "Anilib recovered from a Compose UI failure", failure)
+                runCatching {
+                    started.capability(SettingsCapabilities.DIAGNOSTICS).recordCrash(
+                        "Recovered Android UI failure",
+                        failure.stackTraceToString(),
+                    )
+                }
+            },
         )
     }
 

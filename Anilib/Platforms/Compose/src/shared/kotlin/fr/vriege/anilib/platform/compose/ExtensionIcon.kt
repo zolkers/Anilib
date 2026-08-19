@@ -11,7 +11,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -53,10 +52,10 @@ internal fun ExtensionIcon(
     var image by remember(iconUri, environment) { mutableStateOf<ImageBitmap?>(null) }
     var failed by remember(iconUri, environment) { mutableStateOf(false) }
 
-    LaunchedEffect(iconUri, environment) {
+    CrashSafeLaunchedEffect(iconUri, environment) {
         image = null
         failed = false
-        if (iconUri == null || environment == null) return@LaunchedEffect
+        if (iconUri == null || environment == null) return@CrashSafeLaunchedEffect
         runCatching {
             withContext(Dispatchers.IO) {
                 val response = environment.httpClient.execute(

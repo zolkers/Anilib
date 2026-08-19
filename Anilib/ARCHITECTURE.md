@@ -333,6 +333,17 @@ plus those reports. Reset is a two-phase plan/confirmation protocol whose exact
 targets are allowlisted to settings, HTTP cache, logs, and crash reports; it can
 never select the data root, library, downloads, backup, or extension content.
 
+The shared Compose shell treats feature coroutine and effect failures as
+recoverable UI incidents. It records them through Settings diagnostics and
+offers Continue or Return to library without rebuilding the immutable product
+graph. Desktop additionally intercepts uncaught AWT/Skiko UI-thread failures,
+records them, and lets the toolkit replace the failed dispatch thread; worker,
+Kernel, and virtual-machine failures still follow the ordinary fatal path.
+Android uses the shared coroutine boundary and its existing restartable startup
+state, without attempting to resume a terminated Android main looper. Out of
+memory, forced thread termination, and other virtual-machine failures are never
+misrepresented as recoverable.
+
 ## Product lifecycle
 
 1. A configuration selects feature Bundles.
