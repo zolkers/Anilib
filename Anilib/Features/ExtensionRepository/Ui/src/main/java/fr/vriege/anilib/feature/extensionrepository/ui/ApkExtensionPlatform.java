@@ -3,6 +3,7 @@ package fr.vriege.anilib.feature.extensionrepository.ui;
 import fr.vriege.anilib.feature.extensionrepository.ExtensionPackageMetadata;
 
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 public interface ApkExtensionPlatform {
@@ -28,6 +29,12 @@ public interface ApkExtensionPlatform {
 
     default List<InstalledApkExtension> discoverInstalled() {
         return List.of();
+    }
+
+    default Set<String> installedPackageNames() {
+        return discoverInstalled().stream()
+                .map(InstalledApkExtension::packageName)
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
     }
 
     default ApkExtensionRuntimeReport runtimeReport(InstalledApkExtension extensionPackage) {

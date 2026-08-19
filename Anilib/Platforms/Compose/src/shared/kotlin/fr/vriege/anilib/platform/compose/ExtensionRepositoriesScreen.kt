@@ -86,6 +86,9 @@ internal fun ExtensionRepositoriesScreen(
     var installedApkExtensions by remember(apkExtensionPlatform) {
         mutableStateOf(runCatching(apkExtensionPlatform::discoverInstalled).getOrDefault(emptyList()))
     }
+    var installedApkPackages by remember(apkExtensionPlatform) {
+        mutableStateOf(runCatching(apkExtensionPlatform::installedPackageNames).getOrDefault(emptySet()))
+    }
     var apkRuntimeReports by remember(apkExtensionPlatform) {
         mutableStateOf(inspectApkRuntimes(apkExtensionPlatform, installedApkExtensions))
     }
@@ -124,6 +127,8 @@ internal fun ExtensionRepositoriesScreen(
             .onSuccess {
                 installedApkExtensions = it
                 apkRuntimeReports = inspectApkRuntimes(apkExtensionPlatform, it)
+                installedApkPackages = runCatching(apkExtensionPlatform::installedPackageNames)
+                    .getOrDefault(emptySet())
             }
             .onFailure { error = it.message ?: "Installed APK discovery failed." }
         complete("Refreshing repositories") { presentation.refreshAll() }
@@ -134,6 +139,7 @@ internal fun ExtensionRepositoriesScreen(
         ExtensionDetailScreen(
             extension = extension,
             installed = installed,
+            apkInstalled = extension.packageName() in installedApkPackages,
             trustedKeyIds = view.trustedKeyIds().toSet(),
             pinned = extension.packageName() in view.pinnedPackages(),
             loading = loading,
@@ -165,6 +171,10 @@ internal fun ExtensionRepositoriesScreen(
                 }) { message, failure ->
                     error = failure
                     feedback = message
+                    if (failure == null) {
+                        installedApkPackages = runCatching(apkExtensionPlatform::installedPackageNames)
+                            .getOrDefault(installedApkPackages)
+                    }
                 } }
             } else {
                 null
@@ -327,6 +337,7 @@ internal fun ExtensionRepositoriesScreen(
                     ExtensionPackageCard(
                         extension = extension,
                         installed = installed,
+                        apkInstalled = extension.packageName() in installedApkPackages,
                         pinned = extension.packageName() in view.pinnedPackages(),
                         busy = loading,
                         openDetails = { selectedExtension = extension },
@@ -363,6 +374,11 @@ internal fun ExtensionRepositoriesScreen(
                                 }) { message, failure ->
                                     error = failure
                                     feedback = message
+                                    if (failure == null) {
+                                        installedApkPackages =
+                                            runCatching(apkExtensionPlatform::installedPackageNames)
+                                                .getOrDefault(installedApkPackages)
+                                    }
                                 }
                             }
                         } else {
@@ -530,6 +546,7 @@ private fun apkCompatibility(compatibility: ApkExtensionCompatibility): String =
 private fun ExtensionDetailScreen(
     extension: ExtensionPackageMetadata,
     installed: InstalledExtensionPackage?,
+    apkInstalled: Boolean,
     trustedKeyIds: Set<String>,
     pinned: Boolean,
     loading: Boolean,
@@ -610,7 +627,7 @@ private fun ExtensionDetailScreen(
                         installed?.let {
                             "Installed: ${it.versionName()} (${it.versionCode()}) · " +
                                 it.state().name.lowercase()
-                        } ?: "Not installed",
+                        } ?: if (apkInstalled) "APK installed and active" else "Not installed",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -670,7 +687,7 @@ private fun ExtensionDetailScreen(
                     Text(extension.changelog().orElse("No changelog supplied by this repository."))
                 }
             }
-            if (installed == null && !portable && installApk == null) {
+            if (installed == null && !apkInstalled && !portable && installApk == null) {
                 item {
                     ExtensionDetailCard {
                         Text("Android-only extension", fontWeight = FontWeight.Medium)
@@ -711,7 +728,7 @@ private fun ExtensionDetailScreen(
                             TextButton(onClick = remove, enabled = !loading) { Text("Remove") }
                         }
                     }
-                    if (installed == null && !portable && extension.artifacts().any {
+                    if (installed == null && !apkInstalled && !portable && extension.artifacts().any {
                             it.format() == ExtensionArtifactFormat.ANIYOMI_APK
                         } && installApk != null
                     ) {
@@ -863,6 +880,7 @@ private fun RepositoryCard(repository: ExtensionRepositoryRow, remove: () -> Uni
 private fun ExtensionPackageCard(
     extension: ExtensionPackageMetadata,
     installed: InstalledExtensionPackage?,
+    apkInstalled: Boolean,
     pinned: Boolean,
     busy: Boolean,
     openDetails: () -> Unit,
@@ -914,10 +932,17 @@ private fun ExtensionPackageCard(
                 val apk = availability.androidArtifact().map {
                     it.format() == ExtensionArtifactFormat.ANIYOMI_APK
                 }.orElse(false)
-                if (installed == null && !portable && apk && installApk == null) {
+                if (installed == null && !apkInstalled && !portable && apk && installApk == null) {
                     Text(
                         "Android-only extension · install it from Anilib on Android",
                         color = MaterialTheme.colorScheme.tertiary,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                if (apkInstalled) {
+                    Text(
+                        "Installed · sources active in Browse",
+                        color = MaterialTheme.colorScheme.primary,
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
@@ -942,7 +967,7 @@ private fun ExtensionPackageCard(
                             TextButton(onClick = remove) { Text("Remove") }
                         }
                     }
-                    if (apk && installApk != null && installed == null) {
+                    if (apk && installApk != null && installed == null && !apkInstalled) {
                         Button(onClick = installApk, enabled = !busy) { Text(installApkLabel) }
                     }
                 }

@@ -54,6 +54,7 @@ fun main() {
         extensionEngine.close()
         throw failure
     }
+    extensionEngine.attach(started)
     if (GraphicsEnvironment.isHeadless()) {
         printHeadlessSummary(started)
         try {

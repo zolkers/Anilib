@@ -63,7 +63,9 @@ published.
 Installation is transactional. Plugins install in dependency order. Each owns
 a LIFO cleanup stack; if installation fails, the kernel closes completed
 sessions in reverse order and attaches cleanup failures to the original error.
-The graph becomes immutable after startup.
+The product capability graph becomes immutable after startup. Explicit leaf
+Bundles that publish no capabilities may be registered and removed at runtime;
+their declared contributions and owned lifecycle resources remain transactional.
 
 There is deliberately no classpath scanning, reflection-based injection, global
 service locator, or mutable “bag of services”. Configurations select concrete
@@ -402,8 +404,9 @@ URLs, and owns process shutdown. Extension Repository Runtime maps the loopback
 protocol into ordinary explicit Source Bundles with the original unsigned
 numeric source identity. Catalogue, chapters, pages, episodes, videos, subtitles,
 HLS, and DASH are relayed through that boundary; neither engine classes nor APK
-bytecode enter Anilib's classpath. The immutable Kernel graph means an APK
-installed during a session activates after restart. Portable Anilib Bundles
+bytecode enter Anilib's classpath. The desktop adapter converts every discovered
+source into an explicit leaf Bundle, so an APK installed during a session can be
+registered immediately without changing the product capability graph. Portable Anilib Bundles
 remain the preferred signed, dependency-free cross-platform format.
 
 Anilib deliberately does not synthesize `eu.kanade.*` host classes or copy the

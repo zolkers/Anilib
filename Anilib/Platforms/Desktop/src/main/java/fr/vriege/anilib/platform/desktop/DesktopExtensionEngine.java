@@ -9,6 +9,9 @@ import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionPlatform;
 import fr.vriege.anilib.framework.http.AnilibHttpClient;
 import fr.vriege.anilib.framework.http.HttpTransport;
 import fr.vriege.anilib.kernel.AnilibPlugin;
+import fr.vriege.anilib.kernel.PluginRegistration;
+import fr.vriege.anilib.kernel.StartedAnilib;
+import fr.vriege.anilib.foundation.component.ComponentId;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -25,6 +28,9 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Properties;
@@ -43,6 +49,9 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
     private volatile MiwayomiSourceBridge bridge;
     private volatile Process process;
     private final List<AnilibPlugin> sourceBundles;
+    private final List<PluginRegistration> dynamicRegistrations = new ArrayList<>();
+    private final Set<String> installedPackageNames = new LinkedHashSet<>();
+    private volatile StartedAnilib started;
     private volatile String diagnostic;
 
     private DesktopExtensionEngine(
@@ -59,6 +68,7 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
         this.bridge = bridge;
         this.process = process;
         this.sourceBundles = List.copyOf(sourceBundles);
+        sourceBundles.forEach(bundle -> installedPackageNames.add(bundle.manifest().descriptor().version()));
         this.diagnostic = diagnostic;
     }
 
@@ -101,6 +111,15 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
         return sourceBundles;
     }
 
+    synchronized void attach(StartedAnilib product) {
+        started = Objects.requireNonNull(product, "product must not be null");
+    }
+
+    @Override
+    public synchronized Set<String> installedPackageNames() {
+        return Set.copyOf(installedPackageNames);
+    }
+
     @Override
     public boolean available() {
         return bridge != null && process != null && process.isAlive();
@@ -115,7 +134,7 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
     public String availabilityDescription() {
         return available()
                 ? "Existing manga and anime APK extensions run in Anilib's isolated desktop engine. "
-                        + "Newly installed sources activate after restart."
+                        + "Newly installed sources activate immediately."
                 : diagnostic;
     }
 
@@ -140,9 +159,30 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
                 .uri();
         return CompletableFuture.supplyAsync(() -> {
             ensureAvailable();
-            String result = bridge.install(artifact);
-            return result + " Restart Anilib to activate the source on desktop.";
+            bridge.install(artifact);
+            int activated = activateNewSources();
+            return extensionPackage.displayName() + " installed. " + activated
+                    + " source(s) added immediately to Browse.";
         });
+    }
+
+    private synchronized int activateNewSources() {
+        StartedAnilib product = started;
+        if (product == null) {
+            throw new IllegalStateException("Anilib product is not attached to the desktop extension engine");
+        }
+        Set<ComponentId> active = product.components().stream()
+                .map(component -> component.id())
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        int count = 0;
+        for (AnilibPlugin bundle : bridge.sourceBundles()) {
+            installedPackageNames.add(bundle.manifest().descriptor().version());
+            if (active.add(bundle.manifest().descriptor().id())) {
+                dynamicRegistrations.add(product.install(bundle));
+                count++;
+            }
+        }
+        return count;
     }
 
     @Override

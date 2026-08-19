@@ -11,6 +11,8 @@ public interface StartedAnilib extends AutoCloseable {
 
     List<ComponentDescriptor> components();
 
+    PluginRegistration install(AnilibPlugin plugin);
+
     @Override
     void close();
 }

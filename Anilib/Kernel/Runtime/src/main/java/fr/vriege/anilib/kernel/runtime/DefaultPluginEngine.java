@@ -9,6 +9,7 @@ import fr.vriege.anilib.kernel.ContributionPoint;
 import fr.vriege.anilib.kernel.PluginEngine;
 import fr.vriege.anilib.kernel.PluginInstallationContext;
 import fr.vriege.anilib.kernel.PluginManifest;
+import fr.vriege.anilib.kernel.PluginRegistration;
 import fr.vriege.anilib.kernel.PluginStartupException;
 import fr.vriege.anilib.kernel.StartedAnilib;
 
@@ -255,9 +256,10 @@ public final class DefaultPluginEngine implements PluginEngine {
                 List<ComponentDescriptor> components,
                 List<InstalledPlugin> installed) {
             this.capabilities = Map.copyOf(capabilities);
-            this.contributions = immutableContributions(contributions);
-            this.components = List.copyOf(components);
-            this.installed = List.copyOf(installed);
+            this.contributions = new LinkedHashMap<>();
+            contributions.forEach((point, values) -> this.contributions.put(point, new ArrayList<>(values)));
+            this.components = new ArrayList<>(components);
+            this.installed = new ArrayList<>(installed);
         }
 
         @Override
@@ -280,7 +282,89 @@ public final class DefaultPluginEngine implements PluginEngine {
         @Override
         public synchronized List<ComponentDescriptor> components() {
             ensureOpen();
-            return components;
+            return List.copyOf(components);
+        }
+
+        @Override
+        public synchronized PluginRegistration install(AnilibPlugin plugin) {
+            ensureOpen();
+            AnilibPlugin selected = Objects.requireNonNull(plugin, "plugin must not be null");
+            PluginManifest manifest = Objects.requireNonNull(
+                    selected.manifest(), "plugin manifest must not be null");
+            if (!manifest.providedCapabilities().isEmpty()) {
+                throw new PluginStartupException(
+                        "A dynamically installed plugin cannot provide product capabilities: "
+                                + manifest.descriptor().id());
+            }
+            if (components.stream().anyMatch(component -> component.id().equals(manifest.descriptor().id()))) {
+                throw new PluginStartupException("Duplicate plugin id: " + manifest.descriptor().id());
+            }
+            for (CapabilityKey<?> required : manifest.requiredCapabilities()) {
+                if (!capabilities.containsKey(required)) {
+                    throw new PluginStartupException(
+                            manifest.descriptor().id() + " requires missing capability " + required);
+                }
+            }
+            InstallationContext context = new InstallationContext(manifest, capabilities);
+            InstalledPlugin installation;
+            try {
+                selected.install(context);
+                installation = context.complete();
+            } catch (Exception | LinkageError error) {
+                PluginStartupException failure = new PluginStartupException(
+                        "Failed to install plugin " + manifest.descriptor().id(), error);
+                context.rollbackInto(failure);
+                throw failure;
+            }
+            installation.contributions().forEach((point, values) -> {
+                List<Contribution<?>> target = contributions.computeIfAbsent(point, ignored -> new ArrayList<>());
+                target.addAll(values);
+                target.sort(Comparator.<Contribution<?>, Integer>comparing(Contribution::priority).reversed()
+                        .thenComparing(Contribution::contributor));
+            });
+            components.add(installation.descriptor());
+            installed.add(installation);
+            return new PluginRegistration() {
+                private boolean registrationClosed;
+
+                @Override
+                public ComponentDescriptor component() {
+                    return installation.descriptor();
+                }
+
+                @Override
+                public void close() {
+                    synchronized (DefaultStartedAnilib.this) {
+                        if (registrationClosed) {
+                            return;
+                        }
+                        registrationClosed = true;
+                        remove(installation);
+                    }
+                }
+            };
+        }
+
+        private void remove(InstalledPlugin installation) {
+            if (!installed.remove(installation)) {
+                return;
+            }
+            PluginStartupException failure = new PluginStartupException(
+                    "Plugin failed to close: " + installation.descriptor().id());
+            installation.closeInto(failure);
+            components.remove(installation.descriptor());
+            installation.contributions().forEach((point, values) -> {
+                List<Contribution<?>> current = contributions.get(point);
+                if (current != null) {
+                    current.removeAll(values);
+                    if (current.isEmpty()) {
+                        contributions.remove(point);
+                    }
+                }
+            });
+            if (failure.getSuppressed().length > 0) {
+                throw failure;
+            }
         }
 
         @Override
