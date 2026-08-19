@@ -48,8 +48,11 @@ public final class DefaultTrackerService implements TrackerService, AutoCloseabl
     private final CopyOnWriteArrayList<Runnable> listeners = new CopyOnWriteArrayList<>();
     private final Map<BindingKey, TrackerSyncConflict> conflicts = new LinkedHashMap<>();
     private final Set<BindingKey> dirtyEntries = new HashSet<>();
-    private final ExecutorService synchronizer = Executors.newSingleThreadExecutor(
-            Thread.ofVirtual().name("anilib-tracker-sync").factory());
+    private final ExecutorService synchronizer = Executors.newSingleThreadExecutor(task -> {
+        Thread thread = new Thread(task, "anilib-tracker-sync");
+        thread.setDaemon(true);
+        return thread;
+    });
     private final AtomicBoolean synchronizationQueued = new AtomicBoolean();
     private final AutoCloseable libraryObservation;
     private volatile boolean closed;
