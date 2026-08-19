@@ -228,6 +228,7 @@ fun AnilibApp(
     var playerError by remember { mutableStateOf<String?>(null) }
     var downloadError by remember { mutableStateOf<String?>(null) }
     var moreDestination by remember { mutableStateOf<MoreDestination?>(null) }
+    var browseMainDestination by remember { mutableStateOf(true) }
     var settings by remember(settingsPresentation) { mutableStateOf(initialSettings) }
     var recoveredFailure by remember { mutableStateOf<String?>(null) }
     val handleUiFailure: (Throwable) -> Unit = remember(reportUiFailure) {
@@ -254,6 +255,7 @@ fun AnilibApp(
             navigate(LibraryNavigator::openLibrary)
         }
         section = next
+        if (next == AppSection.BROWSE) browseMainDestination = true
         if (next != AppSection.MORE) moreDestination = null
     }
 
@@ -375,6 +377,12 @@ fun AnilibApp(
                     }
                 }
                 BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                    val showGlobalNavigation = when (section) {
+                        AppSection.ANIME, AppSection.MANGA -> destination.page() != LibraryPage.DETAILS
+                        AppSection.UPDATES -> true
+                        AppSection.BROWSE -> browseMainDestination
+                        AppSection.MORE -> moreDestination == null
+                    }
                     val useNavigationRail = when (settings.navigationStyle()) {
                         NavigationStyle.ADAPTIVE -> maxWidth >= 720.dp
                         NavigationStyle.BOTTOM_BAR -> false
@@ -403,6 +411,8 @@ fun AnilibApp(
                             detailPlatform,
                             destination,
                             section,
+                            showGlobalNavigation,
+                            { browseMainDestination = it },
                             componentCount,
                             navigate,
                             openSection,
@@ -439,6 +449,8 @@ fun AnilibApp(
                             detailPlatform,
                             destination,
                             section,
+                            showGlobalNavigation,
+                            { browseMainDestination = it },
                             componentCount,
                             navigate,
                             openSection,
@@ -505,6 +517,8 @@ private fun ExpandedShell(
     detailPlatform: DetailPlatform,
     destination: LibraryNavigationState,
     section: AppSection,
+    showGlobalNavigation: Boolean,
+    browseDestinationChanged: (Boolean) -> Unit,
     componentCount: Int,
     navigate: ((LibraryNavigator) -> Unit) -> Unit,
     openSection: (AppSection) -> Unit,
@@ -519,8 +533,10 @@ private fun ExpandedShell(
     closeMore: () -> Unit,
 ) {
     Row(modifier = Modifier.fillMaxSize()) {
-        AnilibNavigationRail(section, settings.languagePack(), openSection)
-        VerticalDivider()
+        if (showGlobalNavigation) {
+            AnilibNavigationRail(section, settings.languagePack(), openSection)
+            VerticalDivider()
+        }
         Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
             AppDestination(
                 presentation,
@@ -556,6 +572,7 @@ private fun ExpandedShell(
                 moreDestination,
                 openMore,
                 closeMore,
+                browseDestinationChanged,
             )
         }
     }
@@ -584,6 +601,8 @@ private fun CompactShell(
     detailPlatform: DetailPlatform,
     destination: LibraryNavigationState,
     section: AppSection,
+    showGlobalNavigation: Boolean,
+    browseDestinationChanged: (Boolean) -> Unit,
     componentCount: Int,
     navigate: ((LibraryNavigator) -> Unit) -> Unit,
     openSection: (AppSection) -> Unit,
@@ -633,10 +652,13 @@ private fun CompactShell(
                 moreDestination,
                 openMore,
                 closeMore,
+                browseDestinationChanged,
             )
         }
-        HorizontalDivider()
-        AnilibNavigationBar(section, settings.languagePack(), openSection)
+        if (showGlobalNavigation) {
+            HorizontalDivider()
+            AnilibNavigationBar(section, settings.languagePack(), openSection)
+        }
     }
 }
 
@@ -718,6 +740,7 @@ private fun AppDestination(
     moreDestination: MoreDestination?,
     openMore: (MoreDestination) -> Unit,
     closeMore: () -> Unit,
+    browseDestinationChanged: (Boolean) -> Unit,
 ) {
     when (section) {
         AppSection.ANIME,
@@ -763,6 +786,7 @@ private fun AppDestination(
             browserRuntimeStatus,
             detailPlatform.shareController,
             openTracking,
+            browseDestinationChanged,
             manageExtensions = {
                 openSection(AppSection.MORE)
                 openMore(MoreDestination.EXTENSION_REPOSITORIES)

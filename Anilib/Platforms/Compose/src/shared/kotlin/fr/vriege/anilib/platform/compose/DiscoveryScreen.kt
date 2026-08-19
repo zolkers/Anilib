@@ -131,6 +131,7 @@ internal fun DiscoveryScreen(
     browserRuntimeStatus: BrowserRuntimeStatus,
     shareController: ShareController,
     openTracking: (LibraryItemId) -> Unit,
+    navigationVisibilityChanged: (Boolean) -> Unit,
     manageExtensions: () -> Unit,
 ) {
     var section by remember { mutableStateOf(BrowseSection.ANIME_SOURCES) }
@@ -144,7 +145,12 @@ internal fun DiscoveryScreen(
     var browserPage by remember { mutableStateOf<SourceWebPage?>(null) }
     var extensionRevision by remember { mutableIntStateOf(0) }
     var updatingSources by remember { mutableStateOf<Set<SourceId>>(emptySet()) }
+    val mainDestination = selectedSource == null && browserPage == null
     val scope = rememberCrashSafeCoroutineScope()
+    DisposableEffect(mainDestination, navigationVisibilityChanged) {
+        navigationVisibilityChanged(mainDestination)
+        onDispose { }
+    }
     DisposableEffect(extensionRepositories) {
         val observation = extensionRepositories.observe { extensionRevision++ }
         onDispose { runCatching { observation.close() } }
