@@ -89,6 +89,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -691,6 +692,7 @@ private fun AppDestination(
             else -> LibraryPageContent(
                 presentation,
                 discovery,
+                player,
                 downloads,
                 if (section == AppSection.ANIME) MediaKind.ANIME else MediaKind.MANGA,
                 navigate,
@@ -773,6 +775,7 @@ private fun AppDestination(
 private fun LibraryPageContent(
     presentation: LibraryPresentation,
     discovery: DiscoveryPresentation,
+    player: PlayerPresentation,
     downloads: DownloadPresentation,
     kind: MediaKind,
     navigate: ((LibraryNavigator) -> Unit) -> Unit,
@@ -813,6 +816,28 @@ private fun LibraryPageContent(
             }
         }
         .toList()
+    val titleIds = titles.map { it.id() }
+    var remainingEpisodes by remember(player) {
+        mutableStateOf<Map<LibraryItemId, Int>>(emptyMap())
+    }
+    LaunchedEffect(player, kind, titleIds) {
+        if (kind != MediaKind.ANIME) {
+            remainingEpisodes = emptyMap()
+            return@LaunchedEffect
+        }
+        remainingEpisodes = remainingEpisodes.filterKeys(titleIds::contains)
+        titleIds.forEach { id ->
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    player.episodes(id).count { episode ->
+                        !episode.playback().map { it.completed() }.orElse(false)
+                    }
+                }
+            }.onSuccess { count ->
+                remainingEpisodes = remainingEpisodes + (id to count)
+            }
+        }
+    }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -984,6 +1009,7 @@ private fun LibraryPageContent(
                         gridItems(titles, key = { it.id().value() }) { card ->
                             LibraryCoverCard(
                                 card,
+                                remainingEpisodes[card.id()],
                                 card.id() in selected,
                                 selectionMode,
                                 { selected = selected.toggle(card.id()) },
@@ -996,6 +1022,7 @@ private fun LibraryPageContent(
                         items(titles, key = { it.id().value() }) { card ->
                             LibraryTitleCard(
                                 card,
+                                remainingEpisodes[card.id()],
                                 card.id() in selected,
                                 selectionMode,
                                 { selected = selected.toggle(card.id()) },
@@ -1222,6 +1249,7 @@ private fun LibrarySort.label(): String = when (this) {
 @Composable
 private fun LibraryTitleCard(
     card: LibraryCard,
+    remainingEpisodeCount: Int?,
     selected: Boolean,
     selectionMode: Boolean,
     select: () -> Unit,
@@ -1269,6 +1297,7 @@ private fun LibraryTitleCard(
                     fontWeight = FontWeight.Medium,
                 )
             }
+            RemainingEpisodeBadge(remainingEpisodeCount)
         }
     }
 }
@@ -1276,6 +1305,7 @@ private fun LibraryTitleCard(
 @Composable
 private fun LibraryCoverCard(
     card: LibraryCard,
+    remainingEpisodeCount: Int?,
     selected: Boolean,
     selectionMode: Boolean,
     select: () -> Unit,
@@ -1312,20 +1342,25 @@ private fun LibraryCoverCard(
                     modifier = Modifier.align(Alignment.TopStart),
                 )
             }
-            card.progress().orElse(null)?.let { value ->
-                Surface(
-                    color = MaterialTheme.colorScheme.secondaryContainer,
-                    shape = RoundedCornerShape(bottomEnd = 8.dp),
-                    modifier = Modifier.align(Alignment.TopEnd),
-                ) {
-                    Text(
-                        value.position().toString(),
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                    )
-                }
+            Box(modifier = Modifier.align(Alignment.TopEnd)) {
+                RemainingEpisodeBadge(remainingEpisodeCount)
             }
         }
+    }
+}
+
+@Composable
+private fun RemainingEpisodeBadge(remainingEpisodeCount: Int?) {
+    if (remainingEpisodeCount == null || remainingEpisodeCount <= 0) return
+    Surface(
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        shape = RoundedCornerShape(8.dp),
+    ) {
+        Text(
+            remainingEpisodeCount.toString(),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            color = MaterialTheme.colorScheme.onSecondaryContainer,
+        )
     }
 }
 
@@ -1800,7 +1835,7 @@ private fun DetailsPage(
             if (related.isNotEmpty()) {
                 item { MediaContentHeading("Related titles") }
                 items(related, key = { it.id().value() }) { card ->
-                    LibraryTitleCard(card, false, false, {}, { openRelated(card.id()) })
+                    LibraryTitleCard(card, null, false, false, {}, { openRelated(card.id()) })
                 }
             }
         }
