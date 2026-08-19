@@ -287,6 +287,9 @@ internal object UiTranslations {
             "When both sides changed" to "Lorsque les deux côtés ont changé",
             "Mark all read" to "Tout marquer comme lu",
             "Close browser" to "Fermer le navigateur",
+            "The embedded browser is unavailable on Windows ARM64. Source browsing and downloads remain available." to
+                "Le navigateur intégré n’est pas disponible sur Windows ARM64. " +
+                "La navigation dans les sources et les téléchargements restent disponibles.",
             "Previous page" to "Page précédente",
             "Next page" to "Page suivante",
             "Reload" to "Recharger",

@@ -124,6 +124,8 @@ owns navigation, verifies those cookies, and transfers the resulting session
 through the framework `HttpCookieJar`; only platform adapters select the
 engine, using Android System WebView or desktop KCEF. Browser engine types and
 lifecycle therefore remain outside Java feature code.
+Desktop rejects unsupported native KCEF targets before initialization so an
+optional WebView cannot crash or prevent the rest of the product from starting.
 
 Browser-data maintenance follows the same outer boundary. The shared Settings
 screen invokes a small platform controller. Android clears System WebView
