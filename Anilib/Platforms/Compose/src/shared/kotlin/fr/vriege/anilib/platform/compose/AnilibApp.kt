@@ -139,6 +139,7 @@ import fr.vriege.anilib.feature.settings.ui.SettingsPresentation
 import fr.vriege.anilib.feature.source.SourceContentKind
 import fr.vriege.anilib.feature.source.SourceCatalogueItem
 import fr.vriege.anilib.feature.source.SourceContentUnit
+import fr.vriege.anilib.feature.source.SourceEpisodeId
 import fr.vriege.anilib.feature.source.SourceId
 import fr.vriege.anilib.feature.reader.ui.ReaderController
 import fr.vriege.anilib.feature.reader.ui.ReaderPresentation
@@ -219,6 +220,7 @@ fun AnilibApp(
     var section by remember { mutableStateOf(initialSettings.startScreen().appSection()) }
     var activeReader by remember { mutableStateOf<ReaderController?>(null) }
     var activePlayerTitle by remember { mutableStateOf<LibraryItemId?>(null) }
+    var activePlayerEpisode by remember { mutableStateOf<SourceEpisodeId?>(null) }
     var activeTrackingTitle by remember { mutableStateOf<LibraryItemId?>(null) }
     var readerError by remember { mutableStateOf<String?>(null) }
     var playerError by remember { mutableStateOf<String?>(null) }
@@ -275,6 +277,7 @@ fun AnilibApp(
                 EpisodeScreen(
                     player,
                     playerTitle,
+                    activePlayerEpisode,
                     applyPlayerOrientationPolicy,
                     requestPlayerPictureInPicture,
                     setPlayerActive,
@@ -283,6 +286,7 @@ fun AnilibApp(
                     enableDesktopPlayerControls,
                 ) {
                     activePlayerTitle = null
+                    activePlayerEpisode = null
                 }
             } else if (trackingTitle != null) {
                 val details = presentation.details(trackingTitle).orElse(null)
@@ -311,12 +315,13 @@ fun AnilibApp(
                         .onSuccess { downloadError = null }
                         .onFailure { downloadError = it.message ?: "The download could not be queued." }
                 }
-                val openPlayer: (LibraryItemId) -> Unit = { id ->
+                val openPlayer: (LibraryItemId, SourceEpisodeId?) -> Unit = { id, episodeId ->
                     runCatching {
                         check(player.canOpen(id)) { "This title no longer has a streaming source." }
                     }
                         .onSuccess {
                             playerError = null
+                            activePlayerEpisode = episodeId
                             activePlayerTitle = id
                         }
                         .onFailure { playerError = it.message ?: "The episode list could not be opened." }
@@ -437,7 +442,7 @@ private fun ExpandedShell(
     openSection: (AppSection) -> Unit,
     openReader: (LibraryItemId) -> Unit,
     readerError: String?,
-    openPlayer: (LibraryItemId) -> Unit,
+    openPlayer: (LibraryItemId, SourceEpisodeId?) -> Unit,
     playerError: String?,
     enqueueDownload: (LibraryItemId) -> Unit,
     downloadError: String?,
@@ -518,7 +523,7 @@ private fun CompactShell(
     openSection: (AppSection) -> Unit,
     openReader: (LibraryItemId) -> Unit,
     readerError: String?,
-    openPlayer: (LibraryItemId) -> Unit,
+    openPlayer: (LibraryItemId, SourceEpisodeId?) -> Unit,
     playerError: String?,
     enqueueDownload: (LibraryItemId) -> Unit,
     downloadError: String?,
@@ -642,7 +647,7 @@ private fun AppDestination(
     openSection: (AppSection) -> Unit,
     openReader: (LibraryItemId) -> Unit,
     readerError: String?,
-    openPlayer: (LibraryItemId) -> Unit,
+    openPlayer: (LibraryItemId, SourceEpisodeId?) -> Unit,
     playerError: String?,
     enqueueDownload: (LibraryItemId) -> Unit,
     downloadError: String?,
@@ -1320,7 +1325,7 @@ private fun LibraryCoverCard(
 private fun HistoryPage(
     presentation: LibraryPresentation,
     openReader: (LibraryItemId) -> Unit,
-    openPlayer: (LibraryItemId) -> Unit,
+    openPlayer: (LibraryItemId, SourceEpisodeId?) -> Unit,
     resumeError: String?,
     goBack: () -> Unit,
     navigate: (LibraryHistoryRow, (LibraryNavigator) -> Unit) -> Unit,
@@ -1432,7 +1437,7 @@ private fun HistoryPage(
                                 cards[row.libraryItemId()],
                                 resume = {
                                     if (row.kind() == MediaKind.ANIME) {
-                                        openPlayer(row.libraryItemId())
+                                        openPlayer(row.libraryItemId(), null)
                                     } else {
                                         openReader(row.libraryItemId())
                                     }
@@ -1538,7 +1543,7 @@ private fun DetailsDestination(
     navigate: ((LibraryNavigator) -> Unit) -> Unit,
     openReader: (LibraryItemId) -> Unit,
     readerError: String?,
-    openPlayer: (LibraryItemId) -> Unit,
+    openPlayer: (LibraryItemId, SourceEpisodeId?) -> Unit,
     playerError: String?,
     enqueueDownload: (LibraryItemId) -> Unit,
     downloadError: String?,
@@ -1607,12 +1612,13 @@ private fun DetailsDestination(
             canRead = runCatching { reader.canOpen(details.id()) }.getOrDefault(false),
             canWatch = runCatching { player.canOpen(details.id()) }.getOrDefault(false),
             canDownload = runCatching { downloads.canEnqueue(details.id()) }.getOrDefault(false),
-            canTrack = tracking.accounts().any { it.descriptor().supportedKinds().contains(details.kind()) },
+            canTrack = true,
             readerError = readerError,
             playerError = playerError,
             downloadError = downloadError,
             read = { openReader(details.id()) },
-            watch = { openPlayer(details.id()) },
+            watch = { openPlayer(details.id(), null) },
+            watchEpisode = { episode -> openPlayer(details.id(), episode.episode().id()) },
             download = { enqueueDownload(details.id()) },
             downloadChapter = { chapter ->
                 runCatching { downloads.enqueue(details.id(), chapter.id()) }
@@ -1666,6 +1672,7 @@ private fun DetailsPage(
     downloadError: String?,
     read: () -> Unit,
     watch: () -> Unit,
+    watchEpisode: (EpisodeSnapshot) -> Unit,
     download: () -> Unit,
     downloadChapter: (SourceContentUnit) -> Unit,
     downloadEpisode: (EpisodeSnapshot) -> Unit,
@@ -1735,7 +1742,7 @@ private fun DetailsPage(
                 )
             }
             item {
-                Column(Modifier.fillMaxWidth().widthIn(max = 900.dp)) {
+                Column(Modifier.widthIn(max = 900.dp).fillMaxWidth()) {
                     Text(
                         details.description().ifBlank { "No description available." },
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1773,7 +1780,7 @@ private fun DetailsPage(
                     MediaUnitRow(
                         title = episode.episode().title(),
                         summary = metadata,
-                        open = watch,
+                        open = { watchEpisode(episode) },
                         download = { downloadEpisode(episode) },
                     )
                 }
@@ -1804,7 +1811,7 @@ private fun MediaDetailsHero(
     sourceName: String,
     artwork: @Composable (Modifier) -> Unit,
 ) {
-    BoxWithConstraints(Modifier.fillMaxWidth().widthIn(max = 900.dp).padding(top = 8.dp, bottom = 12.dp)) {
+    BoxWithConstraints(Modifier.widthIn(max = 900.dp).fillMaxWidth().padding(top = 8.dp, bottom = 12.dp)) {
         val coverWidth = if (maxWidth < 600.dp) 112.dp else 156.dp
         val coverHeight = if (maxWidth < 600.dp) 168.dp else 232.dp
         Row(
@@ -1841,7 +1848,7 @@ private fun MediaDetailsActions(
 ) {
     val count = if (episodeCount > 0) "$episodeCount episodes" else "$chapterCount chapters"
     Row(
-        modifier = Modifier.fillMaxWidth().widthIn(max = 720.dp).padding(vertical = 8.dp),
+        modifier = Modifier.widthIn(max = 720.dp).fillMaxWidth().padding(vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
     ) {
         MediaDetailAction(
@@ -1888,7 +1895,7 @@ private fun MediaGenreChips(genres: List<String>) {
 private fun MediaContentHeading(label: String) {
     Text(
         label,
-        modifier = Modifier.fillMaxWidth().widthIn(max = 900.dp).padding(top = 20.dp, bottom = 8.dp),
+        modifier = Modifier.widthIn(max = 900.dp).fillMaxWidth().padding(top = 20.dp, bottom = 8.dp),
         fontWeight = FontWeight.SemiBold,
         fontSize = 18.sp,
     )
@@ -1897,7 +1904,7 @@ private fun MediaContentHeading(label: String) {
 @Composable
 private fun MediaUnitRow(title: String, summary: String, open: () -> Unit, download: () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().widthIn(max = 900.dp).clickable(onClick = open).padding(vertical = 12.dp),
+        modifier = Modifier.widthIn(max = 900.dp).fillMaxWidth().clickable(onClick = open).padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
@@ -1908,7 +1915,7 @@ private fun MediaUnitRow(title: String, summary: String, open: () -> Unit, downl
             Icon(Icons.Outlined.Download, contentDescription = "Download $title")
         }
     }
-    HorizontalDivider(modifier = Modifier.fillMaxWidth().widthIn(max = 900.dp))
+    HorizontalDivider(modifier = Modifier.widthIn(max = 900.dp).fillMaxWidth())
 }
 
 @Composable

@@ -9,9 +9,7 @@ import fr.vriege.anilib.feature.tracker.TrackerEntry;
 import fr.vriege.anilib.feature.tracker.TrackerSearchResult;
 import fr.vriege.anilib.feature.tracker.TrackerStatus;
 import fr.vriege.anilib.feature.tracker.anilist.AniListTracker;
-import fr.vriege.anilib.feature.tracker.anilist.AniListTrackerBundle;
 import fr.vriege.anilib.feature.tracker.kitsu.KitsuTracker;
-import fr.vriege.anilib.feature.tracker.kitsu.KitsuTrackerBundle;
 import fr.vriege.anilib.framework.http.AnilibHttpClient;
 import fr.vriege.anilib.framework.http.HttpMethod;
 import fr.vriege.anilib.framework.http.HttpRequest;
@@ -50,13 +48,13 @@ final class FirstPartyTrackerTest {
                 (request, headers) -> {
                     throw new AssertionError("Provider bundles must not access the network during startup");
                 },
-                List.of(new AniListTrackerBundle(), new KitsuTrackerBundle()))) {
+                List.of())) {
             List<String> ids = application.capability(TrackerCapabilities.SERVICE).accounts().stream()
                     .map(account -> account.descriptor().id().value())
                     .sorted()
                     .toList();
             counter.check(ids.equals(List.of("anilist", "kitsu")),
-                    "first-party tracker bundles must remain explicit opt-in product selections");
+                    "the standard product must select both first-party tracker bundles explicitly");
         } finally {
             deleteDirectory(directory);
         }

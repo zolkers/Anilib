@@ -51,13 +51,18 @@ final class TrackerTest {
             item = LibraryItem.create("Tracked anime", MediaKind.ANIME);
             library.save(item);
             TrackerService service = application.capability(TrackerCapabilities.SERVICE);
-            counter.check(application.capability(TrackerCapabilities.REGISTRY).extensions().size() == 1,
-                    "selected tracker bundles must register through the SDK registrar");
-            counter.check(service.accounts().size() == 1 && !service.accounts().getFirst().authenticated(),
+            counter.check(application.capability(TrackerCapabilities.REGISTRY).extensions().size() == 3,
+                    "first-party and additional tracker bundles must register through the SDK registrar");
+            var testAccount = service.accounts().stream()
+                    .filter(account -> account.descriptor().id().equals(TestTracker.ID))
+                    .findFirst().orElseThrow();
+            counter.check(service.accounts().size() == 3 && !testAccount.authenticated(),
                     "tracker accounts must expose their logged-out state");
             service.authenticate(TestTracker.ID, TrackerCredentials.password("alice", "secret"));
-            counter.check(service.accounts().getFirst().authenticated()
-                            && service.accounts().getFirst().accountName().equals("alice"),
+            testAccount = service.accounts().stream()
+                    .filter(account -> account.descriptor().id().equals(TestTracker.ID))
+                    .findFirst().orElseThrow();
+            counter.check(testAccount.authenticated() && testAccount.accountName().equals("alice"),
                     "tracker authentication must expose the provider account name");
             TrackerSearchResult candidate = service.search(TestTracker.ID, "Tracked", MediaKind.ANIME)
                     .getFirst();

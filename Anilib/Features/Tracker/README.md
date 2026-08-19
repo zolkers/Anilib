@@ -29,8 +29,8 @@ and their latest non-secret state.
 
 ## First-party providers
 
-Anilib includes two optional provider Bundles that are not selected by the
-Standard product:
+Anilib includes two provider Bundles selected explicitly by the Standard
+product:
 
 - AniList uses a personal access token, GraphQL title search, and complete
   list-entry create, update, refresh, and delete mutations;
@@ -60,7 +60,7 @@ exactly one extension SDK: `feature.tracker.api` for trackers or
 `feature.source.api` for sources. AnilibJava rejects direct network, filesystem,
 reflection, Network feature, and Kernel access from either extension type.
 
-The Standard product selects the Tracker Bundle but no provider account.
-First-party and external tracker adapters remain explicit additions to the
-product plugin list, so removing one bundle removes its registration without
-changing Tracker Core or another feature.
+The Standard product selects the Tracker, AniList, and Kitsu Bundles but no
+provider account or credential. External tracker adapters remain explicit
+additions to the product plugin list, so removing one bundle removes its
+registration without changing Tracker Core or another feature.

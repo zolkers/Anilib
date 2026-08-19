@@ -29,7 +29,7 @@ final class PerformanceBudgetTest {
         try {
             long startup = measure(() -> {
                 try (var ignored = StandardAnilib.start(directory.resolve("startup"))) {
-                    counter.check(ignored.components().size() == 14,
+                    counter.check(ignored.components().size() == 16,
                             "performance startup must construct the complete Standard product");
                 }
             });

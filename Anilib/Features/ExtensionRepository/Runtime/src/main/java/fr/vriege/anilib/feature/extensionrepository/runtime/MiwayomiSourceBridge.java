@@ -267,23 +267,6 @@ public final class MiwayomiSourceBridge {
         return baseUri.resolve(path + (query.isEmpty() ? "" : "?" + query));
     }
 
-    private URI proxy(RemoteSource source, URI location, Map<String, String> headers, SourceStreamFormat format) {
-        String path = switch (format) {
-            case HLS -> "/api/v1/hls";
-            case DASH -> "/api/v1/dash";
-            case AUTOMATIC, PROGRESSIVE -> "/api/v1/proxy";
-        };
-        Map<String, String> parameters = new LinkedHashMap<>();
-        parameters.put("sourceId", source.remoteId);
-        parameters.put("url", location.toASCIIString());
-        if (!headers.isEmpty()) {
-            parameters.put("headers", String.join("\n", headers.entrySet().stream()
-                    .map(entry -> entry.getKey() + ": " + entry.getValue())
-                    .toList()));
-        }
-        return endpoint(path, parameters);
-    }
-
     private Optional<URI> proxyImage(RemoteSource source, Object value) {
         return webUri(value).map(location -> endpoint("/api/v1/proxy", Map.of(
                 "sourceId", source.remoteId,
@@ -641,16 +624,16 @@ public final class MiwayomiSourceBridge {
                 URI original = requiredWebUri(video.get("videoUrl"), "Anime stream location");
                 Map<String, String> headers = stringMap(video.get("headers"));
                 SourceStreamFormat streamFormat = format(original);
-                List<SourceSubtitleTrack> subtitles = subtitleTracks(source, video, headers, index);
+                List<SourceSubtitleTrack> subtitles = subtitleTracks(video, headers, index);
                 String quality = optionalText(video, "videoTitle")
                         .or(() -> optionalText(video, "resolution"))
                         .orElse("Stream " + (index + 1));
                 result.add(new SourceVideoStream(
                         "stream-" + index,
                         quality,
-                        proxy(source, original, headers, streamFormat),
+                        original,
                         streamFormat,
-                        Map.of(),
+                        headers,
                         subtitles));
                 index++;
             }
@@ -659,7 +642,6 @@ public final class MiwayomiSourceBridge {
     }
 
     private List<SourceSubtitleTrack> subtitleTracks(
-            RemoteSource source,
             Map<String, Object> video,
             Map<String, String> headers,
             int streamIndex) {
@@ -676,8 +658,8 @@ public final class MiwayomiSourceBridge {
                     "subtitle-" + streamIndex + "-" + index,
                     language,
                     optionalText(track, "lang"),
-                    proxy(source, original, headers, SourceStreamFormat.PROGRESSIVE),
-                    Map.of()));
+                    original,
+                    headers));
         }
         return List.copyOf(result);
     }

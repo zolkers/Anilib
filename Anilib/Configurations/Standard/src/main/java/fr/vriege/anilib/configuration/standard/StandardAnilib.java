@@ -17,7 +17,9 @@ import fr.vriege.anilib.feature.player.PlayerBackend;
 import fr.vriege.anilib.feature.player.PlayerBackends;
 import fr.vriege.anilib.feature.player.bundle.PlayerPlugin;
 import fr.vriege.anilib.feature.tracker.TrackerCapabilities;
+import fr.vriege.anilib.feature.tracker.anilist.AniListTrackerBundle;
 import fr.vriege.anilib.feature.tracker.bundle.TrackerPlugin;
+import fr.vriege.anilib.feature.tracker.kitsu.KitsuTrackerBundle;
 import fr.vriege.anilib.feature.updates.LibraryUpdateNotifier;
 import fr.vriege.anilib.feature.updates.LibraryUpdateNotifiers;
 import fr.vriege.anilib.feature.updates.UpdateCapabilities;
@@ -172,6 +174,8 @@ public final class StandardAnilib {
         plugins.add(new DownloadPlugin(downloads));
         plugins.add(new PlayerPlugin(playbackState, playerPreferences, playerBackend));
         plugins.add(new TrackerPlugin(trackingState));
+        plugins.add(new AniListTrackerBundle());
+        plugins.add(new KitsuTrackerBundle());
         plugins.add(new UpdatePlugin(updateState, updateNotifier));
         plugins.add(ApplicationUpdatePlugin.currentRuntime(
                 dataDirectory.toAbsolutePath().normalize().resolve("application-update.channel")));

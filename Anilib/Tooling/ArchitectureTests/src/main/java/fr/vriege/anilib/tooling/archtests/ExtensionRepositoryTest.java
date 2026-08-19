@@ -144,10 +144,11 @@ final class ExtensionRepositoryTest {
             var episodes = anime.episodes(animePage.items().getFirst().id());
             var streams = anime.streams(episodes.getFirst().id());
             counter.check(episodes.getFirst().title().equals("Episode 1")
-                            && streams.getFirst().location().getHost().equals("127.0.0.1")
+                            && streams.getFirst().location().equals(URI.create("https://cdn.example/master.m3u8"))
                             && streams.getFirst().format().name().equals("HLS")
+                            && streams.getFirst().headers().get("Referer").equals("https://source.example/")
                             && streams.getFirst().subtitles().size() == 1,
-                    "the desktop anime bridge must keep streams and subtitles behind its loopback relay");
+                    "the desktop anime bridge must hand original streams and headers to Anilib's media relay");
         }
         String installed = bridge.install(URI.create("https://repo.example/extensions/example.apk"));
         counter.check(

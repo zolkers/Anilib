@@ -49,6 +49,7 @@ import fr.vriege.anilib.feature.player.PlayerQualityPolicy
 import fr.vriege.anilib.feature.player.PlayerSubtitlePolicy
 import fr.vriege.anilib.feature.player.ui.PlayerController
 import fr.vriege.anilib.feature.player.ui.PlayerPresentation
+import fr.vriege.anilib.feature.source.SourceEpisodeId
 import java.util.Optional
 import kotlin.math.roundToInt
 
@@ -57,6 +58,7 @@ import kotlin.math.roundToInt
 internal fun EpisodeScreen(
     presentation: PlayerPresentation,
     libraryItemId: LibraryItemId,
+    initialEpisodeId: SourceEpisodeId?,
     applyOrientationPolicy: (PlayerOrientationPolicy) -> Unit,
     requestPictureInPicture: () -> Unit,
     setPlayerActive: (Boolean) -> Unit,
@@ -66,10 +68,15 @@ internal fun EpisodeScreen(
     goBack: () -> Unit,
 ) {
     var revision by remember(presentation, libraryItemId) { mutableIntStateOf(0) }
-    var activeController by remember(presentation, libraryItemId) {
-        mutableStateOf<PlayerController?>(null)
+    val initialOpen = remember(presentation, libraryItemId, initialEpisodeId) {
+        initialEpisodeId?.let { runCatching { presentation.open(libraryItemId, it) } }
     }
-    var error by remember(presentation, libraryItemId) { mutableStateOf<String?>(null) }
+    var activeController by remember(presentation, libraryItemId, initialEpisodeId) {
+        mutableStateOf(initialOpen?.getOrNull())
+    }
+    var error by remember(presentation, libraryItemId, initialEpisodeId) {
+        mutableStateOf(initialOpen?.exceptionOrNull()?.message)
+    }
     var query by remember(libraryItemId) { mutableStateOf("") }
     var unwatchedOnly by remember(libraryItemId) { mutableStateOf(false) }
     DisposableEffect(presentation, libraryItemId) {
@@ -89,7 +96,9 @@ internal fun EpisodeScreen(
             setBackgroundAudio,
             enableAndroidControls,
             enableDesktopControls,
-        ) { activeController = null }
+        ) {
+            if (initialEpisodeId == null) activeController = null else goBack()
+        }
         return
     }
     val episodesResult = remember(presentation, libraryItemId, revision) {
