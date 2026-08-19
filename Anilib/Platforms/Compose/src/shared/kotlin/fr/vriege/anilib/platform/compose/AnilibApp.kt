@@ -46,6 +46,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.NewReleases
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.SortByAlpha
 import androidx.compose.material.icons.outlined.Assessment
@@ -934,7 +935,7 @@ private fun LibraryPageContent(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text("${selected.size} selected", fontWeight = FontWeight.SemiBold)
-                    androidx.compose.material3.TextButton(
+                    IconButton(
                         enabled = titles.isNotEmpty(),
                         onClick = {
                             selected = if (selected.size == titles.size) {
@@ -943,20 +944,28 @@ private fun LibraryPageContent(
                                 titles.mapTo(linkedSetOf()) { it.id() }
                             }
                         },
-                    ) { Text("All") }
-                    androidx.compose.material3.TextButton(
+                    ) {
+                        Icon(Icons.Default.SelectAll, contentDescription = "All")
+                    }
+                    IconButton(
                         enabled = selected.isNotEmpty(),
                         onClick = { update { presentation.setFavorite(selected, true) } },
-                    ) { Text("Favorite") }
-                    androidx.compose.material3.TextButton(
+                    ) {
+                        Icon(Icons.Default.Favorite, contentDescription = "Favorite")
+                    }
+                    IconButton(
                         enabled = selected.isNotEmpty(),
                         onClick = { update { presentation.setFavorite(selected, false) } },
-                    ) { Text("Unfavorite") }
-                    androidx.compose.material3.TextButton(
+                    ) {
+                        Icon(Icons.Default.FavoriteBorder, contentDescription = "Unfavorite")
+                    }
+                    IconButton(
                         enabled = selected.isNotEmpty() && overview.categories().isNotEmpty(),
                         onClick = { categoryAction = true },
-                    ) { Text("Category") }
-                    androidx.compose.material3.TextButton(
+                    ) {
+                        Icon(Icons.Outlined.Category, contentDescription = "Category")
+                    }
+                    IconButton(
                         enabled = selected.isNotEmpty(),
                         onClick = {
                             selected.forEach { id ->
@@ -967,15 +976,21 @@ private fun LibraryPageContent(
                                 }
                             }
                         },
-                    ) { Text("Download") }
-                    androidx.compose.material3.TextButton(
+                    ) {
+                        Icon(Icons.Outlined.Download, contentDescription = "Download")
+                    }
+                    IconButton(
                         enabled = selected.isNotEmpty(),
                         onClick = { migrating = true },
-                    ) { Text("Migrate") }
-                    androidx.compose.material3.TextButton(
+                    ) {
+                        Icon(Icons.Outlined.Sync, contentDescription = "Migrate")
+                    }
+                    IconButton(
                         enabled = selected.isNotEmpty(),
                         onClick = { confirmingDelete = true },
-                    ) { Text("Delete") }
+                    ) {
+                        Icon(Icons.Default.Delete, contentDescription = "Delete")
+                    }
                 }
             }
             Row(
@@ -1318,10 +1333,11 @@ private fun LibraryTitleCard(
                 )
             }
             if (card.favorite()) {
-                Text(
-                    text = "Favorite",
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Medium,
+                Icon(
+                    imageVector = Icons.Default.Favorite,
+                    contentDescription = "In Library",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(horizontal = 8.dp).size(22.dp),
                 )
             }
             RemainingEpisodeBadge(remainingEpisodeCount)
@@ -1610,9 +1626,12 @@ private fun HistoryCard(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            androidx.compose.material3.TextButton(onClick = resume) {
-                Text(if (row.kind() == MediaKind.ANIME) "Resume" else "Continue")
-            }
+        }
+        IconButton(onClick = resume) {
+            Icon(
+                Icons.Default.PlayArrow,
+                contentDescription = if (row.kind() == MediaKind.ANIME) "Resume" else "Continue",
+            )
         }
         IconButton(onClick = toggleFavorite) {
             Icon(
