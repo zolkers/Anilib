@@ -7,6 +7,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.net.URLDecoder;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Locale;
 
 final class ExtensionHostHttpExchange {
@@ -98,6 +101,29 @@ final class ExtensionHostHttpExchange {
             }
         }
         return result.append('"').toString();
+    }
+
+    static Map<String, String> query(HttpExchange exchange) {
+        String raw = exchange.getRequestURI().getRawQuery();
+        if (raw == null || raw.isBlank()) {
+            return Map.of();
+        }
+        Map<String, String> result = new LinkedHashMap<>();
+        for (String field : raw.split("&")) {
+            int separator = field.indexOf('=');
+            String name = separator < 0 ? field : field.substring(0, separator);
+            String value = separator < 0 ? "" : field.substring(separator + 1);
+            result.put(decode(name), decode(value));
+        }
+        return Map.copyOf(result);
+    }
+
+    private static String decode(String value) {
+        try {
+            return URLDecoder.decode(value, StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalArgumentException("Invalid URL query encoding", exception);
+        }
     }
 
     private static int skipWhitespace(String document, int cursor) {

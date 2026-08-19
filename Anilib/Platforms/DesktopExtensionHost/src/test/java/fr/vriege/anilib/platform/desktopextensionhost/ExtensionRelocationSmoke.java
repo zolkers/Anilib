@@ -6,6 +6,7 @@ import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
 
 import java.io.IOException;
+import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -30,7 +31,7 @@ final class ExtensionRelocationSmoke {
             writeInput(input);
             ExtensionBytecodeRelocator.RelocationResult result =
                     new ExtensionBytecodeRelocator().relocate(input, output);
-            if (result.relocatedClasses() != 1 || !result.unresolvedPrefixes().isEmpty()) {
+            if (result.relocatedClasses() != 2 || !result.unresolvedPrefixes().isEmpty()) {
                 throw new IllegalStateException("Extension ABI relocation result is invalid: " + result);
             }
             try (JarFile jar = new JarFile(output.toFile())) {
@@ -44,6 +45,14 @@ final class ExtensionRelocationSmoke {
                 if (jar.getJarEntry("META-INF/anilib-desktop-extension.properties") == null) {
                     throw new IllegalStateException("Prepared extension marker is missing");
                 }
+            }
+            try (URLClassLoader loader = new URLClassLoader(new java.net.URL[]{output.toUri().toURL()})) {
+                Class<?> enumType = Class.forName("sample.BrokenEnum", true, loader);
+                if (enumType.getField("ITEM").get(null) == null) {
+                    throw new IllegalStateException("Converted enum constant was not repaired");
+                }
+            } catch (ReflectiveOperationException exception) {
+                throw new IllegalStateException("Converted enum cannot be loaded", exception);
             }
         } finally {
             try (var paths = Files.walk(directory)) {
@@ -65,6 +74,31 @@ final class ExtensionRelocationSmoke {
             jar.putNextEntry(new JarEntry("sample/Extension.class"));
             jar.write(writer.toByteArray());
             jar.closeEntry();
+            writeBrokenEnum(jar);
         }
+    }
+
+    private static void writeBrokenEnum(JarOutputStream jar) throws IOException {
+        ClassWriter writer = new ClassWriter(0);
+        writer.visit(Opcodes.V21, Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL | Opcodes.ACC_ENUM,
+                "sample/BrokenEnum", "Ljava/lang/Enum<Lsample/BrokenEnum;>;", "java/lang/Enum", null);
+        writer.visitField(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC | Opcodes.ACC_FINAL | Opcodes.ACC_ENUM,
+                "ITEM", "Lsample/BrokenEnum;", null, null).visitEnd();
+        var initializer = writer.visitMethod(Opcodes.ACC_STATIC, "<clinit>", "()V", null, null);
+        initializer.visitCode();
+        initializer.visitTypeInsn(Opcodes.NEW, "java/lang/Enum");
+        initializer.visitInsn(Opcodes.DUP);
+        initializer.visitLdcInsn("ITEM");
+        initializer.visitInsn(Opcodes.ICONST_0);
+        initializer.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Enum", "<init>",
+                "(Ljava/lang/String;I)V", false);
+        initializer.visitFieldInsn(Opcodes.PUTSTATIC, "sample/BrokenEnum", "ITEM", "Lsample/BrokenEnum;");
+        initializer.visitInsn(Opcodes.RETURN);
+        initializer.visitMaxs(4, 0);
+        initializer.visitEnd();
+        writer.visitEnd();
+        jar.putNextEntry(new JarEntry("sample/BrokenEnum.class"));
+        jar.write(writer.toByteArray());
+        jar.closeEntry();
     }
 }

@@ -3,6 +3,7 @@ package fr.vriege.anilib.platform.desktopextensionhost.extension;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.ClassRemapper;
 import org.objectweb.asm.commons.Remapper;
 import org.objectweb.asm.tree.AbstractInsnNode;
@@ -36,6 +37,8 @@ public final class ExtensionBytecodeRelocator {
     private static final int MAX_ENTRIES = 25_000;
     private static final long MAX_EXPANDED_BYTES = 256L * 1024L * 1024L;
     private static final String TARGET = "fr/vriege/anilib/platform/desktopextensionhost/compat/";
+    private static final Map<String, String> TYPES = Map.of(
+            "eu/kanade/tachiyomi/AppInfo", TARGET + "aniyomi/AppInfo");
     private static final Map<String, String> PREFIXES = Map.ofEntries(
             Map.entry("eu/kanade/tachiyomi/source/", TARGET + "aniyomi/source/"),
             Map.entry("eu/kanade/tachiyomi/animesource/", TARGET + "aniyomi/animesource/"),
@@ -110,11 +113,63 @@ public final class ExtensionBytecodeRelocator {
     private static int repairConvertedClasses(Map<String, ClassNode> classes) {
         int repairs = 0;
         for (ClassNode node : classes.values()) {
+            repairs += repairEnumConstants(node);
             repairs += repairWrongConstructorOwners(node, classes);
             repairs += repairDirectObjectStores(node, classes);
             repairs += repairLocalObjectStores(node, classes);
         }
         return repairs;
+    }
+
+    private static int repairEnumConstants(ClassNode owner) {
+        if ((owner.access & Opcodes.ACC_ENUM) == 0 || !"java/lang/Enum".equals(owner.superName)) {
+            return 0;
+        }
+        int repairs = 0;
+        for (MethodNode method : List.copyOf(owner.methods)) {
+            if (!"<clinit>".equals(method.name)) {
+                continue;
+            }
+            for (AbstractInsnNode instruction : method.instructions) {
+                if (instruction instanceof TypeInsnNode created
+                        && created.getOpcode() == Opcodes.NEW
+                        && "java/lang/Enum".equals(created.desc)) {
+                    created.desc = owner.name;
+                    repairs++;
+                } else if (instruction instanceof MethodInsnNode call
+                        && call.getOpcode() == Opcodes.INVOKESPECIAL
+                        && "<init>".equals(call.name)
+                        && "java/lang/Enum".equals(call.owner)) {
+                    call.owner = owner.name;
+                    ensureEnumConstructor(owner, call.desc);
+                    repairs++;
+                }
+            }
+        }
+        return repairs;
+    }
+
+    private static void ensureEnumConstructor(ClassNode owner, String descriptor) {
+        for (MethodNode method : owner.methods) {
+            if ("<init>".equals(method.name) && descriptor.equals(method.desc)) {
+                return;
+            }
+        }
+        Type[] arguments = Type.getArgumentTypes(descriptor);
+        if (arguments.length < 2
+                || arguments[0].getSort() != Type.OBJECT
+                || !"java/lang/String".equals(arguments[0].getInternalName())
+                || arguments[1].getSort() != Type.INT) {
+            throw new IllegalArgumentException("Converted enum has an invalid constructor descriptor");
+        }
+        MethodNode constructor = new MethodNode(Opcodes.ACC_PRIVATE, "<init>", descriptor, null, null);
+        constructor.instructions.add(new VarInsnNode(Opcodes.ALOAD, 0));
+        constructor.instructions.add(new VarInsnNode(Opcodes.ALOAD, 1));
+        constructor.instructions.add(new VarInsnNode(Opcodes.ILOAD, 2));
+        constructor.instructions.add(new MethodInsnNode(
+                Opcodes.INVOKESPECIAL, "java/lang/Enum", "<init>", "(Ljava/lang/String;I)V", false));
+        constructor.instructions.add(new InsnNode(Opcodes.RETURN));
+        owner.methods.add(constructor);
     }
 
     private static final class CompatibilityClassWriter extends ClassWriter {
@@ -508,6 +563,10 @@ public final class ExtensionBytecodeRelocator {
 
         @Override
         public String map(String internalName) {
+            String type = TYPES.get(internalName);
+            if (type != null) {
+                return type;
+            }
             for (Map.Entry<String, String> entry : PREFIXES.entrySet()) {
                 if (internalName.startsWith(entry.getKey())) {
                     return entry.getValue() + internalName.substring(entry.getKey().length());

@@ -13,6 +13,7 @@ dependencies {
     implementation 'org.ow2.asm:asm-commons:9.10.1'
     implementation 'org.ow2.asm:asm-tree:9.10.1'
     implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.9.0'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.10.2'
     implementation 'com.squareup.okhttp3:okhttp:5.4.0'
     implementation 'io.reactivex:rxjava:1.3.8'
     implementation 'org.jsoup:jsoup:1.19.1'
@@ -30,6 +31,22 @@ tasks.register('desktopExtensionHostSmoke', JavaExec) {
     dependsOn tasks.named('testClasses')
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'fr.vriege.anilib.platform.desktopextensionhost.DesktopExtensionHostSmoke'
+}
+
+tasks.register('desktopExtensionCompatibilitySmoke', JavaExec) {
+    group = 'verification'
+    description = 'Installs real manga and anime APK extensions and queries their catalogues.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'fr.vriege.anilib.platform.desktopextensionhost.ExtensionCompatibilitySmoke'
+    def mangaExtension = providers.gradleProperty('anilib.mangaExtension')
+    def animeExtension = providers.gradleProperty('anilib.animeExtension')
+    onlyIf {
+        mangaExtension.isPresent() && animeExtension.isPresent()
+    }
+    doFirst {
+        args mangaExtension.get(), animeExtension.get()
+    }
 }
 
 tasks.named('test') {

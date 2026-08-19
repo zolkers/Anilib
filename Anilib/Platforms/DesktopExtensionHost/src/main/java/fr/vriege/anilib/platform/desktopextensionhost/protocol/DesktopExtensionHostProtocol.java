@@ -10,6 +10,8 @@ public final class DesktopExtensionHostProtocol {
     public static final String INSTALL_EXTENSION_PATH = "/api/v1/extensions/install";
     public static final String UNINSTALL_EXTENSION_PATH = "/api/v1/extensions/uninstall";
     public static final String EXTENSION_REPOSITORIES_PATH = "/api/v1/extensions/repos";
+    public static final String MANGA_PATH = "/api/v1/manga/";
+    public static final String ANIME_PATH = "/api/v1/anime/";
 
     private DesktopExtensionHostProtocol() {
     }

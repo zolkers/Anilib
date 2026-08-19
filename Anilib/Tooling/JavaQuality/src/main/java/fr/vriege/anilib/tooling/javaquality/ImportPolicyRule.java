@@ -60,6 +60,8 @@ public final class ImportPolicyRule implements AnilibJavaRule {
             return false;
         }
         return imported.startsWith("com.googlecode.d2j.dex.")
+                || imported.equals("kotlin.ResultKt")
+                || imported.startsWith("kotlin.coroutines.")
                 || imported.startsWith("kotlinx.serialization.json.")
                 || imported.startsWith("net.dongliu.apk.parser.")
                 || imported.startsWith("okhttp3.")

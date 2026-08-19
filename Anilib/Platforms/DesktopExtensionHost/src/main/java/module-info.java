@@ -6,9 +6,11 @@ module fr.vriege.anilib.platform.desktopextensionhost {
     requires org.objectweb.asm.commons;
     requires org.objectweb.asm.tree;
     requires transitive kotlinx.serialization.json;
+    requires transitive kotlinx.coroutines.core;
     requires transitive okhttp3;
-    requires org.jsoup;
+    requires transitive org.jsoup;
 
+    exports fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi;
     exports fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource;
     exports fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model;
     exports fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.online;
@@ -16,6 +18,7 @@ module fr.vriege.anilib.platform.desktopextensionhost {
     exports fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.source;
     exports fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.source.model;
     exports fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.source.online;
+    exports fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.util;
     exports fr.vriege.anilib.platform.desktopextensionhost.compat.android.content;
     exports fr.vriege.anilib.platform.desktopextensionhost.compat.android.app;
     exports fr.vriege.anilib.platform.desktopextensionhost.compat.android.net;
