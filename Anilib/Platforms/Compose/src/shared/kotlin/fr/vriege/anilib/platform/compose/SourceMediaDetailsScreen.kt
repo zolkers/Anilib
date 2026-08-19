@@ -50,6 +50,11 @@ private data class SourceMediaDetails(
     val failures: List<String>,
 )
 
+private data class SourcePendingPlayer(
+    val token: Any,
+    val title: String,
+)
+
 @Composable
 internal fun SourceTitleScreen(
     item: SourceCatalogueItem,
@@ -69,6 +74,7 @@ internal fun SourceTitleScreen(
     val artworkEnvironment = LocalExtensionIconEnvironment.current
     var activeReader by remember(item.id()) { mutableStateOf<ReaderController?>(null) }
     var activePlayer by remember(item.id()) { mutableStateOf<PlayerController?>(null) }
+    var pendingPlayer by remember(item.id()) { mutableStateOf<SourcePendingPlayer?>(null) }
     var loaded by remember(item.id()) { mutableStateOf<Result<SourceMediaDetails>?>(null) }
     var requestRevision by remember(item.id()) { mutableIntStateOf(0) }
     var libraryItem by remember(item.id()) {
@@ -130,6 +136,12 @@ internal fun SourceTitleScreen(
         ) { activePlayer = null }
         return
     }
+    pendingPlayer?.let { request ->
+        PlayerLoadingScreen(request.title) {
+            pendingPlayer = null
+        }
+        return
+    }
 
     operationNotice?.let { message ->
         UiNoticeDialog(UiNoticeKind.ERROR, message, { operationNotice = null }) {
@@ -153,16 +165,26 @@ internal fun SourceTitleScreen(
                 }
 
                 fun openEpisode(episode: SourceEpisode) {
+                    val request = SourcePendingPlayer(Any(), content.details.title())
+                    pendingPlayer = request
                     scope.launch {
                         withContext(Dispatchers.IO) {
                             runCatching { player.open(content.details.title(), episode.id()) }
                         }.onSuccess {
-                            notice = null
-                            playbackNotice = null
-                            activePlayer = it
+                            if (pendingPlayer?.token === request.token) {
+                                notice = null
+                                playbackNotice = null
+                                activePlayer = it
+                                pendingPlayer = null
+                            } else {
+                                it.close()
+                            }
                         }.onFailure {
-                            notice = null
-                            playbackNotice = it.message ?: "The episode could not be opened"
+                            if (pendingPlayer?.token === request.token) {
+                                notice = null
+                                pendingPlayer = null
+                                playbackNotice = it.message ?: "The episode could not be opened"
+                            }
                         }
                     }
                 }
