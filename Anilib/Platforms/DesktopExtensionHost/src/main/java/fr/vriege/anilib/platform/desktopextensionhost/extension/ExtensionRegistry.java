@@ -20,6 +20,7 @@ public final class ExtensionRegistry {
     private final Path directory;
     private final ApkMetadataReader metadataReader;
     private final ExtensionArchivePreparer preparer;
+    private List<InstalledExtension> installedCache;
 
     public ExtensionRegistry(Path dataDirectory) {
         this(dataDirectory, new ApkMetadataReader(), new ExtensionArchivePreparer());
@@ -45,6 +46,7 @@ public final class ExtensionRegistry {
             try {
                 Files.copy(downloadedApk, temporaryApk, StandardCopyOption.REPLACE_EXISTING);
                 preparer.prepare(temporaryApk, temporaryArchive);
+                installedCache = null;
                 replace(temporaryArchive, archive);
                 replace(temporaryApk, apk);
                 return new InstalledExtension(metadata, apk, archive);
@@ -65,6 +67,7 @@ public final class ExtensionRegistry {
             return false;
         }
         try {
+            installedCache = null;
             Files.deleteIfExists(file(metadata.packageName(), ".jar"));
             try (Stream<Path> files = Files.list(directory)) {
                 for (Path apk : files.filter(ExtensionRegistry::apkFile).toList()) {
@@ -90,6 +93,9 @@ public final class ExtensionRegistry {
     }
 
     public synchronized List<InstalledExtension> installed() {
+        if (installedCache != null) {
+            return installedCache;
+        }
         Map<String, InstalledExtension> result = new LinkedHashMap<>();
         try (Stream<Path> files = Files.list(directory)) {
             for (Path apk : files.filter(ExtensionRegistry::apkFile)
@@ -109,7 +115,8 @@ public final class ExtensionRegistry {
                     // A damaged entry is quarantined by omission; it cannot take down the engine.
                 }
             }
-            return List.copyOf(result.values());
+            installedCache = List.copyOf(result.values());
+            return installedCache;
         } catch (IOException exception) {
             throw new UncheckedIOException("Unable to list installed extensions", exception);
         }

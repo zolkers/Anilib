@@ -8,7 +8,9 @@ import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.SEpisode;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.Video;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.network.NetworkHelper;
+import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.network.OkHttpExtensionsKt;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.network.RequestsKt;
+import kotlin.coroutines.Continuation;
 import okhttp3.Headers;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -49,6 +51,17 @@ public abstract class AnimeHttpSource implements AnimeCatalogueSource {
         throw unsupported("anime search");
     }
     protected AnimesPage searchAnimeParse(Response response) { throw unsupported("anime search"); }
+    public Object getSearchAnime(
+            int page,
+            String query,
+            AnimeFilterList filters,
+            Continuation<? super AnimesPage> continuation) {
+        Request request = searchAnimeRequest(page, query, filters);
+        try (Response response = (Response) OkHttpExtensionsKt.awaitSuccess(
+                getClient().newCall(request), null)) {
+            return searchAnimeParse(response);
+        }
+    }
     protected Request latestUpdatesRequest(int page) { throw unsupported("latest anime"); }
     protected AnimesPage latestUpdatesParse(Response response) { throw unsupported("latest anime"); }
     public Request animeDetailsRequest(SAnime anime) {

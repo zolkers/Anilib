@@ -1,6 +1,7 @@
 package fr.vriege.anilib.platform.desktopextensionhost.extension;
 
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.AnimesPage;
+import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.Hoster;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.SAnime;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.SEpisode;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.Video;
@@ -8,134 +9,237 @@ import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.source.mode
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.source.model.Page;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.source.model.SChapter;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.source.model.SManga;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.URI;
-import java.time.Duration;
-import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import kotlin.ResultKt;
-import kotlin.coroutines.Continuation;
-import kotlin.coroutines.CoroutineContext;
-import kotlin.coroutines.EmptyCoroutineContext;
-import kotlin.coroutines.intrinsics.IntrinsicsKt;
+import java.util.TreeSet;
+import java.util.regex.Pattern;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 
 public final class ExtensionSourceOperations {
-    private static final Duration SUSPEND_TIMEOUT = Duration.ofSeconds(45);
     private static final int MAX_PROXY_BYTES = 64 * 1024 * 1024;
+    private static final int MAX_RETAINED_MODELS = 4_096;
+    private static final Pattern WEB_HOST = Pattern.compile("https?://([^/\\\\\"']+)", Pattern.CASE_INSENSITIVE);
+    private static final System.Logger LOGGER = System.getLogger(ExtensionSourceOperations.class.getName());
+
     private final ExtensionRuntimeCatalog catalog;
+    private final Map<ModelKey, SManga> mangaByUrl = retainedModels();
+    private final Map<ModelKey, SAnime> animeByUrl = retainedModels();
+    private final Map<ModelKey, SChapter> chapterByUrl = retainedModels();
+    private final Map<ModelKey, SEpisode> episodeByUrl = retainedModels();
 
     public ExtensionSourceOperations(ExtensionRuntimeCatalog catalog) {
         this.catalog = Objects.requireNonNull(catalog, "catalog");
     }
 
     public MangasPage mangaCatalogue(long sourceId, String operation, int page, String query) {
-        return withSource(sourceId, ExtensionKind.MANGA, source -> {
-            String requestName = switch (operation) {
-                case "popular" -> "popularMangaRequest";
-                case "latest" -> "latestUpdatesRequest";
-                case "search" -> "searchMangaRequest";
-                default -> throw new IllegalArgumentException("Unknown manga catalogue operation");
-            };
-            String parseName = switch (operation) {
-                case "popular" -> "popularMangaParse";
-                case "latest" -> "latestUpdatesParse";
-                case "search" -> "searchMangaParse";
-                default -> throw new IllegalArgumentException("Unknown manga catalogue operation");
-            };
+        return execute(sourceId, ExtensionKind.MANGA, "manga." + operation, "", source -> {
             Object[] arguments = operation.equals("search")
-                    ? new Object[]{page, Objects.requireNonNullElse(query, ""), invoke(source, "getFilterList")}
+                    ? new Object[]{page, Objects.requireNonNullElse(query, ""),
+                            ExtensionOperationDispatcher.invokeAny(source, "getFilterList")}
                     : new Object[]{page};
-            return requestAndParse(source, requestName, arguments, parseName, MangasPage.class);
+            String modernName = switch (operation) {
+                case "popular" -> "getPopularManga";
+                case "latest" -> "getLatestUpdates";
+                case "search" -> "getSearchManga";
+                default -> throw new IllegalArgumentException("Unknown manga catalogue operation");
+            };
+            String reactiveName = switch (operation) {
+                case "popular" -> "fetchPopularManga";
+                case "latest" -> "fetchLatestUpdates";
+                case "search" -> "fetchSearchManga";
+                default -> throw new IllegalArgumentException("Unknown manga catalogue operation");
+            };
+            var modern = ExtensionOperationDispatcher.modernOrRx(
+                    source, modernName, reactiveName, arguments);
+            MangasPage result = modern.available()
+                    ? ExtensionOperationDispatcher.result(modern.value(), MangasPage.class)
+                    : classicMangaCatalogue(source, operation, arguments);
+            result.getMangas().forEach(manga -> mangaByUrl.put(new ModelKey(sourceId, manga.getUrl()), manga));
+            return result;
         });
     }
 
     public AnimesPage animeCatalogue(long sourceId, String operation, int page, String query) {
-        return withSource(sourceId, ExtensionKind.ANIME, source -> {
-            String requestName = switch (operation) {
-                case "popular" -> "popularAnimeRequest";
-                case "latest" -> "latestUpdatesRequest";
-                case "search" -> "searchAnimeRequest";
-                default -> throw new IllegalArgumentException("Unknown anime catalogue operation");
-            };
-            String parseName = switch (operation) {
-                case "popular" -> "popularAnimeParse";
-                case "latest" -> "latestUpdatesParse";
-                case "search" -> "searchAnimeParse";
-                default -> throw new IllegalArgumentException("Unknown anime catalogue operation");
-            };
+        return execute(sourceId, ExtensionKind.ANIME, "anime." + operation, "", source -> {
             Object[] arguments = operation.equals("search")
-                    ? new Object[]{page, Objects.requireNonNullElse(query, ""), invoke(source, "getFilterList")}
+                    ? new Object[]{page, Objects.requireNonNullElse(query, ""),
+                            ExtensionOperationDispatcher.invokeAny(source, "getFilterList")}
                     : new Object[]{page};
-            return requestAndParse(source, requestName, arguments, parseName, AnimesPage.class);
-        });
-    }
-
-    public SManga mangaDetails(long sourceId, String url) {
-        return withSource(sourceId, ExtensionKind.MANGA, source -> {
-            SManga manga = SManga.Companion.create();
-            manga.setUrl(url);
-            SManga result = requestAndParse(
-                    source, "mangaDetailsRequest", new Object[]{manga}, "mangaDetailsParse", SManga.class);
-            result.setInitialized(true);
+            String modernName = switch (operation) {
+                case "popular" -> "getPopularAnime";
+                case "latest" -> "getLatestUpdates";
+                case "search" -> "getSearchAnime";
+                default -> throw new IllegalArgumentException("Unknown anime catalogue operation");
+            };
+            String reactiveName = switch (operation) {
+                case "popular" -> "fetchPopularAnime";
+                case "latest" -> "fetchLatestUpdates";
+                case "search" -> "fetchSearchAnime";
+                default -> throw new IllegalArgumentException("Unknown anime catalogue operation");
+            };
+            var modern = ExtensionOperationDispatcher.modernOrRx(
+                    source, modernName, reactiveName, arguments);
+            AnimesPage result = modern.available()
+                    ? ExtensionOperationDispatcher.result(modern.value(), AnimesPage.class)
+                    : classicAnimeCatalogue(source, operation, arguments);
+            result.getAnimes().forEach(anime -> animeByUrl.put(new ModelKey(sourceId, anime.getUrl()), anime));
             return result;
         });
     }
 
-    public List<SChapter> chapters(long sourceId, String url) {
-        return withSource(sourceId, ExtensionKind.MANGA, source -> {
-            SManga manga = SManga.Companion.create();
-            manga.setUrl(url);
-            return listResult(requestAndParse(
-                    source, "chapterListRequest", new Object[]{manga}, "chapterListParse", List.class),
-                    SChapter.class);
+    public SManga mangaDetails(long sourceId, SourceModel model) {
+        return execute(sourceId, ExtensionKind.MANGA, "manga.details", model.url(), source -> {
+            SManga manga = manga(sourceId, model);
+            var modern = ExtensionOperationDispatcher.modernOrRx(
+                    source, "getMangaDetails", "fetchMangaDetails", manga);
+            SManga result = modern.available()
+                    ? ExtensionOperationDispatcher.result(modern.value(), SManga.class)
+                    : requestAndParse(source, "mangaDetailsRequest", new Object[]{manga},
+                            "mangaDetailsParse", SManga.class);
+            result.setInitialized(true);
+            mangaByUrl.put(new ModelKey(sourceId, result.getUrl()), result);
+            return result;
+        });
+    }
+
+    public List<SChapter> chapters(long sourceId, SourceModel model) {
+        return execute(sourceId, ExtensionKind.MANGA, "manga.chapters", model.url(), source -> {
+            SManga manga = manga(sourceId, model);
+            List<SChapter> result;
+            var update = ExtensionOperationDispatcher.suspend(
+                    source, "getMangaUpdate", manga, List.of(), false, true);
+            if (update.available()) {
+                result = ExtensionOperationDispatcher.listResult(
+                        ExtensionOperationDispatcher.invokeAny(update.value(), "getChapters"), SChapter.class);
+                var updated = ExtensionOperationDispatcher.ordinary(update.value(), "getManga");
+                if (updated.available() && updated.value() instanceof SManga value) {
+                    mangaByUrl.put(new ModelKey(sourceId, value.getUrl()), value);
+                }
+            } else {
+                var modern = ExtensionOperationDispatcher.modernOrRx(
+                        source, "getChapterList", "fetchChapterList", manga);
+                result = modern.available()
+                        ? ExtensionOperationDispatcher.listResult(modern.value(), SChapter.class)
+                        : ExtensionOperationDispatcher.listResult(requestAndParse(
+                                source, "chapterListRequest", new Object[]{manga},
+                                "chapterListParse", List.class), SChapter.class);
+            }
+            result.forEach(chapter -> chapterByUrl.put(new ModelKey(sourceId, chapter.getUrl()), chapter));
+            return result;
         });
     }
 
     public List<Page> pages(long sourceId, String url) {
-        return withSource(sourceId, ExtensionKind.MANGA, source -> {
-            SChapter chapter = SChapter.Companion.create();
-            chapter.setUrl(url);
-            return listResult(requestAndParse(
-                    source, "pageListRequest", new Object[]{chapter}, "pageListParse", List.class), Page.class);
+        return execute(sourceId, ExtensionKind.MANGA, "manga.pages", url, source -> {
+            SChapter chapter = chapterByUrl.get(new ModelKey(sourceId, url));
+            if (chapter == null) {
+                chapter = SChapter.Companion.create();
+                chapter.setUrl(url);
+            }
+            var modern = ExtensionOperationDispatcher.modernOrRx(
+                    source, "getPageList", "fetchPageList", chapter);
+            return modern.available()
+                    ? ExtensionOperationDispatcher.listResult(modern.value(), Page.class)
+                    : ExtensionOperationDispatcher.listResult(requestAndParse(
+                            source, "pageListRequest", new Object[]{chapter},
+                            "pageListParse", List.class), Page.class);
         });
     }
 
-    public SAnime animeDetails(long sourceId, String url) {
-        return withSource(sourceId, ExtensionKind.ANIME, source -> {
-            SAnime anime = SAnime.Companion.create();
-            anime.setUrl(url);
-            SAnime result = requestAndParse(
-                    source, "animeDetailsRequest", new Object[]{anime}, "animeDetailsParse", SAnime.class);
+    public SAnime animeDetails(long sourceId, SourceModel model) {
+        return execute(sourceId, ExtensionKind.ANIME, "anime.details", model.url(), source -> {
+            SAnime anime = anime(sourceId, model);
+            var modern = ExtensionOperationDispatcher.modernOrRx(
+                    source, "getAnimeDetails", "fetchAnimeDetails", anime);
+            SAnime result = modern.available()
+                    ? ExtensionOperationDispatcher.result(modern.value(), SAnime.class)
+                    : requestAndParse(source, "animeDetailsRequest", new Object[]{anime},
+                            "animeDetailsParse", SAnime.class);
             result.setInitialized(true);
+            animeByUrl.put(new ModelKey(sourceId, result.getUrl()), result);
             return result;
         });
     }
 
-    public List<SEpisode> episodes(long sourceId, String url) {
-        return withSource(sourceId, ExtensionKind.ANIME, source -> {
-            SAnime anime = SAnime.Companion.create();
-            anime.setUrl(url);
-            return listResult(requestAndParse(
-                    source, "episodeListRequest", new Object[]{anime}, "episodeListParse", List.class),
-                    SEpisode.class);
+    public List<SEpisode> episodes(long sourceId, SourceModel model) {
+        return execute(sourceId, ExtensionKind.ANIME, "anime.episodes", model.url(), source -> {
+            SAnime anime = anime(sourceId, model);
+            List<SEpisode> result;
+            var update = ExtensionOperationDispatcher.suspend(
+                    source, "getAnimeEpisodeUpdate", anime, List.of(), false, true);
+            if (update.available()) {
+                result = ExtensionOperationDispatcher.listResult(
+                        ExtensionOperationDispatcher.invokeAny(update.value(), "getEpisodes"), SEpisode.class);
+            } else {
+                var modern = ExtensionOperationDispatcher.modernOrRx(
+                        source, "getEpisodeList", "fetchEpisodeList", anime);
+                result = modern.available()
+                        ? ExtensionOperationDispatcher.listResult(modern.value(), SEpisode.class)
+                        : ExtensionOperationDispatcher.listResult(requestAndParse(
+                                source, "episodeListRequest", new Object[]{anime},
+                                "episodeListParse", List.class), SEpisode.class);
+            }
+            result.forEach(episode -> episodeByUrl.put(new ModelKey(sourceId, episode.getUrl()), episode));
+            return result;
         });
     }
 
     public List<Video> videos(long sourceId, String url) {
-        return withSource(sourceId, ExtensionKind.ANIME, source -> {
-            SEpisode episode = SEpisode.Companion.create();
-            episode.setUrl(url);
-            Object result = invokeSuspend(source, "getVideoList", episode);
-            return listResult(result, Video.class);
+        return execute(sourceId, ExtensionKind.ANIME, "anime.videos", url, source -> {
+            SEpisode episode = episodeByUrl.get(new ModelKey(sourceId, url));
+            if (episode == null) {
+                episode = SEpisode.Companion.create();
+                episode.setUrl(url);
+            }
+            if (ExtensionOperationDispatcher.supportsHosters(source)) {
+                var hosters = ExtensionOperationDispatcher.suspend(source, "getHosterList", episode);
+                if (hosters.available()) {
+                    return hosterVideos(source, hosters.value());
+                }
+            }
+            var modern = ExtensionOperationDispatcher.modernOrRx(
+                    source, "getVideoList", "fetchVideoList", episode);
+            List<Video> result = modern.available()
+                    ? ExtensionOperationDispatcher.listResult(modern.value(), Video.class)
+                    : ExtensionOperationDispatcher.listResult(requestAndParse(
+                            source, "videoListRequest", new Object[]{episode},
+                            "videoListParse", List.class), Video.class);
+            if (result.isEmpty()) {
+                OkHttpClient client = ExtensionOperationDispatcher.result(
+                        ExtensionOperationDispatcher.invokeAny(source, "getClient"), OkHttpClient.class);
+                okhttp3.Headers headers = ExtensionOperationDispatcher.result(
+                        ExtensionOperationDispatcher.invokeAny(source, "getHeaders"), okhttp3.Headers.class);
+                result = EmbeddedVideoFallback.resolve(client, headers, url);
+                if (result.isEmpty()) {
+                    LOGGER.log(System.Logger.Level.WARNING,
+                            "Extension and bounded embed fallback returned no videos; episode host candidates: "
+                                    + episodeHosts(url));
+                } else {
+                    LOGGER.log(System.Logger.Level.INFO,
+                            "Bounded embed fallback recovered " + result.size() + " video(s) from: "
+                                    + episodeHosts(url));
+                }
+            }
+            return result;
         });
+    }
+
+    private static String episodeHosts(String value) {
+        var hosts = new TreeSet<String>(String.CASE_INSENSITIVE_ORDER);
+        var matches = WEB_HOST.matcher(value);
+        while (matches.find()) {
+            hosts.add(matches.group(1));
+        }
+        return hosts.isEmpty() ? "none" : String.join(", ", hosts);
     }
 
     public ProxiedResource proxy(long sourceId, String url) {
@@ -144,13 +248,15 @@ public final class ExtensionSourceOperations {
                 || location.getHost() == null) {
             throw new IllegalArgumentException("Proxy URL must be absolute HTTP(S)");
         }
-        return withAnySource(sourceId, source -> {
-            OkHttpClient client = result(invoke(source, "getClient"), OkHttpClient.class);
-            okhttp3.Headers headers = result(invoke(source, "getHeaders"), okhttp3.Headers.class);
+        return executeAny(sourceId, "source.proxy", url, source -> {
+            OkHttpClient client = ExtensionOperationDispatcher.result(
+                    ExtensionOperationDispatcher.invokeAny(source, "getClient"), OkHttpClient.class);
+            okhttp3.Headers headers = ExtensionOperationDispatcher.result(
+                    ExtensionOperationDispatcher.invokeAny(source, "getHeaders"), okhttp3.Headers.class);
             Request request = new Request.Builder().url(location.toString()).headers(headers).build();
             try (Response response = client.newCall(request).execute()) {
                 if (!response.isSuccessful()) {
-                    throw new IllegalStateException("Source resource failed with HTTP " + response.code());
+                    throw new RemoteRequestException("Source resource failed with HTTP " + response.code());
                 }
                 okhttp3.ResponseBody body = Objects.requireNonNull(response.body(), "Source resource has no body");
                 long length = body.contentLength();
@@ -166,30 +272,42 @@ public final class ExtensionSourceOperations {
                             ? "application/octet-stream" : body.contentType().toString();
                     return new ProxiedResource(bytes, contentType);
                 }
-            } catch (java.io.IOException exception) {
-                throw new java.io.UncheckedIOException("Source resource request failed", exception);
+            } catch (IOException exception) {
+                throw new UncheckedIOException("Source resource request failed", exception);
             }
         });
     }
 
-    private <T> T withSource(long sourceId, ExtensionKind kind, SourceOperation<T> operation) {
-        try (ExtensionRuntimeCatalog.Snapshot snapshot = catalog.discover()) {
-            LoadedSource loaded = snapshot.sources().stream()
-                    .filter(source -> source.id() == sourceId && source.kind() == kind)
-                    .findFirst()
-                    .orElseThrow(() -> new IllegalArgumentException("Source is not installed"));
-            return operation.apply(loaded.instance());
-        }
+    private MangasPage classicMangaCatalogue(Object source, String operation, Object[] arguments) {
+        String request = switch (operation) {
+            case "popular" -> "popularMangaRequest";
+            case "latest" -> "latestUpdatesRequest";
+            case "search" -> "searchMangaRequest";
+            default -> throw new IllegalArgumentException("Unknown manga catalogue operation");
+        };
+        String parse = switch (operation) {
+            case "popular" -> "popularMangaParse";
+            case "latest" -> "latestUpdatesParse";
+            case "search" -> "searchMangaParse";
+            default -> throw new IllegalArgumentException("Unknown manga catalogue operation");
+        };
+        return requestAndParse(source, request, arguments, parse, MangasPage.class);
     }
 
-    private <T> T withAnySource(long sourceId, SourceOperation<T> operation) {
-        try (ExtensionRuntimeCatalog.Snapshot snapshot = catalog.discover()) {
-            LoadedSource loaded = snapshot.sources().stream()
-                    .filter(source -> source.id() == sourceId)
-                    .findFirst()
-                    .orElseThrow(() -> new IllegalArgumentException("Source is not installed"));
-            return operation.apply(loaded.instance());
-        }
+    private AnimesPage classicAnimeCatalogue(Object source, String operation, Object[] arguments) {
+        String request = switch (operation) {
+            case "popular" -> "popularAnimeRequest";
+            case "latest" -> "latestUpdatesRequest";
+            case "search" -> "searchAnimeRequest";
+            default -> throw new IllegalArgumentException("Unknown anime catalogue operation");
+        };
+        String parse = switch (operation) {
+            case "popular" -> "popularAnimeParse";
+            case "latest" -> "latestUpdatesParse";
+            case "search" -> "searchAnimeParse";
+            default -> throw new IllegalArgumentException("Unknown anime catalogue operation");
+        };
+        return requestAndParse(source, request, arguments, parse, AnimesPage.class);
     }
 
     private static <T> T requestAndParse(
@@ -198,133 +316,211 @@ public final class ExtensionSourceOperations {
             Object[] requestArguments,
             String parseMethod,
             Class<T> resultType) {
-        Request request = result(invoke(source, requestMethod, requestArguments), Request.class);
-        OkHttpClient client = result(invoke(source, "getClient"), OkHttpClient.class);
+        if (!ExtensionOperationDispatcher.hasClassicImplementation(source, parseMethod, (Object) null)) {
+            throw new UnsupportedOperationException("Extension does not implement " + parseMethod);
+        }
+        Request request = ExtensionOperationDispatcher.result(
+                ExtensionOperationDispatcher.invokeAny(source, requestMethod, requestArguments), Request.class);
+        OkHttpClient client = ExtensionOperationDispatcher.result(
+                ExtensionOperationDispatcher.invokeAny(source, "getClient"), OkHttpClient.class);
         try (Response response = client.newCall(request).execute()) {
             if (!response.isSuccessful()) {
-                throw new IllegalStateException("Source request failed with HTTP " + response.code());
+                throw new RemoteRequestException("Source request failed with HTTP " + response.code());
             }
-            return result(invoke(source, parseMethod, response), resultType);
-        } catch (java.io.IOException exception) {
-            throw new java.io.UncheckedIOException("Source request failed", exception);
+            try {
+                return ExtensionOperationDispatcher.result(
+                        ExtensionOperationDispatcher.invokeAny(source, parseMethod, response), resultType);
+            } catch (RuntimeException | LinkageError failure) {
+                throw new ParseException("Extension response parsing failed", failure);
+            }
+        } catch (IOException exception) {
+            throw new UncheckedIOException("Source request failed", exception);
         }
     }
 
-    private static Object invokeSuspend(Object source, String name, Object... arguments) {
-        CompletableFuture<Object> resumed = new CompletableFuture<>();
-        Continuation<Object> continuation = new Continuation<>() {
-            @Override public CoroutineContext getContext() { return EmptyCoroutineContext.INSTANCE; }
-            @Override public void resumeWith(Object value) {
-                try {
-                    ResultKt.throwOnFailure(value);
-                    resumed.complete(value);
-                } catch (RuntimeException | Error failure) {
-                    resumed.completeExceptionally(failure);
-                }
+    private static List<Video> hosterVideos(Object source, Object value) {
+        List<Hoster> hosters = ExtensionOperationDispatcher.listResult(value, Hoster.class);
+        List<Video> videos = new ArrayList<>();
+        for (Hoster hoster : hosters) {
+            if (hoster.getVideoList() != null) {
+                videos.addAll(hoster.getVideoList());
+                continue;
             }
-        };
-        Object[] invocation = Arrays.copyOf(arguments, arguments.length + 1);
-        invocation[arguments.length] = continuation;
-        Object result = invoke(source, name, invocation);
-        if (result != IntrinsicsKt.getCOROUTINE_SUSPENDED()) {
-            return result;
+            var lazy = ExtensionOperationDispatcher.suspend(source, "getVideoList", hoster);
+            if (!lazy.available()) {
+                throw new UnsupportedOperationException("Extension does not implement lazy hoster videos");
+            }
+            videos.addAll(ExtensionOperationDispatcher.listResult(lazy.value(), Video.class));
         }
+        return List.copyOf(videos);
+    }
+
+    private SManga manga(long sourceId, SourceModel model) {
+        ModelKey key = new ModelKey(sourceId, model.url());
+        SManga manga = mangaByUrl.get(key);
+        if (manga == null) {
+            manga = SManga.Companion.create();
+        }
+        apply(model, manga);
+        mangaByUrl.put(key, manga);
+        return manga;
+    }
+
+    private SAnime anime(long sourceId, SourceModel model) {
+        ModelKey key = new ModelKey(sourceId, model.url());
+        SAnime anime = animeByUrl.get(key);
+        if (anime == null) {
+            anime = SAnime.Companion.create();
+        }
+        apply(model, anime);
+        animeByUrl.put(key, anime);
+        return anime;
+    }
+
+    private static void apply(SourceModel model, SManga manga) {
+        manga.setUrl(model.url());
+        if (!model.title().isBlank()) manga.setTitle(model.title());
+        if (!model.thumbnailUrl().isBlank()) manga.setThumbnail_url(model.thumbnailUrl());
+        if (!model.description().isBlank()) manga.setDescription(model.description());
+        if (!model.artist().isBlank()) manga.setArtist(model.artist());
+        if (!model.author().isBlank()) manga.setAuthor(model.author());
+        if (!model.genre().isBlank()) manga.setGenre(model.genre());
+        if (model.status() >= 0) manga.setStatus(model.status());
+    }
+
+    private static void apply(SourceModel model, SAnime anime) {
+        anime.setUrl(model.url());
+        if (!model.title().isBlank()) anime.setTitle(model.title());
+        if (!model.thumbnailUrl().isBlank()) anime.setThumbnail_url(model.thumbnailUrl());
+        if (!model.description().isBlank()) anime.setDescription(model.description());
+        if (!model.artist().isBlank()) anime.setArtist(model.artist());
+        if (!model.author().isBlank()) anime.setAuthor(model.author());
+        if (!model.genre().isBlank()) anime.setGenre(model.genre());
+        if (model.status() >= 0) anime.setStatus(model.status());
+    }
+
+    private <T> T execute(
+            long sourceId,
+            ExtensionKind kind,
+            String operation,
+            String url,
+            SourceOperation<T> action) {
+        try (ExtensionRuntimeCatalog.Snapshot snapshot = catalog.discover()) {
+            LoadedSource loaded = snapshot.sources().stream()
+                    .filter(source -> source.id() == sourceId && source.kind() == kind)
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("Source is not installed"));
+            return invoke(loaded, operation, url, action);
+        }
+    }
+
+    private <T> T executeAny(long sourceId, String operation, String url, SourceOperation<T> action) {
+        try (ExtensionRuntimeCatalog.Snapshot snapshot = catalog.discover()) {
+            LoadedSource loaded = snapshot.sources().stream()
+                    .filter(source -> source.id() == sourceId)
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("Source is not installed"));
+            return invoke(loaded, operation, url, action);
+        }
+    }
+
+    private static <T> T invoke(
+            LoadedSource source,
+            String operation,
+            String url,
+            SourceOperation<T> action) {
         try {
-            return resumed.get(SUSPEND_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
-        } catch (TimeoutException exception) {
-            throw new IllegalStateException("Source operation timed out", exception);
-        } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("Source operation was interrupted", exception);
-        } catch (java.util.concurrent.ExecutionException exception) {
-            throw propagate(exception.getCause());
+            return action.apply(source.instance());
+        } catch (IllegalArgumentException failure) {
+            throw failure;
+        } catch (RuntimeException | LinkageError failure) {
+            throw new ExtensionOperationException(
+                    classify(failure), operation, source.packageName(), source.id(), url, failure);
         }
     }
 
-    private static Object invoke(Object target, String name, Object... arguments) {
-        Method method = method(target.getClass(), name, arguments);
-        try {
-            method.setAccessible(true);
-            return method.invoke(target, arguments);
-        } catch (IllegalAccessException exception) {
-            throw new IllegalStateException("Source operation is inaccessible: " + name, exception);
-        } catch (InvocationTargetException exception) {
-            throw propagate(exception.getCause());
+    private static ExtensionOperationException.Code classify(Throwable failure) {
+        if (failure instanceof UnsupportedOperationException) {
+            return ExtensionOperationException.Code.UNSUPPORTED_CAPABILITY;
         }
+        if (failure instanceof RemoteRequestException || failure instanceof UncheckedIOException) {
+            return ExtensionOperationException.Code.REMOTE_HTTP_FAILURE;
+        }
+        if (failure instanceof ParseException) {
+            return ExtensionOperationException.Code.PARSE_FAILURE;
+        }
+        if (failure instanceof ExtensionOperationDispatcher.AbiException
+                || failure instanceof ReflectiveOperationException
+                || failure instanceof LinkageError
+                || failure instanceof ClassCastException
+                || failure instanceof NullPointerException) {
+            return ExtensionOperationException.Code.ABI_FAILURE;
+        }
+        return ExtensionOperationException.Code.INTERNAL_HOST_FAILURE;
     }
 
-    private static Method method(Class<?> type, String name, Object[] arguments) {
-        for (Class<?> current = type; current != null; current = current.getSuperclass()) {
-            for (Method method : current.getDeclaredMethods()) {
-                if (method.getName().equals(name) && compatible(method.getParameterTypes(), arguments)) {
-                    return method;
-                }
+    private static <K, V> Map<K, V> retainedModels() {
+        return Collections.synchronizedMap(new LinkedHashMap<>(64, 0.75f, true) {
+            @Override
+            protected boolean removeEldestEntry(Map.Entry<K, V> eldest) {
+                return size() > MAX_RETAINED_MODELS;
             }
-        }
-        throw new IllegalStateException("Source operation is unavailable: " + name);
-    }
-
-    private static boolean compatible(Class<?>[] parameters, Object[] arguments) {
-        if (parameters.length != arguments.length) {
-            return false;
-        }
-        for (int index = 0; index < parameters.length; index++) {
-            Object argument = arguments[index];
-            Class<?> parameter = parameters[index];
-            if (argument == null) {
-                if (parameter.isPrimitive()) {
-                    return false;
-                }
-            } else if (!boxed(parameter).isInstance(argument)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private static Class<?> boxed(Class<?> value) {
-        if (!value.isPrimitive()) {
-            return value;
-        }
-        if (value == int.class) return Integer.class;
-        if (value == long.class) return Long.class;
-        if (value == boolean.class) return Boolean.class;
-        if (value == float.class) return Float.class;
-        if (value == double.class) return Double.class;
-        if (value == short.class) return Short.class;
-        if (value == byte.class) return Byte.class;
-        if (value == char.class) return Character.class;
-        return Void.class;
-    }
-
-    private static <T> T result(Object value, Class<T> type) {
-        if (type.isInstance(value)) {
-            return type.cast(value);
-        }
-        throw new IllegalStateException("Source operation returned "
-                + (value == null ? "null" : value.getClass().getName()) + " instead of " + type.getName());
-    }
-
-    private static <T> List<T> listResult(Object value, Class<T> elementType) {
-        if (!(value instanceof List<?> values)) {
-            throw new IllegalStateException("Source operation did not return a list");
-        }
-        return values.stream().map(item -> result(item, elementType)).toList();
-    }
-
-    private static RuntimeException propagate(Throwable failure) {
-        if (failure instanceof RuntimeException runtime) {
-            return runtime;
-        }
-        if (failure instanceof Error error) {
-            throw error;
-        }
-        return new IllegalStateException("Source operation failed", failure);
+        });
     }
 
     @FunctionalInterface
     private interface SourceOperation<T> {
         T apply(Object source);
+    }
+
+    private record ModelKey(long sourceId, String url) {
+        private ModelKey {
+            Objects.requireNonNull(url, "url");
+        }
+    }
+
+    private static final class RemoteRequestException extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+
+        private RemoteRequestException(String message) {
+            super(message);
+        }
+    }
+
+    private static final class ParseException extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+
+        private ParseException(String message, Throwable cause) {
+            super(message, cause);
+        }
+    }
+
+    public record SourceModel(
+            String url,
+            String title,
+            String thumbnailUrl,
+            String description,
+            String artist,
+            String author,
+            String genre,
+            int status) {
+        public SourceModel {
+            url = require(url, "url");
+            title = Objects.requireNonNullElse(title, "").strip();
+            thumbnailUrl = Objects.requireNonNullElse(thumbnailUrl, "").strip();
+            description = Objects.requireNonNullElse(description, "").strip();
+            artist = Objects.requireNonNullElse(artist, "").strip();
+            author = Objects.requireNonNullElse(author, "").strip();
+            genre = Objects.requireNonNullElse(genre, "").strip();
+        }
+
+        private static String require(String value, String label) {
+            String result = Objects.requireNonNull(value, label).strip();
+            if (result.isEmpty()) {
+                throw new IllegalArgumentException(label + " must not be blank");
+            }
+            return result;
+        }
     }
 
     public record ProxiedResource(byte[] body, String contentType) {

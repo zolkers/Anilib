@@ -15,4 +15,11 @@ public class ListPreference extends Preference {
     public void setEntryValues(CharSequence[] values) { entryValues = values == null ? null : values.clone(); }
     public String getValue() { return value; }
     public void setValue(String newValue) { value = newValue; }
+    public int findIndexOfValue(String searchedValue) {
+        if (searchedValue == null || entryValues == null) return -1;
+        for (int index = entryValues.length - 1; index >= 0; index--) {
+            if (searchedValue.contentEquals(entryValues[index])) return index;
+        }
+        return -1;
+    }
 }

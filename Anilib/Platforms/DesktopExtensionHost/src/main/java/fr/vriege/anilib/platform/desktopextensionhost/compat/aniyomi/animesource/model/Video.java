@@ -49,8 +49,23 @@ public class Video {
         videoPageUrl = url;
     }
 
+    public Video(String url, String quality, String videoUrl, Headers headers,
+                 List<Track> subtitleTracks, List<Track> audioTracks, int mask,
+                 kotlin.jvm.internal.DefaultConstructorMarker marker) {
+        this(url, quality, videoUrl,
+                (mask & 8) == 0 ? headers : new Headers.Builder().build(),
+                (mask & 16) == 0 ? subtitleTracks : List.of(),
+                (mask & 32) == 0 ? audioTracks : List.of());
+    }
+
     public Video(String url, String quality, String videoUrl, Uri uri, Headers headers) {
         this(url, quality, videoUrl, headers, List.of(), List.of());
+    }
+
+    public Video(String url, String quality, String videoUrl, Uri uri, Headers headers, int mask,
+                 kotlin.jvm.internal.DefaultConstructorMarker marker) {
+        this(url, quality, videoUrl, uri,
+                (mask & 16) == 0 ? headers : new Headers.Builder().build());
     }
 
     public String getVideoUrl() { return videoUrl; }

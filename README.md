@@ -127,7 +127,7 @@ in-memory JPMS layer per artifact into the shared Source registry; a broken
 artifact is reported without blocking valid Bundles. Anilib ships with no
 third-party source catalogue. A pasted GitHub repository URL is resolved through
 its default branch and conventional `repo` publication branch, with dynamic
-`index.min.json` then `index.json` discovery; the same signed portable Bundle is
+`index.pb`, `index.min.json`, then `index.json` discovery; the same signed portable Bundle is
 installed by Android and desktop.
 Installed portable sources share one update channel: repositories expose newer
 versions to both products, `Update all` reuses the complete verification path,

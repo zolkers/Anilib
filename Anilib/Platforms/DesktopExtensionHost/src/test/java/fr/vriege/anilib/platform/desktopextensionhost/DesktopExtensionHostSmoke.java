@@ -2,6 +2,9 @@ package fr.vriege.anilib.platform.desktopextensionhost;
 
 import fr.vriege.anilib.platform.desktopextensionhost.protocol.DesktopExtensionHostProtocol;
 import fr.vriege.anilib.platform.desktopextensionhost.server.DesktopExtensionHostServer;
+import fr.vriege.anilib.platform.desktopextensionhost.extension.EmbeddedVideoFallbackSmoke;
+import fr.vriege.anilib.platform.desktopextensionhost.extension.ExtensionOperationDispatcherSmoke;
+import fr.vriege.anilib.platform.desktopextensionhost.extension.ExtensionRegistryCacheSmoke;
 
 import java.net.InetAddress;
 import java.net.URI;
@@ -18,8 +21,13 @@ public final class DesktopExtensionHostSmoke {
 
     public static void main(String[] arguments) throws Exception {
         ExtensionRelocationSmoke.verify();
+        ExtensionAbiVerifierSmoke.verify();
         ExtensionRuntimeCatalogSmoke.verify();
         ExtensionSourceModelSmoke.verify();
+        ExtensionOperationDispatcherSmoke.verify();
+        ExtensionRegistryCacheSmoke.verify();
+        EmbeddedVideoFallbackSmoke.verify();
+        QuickJsCompatibilitySmoke.verify();
         Path data = Files.createTempDirectory("anilib-desktop-extension-host-");
         try (DesktopExtensionHostServer server = DesktopExtensionHostServer.open(
                 InetAddress.getLoopbackAddress(), 0, data)) {
@@ -41,7 +49,9 @@ public final class DesktopExtensionHostSmoke {
                             .POST(HttpRequest.BodyPublishers.ofString("not-json"))
                             .build(),
                     HttpResponse.BodyHandlers.ofString());
-            if (rejected.statusCode() != 400 || !rejected.body().contains("error")) {
+            if (rejected.statusCode() != 400
+                    || !rejected.body().contains("\"code\":\"invalid_request\"")
+                    || rejected.headers().firstValue("X-Anilib-Correlation-Id").isEmpty()) {
                 throw new IllegalStateException("Desktop engine did not isolate a malformed request");
             }
             verifyGet(server, DesktopExtensionHostProtocol.HEALTH_PATH, "\"status\":\"ok\"");

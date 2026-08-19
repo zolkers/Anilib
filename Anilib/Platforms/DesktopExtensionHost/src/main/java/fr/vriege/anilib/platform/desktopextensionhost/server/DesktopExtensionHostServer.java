@@ -4,6 +4,7 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import fr.vriege.anilib.platform.desktopextensionhost.extension.ExtensionDownloadClient;
 import fr.vriege.anilib.platform.desktopextensionhost.extension.ExtensionKind;
+import fr.vriege.anilib.platform.desktopextensionhost.extension.ExtensionOperationException;
 import fr.vriege.anilib.platform.desktopextensionhost.extension.ExtensionRegistry;
 import fr.vriege.anilib.platform.desktopextensionhost.extension.ExtensionRuntimeCatalog;
 import fr.vriege.anilib.platform.desktopextensionhost.extension.ExtensionSourceOperations;
@@ -34,8 +35,18 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public final class DesktopExtensionHostServer implements AutoCloseable {
+    private static final System.Logger LOGGER = System.getLogger(DesktopExtensionHostServer.class.getName());
+    private static final Pattern WEB_LOCATION = Pattern.compile("https?://[^\\s]+", Pattern.CASE_INSENSITIVE);
+    private static final Pattern NAMED_SECRET = Pattern.compile(
+            "(?i)(authorization|token|api[_-]?key|cookie)\\s*[:=]\\s*[^\\s,;]+"
+    );
+    private static final Pattern BEARER_SECRET = Pattern.compile("(?i)bearer\\s+[^\\s,;]+");
+    private static final String CORRELATION_HEADER = "X-Anilib-Correlation-Id";
     private final Path dataDirectory;
     private final HttpServer server;
     private final ExecutorService executor;
@@ -109,16 +120,16 @@ public final class DesktopExtensionHostServer implements AutoCloseable {
     }
 
     private void configure() {
-        server.createContext(DesktopExtensionHostProtocol.HEALTH_PATH, exchange -> {
+        server.createContext(DesktopExtensionHostProtocol.HEALTH_PATH, exchange -> safely(exchange, () -> {
             if (ExtensionHostHttpExchange.requireGet(exchange)) {
                 ExtensionHostHttpExchange.json(exchange, 200, healthJson());
             }
-        });
-        server.createContext(DesktopExtensionHostProtocol.CAPABILITIES_PATH, exchange -> {
+        }));
+        server.createContext(DesktopExtensionHostProtocol.CAPABILITIES_PATH, exchange -> safely(exchange, () -> {
             if (ExtensionHostHttpExchange.requireGet(exchange)) {
                 ExtensionHostHttpExchange.json(exchange, 200, DesktopExtensionHostCapabilities.bootstrap().toJson());
             }
-        });
+        }));
         server.createContext(DesktopExtensionHostProtocol.SOURCES_PATH, exchange -> safely(exchange, () -> {
             if (ExtensionHostHttpExchange.requireGet(exchange)) {
                 try (ExtensionRuntimeCatalog.Snapshot snapshot = runtimeCatalog.discover()) {
@@ -216,8 +227,8 @@ public final class DesktopExtensionHostServer implements AutoCloseable {
         String json = switch (route.operation()) {
             case "popular", "latest", "search" -> mangaPageJson(sourceOperations.mangaCatalogue(
                     route.sourceId(), route.operation(), page(query), query.get("query")));
-            case "details" -> mangaJson(sourceOperations.mangaDetails(route.sourceId(), required(query, "url")));
-            case "chapters" -> chaptersJson(sourceOperations.chapters(route.sourceId(), required(query, "url")));
+            case "details" -> mangaJson(sourceOperations.mangaDetails(route.sourceId(), sourceModel(query)));
+            case "chapters" -> chaptersJson(sourceOperations.chapters(route.sourceId(), sourceModel(query)));
             case "pages" -> pagesJson(sourceOperations.pages(route.sourceId(), required(query, "url")));
             default -> throw new IllegalArgumentException("Unknown manga operation");
         };
@@ -233,8 +244,8 @@ public final class DesktopExtensionHostServer implements AutoCloseable {
         String json = switch (route.operation()) {
             case "popular", "latest", "search" -> animePageJson(sourceOperations.animeCatalogue(
                     route.sourceId(), route.operation(), page(query), query.get("query")));
-            case "details" -> animeJson(sourceOperations.animeDetails(route.sourceId(), required(query, "url")));
-            case "episodes" -> episodesJson(sourceOperations.episodes(route.sourceId(), required(query, "url")));
+            case "details" -> animeJson(sourceOperations.animeDetails(route.sourceId(), sourceModel(query)));
+            case "episodes" -> episodesJson(sourceOperations.episodes(route.sourceId(), sourceModel(query)));
             case "videos" -> videosJson(sourceOperations.videos(route.sourceId(), required(query, "url")));
             default -> throw new IllegalArgumentException("Unknown anime operation");
         };
@@ -274,6 +285,26 @@ public final class DesktopExtensionHostServer implements AutoCloseable {
             throw new IllegalArgumentException("Missing query parameter: " + name);
         }
         return value;
+    }
+
+    private static ExtensionSourceOperations.SourceModel sourceModel(Map<String, String> query) {
+        return new ExtensionSourceOperations.SourceModel(
+                required(query, "url"),
+                query.get("title"),
+                query.get("thumbnailUrl"),
+                query.get("description"),
+                query.get("artist"),
+                query.get("author"),
+                query.get("genre"),
+                integer(query.get("status"), -1));
+    }
+
+    private static int integer(String value, int fallback) {
+        try {
+            return value == null ? fallback : Integer.parseInt(value);
+        } catch (NumberFormatException ignored) {
+            return fallback;
+        }
     }
 
     private static String mangaPageJson(MangasPage page) {
@@ -440,19 +471,80 @@ public final class DesktopExtensionHostServer implements AutoCloseable {
     }
 
     private static void safely(HttpExchange exchange, Runnable action) {
+        String correlationId = UUID.randomUUID().toString();
+        exchange.getResponseHeaders().set(CORRELATION_HEADER, correlationId);
         try {
             action.run();
+        } catch (ExtensionOperationException exception) {
+            logFailure(correlationId, exchange, exception);
+            ExtensionHostHttpExchange.json(exchange, exception.code().statusCode(), errorJson(
+                    exception.code().protocolValue(), exception.getMessage(), correlationId));
         } catch (IllegalArgumentException exception) {
-            ExtensionHostHttpExchange.json(exchange, 400, "{\"error\":"
-                    + ExtensionHostHttpExchange.jsonString(message(exception)) + '}');
+            logFailure(correlationId, exchange, exception);
+            ExtensionHostHttpExchange.json(exchange, 400, errorJson(
+                    "invalid_request", "The extension host rejected the request", correlationId));
         } catch (RuntimeException | LinkageError exception) {
-            ExtensionHostHttpExchange.json(exchange, 500, "{\"error\":"
-                    + ExtensionHostHttpExchange.jsonString(message(exception)) + '}');
+            logFailure(correlationId, exchange, exception);
+            ExtensionHostHttpExchange.json(exchange, 500, errorJson(
+                    "internal_host_failure", "The desktop extension host could not complete the request",
+                    correlationId));
         }
     }
 
-    private static String message(Throwable exception) {
-        return exception.getMessage() == null ? exception.getClass().getSimpleName() : exception.getMessage();
+    private static String errorJson(String code, String message, String correlationId) {
+        return "{\"error\":{\"code\":" + ExtensionHostHttpExchange.jsonString(code)
+                + ",\"message\":" + ExtensionHostHttpExchange.jsonString(message)
+                + ",\"correlationId\":" + ExtensionHostHttpExchange.jsonString(correlationId) + "}}";
+    }
+
+    private static void logFailure(String correlationId, HttpExchange exchange, Throwable failure) {
+        StringBuilder diagnostic = new StringBuilder("Desktop extension host operation failed")
+                .append(" correlationId=").append(correlationId)
+                .append(" method=").append(exchange.getRequestMethod())
+                .append(" path=").append(exchange.getRequestURI().getPath());
+        if (failure instanceof ExtensionOperationException operation) {
+            diagnostic.append(" operation=").append(operation.operation())
+                    .append(" package=").append(operation.packageName())
+                    .append(" sourceId=").append(Long.toUnsignedString(operation.sourceId()))
+                    .append(" sourceUrl=").append(sanitizeUrl(operation.sourceUrl()))
+                    .append(" code=").append(operation.code().protocolValue());
+        }
+        int depth = 0;
+        for (Throwable current = failure; current != null && depth < 12; current = current.getCause()) {
+            diagnostic.append(System.lineSeparator())
+                    .append("causedBy[").append(depth).append("]=")
+                    .append(current.getClass().getName()).append(": ")
+                    .append(sanitizeMessage(current.getMessage()));
+            for (StackTraceElement frame : current.getStackTrace()) {
+                diagnostic.append(System.lineSeparator()).append("  at ").append(frame);
+            }
+            if (current.getCause() == current) break;
+            depth++;
+        }
+        LOGGER.log(System.Logger.Level.ERROR, diagnostic.toString());
+    }
+
+    private static String sanitizeUrl(String value) {
+        if (value == null || value.isBlank()) return "";
+        try {
+            URI uri = URI.create(value);
+            if (!uri.isAbsolute()) return uri.getPath() == null ? "" : uri.getPath();
+            return new URI(uri.getScheme(), null, uri.getHost(), uri.getPort(), uri.getPath(), null, null).toString();
+        } catch (java.net.URISyntaxException | IllegalArgumentException ignored) {
+            return "<invalid-url>";
+        }
+    }
+
+    private static String sanitizeMessage(String value) {
+        if (value == null || value.isBlank()) return "<no-message>";
+        Matcher matcher = WEB_LOCATION.matcher(value);
+        StringBuilder sanitized = new StringBuilder();
+        while (matcher.find()) {
+            matcher.appendReplacement(sanitized, Matcher.quoteReplacement(sanitizeUrl(matcher.group())));
+        }
+        matcher.appendTail(sanitized);
+        String withoutNamedSecrets = NAMED_SECRET.matcher(sanitized).replaceAll("$1=<redacted>");
+        return BEARER_SECRET.matcher(withoutNamedSecrets).replaceAll("Bearer <redacted>");
     }
 
     private static void deleteDownload(Path downloaded) {
@@ -467,5 +559,6 @@ public final class DesktopExtensionHostServer implements AutoCloseable {
     public void close() {
         server.stop(0);
         executor.close();
+        runtimeCatalog.close();
     }
 }

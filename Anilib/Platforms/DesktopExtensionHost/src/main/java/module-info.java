@@ -9,6 +9,7 @@ module fr.vriege.anilib.platform.desktopextensionhost {
     requires transitive kotlinx.coroutines.core;
     requires transitive okhttp3;
     requires transitive org.jsoup;
+    requires transitive rxjava;
 
     exports fr.vriege.anilib.platform.desktopextensionhost;
     exports fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi;
@@ -32,4 +33,5 @@ module fr.vriege.anilib.platform.desktopextensionhost {
     exports fr.vriege.anilib.platform.desktopextensionhost.compat.androidx.preference;
     exports fr.vriege.anilib.platform.desktopextensionhost.compat.injekt;
     exports fr.vriege.anilib.platform.desktopextensionhost.compat.injekt.api;
+    exports fr.vriege.anilib.platform.desktopextensionhost.compat.quickjs;
 }

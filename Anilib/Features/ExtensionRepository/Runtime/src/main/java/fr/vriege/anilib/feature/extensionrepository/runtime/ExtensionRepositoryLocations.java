@@ -1,6 +1,8 @@
 package fr.vriege.anilib.feature.extensionrepository.runtime;
 
 import java.net.URI;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 
@@ -13,6 +15,10 @@ public final class ExtensionRepositoryLocations {
 
     public static List<URI> indexCandidates(URI configuredLocation) {
         URI location = AniyomiRepositoryIndexParser.requireRepositoryUri(configuredLocation);
+        List<URI> directIndexCandidates = directIndexCandidates(location);
+        if (!directIndexCandidates.isEmpty()) {
+            return directIndexCandidates;
+        }
         if (!GITHUB_HOST.equals(location.getHost().toLowerCase(Locale.ROOT))) {
             return List.of(location);
         }
@@ -33,6 +39,31 @@ public final class ExtensionRepositoryLocations {
                 URI.create(root.replace("/HEAD/", "/repo/") + "index.pb"),
                 URI.create(root.replace("/HEAD/", "/repo/") + "index.min.json"),
                 URI.create(root.replace("/HEAD/", "/repo/") + "index.json"));
+    }
+
+    private static List<URI> directIndexCandidates(URI location) {
+        String path = location.getPath();
+        String fileName;
+        if (path.endsWith("/index.pb")) {
+            fileName = "index.pb";
+        } else if (path.endsWith("/index.min.json")) {
+            fileName = "index.min.json";
+        } else if (path.endsWith("/index.json")) {
+            fileName = "index.json";
+        } else {
+            return List.of();
+        }
+        URI directory = location.resolve(".");
+        LinkedHashSet<URI> candidates = new LinkedHashSet<>();
+        candidates.add(location);
+        candidates.add(directory.resolve("index.pb"));
+        if (!"index.min.json".equals(fileName)) {
+            candidates.add(directory.resolve("index.min.json"));
+        }
+        if (!"index.json".equals(fileName)) {
+            candidates.add(directory.resolve("index.json"));
+        }
+        return List.copyOf(new ArrayList<>(candidates));
     }
 
     private static String stripGitSuffix(String repository) {

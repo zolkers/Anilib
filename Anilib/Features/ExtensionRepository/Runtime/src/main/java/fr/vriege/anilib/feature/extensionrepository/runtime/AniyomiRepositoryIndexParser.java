@@ -28,6 +28,9 @@ public final class AniyomiRepositoryIndexParser {
     private static final int MAX_INDEX_CHARACTERS = 4 * 1024 * 1024;
     private static final int MAX_PACKAGES = 10_000;
     private static final int MAX_SOURCES_PER_PACKAGE = 100;
+    private static final Set<String> REPOSITORY_NOTICE_PACKAGES = Set.of(
+            "eu.kanade.tachiyomi.extension.all.keiyoushi",
+            "eu.kanade.tachiyomi.extension.all.mihon");
 
     public AniyomiRepositoryIndexParser() {
     }
@@ -54,7 +57,11 @@ public final class AniyomiRepositoryIndexParser {
         List<ExtensionPackageMetadata> packages = new ArrayList<>();
         Set<String> packageNames = new HashSet<>();
         for (Object entry : entries) {
-            ExtensionPackageMetadata metadata = packageMetadata(repository, object(entry, "package"));
+            Map<String, Object> packageEntry = object(entry, "package");
+            if (repositoryNotice(packageEntry)) {
+                continue;
+            }
+            ExtensionPackageMetadata metadata = packageMetadata(repository, packageEntry);
             if (!packageNames.add(metadata.packageName())) {
                 throw new IllegalArgumentException("Duplicate extension package: " + metadata.packageName());
             }
@@ -62,6 +69,11 @@ public final class AniyomiRepositoryIndexParser {
         }
         packages.sort(Comparator.comparing(ExtensionPackageMetadata::packageName));
         return List.copyOf(packages);
+    }
+
+    private boolean repositoryNotice(Map<String, Object> entry) {
+        Object packageName = entry.get("pkg");
+        return packageName instanceof String value && REPOSITORY_NOTICE_PACKAGES.contains(value);
     }
 
     private ExtensionPackageMetadata packageMetadata(URI repository, Map<String, Object> entry) {

@@ -66,6 +66,7 @@ public final class ImportPolicyRule implements AnilibJavaRule {
                 || imported.startsWith("net.dongliu.apk.parser.")
                 || imported.startsWith("okhttp3.")
                 || imported.startsWith("org.jsoup.")
-                || imported.startsWith("org.objectweb.asm.");
+                || imported.startsWith("org.objectweb.asm.")
+                || imported.startsWith("rx.");
     }
 }

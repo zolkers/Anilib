@@ -15,10 +15,12 @@ fragments are invalid.
 
 Offline compatibility tests use synthetic entries matching the public
 [Yuzono anime](https://raw.githubusercontent.com/yuzono/anime-repo/repo/index.min.json)
-and [Keiyoushi manga](https://raw.githubusercontent.com/keiyoushi/extensions/repo/index.min.json)
-JSON shapes inspected on 2026-08-18. They retain only field structure and edge
-cases such as unsigned 64-bit source identifiers, `all`/regional languages, and
-filename-only APK paths; no third-party catalogue entry is redistributed.
+JSON shape and [Keiyoushi manga](https://github.com/keiyoushi/extensions)
+Mihon Protobuf shape inspected on 2026-08-19. They retain only field structure
+and edge cases such as unsigned 64-bit source identifiers, `all`/regional
+languages, and filename-only APK paths; no third-party catalogue entry is
+redistributed. If a configured legacy JSON URL contains only Keiyoushi's app
+migration notices, refresh continues with the adjacent `index.pb` catalogue.
 Filename-only APK values resolve through the conventional adjacent `apk/`
 directory, while explicit relative paths and absolute HTTPS URLs remain intact.
 

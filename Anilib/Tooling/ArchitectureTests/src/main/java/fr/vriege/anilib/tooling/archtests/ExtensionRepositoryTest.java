@@ -33,6 +33,7 @@ import fr.vriege.anilib.framework.http.AnilibHttpClient;
 import fr.vriege.anilib.framework.http.HttpRequest;
 import fr.vriege.anilib.framework.http.HttpResponse;
 import fr.vriege.anilib.feature.source.CatalogueSource;
+import fr.vriege.anilib.feature.source.DetailedSource;
 import fr.vriege.anilib.feature.source.PagedSource;
 import fr.vriege.anilib.feature.source.SourceBrowseRequest;
 import fr.vriege.anilib.feature.source.SourceContentKind;
@@ -45,6 +46,7 @@ import fr.vriege.anilib.feature.source.SourcePageResource;
 import fr.vriege.anilib.feature.source.SourcePreferenceDefinition;
 import fr.vriege.anilib.feature.source.SourcePreferenceType;
 import fr.vriege.anilib.feature.source.SourceSearchRequest;
+import fr.vriege.anilib.feature.source.SourceTitleDetails;
 import fr.vriege.anilib.feature.source.StreamingSource;
 import fr.vriege.anilib.feature.source.WebSource;
 import fr.vriege.anilib.feature.source.SourceCapabilities;
@@ -96,6 +98,8 @@ final class ExtensionRepositoryTest {
         parsesMihonProtobufRepositories(counter);
         selectsArtifactsByHostPlatform(counter);
         parsesPublicRepositoryShapes(counter);
+        filtersRepositoryMigrationNotices(counter);
+        upgradesMigrationNoticeIndexesToProtobuf(counter);
         rejectsUnsafeMetadata(counter);
         persistsAndRefreshesUserRepositories(counter);
         persistsBrowsePreferences(counter);
@@ -133,10 +137,13 @@ final class ExtensionRepositoryTest {
             CatalogueSource mangaCatalogue = (CatalogueSource) registry.find(
                     fr.vriege.anilib.feature.source.SourceId.of("aniyomi.42")).orElseThrow();
             SourcePage mangaPage = mangaCatalogue.popular(new SourceBrowseRequest(1, 20, List.of(), Map.of()));
+            SourceTitleDetails mangaDetails = ((DetailedSource) mangaCatalogue)
+                    .details(mangaPage.items().getFirst());
             PagedSource manga = (PagedSource) mangaCatalogue;
             var chapters = manga.contentUnits(mangaPage.items().getFirst().id());
             var pages = manga.pages(chapters.getFirst().id());
             counter.check(mangaPage.items().getFirst().title().equals("Bridge Manga")
+                            && mangaDetails.description().equals("Detailed manga")
                             && chapters.getFirst().title().equals("Chapter 1")
                             && new String(manga.readPage(pages.getFirst()), StandardCharsets.UTF_8).equals("image"),
                     "the desktop manga bridge must map catalogue, chapters, pages, and proxied bytes");
@@ -146,10 +153,13 @@ final class ExtensionRepositoryTest {
             SourcePage animePage = animeCatalogue.search(new SourceSearchRequest(
                     "bridge",
                     new SourceBrowseRequest(1, 20, List.of(), Map.of())));
+            SourceTitleDetails animeDetails = ((DetailedSource) animeCatalogue)
+                    .details(animePage.items().getFirst());
             StreamingSource anime = (StreamingSource) animeCatalogue;
             var episodes = anime.episodes(animePage.items().getFirst().id());
             var streams = anime.streams(episodes.getFirst().id());
-            counter.check(episodes.getFirst().title().equals("Episode 1")
+            counter.check(animeDetails.description().equals("Detailed anime")
+                            && episodes.getFirst().title().equals("Episode 1")
                             && streams.getFirst().location().equals(URI.create("https://cdn.example/master.m3u8"))
                             && streams.getFirst().format().name().equals("HLS")
                             && streams.getFirst().headers().get("Referer").equals("https://source.example/")
@@ -326,6 +336,62 @@ final class ExtensionRepositoryTest {
                         "https://raw.githubusercontent.com/keiyoushi/extensions/repo/apk/"
                                 + "tachiyomi-all.synthetic-v1.4.1.apk")),
                 "Keiyoushi APK filenames must resolve through the public repository apk directory");
+    }
+
+    private static void filtersRepositoryMigrationNotices(Counter counter) {
+        String notices = """
+                [{
+                  "name":"Outdated App",
+                  "pkg":"eu.kanade.tachiyomi.extension.all.keiyoushi",
+                  "apk":"tachiyomi-all.keiyoushi-v1.4.1.apk",
+                  "lang":"all","code":1,"version":"1.4.1","nsfw":0,
+                  "sources":[{"name":"Outdated App","lang":"all","id":"1"}]
+                },{
+                  "name":"Update to Mihon 0.20.1+",
+                  "pkg":"eu.kanade.tachiyomi.extension.all.mihon",
+                  "apk":"tachiyomi-all.mihon-v1.4.1.apk",
+                  "lang":"all","code":1,"version":"1.4.1","nsfw":0,
+                  "sources":[{"name":"Update to Mihon","lang":"all","id":"1"}]
+                }]
+                """;
+        counter.check(new AniyomiRepositoryIndexParser().parse(INDEX, notices).isEmpty(),
+                "repository migration notices must not appear as installable source extensions");
+    }
+
+    private static void upgradesMigrationNoticeIndexesToProtobuf(Counter counter) {
+        Path directory = temporaryDirectory();
+        try {
+            URI jsonIndex = URI.create(
+                    "https://raw.githubusercontent.com/keiyoushi/extensions/repo/index.min.json");
+            URI protobufIndex = URI.create(
+                    "https://raw.githubusercontent.com/keiyoushi/extensions/repo/index.pb");
+            List<URI> requests = new java.util.ArrayList<>();
+            AnilibHttpClient client = request -> {
+                requests.add(request.uri());
+                if (request.uri().equals(jsonIndex)) {
+                    byte[] notices = "[{\"pkg\":\"eu.kanade.tachiyomi.extension.all.keiyoushi\"}]"
+                            .getBytes(StandardCharsets.UTF_8);
+                    return new HttpResponse(200, Map.of(), notices, false);
+                }
+                if (request.uri().equals(protobufIndex)) {
+                    return new HttpResponse(200, Map.of(), gzip(mihonProtobufIndex()), false);
+                }
+                return new HttpResponse(404, Map.of(), new byte[0], false);
+            };
+            DefaultExtensionRepositoryService service = new DefaultExtensionRepositoryService(
+                    new FileExtensionRepositoryStore(directory.resolve("repositories.txt")),
+                    client);
+            service.add(jsonIndex);
+            ExtensionRepositorySnapshot snapshot = service.refresh(jsonIndex);
+            counter.check(snapshot.successful()
+                            && snapshot.packages().size() == 1
+                            && snapshot.packages().getFirst().displayName().equals("Example Manga"),
+                    "a legacy migration-only JSON index must upgrade to its sibling Mihon Protobuf index");
+            counter.check(requests.equals(List.of(jsonIndex, protobufIndex)),
+                    "direct JSON repositories must preserve their configured URL before trying index.pb");
+        } finally {
+            deleteDirectory(directory);
+        }
     }
 
     private static void parsesMihonProtobufRepositories(Counter counter) {
@@ -1047,6 +1113,20 @@ final class ExtensionRepositoryTest {
                 case "/api/v1/manga/42/chapters" -> """
                         {"chapters":[{"url":"/chapter/1","name":"Chapter 1","date_upload":1700000000000}]}
                         """;
+                case "/api/v1/manga/42/details" -> {
+                    String query = request.uri().getRawQuery();
+                    if (query == null || !query.contains("title=Bridge%20Manga")
+                            || !query.contains("description=Description")
+                            || !query.contains("thumbnailUrl=https%3A%2F%2Fcdn.example%2Fmanga.jpg")) {
+                        throw new AssertionError("Manga details lost the complete catalogue model: " + request.uri());
+                    }
+                    yield """
+                            {"manga":{"url":"/manga/bridge","title":"Bridge Manga",
+                            "description":"Detailed manga","author":"Author","artist":"Artist",
+                            "genre":"Action, Adventure","status":1,
+                            "thumbnail_url":"https://cdn.example/manga-detail.jpg"}}
+                            """;
+                }
                 case "/api/v1/manga/42/pages" -> """
                         {"pages":[{"index":0,"number":1,"url":"","imageUrl":"https://cdn.example/page.jpg"}]}
                         """;
@@ -1059,6 +1139,20 @@ final class ExtensionRepositoryTest {
                         "date_upload":1700000000000,"scanlator":"Team",
                         "preview_url":"https://cdn.example/episode.jpg"}]}
                         """;
+                case "/api/v1/anime/43/details" -> {
+                    String query = request.uri().getRawQuery();
+                    if (query == null || !query.contains("title=Bridge%20Anime")
+                            || !query.contains("description=Description")
+                            || !query.contains("thumbnailUrl=https%3A%2F%2Fcdn.example%2Fanime.jpg")) {
+                        throw new AssertionError("Anime details lost the complete catalogue model: " + request.uri());
+                    }
+                    yield """
+                            {"anime":{"url":"/anime/bridge","title":"Bridge Anime",
+                            "description":"Detailed anime","author":"Studio","artist":"",
+                            "genre":"Action","status":1,
+                            "thumbnail_url":"https://cdn.example/anime-detail.jpg"}}
+                            """;
+                }
                 case "/api/v1/anime/43/videos" -> """
                         {"videos":[{"videoUrl":"https://cdn.example/master.m3u8","videoTitle":"1080p",
                         "headers":{"Referer":"https://source.example/"},

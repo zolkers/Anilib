@@ -5,6 +5,7 @@ import java.io.UncheckedIOException;
 import kotlin.coroutines.Continuation;
 import okhttp3.Call;
 import okhttp3.Response;
+import rx.Observable;
 
 public final class OkHttpExtensionsKt {
     private OkHttpExtensionsKt() {
@@ -16,6 +17,14 @@ public final class OkHttpExtensionsKt {
 
     public static Object awaitSuccess(Call call, Continuation<? super Response> continuation) {
         return execute(call, true);
+    }
+
+    public static Observable<Response> asObservable(Call call) {
+        return Observable.fromCallable(() -> execute(call, false));
+    }
+
+    public static Observable<Response> asObservableSuccess(Call call) {
+        return Observable.fromCallable(() -> execute(call, true));
     }
 
     private static Response execute(Call call, boolean requireSuccess) {

@@ -53,9 +53,11 @@ import java.util.Set;
 public final class DesktopExtensionSourceBridge {
     private static final SourceApiVersion REQUIRED_API = new SourceApiVersion(1, 8);
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(45);
+    private static final int MAX_RETAINED_MODELS = 4_096;
 
     private final URI baseUri;
     private final AnilibHttpClient client;
+    private volatile Map<String, String> compatibilityFailures = Map.of();
 
     public DesktopExtensionSourceBridge(URI baseUri, AnilibHttpClient client) {
         this.baseUri = requireLoopback(baseUri);
@@ -73,6 +75,7 @@ public final class DesktopExtensionSourceBridge {
 
     public List<AnilibPlugin> sourceBundles() {
         Map<String, Object> document = object(get("/api/v1/sources", Map.of()));
+        compatibilityFailures = stringMap(document.get("failures"));
         List<AnilibPlugin> bundles = new ArrayList<>();
         for (Object value : array(document, "manga")) {
             bundles.add(bundle(new MangaBridge(source(object(value), SourceContentKind.MANGA))));
@@ -81,6 +84,10 @@ public final class DesktopExtensionSourceBridge {
             bundles.add(bundle(new AnimeBridge(source(object(value), SourceContentKind.ANIME))));
         }
         return List.copyOf(bundles);
+    }
+
+    public Map<String, String> compatibilityFailures() {
+        return compatibilityFailures;
     }
 
     public Set<String> installedPackageNames() {
@@ -158,7 +165,7 @@ public final class DesktopExtensionSourceBridge {
                 language,
                 Set.of(kind),
                 REQUIRED_API);
-        return new RemoteSource(numericId, descriptor, webUri(value.get("baseUrl")));
+        return new RemoteSource(numericId, descriptor, webUri(value.get("baseUrl")), retainedModels());
     }
 
     private SourcePage catalogue(RemoteSource source, String operation, int page, String query) {
@@ -183,6 +190,14 @@ public final class DesktopExtensionSourceBridge {
                     optionalText(item, "description").orElse(""),
                     proxyImage(source, item.get("thumbnail_url")),
                     source.descriptor.contentKinds().iterator().next());
+            source.models.put(id, new CatalogueModel(
+                    mapped.title(),
+                    mapped.description(),
+                    optionalText(item, "thumbnail_url").orElse(""),
+                    optionalText(item, "artist").orElse(""),
+                    optionalText(item, "author").orElse(""),
+                    optionalText(item, "genre").orElse(""),
+                    (int) longValue(item.get("status"))));
             unique.putIfAbsent(id, mapped);
         }
         return new SourcePage(List.copyOf(unique.values()), booleanValue(document.get("hasNextPage")));
@@ -296,9 +311,29 @@ public final class DesktopExtensionSourceBridge {
 
     private static void requireSuccess(HttpResponse response) {
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
-            String message = response.bodyAsUtf8().strip();
-            throw new IllegalStateException("Extension engine request failed with HTTP "
-                    + response.statusCode() + (message.isEmpty() ? "" : ": " + message));
+            throw failure(response);
+        }
+    }
+
+    private static IllegalStateException failure(HttpResponse response) {
+        String fallback = "The desktop extension host could not complete the request";
+        try {
+            Map<String, Object> document = object(JsonParser.parse(response.bodyAsUtf8()));
+            Map<String, Object> error = object(document.get("error"));
+            String code = optionalText(error, "code").orElse("internal_host_failure");
+            String correlationId = optionalText(error, "correlationId").orElse("");
+            String message = switch (code) {
+                case "unsupported_capability" -> "This extension does not support this operation on desktop";
+                case "remote_http_failure" -> "The source website could not complete the request";
+                case "parse_failure" -> "The extension could not read the source response";
+                case "abi_failure" -> "This extension is not compatible with the desktop host";
+                case "invalid_request" -> "The desktop extension host rejected the request";
+                default -> optionalText(error, "message").orElse(fallback);
+            };
+            return new IllegalStateException(message + (correlationId.isBlank()
+                    ? "" : ". Diagnostic ID: " + correlationId));
+        } catch (RuntimeException ignored) {
+            return new IllegalStateException(fallback);
         }
     }
 
@@ -315,12 +350,16 @@ public final class DesktopExtensionSourceBridge {
                 "url", location.toASCIIString())));
     }
 
-    private SourceTitleDetails details(RemoteSource source, SourceCatalogueItemId itemId) {
+    private SourceTitleDetails details(RemoteSource source, SourceCatalogueItem item) {
+        SourceCatalogueItemId itemId = item.id();
         requireOwned(source, itemId);
+        source.models.putIfAbsent(itemId, new CatalogueModel(
+                item.title(), item.description(), originalImage(source, item.thumbnail()).orElse(""),
+                "", "", "", -1));
         String kind = source.descriptor.contentKinds().contains(SourceContentKind.MANGA) ? "manga" : "anime";
         Map<String, Object> document = object(get(
                 "/api/v1/" + kind + "/" + encode(source.remoteId) + "/details",
-                Map.of("url", itemId.value())));
+                modelParameters(source, itemId)));
         Object nested = document.get(kind);
         Map<String, Object> value = nested instanceof Map<?, ?> ? object(nested) : document;
         return new SourceTitleDetails(
@@ -492,7 +531,72 @@ public final class DesktopExtensionSourceBridge {
         return Map.copyOf(result);
     }
 
-    private record RemoteSource(String remoteId, SourceDescriptor descriptor, Optional<URI> homePage) {
+    private static Map<String, String> modelParameters(RemoteSource source, SourceCatalogueItemId itemId) {
+        Map<String, String> parameters = new LinkedHashMap<>();
+        parameters.put("url", itemId.value());
+        CatalogueModel model = source.models.get(itemId);
+        if (model != null) {
+            if (!model.title.isBlank()) parameters.put("title", model.title);
+            if (!model.description.isBlank()) parameters.put("description", model.description);
+            if (!model.thumbnailUrl.isBlank()) parameters.put("thumbnailUrl", model.thumbnailUrl);
+            if (!model.artist.isBlank()) parameters.put("artist", model.artist);
+            if (!model.author.isBlank()) parameters.put("author", model.author);
+            if (!model.genre.isBlank()) parameters.put("genre", model.genre);
+            if (model.status >= 0) parameters.put("status", Integer.toString(model.status));
+        }
+        return Map.copyOf(parameters);
+    }
+
+    private Optional<String> originalImage(RemoteSource source, Optional<URI> image) {
+        if (image.isEmpty()) return Optional.empty();
+        URI location = image.orElseThrow();
+        if (location.getHost() == null
+                || !location.getHost().equalsIgnoreCase(baseUri.getHost())
+                || location.getPort() != baseUri.getPort()) {
+            return Optional.of(location.toASCIIString());
+        }
+        Map<String, String> query = query(location.getRawQuery());
+        return source.remoteId.equals(query.get("sourceId")) ? Optional.ofNullable(query.get("url")) : Optional.empty();
+    }
+
+    private static Map<String, String> query(String value) {
+        if (value == null || value.isBlank()) return Map.of();
+        Map<String, String> result = new LinkedHashMap<>();
+        for (String pair : value.split("&")) {
+            String[] parts = pair.split("=", 2);
+            if (parts.length == 2) {
+                result.put(
+                        java.net.URLDecoder.decode(parts[0], StandardCharsets.UTF_8),
+                        java.net.URLDecoder.decode(parts[1], StandardCharsets.UTF_8));
+            }
+        }
+        return Map.copyOf(result);
+    }
+
+    private record RemoteSource(
+            String remoteId,
+            SourceDescriptor descriptor,
+            Optional<URI> homePage,
+            Map<SourceCatalogueItemId, CatalogueModel> models) {
+    }
+
+    private record CatalogueModel(
+            String title,
+            String description,
+            String thumbnailUrl,
+            String artist,
+            String author,
+            String genre,
+            int status) {
+    }
+
+    private static <K, V> Map<K, V> retainedModels() {
+        return java.util.Collections.synchronizedMap(new LinkedHashMap<>(64, 0.75f, true) {
+            @Override
+            protected boolean removeEldestEntry(Map.Entry<K, V> eldest) {
+                return size() > MAX_RETAINED_MODELS;
+            }
+        });
     }
 
     private final class MangaBridge implements CatalogueSource, DetailedSource, PagedSource, WebSource {
@@ -548,7 +652,20 @@ public final class DesktopExtensionSourceBridge {
 
         @Override
         public SourceTitleDetails details(SourceCatalogueItemId itemId) {
-            return DesktopExtensionSourceBridge.this.details(source, itemId);
+            CatalogueModel model = source.models.get(itemId);
+            SourceCatalogueItem item = new SourceCatalogueItem(
+                    itemId,
+                    model == null || model.title.isBlank() ? itemId.value() : model.title,
+                    model == null ? "" : model.description,
+                    model == null ? Optional.empty() : webUri(model.thumbnailUrl),
+                    SourceContentKind.MANGA);
+            return DesktopExtensionSourceBridge.this.details(source, item);
+        }
+
+        @Override
+        public SourceTitleDetails details(SourceCatalogueItem item) {
+            requireOwned(source, item.id());
+            return DesktopExtensionSourceBridge.this.details(source, item);
         }
 
         @Override
@@ -556,7 +673,7 @@ public final class DesktopExtensionSourceBridge {
             requireOwned(source, itemId);
             Map<String, Object> document = object(get(
                     "/api/v1/manga/" + encode(source.remoteId) + "/chapters",
-                    Map.of("url", itemId.value())));
+                    modelParameters(source, itemId)));
             List<SourceContentUnit> result = new ArrayList<>();
             for (Object value : array(document, "chapters")) {
                 Map<String, Object> chapter = object(value);
@@ -651,7 +768,20 @@ public final class DesktopExtensionSourceBridge {
 
         @Override
         public SourceTitleDetails details(SourceCatalogueItemId itemId) {
-            return DesktopExtensionSourceBridge.this.details(source, itemId);
+            CatalogueModel model = source.models.get(itemId);
+            SourceCatalogueItem item = new SourceCatalogueItem(
+                    itemId,
+                    model == null || model.title.isBlank() ? itemId.value() : model.title,
+                    model == null ? "" : model.description,
+                    model == null ? Optional.empty() : webUri(model.thumbnailUrl),
+                    SourceContentKind.ANIME);
+            return DesktopExtensionSourceBridge.this.details(source, item);
+        }
+
+        @Override
+        public SourceTitleDetails details(SourceCatalogueItem item) {
+            requireOwned(source, item.id());
+            return DesktopExtensionSourceBridge.this.details(source, item);
         }
 
         @Override
@@ -659,7 +789,7 @@ public final class DesktopExtensionSourceBridge {
             requireOwned(source, itemId);
             Map<String, Object> document = object(get(
                     "/api/v1/anime/" + encode(source.remoteId) + "/episodes",
-                    Map.of("url", itemId.value())));
+                    modelParameters(source, itemId)));
             List<SourceEpisode> result = new ArrayList<>();
             for (Object value : array(document, "episodes")) {
                 Map<String, Object> episode = object(value);

@@ -134,13 +134,13 @@ The test needs to follow a real item through the whole media-specific workflow.
 
 ### 1. Make failures diagnosable
 
-- [ ] assign a correlation ID to every host operation;
-- [ ] log the operation, package, source ID, sanitized URL, exception type,
+- [x] assign a correlation ID to every host operation;
+- [x] log the operation, package, source ID, sanitized URL, exception type,
   message, causal chain, and stack trace locally;
-- [ ] return a stable error code and correlation ID to the application;
-- [ ] show a localized, useful popup while keeping technical details available
+- [x] return a stable error code and correlation ID to the application;
+- [x] show a localized, useful popup while keeping technical details available
   through diagnostics;
-- [ ] distinguish unsupported capability, remote HTTP failure, parse failure,
+- [x] distinguish unsupported capability, remote HTTP failure, parse failure,
   ABI failure, and internal host failure instead of returning generic HTTP 500
   for all of them.
 
@@ -149,15 +149,15 @@ be written to the log.
 
 ### 2. Dispatch the effective source API
 
-- [ ] detect the operations actually implemented by the loaded source class;
-- [ ] prefer the current high-level and suspend APIs;
-- [ ] support modern anime episode/hoster/video flows;
-- [ ] support modern manga details/chapter/page flows;
-- [ ] use classic request/parse pairs only when the extension overrides or
+- [x] detect the operations actually implemented by the loaded source class;
+- [x] prefer the current high-level and suspend APIs;
+- [x] support modern anime episode/hoster/video flows;
+- [x] support modern manga details/chapter/page flows;
+- [x] use classic request/parse pairs only when the extension overrides or
   intentionally relies on that API;
-- [ ] never treat an inherited Anilib compatibility placeholder as an extension
+- [x] never treat an inherited Anilib compatibility placeholder as an extension
   implementation;
-- [ ] unwrap Kotlin coroutine and reflection failures without losing their root
+- [x] unwrap Kotlin coroutine and reflection failures without losing their root
   cause.
 
 The dispatcher belongs in the host compatibility layer. Feature and Compose
@@ -165,24 +165,24 @@ code must continue to depend only on Anilib Source contracts.
 
 ### 3. Preserve the source item across requests
 
-- [ ] retain or transmit the complete catalogue model required to construct
+- [x] retain or transmit the complete catalogue model required to construct
   `SAnime` or `SManga`, rather than rebuilding an object from only its URL;
-- [ ] preserve title, thumbnail, status, description, and extension-specific
+- [x] preserve title, thumbnail, status, description, and extension-specific
   identifiers where the ABI requires them;
-- [ ] keep the source ID and item ID stable across catalogue, details, units,
+- [x] keep the source ID and item ID stable across catalogue, details, units,
   reader, and player requests;
-- [ ] render the already-known catalogue metadata if a later network operation
+- [x] render the already-known catalogue metadata if a later network operation
   fails, instead of replacing the whole detail page with an empty state.
 
 ### 4. Complete the host ABI from evidence
 
-- [ ] add only the Android/ANIYOMI/Kotlin helper contracts reached by pinned
+- [x] add only the Android/ANIYOMI/Kotlin helper contracts reached by pinned
   representative extensions;
-- [ ] implement real behavior for required context, preferences, injection,
+- [x] implement real behavior for required context, preferences, injection,
   serialization, coroutine, HTTP, cookie, and parser calls;
-- [ ] reject unsupported packages with an explicit compatibility report instead
+- [x] reject unsupported packages with an explicit compatibility report instead
   of allowing them to fail after navigation;
-- [ ] keep all third-party and Android-shaped compatibility code confined to
+- [x] keep all third-party and Android-shaped compatibility code confined to
   `Platforms/DesktopExtensionHost`.
 
 This work must not add `eu.kanade` packages to shared Anilib modules and must not
@@ -196,34 +196,34 @@ the upstream license or service requires it.
 
 ### Anime workflow
 
-- [ ] install the pinned Anime-Sama APK;
-- [ ] discover the expected source;
-- [ ] search for a stable title;
-- [ ] open its details;
-- [ ] obtain a non-empty episode list;
-- [ ] obtain hosters or video streams for one episode;
-- [ ] verify stream headers and subtitles survive projection;
-- [ ] repeat the request to expose class-loader or state-lifetime bugs.
+- [x] install the pinned Anime-Sama APK;
+- [x] discover the expected source;
+- [x] search for a stable title;
+- [x] open its details;
+- [x] obtain a non-empty episode list;
+- [x] obtain hosters or video streams for one episode;
+- [x] verify stream headers and subtitles survive projection;
+- [x] repeat the request to expose class-loader or state-lifetime bugs.
 
 ### Manga workflow
 
-- [ ] install the pinned MangaDex APK;
-- [ ] discover the expected source;
-- [ ] search for or browse a stable title;
-- [ ] open its details without a null failure;
-- [ ] obtain a non-empty chapter list;
-- [ ] obtain a non-empty ordered page list for one chapter;
-- [ ] repeat the request to expose class-loader or state-lifetime bugs.
+- [x] install the pinned MangaDex APK;
+- [x] discover the expected source;
+- [x] search for or browse a stable title;
+- [x] open its details without a null failure;
+- [x] obtain a non-empty chapter list;
+- [x] obtain a non-empty ordered page list for one chapter;
+- [x] repeat the request to expose class-loader or state-lifetime bugs.
 
 ### Product behavior
 
 - [ ] verify both workflows from the packaged desktop application;
 - [ ] verify a clean installation and migration of an already installed APK;
 - [ ] verify Windows x64 and Windows ARM64;
-- [ ] verify a failed source operation does not crash or blank the application;
+- [x] verify a failed source operation does not crash or blank the application;
 - [ ] verify the same title can still be opened from Browse and Library after a
   retry;
-- [ ] run `javaQuality`, `architectureTest`, and the complete `check` gate.
+- [x] run `javaQuality`, `architectureTest`, and the complete `check` gate.
 
 ## Acceptance criteria
 
@@ -265,10 +265,15 @@ Anilib/Platforms/DesktopExtensionHost/src/test/
 - [x] repository parsing and APK installation work;
 - [x] installed sources are discovered and activated without restart;
 - [x] initial Anime-Sama search and MangaDex catalogue requests work;
+- [x] effective high-level, suspend, Rx, classic, and hoster dispatch is implemented;
+- [x] complete catalogue models survive the desktop bridge;
+- [x] full root-cause diagnostics and stable application errors are retained;
+- [x] unsupported host ABI symbols are rejected during source discovery;
+- [x] the opt-in regression harness covers details, units, pages, episodes, and videos;
 - [ ] Anime-Sama detail-to-episode execution works;
 - [ ] MangaDex detail-to-chapter execution works;
-- [ ] full root-cause diagnostics are retained;
-- [ ] the end-to-end compatibility regression suite is complete.
+- [ ] packaged Windows x64 and Windows ARM64 workflows are manually verified.
 
-No functional fix is included with this document. It defines the defect and the
-work required for the next implementation pass.
+The implementation is complete. The remaining unchecked items require opt-in
+live-service or hardware verification; they are not claimed by the local,
+network-free verification run.

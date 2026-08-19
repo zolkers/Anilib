@@ -11,26 +11,45 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-public final class ExtensionRuntimeCatalog {
+public final class ExtensionRuntimeCatalog implements AutoCloseable {
     private final ExtensionRegistry registry;
+    private final ExtensionAbiVerifier abiVerifier;
+    private final List<Snapshot> generations = new ArrayList<>();
+    private Snapshot active;
+    private String activeSignature = "";
 
     public ExtensionRuntimeCatalog(ExtensionRegistry registry) {
         this.registry = Objects.requireNonNull(registry, "registry");
+        this.abiVerifier = new ExtensionAbiVerifier();
     }
 
-    public Snapshot discover() {
-        return discover(registry.installed());
+    public synchronized Snapshot discover() {
+        List<InstalledExtension> installed = registry.installed();
+        String signature = signature(installed);
+        if (active == null || !activeSignature.equals(signature)) {
+            active = discover(installed, true);
+            activeSignature = signature;
+            generations.add(active);
+        }
+        return active.borrow();
     }
 
     public Snapshot discover(List<InstalledExtension> extensions) {
+        return discover(extensions, false);
+    }
+
+    private Snapshot discover(List<InstalledExtension> extensions, boolean validateCompatibility) {
         List<LoadedSource> sources = new ArrayList<>();
         Map<String, String> failures = new LinkedHashMap<>();
         List<ExtensionClassLoader> loaders = new ArrayList<>();
         for (InstalledExtension extension : extensions) {
             try {
+                if (validateCompatibility) {
+                    abiVerifier.requireCompatible(extension.archive());
+                }
                 ExtensionClassLoader loader = new ExtensionClassLoader(extension.archive());
                 loaders.add(loader);
-                load(extension.metadata(), loader, sources);
+                load(extension.metadata(), loader, sources, validateCompatibility);
             } catch (LinkageError | ReflectiveOperationException | IOException | RuntimeException failure) {
                 failures.put(extension.metadata().packageName(), conciseMessage(failure));
             }
@@ -38,10 +57,40 @@ public final class ExtensionRuntimeCatalog {
         return new Snapshot(sources, failures, loaders);
     }
 
+    private static String signature(List<InstalledExtension> extensions) {
+        return String.join("\n", extensions.stream()
+                .map(extension -> extension.metadata().packageName()
+                        + ':' + extension.metadata().versionCode()
+                        + ':' + extension.archive().toAbsolutePath().normalize())
+                .sorted()
+                .toList());
+    }
+
+    @Override
+    public synchronized void close() {
+        UncheckedIOException failure = null;
+        for (Snapshot generation : generations) {
+            try {
+                generation.close();
+            } catch (UncheckedIOException exception) {
+                if (failure == null) {
+                    failure = exception;
+                } else {
+                    failure.addSuppressed(exception);
+                }
+            }
+        }
+        generations.clear();
+        active = null;
+        activeSignature = "";
+        if (failure != null) throw failure;
+    }
+
     private static void load(
             ExtensionApkMetadata metadata,
             ClassLoader loader,
-            List<LoadedSource> sources) throws ReflectiveOperationException {
+            List<LoadedSource> sources,
+            boolean validateCompatibility) throws ReflectiveOperationException {
         List<Object> instances = new ArrayList<>();
         if (metadata.factoryClass().isPresent()) {
             expandFactory(instantiate(loader.loadClass(metadata.factoryClass().orElseThrow())), instances, true);
@@ -54,7 +103,8 @@ public final class ExtensionRuntimeCatalog {
             throw new IllegalStateException("Extension produced no sources");
         }
         for (Object instance : instances) {
-            sources.add(describe(metadata, Objects.requireNonNull(instance, "source instance")));
+            sources.add(describe(
+                    metadata, Objects.requireNonNull(instance, "source instance"), validateCompatibility));
         }
     }
 
@@ -81,8 +131,14 @@ public final class ExtensionRuntimeCatalog {
         return type.getConstructor().newInstance();
     }
 
-    private static LoadedSource describe(ExtensionApkMetadata metadata, Object source)
+    private static LoadedSource describe(
+            ExtensionApkMetadata metadata,
+            Object source,
+            boolean validateCompatibility)
             throws ReflectiveOperationException {
+        if (validateCompatibility) {
+            ExtensionCompatibility.requireSupported(metadata.kind(), source);
+        }
         long id = number(source, "getId").longValue();
         String name = text(source, "getName");
         String language = optionalText(source, "getLang", "und");
@@ -160,6 +216,10 @@ public final class ExtensionRuntimeCatalog {
 
         public Map<String, String> failures() {
             return failures;
+        }
+
+        private Snapshot borrow() {
+            return new Snapshot(sources, failures, List.of());
         }
 
         @Override

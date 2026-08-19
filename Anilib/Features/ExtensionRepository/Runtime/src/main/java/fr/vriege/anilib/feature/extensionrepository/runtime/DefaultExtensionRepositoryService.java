@@ -90,12 +90,7 @@ public final class DefaultExtensionRepositoryService implements ExtensionReposit
         Instant fetchedAt = clock.instant();
         ExtensionRepositorySnapshot snapshot;
         try {
-            FetchResult fetched = fetchRepository(repository);
-            HttpResponse response = fetched.response();
-            if (response.body().length > MAX_INDEX_BYTES) {
-                throw new IllegalArgumentException("Repository response exceeds 4 MiB");
-            }
-            List<ExtensionPackageMetadata> packages = parser.parse(fetched.finalUri(), response.body());
+            List<ExtensionPackageMetadata> packages = fetchRepository(repository);
             snapshot = new ExtensionRepositorySnapshot(repository, fetchedAt, packages, java.util.Optional.empty());
         } catch (RuntimeException exception) {
             snapshot = new ExtensionRepositorySnapshot(
@@ -159,11 +154,23 @@ public final class DefaultExtensionRepositoryService implements ExtensionReposit
         throw new IllegalStateException("Unreachable repository redirect state");
     }
 
-    private FetchResult fetchRepository(URI configuredLocation) {
+    private List<ExtensionPackageMetadata> fetchRepository(URI configuredLocation) {
         RuntimeException lastFailure = null;
-        for (URI candidate : ExtensionRepositoryLocations.indexCandidates(configuredLocation)) {
+        List<URI> candidates = ExtensionRepositoryLocations.indexCandidates(configuredLocation);
+        for (int index = 0; index < candidates.size(); index++) {
+            URI candidate = candidates.get(index);
             try {
-                return fetch(candidate);
+                FetchResult fetched = fetch(candidate);
+                HttpResponse response = fetched.response();
+                if (response.body().length > MAX_INDEX_BYTES) {
+                    throw new IllegalArgumentException("Repository response exceeds 4 MiB");
+                }
+                List<ExtensionPackageMetadata> packages = parser.parse(fetched.finalUri(), response.body());
+                if (!packages.isEmpty() || index == candidates.size() - 1) {
+                    return packages;
+                }
+                lastFailure = new IllegalStateException(
+                        "Repository index contains no installable extensions: " + fetched.finalUri());
             } catch (RuntimeException exception) {
                 if (lastFailure != null) {
                     exception.addSuppressed(lastFailure);

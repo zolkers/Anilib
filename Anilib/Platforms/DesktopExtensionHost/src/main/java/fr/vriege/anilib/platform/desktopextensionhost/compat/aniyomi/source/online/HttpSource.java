@@ -2,6 +2,7 @@ package fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.source.onl
 
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.source.CatalogueSource;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.network.NetworkHelper;
+import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.network.OkHttpExtensionsKt;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.network.RequestsKt;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.source.model.FilterList;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.source.model.MangasPage;
@@ -12,6 +13,7 @@ import okhttp3.Headers;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
+import rx.Observable;
 
 import java.nio.ByteBuffer;
 import java.net.URI;
@@ -68,6 +70,70 @@ public abstract class HttpSource implements CatalogueSource {
     }
     protected String imageUrlParse(Response response) { throw unsupported("manga image URL"); }
     public FilterList getFilterList() { return new FilterList(); }
+
+    public Observable<MangasPage> fetchPopularManga(int page) {
+        return OkHttpExtensionsKt.asObservableSuccess(getClient().newCall(popularMangaRequest(page)))
+                .map(response -> {
+                    try (response) {
+                        return popularMangaParse(response);
+                    }
+                });
+    }
+
+    public Observable<MangasPage> fetchSearchManga(int page, String query, FilterList filters) {
+        return OkHttpExtensionsKt.asObservableSuccess(
+                getClient().newCall(searchMangaRequest(page, query, filters)))
+                .map(response -> {
+                    try (response) {
+                        return searchMangaParse(response);
+                    }
+                });
+    }
+
+    public Observable<MangasPage> fetchLatestUpdates(int page) {
+        return OkHttpExtensionsKt.asObservableSuccess(getClient().newCall(latestUpdatesRequest(page)))
+                .map(response -> {
+                    try (response) {
+                        return latestUpdatesParse(response);
+                    }
+                });
+    }
+
+    public Observable<SManga> fetchMangaDetails(SManga manga) {
+        return OkHttpExtensionsKt.asObservableSuccess(getClient().newCall(mangaDetailsRequest(manga)))
+                .map(response -> {
+                    try (response) {
+                        return mangaDetailsParse(response);
+                    }
+                });
+    }
+
+    public Observable<List<SChapter>> fetchChapterList(SManga manga) {
+        return OkHttpExtensionsKt.asObservableSuccess(getClient().newCall(chapterListRequest(manga)))
+                .map(response -> {
+                    try (response) {
+                        return chapterListParse(response);
+                    }
+                });
+    }
+
+    public Observable<List<Page>> fetchPageList(SChapter chapter) {
+        return OkHttpExtensionsKt.asObservableSuccess(getClient().newCall(pageListRequest(chapter)))
+                .map(response -> {
+                    try (response) {
+                        return pageListParse(response);
+                    }
+                });
+    }
+
+    public Observable<String> fetchImageUrl(Page page) {
+        return OkHttpExtensionsKt.asObservableSuccess(getClient().newCall(imageUrlRequest(page)))
+                .map(response -> {
+                    try (response) {
+                        return imageUrlParse(response);
+                    }
+                });
+    }
 
     public String getMangaUrl(SManga manga) { return mangaDetailsRequest(manga).url().toString(); }
     public String getChapterUrl(SChapter chapter) { return pageListRequest(chapter).url().toString(); }
