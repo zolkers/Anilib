@@ -28,6 +28,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Public
@@ -246,7 +247,7 @@ internal fun DiscoveryScreen(
                             Text("Languages")
                         }
                     }
-                    if (section.searchable() && !globalSearch) {
+                    if (section.sourceTab() && !globalSearch) {
                         IconButton(onClick = { globalSearch = true }) {
                             Icon(Icons.Default.Search, contentDescription = "Global search")
                         }
@@ -278,6 +279,31 @@ internal fun DiscoveryScreen(
                     )
                 }
             }
+            if (section.extensionTab()) {
+                OutlinedTextField(
+                    value = globalQuery,
+                    onValueChange = { globalQuery = it },
+                    singleLine = true,
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    trailingIcon = {
+                        if (globalQuery.isNotEmpty()) {
+                            IconButton(onClick = { globalQuery = "" }) {
+                                Icon(Icons.Default.Close, contentDescription = "Close search")
+                            }
+                        }
+                    },
+                    placeholder = {
+                        Text(
+                            if (section.kind == SourceContentKind.ANIME) {
+                                "Search anime extensions"
+                            } else {
+                                "Search manga extensions"
+                            },
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                )
+            }
             browseError?.let { message ->
                 Text(
                     message,
@@ -285,9 +311,7 @@ internal fun DiscoveryScreen(
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
                 )
             }
-            if (globalSearch && globalQuery.isNotBlank() && section.sourceTab()) {
-                GlobalSearchContent(presentation, section.kind!!, globalQuery)
-            } else if (globalSearch && section.extensionTab()) {
+            if (section.extensionTab()) {
                 ExtensionDiscoveryList(
                     extensionRepositories,
                     apkExtensionPlatform,
@@ -299,6 +323,8 @@ internal fun DiscoveryScreen(
                     globalQuery,
                     manageExtensions,
                 )
+            } else if (globalSearch && globalQuery.isNotBlank() && section.sourceTab()) {
+                GlobalSearchContent(presentation, section.kind!!, globalQuery)
             } else {
                 when (section) {
                     BrowseSection.ANIME_SOURCES,
@@ -342,20 +368,9 @@ internal fun DiscoveryScreen(
                             update = ::updateSource,
                         )
                     }
-                    BrowseSection.ANIME_EXTENSIONS -> ExtensionDiscoveryList(
-                        extensionRepositories,
-                        apkExtensionPlatform,
-                        ExtensionContentKind.ANIME,
-                        "",
-                        manageExtensions,
-                    )
-                    BrowseSection.MANGA_EXTENSIONS -> ExtensionDiscoveryList(
-                        extensionRepositories,
-                        apkExtensionPlatform,
-                        ExtensionContentKind.MANGA,
-                        "",
-                        manageExtensions,
-                    )
+                    BrowseSection.ANIME_EXTENSIONS,
+                    BrowseSection.MANGA_EXTENSIONS,
+                    -> Unit
                     BrowseSection.MIGRATE_ANIME -> MigrationContent(
                         SourceContentKind.ANIME,
                         presentation,
@@ -1919,8 +1934,6 @@ private fun BrowseSection.sourceTab(): Boolean =
 
 private fun BrowseSection.extensionTab(): Boolean =
     this == BrowseSection.ANIME_EXTENSIONS || this == BrowseSection.MANGA_EXTENSIONS
-
-private fun BrowseSection.searchable(): Boolean = sourceTab() || extensionTab()
 
 private fun ExtensionContentKind.matches(kind: SourceContentKind?): Boolean = when (this) {
     ExtensionContentKind.ANIME -> kind == SourceContentKind.ANIME

@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -192,6 +193,19 @@ internal fun BrowserScreen(
                 ) {
                     Text(message, modifier = Modifier.weight(1f))
                     TextButton(onClick = { platformMessage = null }) { Text("Dismiss") }
+                }
+            }
+            state.errorsForCurrentRequest.lastOrNull { it.isFromMainFrame }?.let { failure ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "Page failed to load (${failure.code}): ${failure.description}",
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(onClick = navigator::reload) { Text("Retry") }
                 }
             }
             WebView(

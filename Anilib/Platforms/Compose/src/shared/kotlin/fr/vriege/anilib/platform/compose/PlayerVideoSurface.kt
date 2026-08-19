@@ -1,5 +1,8 @@
 package fr.vriege.anilib.platform.compose
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -33,6 +36,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
@@ -44,6 +48,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.unit.dp
 import fr.vriege.anilib.feature.player.PlayerPlayback
 import fr.vriege.anilib.feature.player.PlayerAdvancedCapability
@@ -53,8 +58,10 @@ import fr.vriege.anilib.feature.player.ui.PlayerController
 import io.github.kdroidfilter.composemediaplayer.VideoPlayerSurface
 import io.github.kdroidfilter.composemediaplayer.rememberVideoPlayerState
 import kotlin.math.abs
+import kotlinx.coroutines.delay
 
 private const val PROGRESS_INTERVAL_MILLIS = 2_000L
+private const val CONTROLS_HIDE_DELAY_MILLIS = 3_000L
 
 @Composable
 internal fun PlayerVideoSurface(
@@ -75,6 +82,7 @@ internal fun PlayerVideoSurface(
     val player = rememberVideoPlayerState()
     val preferences = controller.preferences()
     var controlsVisible by remember(bridge) { mutableStateOf(true) }
+    var controlsActivity by remember(bridge) { mutableIntStateOf(0) }
     var locked by remember(bridge) { mutableStateOf(false) }
     var brightness by remember(bridge) { mutableFloatStateOf(1f) }
     var volume by remember(bridge) { mutableFloatStateOf(bridge.snapshot().volume()) }
@@ -119,18 +127,40 @@ internal fun PlayerVideoSurface(
             }
         }
     }
+    LaunchedEffect(
+        bridge,
+        controlsVisible,
+        controlsActivity,
+        player.isPlaying,
+        locked,
+        customMenu,
+        advancedMenu,
+    ) {
+        if (controlsVisible && player.isPlaying && !locked && !customMenu && !advancedMenu) {
+            delay(CONTROLS_HIDE_DELAY_MILLIS)
+            controlsVisible = false
+        }
+    }
+
+    fun revealControls() {
+        controlsVisible = true
+        controlsActivity++
+    }
 
     fun seekBy(deltaMillis: Long) {
+        revealControls()
         val state = bridge.snapshot()
         val maximum = if (state.durationMillis() > 0) state.durationMillis() else Long.MAX_VALUE
         controller.seekTo((state.positionMillis() + deltaMillis).coerceIn(0L, maximum))
     }
 
     fun togglePlayback() {
+        revealControls()
         if (player.isPlaying) controller.pause() else controller.play()
     }
 
     fun cycleSpeed() {
+        revealControls()
         val speeds = floatArrayOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
         val current = bridge.snapshot().playbackSpeed()
         val index = speeds.indexOfFirst { it > current + 0.01f }
@@ -138,11 +168,13 @@ internal fun PlayerVideoSurface(
     }
 
     fun cycleOrientation() {
+        revealControls()
         val values = PlayerOrientationPolicy.entries
         orientation = values[(orientation.ordinal + 1) % values.size]
     }
 
     fun execute(action: PlayerCustomAction) {
+        revealControls()
         when (action) {
             PlayerCustomAction.SEEK_BACK -> seekBy(-10_000L)
             PlayerCustomAction.SEEK_FORWARD -> seekBy(10_000L)
@@ -163,7 +195,11 @@ internal fun PlayerVideoSurface(
             .background(Color.Black)
             .pointerInput(locked) {
                 detectTapGestures(
-                    onTap = { if (!locked) controlsVisible = !controlsVisible },
+                    onTap = {
+                        if (!locked) {
+                            if (controlsVisible) controlsVisible = false else revealControls()
+                        }
+                    },
                     onDoubleTap = { position ->
                         if (!locked) {
                             when {
@@ -175,9 +211,19 @@ internal fun PlayerVideoSurface(
                     },
                 )
             }
+            .pointerInput(locked) {
+                awaitPointerEventScope {
+                    while (true) {
+                        if (awaitPointerEvent().type == PointerEventType.Move && !locked) {
+                            revealControls()
+                        }
+                    }
+                }
+            }
             .pointerInput(locked, brightness, volume) {
                 detectDragGestures(
                     onDragStart = {
+                        if (!locked) revealControls()
                         drag = Offset.Zero
                         dragStartX = it.x
                     },
@@ -215,35 +261,51 @@ internal fun PlayerVideoSurface(
                 )
             }
             if (locked) {
-                IconButton(onClick = { locked = false }, modifier = Modifier.align(Alignment.Center)) {
+                IconButton(
+                    onClick = {
+                        locked = false
+                        revealControls()
+                    },
+                    modifier = Modifier.align(Alignment.Center),
+                ) {
                     Icon(Icons.Default.LockOpen, "Unlock controls", tint = Color.White)
                 }
-            } else if (controlsVisible) {
-                Row(
-                    modifier = Modifier.align(Alignment.Center),
-                    verticalAlignment = Alignment.CenterVertically,
+            } else {
+                AnimatedVisibility(
+                    visible = controlsVisible,
+                    enter = fadeIn(),
+                    exit = fadeOut(),
+                    modifier = Modifier.fillMaxSize(),
                 ) {
-                    IconButton(onClick = { seekBy(-10_000L) }) {
-                        Icon(Icons.Default.Replay10, "Seek back", tint = Color.White)
-                    }
-                    IconButton(onClick = ::togglePlayback, modifier = Modifier.size(64.dp)) {
-                        Icon(
-                            if (player.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                            contentDescription = if (player.isPlaying) "Pause" else "Play",
-                            tint = Color.White,
-                            modifier = Modifier.size(42.dp),
-                        )
-                    }
-                    IconButton(onClick = { seekBy(10_000L) }) {
-                        Icon(Icons.Default.Forward10, "Seek forward", tint = Color.White)
-                    }
-                }
-                Column(
-                    modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(12.dp),
-                ) {
+                    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.42f))) {
+                        Row(
+                            modifier = Modifier.align(Alignment.Center),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            IconButton(onClick = { seekBy(-10_000L) }) {
+                                Icon(Icons.Default.Replay10, "Seek back", tint = Color.White)
+                            }
+                            IconButton(onClick = ::togglePlayback, modifier = Modifier.size(64.dp)) {
+                                Icon(
+                                    if (player.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                    contentDescription = if (player.isPlaying) "Pause" else "Play",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(42.dp),
+                                )
+                            }
+                            IconButton(onClick = { seekBy(10_000L) }) {
+                                Icon(Icons.Default.Forward10, "Seek forward", tint = Color.White)
+                            }
+                        }
+                        Column(
+                            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(12.dp),
+                        ) {
                     Slider(
                         value = player.sliderPos.coerceIn(0f, 1000f),
-                        onValueChange = player::seekStart,
+                        onValueChange = {
+                            revealControls()
+                            player.seekStart(it)
+                        },
                         onValueChangeFinished = {
                             player.seekFinished()
                             persistProgress(controller, bridge)
@@ -255,6 +317,7 @@ internal fun PlayerVideoSurface(
                         Slider(
                             value = volume,
                             onValueChange = {
+                                revealControls()
                                 volume = it
                                 controller.setVolume(it)
                             },
@@ -275,7 +338,10 @@ internal fun PlayerVideoSurface(
                             preferences.introEndMillis() > 0L &&
                             bridge.snapshot().positionMillis() < preferences.introEndMillis()
                         ) {
-                            TextButton(onClick = { controller.seekTo(preferences.introEndMillis()) }) {
+                            TextButton(onClick = {
+                                revealControls()
+                                controller.seekTo(preferences.introEndMillis())
+                            }) {
                                 Text("Skip intro", color = Color.White)
                             }
                         }
@@ -287,6 +353,7 @@ internal fun PlayerVideoSurface(
                             playbackState.durationMillis() - preferences.outroDurationMillis()
                         ) {
                             TextButton(onClick = {
+                                revealControls()
                                 controller.seekTo(playbackState.durationMillis())
                                 controller.markCompleted()
                             }) {
@@ -303,10 +370,14 @@ internal fun PlayerVideoSurface(
                             Text("${bridge.snapshot().playbackSpeed()}×", color = Color.White)
                         }
                         if (enableAndroidControls) {
-                            TextButton(onClick = requestPictureInPicture) {
+                            TextButton(onClick = {
+                                revealControls()
+                                requestPictureInPicture()
+                            }) {
                                 Text("PiP", color = Color.White)
                             }
                             TextButton(onClick = {
+                                revealControls()
                                 backgroundAudio = !backgroundAudio
                                 setBackgroundAudio(backgroundAudio)
                             }) {
@@ -317,22 +388,36 @@ internal fun PlayerVideoSurface(
                             }
                         }
                         if (enableDesktopControls && controller.advancedCapabilities().isNotEmpty()) {
-                            TextButton(onClick = { advancedMenu = true }) {
+                            TextButton(onClick = {
+                                revealControls()
+                                advancedMenu = true
+                            }) {
                                 Text("Advanced", color = Color.White)
                             }
                         }
                         IconButton(onClick = ::cycleOrientation) {
                             Icon(Icons.Default.ScreenRotation, "Orientation", tint = Color.White)
                         }
-                        IconButton(onClick = { customMenu = true }) {
+                        IconButton(onClick = {
+                            revealControls()
+                            customMenu = true
+                        }) {
                             Icon(Icons.Default.Tune, "Custom buttons", tint = Color.White)
                         }
-                        IconButton(onClick = { locked = true }) {
+                        IconButton(onClick = {
+                            controlsVisible = false
+                            locked = true
+                        }) {
                             Icon(Icons.Default.Lock, "Lock controls", tint = Color.White)
                         }
-                        IconButton(onClick = player::toggleFullscreen) {
+                        IconButton(onClick = {
+                            revealControls()
+                            player.toggleFullscreen()
+                        }) {
                             Icon(Icons.Default.Fullscreen, "Fullscreen", tint = Color.White)
                         }
+                    }
+                }
                     }
                 }
             }

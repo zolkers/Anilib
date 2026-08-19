@@ -62,8 +62,11 @@ internal object UiTranslations {
             "Reader" to "Lecteur",
             "Remove" to "Retirer",
             "Restore" to "Restaurer",
+            "Retry" to "Réessayer",
             "Save" to "Enregistrer",
             "Search" to "Rechercher",
+            "Search anime extensions" to "Rechercher des extensions dâ€™anime",
+            "Search manga extensions" to "Rechercher des extensions de manga",
             "Settings" to "Paramètres",
             "Share" to "Partager",
             "Statistics" to "Statistiques",
@@ -487,6 +490,8 @@ internal object UiTranslations {
             text.startsWith("Color filter: ") -> "Filtre de couleur : " + text.removePrefix("Color filter: ")
             text.startsWith("Resume at ") -> "Reprendre à " + text.removePrefix("Resume at ")
             text.startsWith("Remote page: ") -> "Page distante : " + text.removePrefix("Remote page: ")
+            text.startsWith("Page failed to load ") ->
+                "Échec du chargement de la page " + text.removePrefix("Page failed to load ")
             text.startsWith("Required Source API ") -> "API Source requise " + text.removePrefix("Required Source API ")
             text.startsWith("Downloaded ") -> "Téléchargé : " + text.removePrefix("Downloaded ")
             text.startsWith("Available: ") -> "Disponible : " + text.removePrefix("Available: ")
