@@ -1,6 +1,7 @@
 package fr.vriege.anilib.platform.compose
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -20,6 +22,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ViewList
@@ -95,7 +98,14 @@ import fr.vriege.anilib.feature.source.SourcePermission
 import fr.vriege.anilib.feature.source.SourcePreferenceType
 import fr.vriege.anilib.feature.source.SourceId
 import fr.vriege.anilib.feature.source.SourceWebPage
+import fr.vriege.anilib.feature.source.SourceTitleDetails
+import fr.vriege.anilib.feature.source.SourceEpisode
+import fr.vriege.anilib.feature.source.SourceContentUnit
 import fr.vriege.anilib.framework.http.HttpCookieJar
+import fr.vriege.anilib.feature.player.ui.PlayerPresentation
+import fr.vriege.anilib.feature.player.ui.PlayerController
+import fr.vriege.anilib.feature.reader.ui.ReaderPresentation
+import fr.vriege.anilib.feature.reader.ui.ReaderController
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.Dispatchers
@@ -116,6 +126,8 @@ private enum class BrowseSection(val label: String, val kind: SourceContentKind?
 internal fun DiscoveryScreen(
     presentation: DiscoveryPresentation,
     library: LibraryPresentation,
+    reader: ReaderPresentation,
+    player: PlayerPresentation,
     extensionRepositories: ExtensionRepositoryPresentation,
     browserCookies: HttpCookieJar,
     browserRuntimeStatus: BrowserRuntimeStatus,
@@ -187,6 +199,8 @@ internal fun DiscoveryScreen(
             source = source,
             listing = listing,
             presentation = presentation,
+            reader = reader,
+            player = player,
             openWebPage = { browserPage = it },
             navigateUp = { selectedSource = null },
         )
@@ -568,13 +582,17 @@ private fun SourceCatalogueScreen(
     source: SourceDescriptor,
     listing: SourceListing,
     presentation: DiscoveryPresentation,
+    reader: ReaderPresentation,
+    player: PlayerPresentation,
     openWebPage: (SourceWebPage) -> Unit,
     navigateUp: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
+    var selectedItem by remember(source.id()) { mutableStateOf<SourceCatalogueItem?>(null) }
+    var selectedListing by remember(source.id(), listing) { mutableStateOf(listing) }
     var query by remember(source.id()) { mutableStateOf("") }
     var searchActive by remember(source.id()) { mutableStateOf(false) }
-    var page by remember(source.id(), listing) { mutableIntStateOf(1) }
+    var page by remember(source.id(), selectedListing) { mutableIntStateOf(1) }
     var grid by remember(source.id()) {
         mutableStateOf(
             presentation.catalogueDisplayMode(source.id()) == DiscoveryCatalogueDisplayMode.GRID,
@@ -592,12 +610,12 @@ private fun SourceCatalogueScreen(
     }
     val sourceWebPage = remember(source.id()) { presentation.sourceWebPage(source.id()).orElse(null) }
     val supportsRefresh = remember(source.id()) { presentation.supportsRefresh(source.id()) }
-    var result by remember(source.id(), listing, query, page, filterValues, preferenceRevision) {
+    var result by remember(source.id(), selectedListing, query, page, filterValues, preferenceRevision) {
         mutableStateOf<Result<SourcePage>?>(null)
     }
     LaunchedEffect(
         source.id(),
-        listing,
+        selectedListing,
         query,
         page,
         filterValues,
@@ -609,12 +627,24 @@ private fun SourceCatalogueScreen(
             runCatching {
                 val filters = filterValues.map { SourceFilterValue(it.key, it.value) }
                 if (query.isBlank()) {
-                    presentation.browse(source.id(), listing, page, 30, filters)
+                    presentation.browse(source.id(), selectedListing, page, 30, filters)
                 } else {
                     presentation.search(source.id(), query, page, 30, filters)
                 }
             }
         }
+    }
+
+    selectedItem?.let { item ->
+        SourceTitleScreen(
+            item = item,
+            presentation = presentation,
+            reader = reader,
+            player = player,
+            openWebPage = openWebPage,
+            navigateUp = { selectedItem = null },
+        )
+        return
     }
 
     Scaffold(
@@ -636,7 +666,7 @@ private fun SourceCatalogueScreen(
                         Column {
                             Text(source.displayName())
                             Text(
-                                if (listing == SourceListing.POPULAR) "Popular" else "Latest",
+                                if (selectedListing == SourceListing.POPULAR) "Popular" else "Latest",
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 12.sp,
                             )
@@ -719,6 +749,31 @@ private fun SourceCatalogueScreen(
         },
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                FilterChip(
+                    selected = selectedListing == SourceListing.POPULAR,
+                    onClick = { selectedListing = SourceListing.POPULAR; page = 1 },
+                    label = { Text("Popular") },
+                )
+                if (presentation.supportsLatest(source.id())) {
+                    FilterChip(
+                        selected = selectedListing == SourceListing.LATEST,
+                        onClick = { selectedListing = SourceListing.LATEST; page = 1 },
+                        label = { Text("Latest") },
+                    )
+                }
+                if (definitions.isNotEmpty()) {
+                    FilterChip(
+                        selected = showFilters,
+                        onClick = { showFilters = !showFilters },
+                        label = { Text("Filter") },
+                        leadingIcon = { Icon(Icons.Default.Tune, contentDescription = null) },
+                    )
+                }
+            }
             if (showFilters) {
                 FilterPanel(definitions, filterValues) {
                     filterValues = it
@@ -749,6 +804,7 @@ private fun SourceCatalogueScreen(
                 CatalogueContent(
                     page = sourcePage,
                     grid = grid,
+                    open = { selectedItem = it },
                     add = { item ->
                         presentation.addToLibrary(item)
                         notice = "${item.title()} added to Library"
@@ -767,6 +823,7 @@ private fun SourceCatalogueScreen(
 private fun ColumnScope.CatalogueContent(
     page: SourcePage,
     grid: Boolean,
+    open: (SourceCatalogueItem) -> Unit,
     add: (SourceCatalogueItem) -> Unit,
     webPage: (SourceCatalogueItem) -> SourceWebPage?,
     openWebPage: (SourceWebPage) -> Unit,
@@ -784,13 +841,13 @@ private fun ColumnScope.CatalogueContent(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             items(page.items(), key = { it.id().toString() }) { item ->
-                CatalogueCard(item, add, webPage(item), openWebPage)
+                CatalogueCard(item, open, add, webPage(item), openWebPage)
             }
         }
     } else {
         LazyColumn(modifier = Modifier.weight(1f)) {
             items(page.items(), key = { it.id().toString() }) { item ->
-                CatalogueRow(item, add, webPage(item), openWebPage)
+                CatalogueRow(item, open, add, webPage(item), openWebPage)
             }
         }
     }
@@ -799,13 +856,28 @@ private fun ColumnScope.CatalogueContent(
 @Composable
 private fun CatalogueCard(
     item: SourceCatalogueItem,
+    open: (SourceCatalogueItem) -> Unit,
     add: (SourceCatalogueItem) -> Unit,
     webPage: SourceWebPage?,
     openWebPage: (SourceWebPage) -> Unit,
 ) {
-    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
-        Column(modifier = Modifier.fillMaxWidth().padding(14.dp)) {
-            Row(verticalAlignment = Alignment.Top) {
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable { open(item) },
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+    ) {
+        Box {
+            RemoteArtwork(
+                item.thumbnail().orElse(null),
+                item.title(),
+                modifier = Modifier.fillMaxWidth().aspectRatio(0.68f),
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth().align(Alignment.BottomCenter)
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.86f))
+                    .padding(start = 10.dp, top = 8.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text(
                     item.title(),
                     fontWeight = FontWeight.SemiBold,
@@ -815,19 +887,6 @@ private fun CatalogueCard(
                 )
                 CatalogueItemMenu(item, add, webPage, openWebPage)
             }
-            Spacer(Modifier.height(8.dp))
-            Text(
-                item.description(),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.height(10.dp))
-            OutlinedButton(onClick = { add(item) }) {
-                Icon(Icons.Default.Add, contentDescription = null)
-                Spacer(Modifier.width(6.dp))
-                Text("Library")
-            }
         }
     }
 }
@@ -835,17 +894,30 @@ private fun CatalogueCard(
 @Composable
 private fun CatalogueRow(
     item: SourceCatalogueItem,
+    open: (SourceCatalogueItem) -> Unit,
     add: (SourceCatalogueItem) -> Unit,
     webPage: SourceWebPage?,
     openWebPage: (SourceWebPage) -> Unit,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
+        modifier = Modifier.fillMaxWidth().clickable { open(item) }
+            .padding(horizontal = 20.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        RemoteArtwork(
+            item.thumbnail().orElse(null),
+            item.title(),
+            modifier = Modifier.size(width = 64.dp, height = 92.dp).clip(RoundedCornerShape(8.dp)),
+        )
+        Spacer(Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(item.title(), fontWeight = FontWeight.Medium)
-            Text(item.description(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                item.description(),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
         CatalogueItemMenu(item, add, webPage, openWebPage)
     }
@@ -883,6 +955,224 @@ private fun CatalogueItemMenu(
                     },
                 )
             }
+        }
+    }
+}
+
+private data class SourceTitleContent(
+    val details: SourceTitleDetails,
+    val episodes: List<SourceEpisode>,
+    val chapters: List<SourceContentUnit>,
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SourceTitleScreen(
+    item: SourceCatalogueItem,
+    presentation: DiscoveryPresentation,
+    reader: ReaderPresentation,
+    player: PlayerPresentation,
+    openWebPage: (SourceWebPage) -> Unit,
+    navigateUp: () -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    val artworkEnvironment = LocalExtensionIconEnvironment.current
+    var activeReader by remember(item.id()) { mutableStateOf<ReaderController?>(null) }
+    var activePlayer by remember(item.id()) { mutableStateOf<PlayerController?>(null) }
+    var content by remember(item.id()) { mutableStateOf<Result<SourceTitleContent>?>(null) }
+    var libraryItem by remember(item.id()) {
+        mutableStateOf(presentation.libraryItem(item.id()).orElse(null))
+    }
+    var notice by remember(item.id()) { mutableStateOf<String?>(null) }
+    val webPage = remember(item.id()) { presentation.titleWebPage(item.id()).orElse(null) }
+    LaunchedEffect(item.id()) {
+        content = withContext(Dispatchers.IO) {
+            runCatching {
+                SourceTitleContent(
+                    presentation.titleDetails(item),
+                    presentation.episodes(item.id()),
+                    presentation.contentUnits(item.id()),
+                )
+            }
+        }
+    }
+    activeReader?.let { controller ->
+        DisposableEffect(controller) {
+            onDispose { controller.close() }
+        }
+        ReaderScreen(
+            controller,
+            artworkEnvironment?.decode ?: { null },
+            {},
+            { _, _ -> },
+        ) { activeReader = null }
+        return
+    }
+    activePlayer?.let { controller ->
+        DisposableEffect(controller) {
+            onDispose { controller.close() }
+        }
+        PlayerSelectionScreen(
+            controller,
+            {},
+            {},
+            {},
+            {},
+            false,
+            true,
+        ) { activePlayer = null }
+        return
+    }
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(item.title(), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                navigationIcon = {
+                    IconButton(onClick = navigateUp) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    webPage?.let { page ->
+                        IconButton(onClick = { openWebPage(page) }) {
+                            Icon(Icons.Default.Public, contentDescription = "Open title website")
+                        }
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        when (val loaded = content) {
+            null -> Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+            else -> loaded.fold(
+                onSuccess = { value ->
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize().padding(padding),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
+                    ) {
+                        item {
+                            Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+                                RemoteArtwork(
+                                    value.details.thumbnail().orElse(null),
+                                    value.details.title(),
+                                    modifier = Modifier.size(width = 150.dp, height = 220.dp)
+                                        .clip(RoundedCornerShape(12.dp)),
+                                )
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text(
+                                        value.details.title(),
+                                        style = MaterialTheme.typography.headlineSmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                    )
+                                    Text(
+                                        value.details.status().name.lowercase().replace('_', ' '),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                    Button(
+                                        onClick = {
+                                            scope.launch {
+                                                runCatching {
+                                                    withContext(Dispatchers.IO) {
+                                                        presentation.addToLibrary(item)
+                                                    }
+                                                }.onSuccess {
+                                                    libraryItem = it
+                                                    notice = "Added as a Library shortcut"
+                                                }.onFailure {
+                                                    notice = it.message ?: "Could not add this shortcut"
+                                                }
+                                            }
+                                        },
+                                        enabled = libraryItem == null,
+                                    ) {
+                                        Icon(
+                                            if (libraryItem == null) Icons.Default.Add else Icons.Default.Check,
+                                            contentDescription = null,
+                                        )
+                                        Spacer(Modifier.width(6.dp))
+                                        Text(if (libraryItem == null) "Add shortcut" else "In Library")
+                                    }
+                                }
+                            }
+                        }
+                        notice?.let { message -> item { Text(message, color = MaterialTheme.colorScheme.primary) } }
+                        if (value.details.description().isNotBlank()) {
+                            item { Text(value.details.description()) }
+                        }
+                        if (value.details.genres().isNotEmpty()) {
+                            item {
+                                Text(
+                                    value.details.genres().joinToString(" · "),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                        if (value.episodes.isNotEmpty()) {
+                            item { Text("Episodes", style = MaterialTheme.typography.titleLarge) }
+                            items(value.episodes, key = { it.id().toString() }) { episode ->
+                                Card(
+                                    modifier = Modifier.fillMaxWidth().clickable {
+                                        runCatching {
+                                            player.open(value.details.title(), episode.id())
+                                        }.onSuccess {
+                                            notice = null
+                                            activePlayer = it
+                                        }.onFailure {
+                                            notice = it.message ?: "The episode could not be opened"
+                                        }
+                                    },
+                                ) {
+                                    Column(Modifier.fillMaxWidth().padding(14.dp)) {
+                                        Text(episode.title(), fontWeight = FontWeight.Medium)
+                                        if (episode.episodeNumber() >= 0) {
+                                            Text(
+                                                "Episode ${episode.episodeNumber()}",
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if (value.chapters.isNotEmpty()) {
+                            item { Text("Chapters", style = MaterialTheme.typography.titleLarge) }
+                            items(value.chapters, key = { it.id().toString() }) { chapter ->
+                                Card(
+                                    modifier = Modifier.fillMaxWidth().clickable {
+                                        runCatching {
+                                            reader.open(value.details.title(), chapter.id())
+                                        }.onSuccess {
+                                            notice = null
+                                            activeReader = it
+                                        }.onFailure {
+                                            notice = it.message ?: "The chapter could not be opened"
+                                        }
+                                    },
+                                ) {
+                                    Text(
+                                        chapter.title(),
+                                        modifier = Modifier.fillMaxWidth().padding(14.dp),
+                                        fontWeight = FontWeight.Medium,
+                                    )
+                                }
+                            }
+                        }
+                        if (value.episodes.isEmpty() && value.chapters.isEmpty()) {
+                            item { EmptyDiscovery("No episodes or chapters available") }
+                        }
+                    }
+                },
+                onFailure = { failure ->
+                    Box(Modifier.fillMaxSize().padding(padding)) {
+                        DiscoveryFailure(failure.message ?: "Unable to load this title") {
+                            content = null
+                        }
+                    }
+                },
+            )
         }
     }
 }
@@ -1055,6 +1345,7 @@ private fun GlobalSearchContent(
                 items(page.items(), key = { it.id().toString() }) { item ->
                     CatalogueRow(
                         item = item,
+                        open = {},
                         add = { presentation.addToLibrary(it) },
                         webPage = null,
                         openWebPage = {},

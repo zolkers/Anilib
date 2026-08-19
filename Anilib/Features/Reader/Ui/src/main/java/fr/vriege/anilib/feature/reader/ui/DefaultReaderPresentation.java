@@ -6,6 +6,8 @@ import fr.vriege.anilib.feature.reader.ReaderService;
 import fr.vriege.anilib.feature.reader.ReaderInteractionPreferenceStore;
 import fr.vriege.anilib.feature.reader.ReaderReadStateStore;
 import fr.vriege.anilib.feature.source.SourceContentUnit;
+import fr.vriege.anilib.feature.source.SourceCatalogueItemId;
+import fr.vriege.anilib.feature.source.SourceContentUnitId;
 
 import java.util.List;
 import java.util.Objects;
@@ -38,7 +40,17 @@ public final class DefaultReaderPresentation implements ReaderPresentation {
     }
 
     @Override
+    public List<SourceContentUnit> contentUnits(SourceCatalogueItemId itemId) {
+        return reader.contentUnits(itemId);
+    }
+
+    @Override
     public ReaderController open(LibraryItemId libraryItemId) {
         return new ReaderController(reader, libraryItemId, interactions, display, readState);
+    }
+
+    @Override
+    public ReaderController open(String title, SourceContentUnitId contentUnitId) {
+        return new ReaderController(reader, title, contentUnitId, interactions, display, readState);
     }
 }

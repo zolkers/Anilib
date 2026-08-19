@@ -12,12 +12,12 @@ explicit so an architectural seam cannot be mistaken for a finished workflow.
 | Screen group | Audited | Result | Next user-visible gap |
 | --- | --- | --- | --- |
 | Application shell and primary navigation | [x] | Partial | Add update/source badges, configurable start screen, and tab reselection behavior |
-| Library | [x] | Partial | Search, filters, persisted display choices, multi-selection, and bulk category/favourite/download/migrate/delete actions are live |
-| Anime and manga details | [x] | Complete | Shared artwork, facts, editable metadata, chapter/episode lists, related titles, reader/player/download/tracking actions, sharing, and title/source WebView entry points are live |
+| Library | [x] | Partial | Cover grid/list and shortcut-only ownership are live; validate density, badges, empty states, and bulk actions against the reference on both packaged hosts |
+| Anime and manga details | [x] | Partial | Source artwork, metadata, episode/chapter lists, and direct non-persistent Reader/Player opening no longer require Library admission; packaged-host visual validation remains |
 | Updates | [x] | Complete | Explicit scheduling, refresh/cancel, failures, progress, anime/manga/unread filters, date grouping, selection read/remove/exclude/download actions, per-item downloads, and actionable skipped-reason exceptions are live |
 | History | [x] | Complete | Search, Today/Yesterday/date grouping, anime/manga filters and labels, title navigation, media-aware resume, and targeted removal are live |
 | Browse landing and sources | [x] | Complete | Anime/manga source, extension, and migration tabs expose update-count badges, fixed-density rows, source/extension overflow actions, global search, languages, pinning, latest, WebView, and repository navigation |
-| Source catalogue, search, and filters | [x] | Complete | Popular/latest, paging, search, filters, source preferences, per-source persisted list/grid display, item menus, WebView entry, and library admission are live |
+| Source catalogue, search, and filters | [x] | Partial | Popular/latest chips, cover grid/list, search, source preferences, title navigation, direct playback/reading, WebView entry, and independent shortcut admission are live; add infinite paging and sidecar filter transport |
 | Local source | [x] | Complete | Aniyomi-compatible manga/anime roots expose metadata, covers, ordered chapters/episodes, thumbnails, subtitles, and an explicit atomic re-scan action |
 | Migration | [x] | Complete | Multi-title selection, target-source comparison, seasonal anime matching, title options, candidate preview, progress, cancellation, and retry of partial failures are live |
 | Extensions and repositories | [x] | Partial | Repository catalogue, scrollable language/pin ordering with immediate filled-pin feedback, repository artwork, platform-specific install actions and explanations, permission/trust/version/changelog details, progress, retry diagnostics, enable/remove, source navigation, and Browse update badges are live; add full per-source management parity |

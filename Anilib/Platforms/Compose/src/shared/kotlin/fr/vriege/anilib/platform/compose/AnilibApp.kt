@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -25,6 +26,7 @@ import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -672,6 +674,8 @@ private fun AppDestination(
         AppSection.BROWSE -> DiscoveryScreen(
             discovery,
             presentation,
+            reader,
+            player,
             extensionRepositories,
             browserCookies,
             browserRuntimeStatus,
@@ -931,7 +935,7 @@ private fun LibraryPageContent(
             }
             Spacer(Modifier.height(8.dp))
             if (overview.titles().isEmpty()) {
-                EmptyPage("Your library is empty. Add local content to begin.")
+                EmptyPage("Your library is empty. Add shortcuts from Browse to keep your titles here.")
             } else if (titles.isEmpty()) {
                 EmptyPage("No titles match the active library filters.")
             } else {
@@ -947,7 +951,7 @@ private fun LibraryPageContent(
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         gridItems(titles, key = { it.id().value() }) { card ->
-                            LibraryTitleCard(
+                            LibraryCoverCard(
                                 card,
                                 card.id() in selected,
                                 selectionMode,
@@ -1204,6 +1208,13 @@ private fun LibraryTitleCard(
             if (selectionMode) {
                 Checkbox(selected, onCheckedChange = { select() })
             }
+            RemoteArtwork(
+                card.artwork().orElse(null),
+                card.title(),
+                modifier = Modifier.size(width = 58.dp, height = 82.dp)
+                    .clip(RoundedCornerShape(9.dp)),
+            )
+            Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = card.title(),
@@ -1225,6 +1236,53 @@ private fun LibraryTitleCard(
                     text = "Favorite",
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Medium,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LibraryCoverCard(
+    card: LibraryCard,
+    selected: Boolean,
+    selectionMode: Boolean,
+    select: () -> Unit,
+    openDetails: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = if (selectionMode) select else openDetails),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+    ) {
+        Column {
+            Box {
+                RemoteArtwork(
+                    card.artwork().orElse(null),
+                    card.title(),
+                    modifier = Modifier.fillMaxWidth().aspectRatio(0.68f),
+                )
+                if (selectionMode) {
+                    Checkbox(
+                        checked = selected,
+                        onCheckedChange = { select() },
+                        modifier = Modifier.align(Alignment.TopStart),
+                    )
+                }
+            }
+            Column(Modifier.fillMaxWidth().padding(10.dp)) {
+                Text(
+                    card.title(),
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    cardMetadata(card),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.bodySmall,
                 )
             }
         }

@@ -23,6 +23,11 @@ import fr.vriege.anilib.feature.source.SourceStreamFormat;
 import fr.vriege.anilib.feature.source.SourceSubtitleTrack;
 import fr.vriege.anilib.feature.source.SourceVideoStream;
 import fr.vriege.anilib.feature.source.StreamingSource;
+import fr.vriege.anilib.feature.source.DetailedSource;
+import fr.vriege.anilib.feature.source.SourcePublicationStatus;
+import fr.vriege.anilib.feature.source.SourceTitleDetails;
+import fr.vriege.anilib.feature.source.SourcePreferenceDefinition;
+import fr.vriege.anilib.feature.source.SourcePreferenceType;
 import fr.vriege.anilib.foundation.component.ComponentDescriptor;
 import fr.vriege.anilib.foundation.validation.Preconditions;
 import fr.vriege.anilib.framework.http.AnilibHttpClient;
@@ -45,7 +50,7 @@ import java.util.Optional;
 import java.util.Set;
 
 public final class MiwayomiSourceBridge {
-    private static final SourceApiVersion REQUIRED_API = new SourceApiVersion(1, 7);
+    private static final SourceApiVersion REQUIRED_API = new SourceApiVersion(1, 8);
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(45);
 
     private final URI baseUri;
@@ -95,7 +100,7 @@ public final class MiwayomiSourceBridge {
             throw new IllegalStateException(optionalText(result, "error").orElse("Extension engine rejected the APK"));
         }
         String name = optionalText(result, "name").orElse(uri.getPath());
-        return name + " installed for desktop. Restart Anilib to activate its sources.";
+        return name + " installed for desktop.";
     }
 
     private AnilibPlugin bundle(Source source) {
@@ -152,11 +157,67 @@ public final class MiwayomiSourceBridge {
                     id,
                     text(item, "title"),
                     optionalText(item, "description").orElse(""),
-                    webUri(item.get("thumbnail_url")),
+                    proxyImage(source, item.get("thumbnail_url")),
                     source.descriptor.contentKinds().iterator().next());
             unique.putIfAbsent(id, mapped);
         }
         return new SourcePage(List.copyOf(unique.values()), booleanValue(document.get("hasNextPage")));
+    }
+
+    private List<SourcePreferenceDefinition> preferences(RemoteSource source) {
+        Map<String, Object> document = object(get(
+                "/api/v1/sources/" + encode(source.remoteId) + "/prefs", Map.of()));
+        Object raw = document.get("prefs");
+        if (!(raw instanceof List<?> values)) {
+            return List.of();
+        }
+        List<SourcePreferenceDefinition> result = new ArrayList<>();
+        for (Object entry : values) {
+            Map<String, Object> value = object(entry);
+            String id = text(value, "key");
+            String title = optionalText(value, "title").orElse(id);
+            String summary = optionalText(value, "summary").orElse("");
+            String type = optionalText(value, "type").orElse("text").toLowerCase(Locale.ROOT);
+            String current = String.valueOf(value.getOrDefault("value", ""));
+            List<String> options = splitValues(value.get("values"));
+            SourcePreferenceType mapped = switch (type) {
+                case "boolean", "switch" -> SourcePreferenceType.SWITCH;
+                case "list", "select" -> SourcePreferenceType.SELECT;
+                default -> SourcePreferenceType.TEXT;
+            };
+            String defaultValue = switch (mapped) {
+                case SWITCH -> Boolean.toString(Boolean.parseBoolean(current));
+                case SELECT -> options.contains(current) ? current : options.isEmpty() ? "" : options.getFirst();
+                case TEXT -> current.equals("null") ? "" : current;
+            };
+            if (mapped != SourcePreferenceType.SELECT || !options.isEmpty()) {
+                result.add(new SourcePreferenceDefinition(
+                        id, title, summary, mapped, options, defaultValue, false));
+            }
+        }
+        return List.copyOf(result);
+    }
+
+    private void applyPreferences(RemoteSource source, Map<String, String> values) {
+        if (values.isEmpty()) {
+            return;
+        }
+        String body = "{" + String.join(",", values.entrySet().stream()
+                .map(entry -> jsonString(entry.getKey()) + ":" + preferenceJson(entry.getValue()))
+                .toList()) + "}";
+        Map<String, Object> result = object(post(
+                "/api/v1/sources/" + encode(source.remoteId) + "/prefs", body));
+        if (!booleanValue(result.get("ok"))) {
+            throw new IllegalStateException(optionalText(result, "error")
+                    .orElse("Extension engine rejected source preferences"));
+        }
+    }
+
+    private static String preferenceJson(String value) {
+        if (value.equals("true") || value.equals("false")) {
+            return value;
+        }
+        return jsonString(value);
     }
 
     private Object get(String path, Map<String, String> parameters) {
@@ -221,6 +282,56 @@ public final class MiwayomiSourceBridge {
                     .toList()));
         }
         return endpoint(path, parameters);
+    }
+
+    private Optional<URI> proxyImage(RemoteSource source, Object value) {
+        return webUri(value).map(location -> endpoint("/api/v1/proxy", Map.of(
+                "sourceId", source.remoteId,
+                "url", location.toASCIIString())));
+    }
+
+    private SourceTitleDetails details(RemoteSource source, SourceCatalogueItemId itemId) {
+        requireOwned(source, itemId);
+        String kind = source.descriptor.contentKinds().contains(SourceContentKind.MANGA) ? "manga" : "anime";
+        Map<String, Object> document = object(get(
+                "/api/v1/" + kind + "/" + encode(source.remoteId) + "/details",
+                Map.of("url", itemId.value())));
+        Object nested = document.get(kind);
+        Map<String, Object> value = nested instanceof Map<?, ?> ? object(nested) : document;
+        return new SourceTitleDetails(
+                itemId,
+                text(value, "title"),
+                optionalText(value, "description").orElse(""),
+                splitValues(value.get("author")),
+                splitValues(value.get("artist")),
+                splitValues(value.get("genre")),
+                publicationStatus(value.get("status")),
+                proxyImage(source, value.get("thumbnail_url")),
+                source.descriptor.contentKinds().iterator().next());
+    }
+
+    private static List<String> splitValues(Object value) {
+        if (value instanceof List<?> values) {
+            return values.stream().filter(String.class::isInstance).map(String.class::cast)
+                    .map(String::strip).filter(item -> !item.isEmpty()).toList();
+        }
+        if (value instanceof String text) {
+            return java.util.Arrays.stream(text.split(","))
+                    .map(String::strip).filter(item -> !item.isEmpty()).toList();
+        }
+        return List.of();
+    }
+
+    private static SourcePublicationStatus publicationStatus(Object value) {
+        return switch ((int) longValue(value)) {
+            case 1 -> SourcePublicationStatus.ONGOING;
+            case 2 -> SourcePublicationStatus.COMPLETED;
+            case 3 -> SourcePublicationStatus.LICENSED;
+            case 4 -> SourcePublicationStatus.FINISHED;
+            case 5 -> SourcePublicationStatus.CANCELLED;
+            case 6 -> SourcePublicationStatus.ON_HIATUS;
+            default -> SourcePublicationStatus.UNKNOWN;
+        };
     }
 
     private static URI requireLoopback(URI value) {
@@ -359,7 +470,7 @@ public final class MiwayomiSourceBridge {
     private record RemoteSource(String remoteId, SourceDescriptor descriptor) {
     }
 
-    private final class MangaBridge implements CatalogueSource, PagedSource {
+    private final class MangaBridge implements CatalogueSource, DetailedSource, PagedSource {
         private final RemoteSource source;
 
         private MangaBridge(RemoteSource source) {
@@ -373,6 +484,7 @@ public final class MiwayomiSourceBridge {
 
         @Override
         public SourcePage popular(SourceBrowseRequest request) {
+            applyPreferences(source, request.preferences());
             return catalogue(source, "popular", request.page(), null);
         }
 
@@ -383,12 +495,24 @@ public final class MiwayomiSourceBridge {
 
         @Override
         public SourcePage latest(SourceBrowseRequest request) {
+            applyPreferences(source, request.preferences());
             return catalogue(source, "latest", request.page(), null);
         }
 
         @Override
         public SourcePage search(SourceSearchRequest request) {
+            applyPreferences(source, request.browseRequest().preferences());
             return catalogue(source, "search", request.browseRequest().page(), request.query());
+        }
+
+        @Override
+        public List<SourcePreferenceDefinition> preferences() {
+            return MiwayomiSourceBridge.this.preferences(source);
+        }
+
+        @Override
+        public SourceTitleDetails details(SourceCatalogueItemId itemId) {
+            return MiwayomiSourceBridge.this.details(source, itemId);
         }
 
         @Override
@@ -438,7 +562,7 @@ public final class MiwayomiSourceBridge {
         }
     }
 
-    private final class AnimeBridge implements CatalogueSource, StreamingSource {
+    private final class AnimeBridge implements CatalogueSource, DetailedSource, StreamingSource {
         private final RemoteSource source;
 
         private AnimeBridge(RemoteSource source) {
@@ -452,6 +576,7 @@ public final class MiwayomiSourceBridge {
 
         @Override
         public SourcePage popular(SourceBrowseRequest request) {
+            applyPreferences(source, request.preferences());
             return catalogue(source, "popular", request.page(), null);
         }
 
@@ -462,12 +587,24 @@ public final class MiwayomiSourceBridge {
 
         @Override
         public SourcePage latest(SourceBrowseRequest request) {
+            applyPreferences(source, request.preferences());
             return catalogue(source, "latest", request.page(), null);
         }
 
         @Override
         public SourcePage search(SourceSearchRequest request) {
+            applyPreferences(source, request.browseRequest().preferences());
             return catalogue(source, "search", request.browseRequest().page(), request.query());
+        }
+
+        @Override
+        public List<SourcePreferenceDefinition> preferences() {
+            return MiwayomiSourceBridge.this.preferences(source);
+        }
+
+        @Override
+        public SourceTitleDetails details(SourceCatalogueItemId itemId) {
+            return MiwayomiSourceBridge.this.details(source, itemId);
         }
 
         @Override

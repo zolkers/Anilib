@@ -15,6 +15,9 @@ import fr.vriege.anilib.feature.source.SourceId;
 import fr.vriege.anilib.feature.source.SourceListing;
 import fr.vriege.anilib.feature.source.SourcePage;
 import fr.vriege.anilib.feature.source.SourceWebPage;
+import fr.vriege.anilib.feature.source.SourceTitleDetails;
+import fr.vriege.anilib.feature.source.SourceContentUnit;
+import fr.vriege.anilib.feature.source.SourceEpisode;
 
 import java.util.List;
 import java.util.Map;
@@ -72,6 +75,14 @@ public interface DiscoveryPresentation {
     List<SourcePreferenceSnapshot> preferences(SourceId sourceId);
 
     void setPreference(SourceId sourceId, String preferenceId, String value);
+
+    SourceTitleDetails titleDetails(SourceCatalogueItem item);
+
+    List<SourceContentUnit> contentUnits(SourceCatalogueItemId itemId);
+
+    List<SourceEpisode> episodes(SourceCatalogueItemId itemId);
+
+    Optional<LibraryItemId> libraryItem(SourceCatalogueItemId itemId);
 
     LibraryItemId addToLibrary(SourceCatalogueItem item);
 

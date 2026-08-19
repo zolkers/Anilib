@@ -41,6 +41,7 @@ final class SourceExtensionSdkTest {
     static int run() {
         Counter counter = new Counter();
         verifiesRegistry(counter);
+        verifiesDynamicBundleRegistration(counter);
         rejectsDuplicateSourceIds(counter);
         rejectsIncompatibleApi(counter);
         validatesDescriptors(counter);
@@ -48,6 +49,21 @@ final class SourceExtensionSdkTest {
         enforcesExplicitPermissions(counter);
         rejectsInvalidExtensionDeclarations(counter);
         return counter.value;
+    }
+
+    private static void verifiesDynamicBundleRegistration(Counter counter) {
+        Source source = source("test.dynamic", "Dynamic", SourceSdk.API_VERSION);
+        try (StartedAnilib application = new DefaultPluginEngine().start(List.of(new SourceSdkPlugin()))) {
+            SourceRegistry registry = application.capability(SourceCapabilities.REGISTRY);
+            var registration = application.install(extension("extension.dynamic", source));
+            counter.check(registry.find(SourceId.of("test.dynamic")).orElseThrow() == source,
+                    "a running product must activate an explicitly installed source Bundle");
+            counter.check(application.components().contains(registration.component()),
+                    "a dynamic Bundle must remain visible in the product component inventory");
+            registration.close();
+            counter.check(registry.find(SourceId.of("test.dynamic")).isEmpty(),
+                    "closing a dynamic Bundle registration must remove its source");
+        }
     }
 
     private static void verifiesRegistry(Counter counter) {
@@ -106,7 +122,9 @@ final class SourceExtensionSdkTest {
                 "current Source API must support its browser-policy contract");
         counter.check(SourceSdk.API_VERSION.supports(new SourceApiVersion(1, 7)),
                 "current Source API must support refresh and episode thumbnails");
-        counter.check(!SourceSdk.API_VERSION.supports(new SourceApiVersion(1, 8)),
+        counter.check(SourceSdk.API_VERSION.supports(new SourceApiVersion(1, 8)),
+                "current Source API must support title details");
+        counter.check(!SourceSdk.API_VERSION.supports(new SourceApiVersion(1, 9)),
                 "current Source API must reject a newer minor contract");
     }
 

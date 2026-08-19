@@ -31,6 +31,13 @@ import fr.vriege.anilib.feature.source.SourceRegistry;
 import fr.vriege.anilib.feature.source.SourceSearchRequest;
 import fr.vriege.anilib.feature.source.SourceWebPage;
 import fr.vriege.anilib.feature.source.WebSource;
+import fr.vriege.anilib.feature.source.DetailedSource;
+import fr.vriege.anilib.feature.source.PagedSource;
+import fr.vriege.anilib.feature.source.StreamingSource;
+import fr.vriege.anilib.feature.source.SourceContentUnit;
+import fr.vriege.anilib.feature.source.SourceEpisode;
+import fr.vriege.anilib.feature.source.SourcePublicationStatus;
+import fr.vriege.anilib.feature.source.SourceTitleDetails;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -201,6 +208,54 @@ public final class DefaultDiscoveryService implements DiscoveryService {
     }
 
     @Override
+    public SourceTitleDetails titleDetails(SourceCatalogueItem item) {
+        Objects.requireNonNull(item, "item must not be null");
+        Source source = registry.find(item.id().sourceId())
+                .orElseThrow(() -> new IllegalArgumentException("Source is not installed: " + item.id().sourceId()));
+        if (source instanceof DetailedSource detailedSource) {
+            return Objects.requireNonNull(
+                    detailedSource.details(item.id()), "detailed source returned null details");
+        }
+        return new SourceTitleDetails(
+                item.id(), item.title(), item.description(), List.of(), List.of(), List.of(),
+                SourcePublicationStatus.UNKNOWN, item.thumbnail(), item.contentKind());
+    }
+
+    @Override
+    public List<SourceContentUnit> contentUnits(SourceCatalogueItemId itemId) {
+        Objects.requireNonNull(itemId, "itemId must not be null");
+        Source source = registry.find(itemId.sourceId())
+                .orElseThrow(() -> new IllegalArgumentException("Source is not installed: " + itemId.sourceId()));
+        if (!(source instanceof PagedSource pagedSource)) {
+            return List.of();
+        }
+        return List.copyOf(Objects.requireNonNull(
+                pagedSource.contentUnits(itemId), "paged source returned null content units"));
+    }
+
+    @Override
+    public List<SourceEpisode> episodes(SourceCatalogueItemId itemId) {
+        Objects.requireNonNull(itemId, "itemId must not be null");
+        Source source = registry.find(itemId.sourceId())
+                .orElseThrow(() -> new IllegalArgumentException("Source is not installed: " + itemId.sourceId()));
+        if (!(source instanceof StreamingSource streamingSource)) {
+            return List.of();
+        }
+        return List.copyOf(Objects.requireNonNull(
+                streamingSource.episodes(itemId), "streaming source returned null episodes"));
+    }
+
+    @Override
+    public Optional<LibraryItemId> libraryItem(SourceCatalogueItemId itemId) {
+        Objects.requireNonNull(itemId, "itemId must not be null");
+        LibraryOrigin selected = new LibraryOrigin(itemId.sourceId().toString(), itemId.value());
+        return library.snapshot().stream()
+                .filter(item -> item.origin().filter(selected::equals).isPresent())
+                .map(LibraryItem::id)
+                .findFirst();
+    }
+
+    @Override
     public LibraryItemId addToLibrary(SourceCatalogueItem item) {
         Objects.requireNonNull(item, "item must not be null");
         catalogue(item.id().sourceId());
@@ -212,8 +267,9 @@ public final class DefaultDiscoveryService implements DiscoveryService {
         if (existing != null) {
             return existing.id();
         }
-        LibraryItem created = LibraryItem.create(item.title(), mediaKind(item.contentKind()))
-                .withMetadata(metadata(item))
+        SourceTitleDetails details = titleDetails(item);
+        LibraryItem created = LibraryItem.create(details.title(), mediaKind(details.contentKind()))
+                .withMetadata(metadata(details))
                 .withOrigin(origin);
         library.save(created);
         return created.id();
@@ -388,5 +444,22 @@ public final class DefaultDiscoveryService implements DiscoveryService {
                 PublicationStatus.UNKNOWN,
                 item.thumbnail(),
                 List.of());
+    }
+
+    private static LibraryTitleMetadata metadata(SourceTitleDetails details) {
+        return new LibraryTitleMetadata(
+                details.description(),
+                details.authors(),
+                details.artists(),
+                switch (details.status()) {
+                    case ONGOING -> PublicationStatus.ONGOING;
+                    case COMPLETED, FINISHED -> PublicationStatus.COMPLETED;
+                    case LICENSED -> PublicationStatus.UNKNOWN;
+                    case CANCELLED -> PublicationStatus.CANCELLED;
+                    case ON_HIATUS -> PublicationStatus.HIATUS;
+                    case UNKNOWN -> PublicationStatus.UNKNOWN;
+                },
+                details.thumbnail(),
+                details.genres());
     }
 }

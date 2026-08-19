@@ -150,8 +150,9 @@ final class ExtensionRepositoryTest {
                     "the desktop anime bridge must keep streams and subtitles behind its loopback relay");
         }
         String installed = bridge.install(URI.create("https://repo.example/extensions/example.apk"));
-        counter.check(client.savedRepositories && client.installRequested && installed.contains("Restart Anilib"),
-                "desktop APK installation must synchronize repositories and require an explicit restart");
+        counter.check(
+                client.savedRepositories && client.installRequested && installed.contains("installed for desktop"),
+                "desktop APK installation must synchronize repositories and report immediate installation");
         counter.expectIllegalArgument(
                 () -> new MiwayomiSourceBridge(URI.create("http://example.test:43127/"), client),
                 "the desktop APK bridge must reject non-loopback engines");

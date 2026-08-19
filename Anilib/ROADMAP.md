@@ -178,8 +178,8 @@ revision and run the same fixtures on packaged Android and desktop hosts.
   reports, identity-preserving Anilib module scaffold, dual-artifact publisher,
   checksums, and reusable GitHub publication workflow
 - [x] execute existing manga and anime APK sources on desktop through an optional
-  checksum-pinned sidecar, explicit Source Bundles, loopback-only catalogue,
-  chapter/page/episode/stream adapters, repository sync, and restart activation
+  checksum-pinned sidecar, explicit hot-installed leaf Source Bundles, loopback-only
+  catalogue/details/preferences/chapter/page/episode/stream adapters, and repository sync
 - [x] provision the pinned desktop compatibility sidecar on the first explicit
   APK installation, with bounded download, official release URL, SHA-256
   verification, atomic configuration, and no manual `engine.properties` step
@@ -207,6 +207,17 @@ platform-specific.
   and activity period
 
 ### 2. Browse, sources, extensions, and migration
+
+- [x] replace text-only catalogue cards with cached cover grids/lists, popular/latest
+  controls, autonomous source-title details, episode/chapter lists, and independent
+  Library shortcut admission on Android and desktop shared UI
+- [x] activate newly installed desktop APK sources without application restart and
+  keep repository cards in a non-downloadable installed state
+- [x] open source episodes and chapters directly in Player/Reader without persisting
+  a Library title; transient sessions must not write Library history or progress
+- [ ] replace explicit catalogue pagination with bounded incremental loading
+- [ ] transport extension-defined filter state through the desktop compatibility
+  engine or document and gate the exact unsupported engine versions
 
 - [x] add source and extension update badges, richer overflow actions, and exact
   Aniyomi density and loading/error states

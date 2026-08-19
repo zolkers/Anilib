@@ -337,15 +337,18 @@ internal object UiTranslations {
             "Downloaded only" to "Téléchargés uniquement",
             "Install on Android" to "Installer sur Android",
             "Install for desktop" to "Installer sur le bureau",
+            "Open title website" to "Ouvrir le site du titre",
+            "Installed · sources active in Browse" to
+                "Installée · sources actives dans Parcourir",
             "Installing APK in desktop engine" to "Installation de l’APK dans le moteur bureau",
             "Downloading verified desktop compatibility" to
                 "Téléchargement de la compatibilité bureau vérifiée",
             "Desktop APK compatibility is ready to install. Select Install for desktop on any APK source." to
                 "La compatibilité APK sur bureau est prête. Sélectionnez Installer sur le bureau sur une source APK.",
             ("Existing manga and anime APK extensions run in Anilib's isolated desktop engine. " +
-                "Newly installed sources activate after restart.") to
+                "Newly installed sources activate immediately.") to
                 ("Les extensions APK manga et anime fonctionnent dans le moteur bureau isolé d’Anilib. " +
-                    "Les nouvelles sources s’activent après redémarrage."),
+                    "Les nouvelles sources s’activent immédiatement."),
             "Library and reading activity" to "Bibliothèque et activité de lecture",
             "Manage external tracking accounts" to "Gérer les comptes de suivi externes",
             "No extensions installed" to "Aucune extension installée",

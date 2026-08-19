@@ -5,6 +5,7 @@ import fr.vriege.anilib.feature.player.EpisodeSnapshot;
 import fr.vriege.anilib.feature.player.PlayerPreferenceStore;
 import fr.vriege.anilib.feature.player.PlayerService;
 import fr.vriege.anilib.feature.source.SourceEpisodeId;
+import fr.vriege.anilib.feature.source.SourceCatalogueItemId;
 
 import java.util.List;
 import java.util.Objects;
@@ -29,8 +30,18 @@ public final class DefaultPlayerPresentation implements PlayerPresentation {
     }
 
     @Override
+    public List<EpisodeSnapshot> episodes(SourceCatalogueItemId itemId) {
+        return player.episodes(itemId);
+    }
+
+    @Override
     public PlayerController open(LibraryItemId libraryItemId, SourceEpisodeId episodeId) {
         return new PlayerController(player.open(libraryItemId, episodeId), preferences);
+    }
+
+    @Override
+    public PlayerController open(String title, SourceEpisodeId episodeId) {
+        return new PlayerController(player.open(title, episodeId), preferences);
     }
 
     @Override

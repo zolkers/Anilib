@@ -18,6 +18,9 @@ import fr.vriege.anilib.feature.source.SourceId;
 import fr.vriege.anilib.feature.source.SourceListing;
 import fr.vriege.anilib.feature.source.SourcePage;
 import fr.vriege.anilib.feature.source.SourceWebPage;
+import fr.vriege.anilib.feature.source.SourceTitleDetails;
+import fr.vriege.anilib.feature.source.SourceContentUnit;
+import fr.vriege.anilib.feature.source.SourceEpisode;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -236,6 +239,26 @@ public final class DefaultDiscoveryPresentation implements DiscoveryPresentation
     @Override
     public void setPreference(SourceId sourceId, String preferenceId, String value) {
         service.setPreference(sourceId, preferenceId, value);
+    }
+
+    @Override
+    public SourceTitleDetails titleDetails(SourceCatalogueItem item) {
+        return service.titleDetails(item);
+    }
+
+    @Override
+    public List<SourceContentUnit> contentUnits(SourceCatalogueItemId itemId) {
+        return service.contentUnits(itemId);
+    }
+
+    @Override
+    public List<SourceEpisode> episodes(SourceCatalogueItemId itemId) {
+        return service.episodes(itemId);
+    }
+
+    @Override
+    public Optional<LibraryItemId> libraryItem(SourceCatalogueItemId itemId) {
+        return service.libraryItem(itemId);
     }
 
     @Override

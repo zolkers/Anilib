@@ -198,7 +198,7 @@ private fun EpisodeCard(episode: EpisodeSnapshot, open: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun PlayerSelectionScreen(
+internal fun PlayerSelectionScreen(
     controller: PlayerController,
     applyOrientationPolicy: (PlayerOrientationPolicy) -> Unit,
     requestPictureInPicture: () -> Unit,

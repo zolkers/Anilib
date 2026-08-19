@@ -485,7 +485,8 @@ public final class DefaultLibraryPresentation implements LibraryPresentation {
                 item.addedAt(),
                 item.categories().stream().sorted(TEXT_ORDER).toList(),
                 item.favorite(),
-                item.progress());
+                item.progress(),
+                item.metadata().artwork());
     }
 
     private static LibraryDetails details(LibraryItem item) {

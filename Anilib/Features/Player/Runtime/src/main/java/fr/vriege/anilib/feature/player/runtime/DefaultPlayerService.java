@@ -118,6 +118,15 @@ public final class DefaultPlayerService implements PlayerService, AutoCloseable 
     }
 
     @Override
+    public synchronized List<EpisodeSnapshot> episodes(SourceCatalogueItemId itemId) {
+        ensureOpen();
+        StreamingSource source = streamingSource(itemId);
+        return validatedEpisodes(source, itemId).stream()
+                .map(episode -> new EpisodeSnapshot(episode, Optional.empty()))
+                .toList();
+    }
+
+    @Override
     public synchronized PlayerSession open(
             LibraryItemId libraryItemId,
             SourceEpisodeId episodeId) {
@@ -160,6 +169,34 @@ public final class DefaultPlayerService implements PlayerService, AutoCloseable 
     }
 
     @Override
+    public synchronized PlayerSession open(String title, SourceEpisodeId episodeId) {
+        ensureOpen();
+        String selectedTitle = Objects.requireNonNull(title, "title must not be null");
+        SourceEpisodeId selectedEpisodeId = Objects.requireNonNull(
+                episodeId, "episodeId must not be null");
+        StreamingSource source = streamingSource(selectedEpisodeId.itemId());
+        SourceEpisode episode = validatedEpisodes(source, selectedEpisodeId.itemId()).stream()
+                .filter(candidate -> candidate.id().equals(selectedEpisodeId))
+                .findFirst()
+                .orElseThrow(() -> new PlayerException("Episode is no longer available"));
+        List<SourceVideoStream> streams = validatedStreams(source, selectedEpisodeId);
+        LibraryItemId transientId = new LibraryItemId("transient-player-" + java.util.UUID.randomUUID());
+        PlaybackState playback = new PlaybackState(
+                transientId, selectedEpisodeId, 0L, PlaybackState.UNKNOWN_DURATION, false, clock.instant());
+        PlayerSessionSnapshot snapshot = new PlayerSessionSnapshot(
+                transientId,
+                selectedTitle,
+                episode,
+                streams,
+                streams.getFirst().id(),
+                Optional.empty(),
+                playback);
+        DefaultPlayerSession session = new DefaultPlayerSession(this, backend, snapshot);
+        sessions.add(session);
+        return session;
+    }
+
+    @Override
     public synchronized AutoCloseable observe(Runnable listener) {
         ensureOpen();
         Runnable value = Objects.requireNonNull(listener, "listener must not be null");
@@ -183,6 +220,10 @@ public final class DefaultPlayerService implements PlayerService, AutoCloseable 
                 durationMillis,
                 finalCompleted,
                 clock.instant());
+        if (library.find(previous.libraryItemId()).isEmpty()) {
+            notifyListeners();
+            return replacement;
+        }
         if (!persistenceAllowed.getAsBoolean()) {
             notifyListeners();
             return replacement;
@@ -249,6 +290,16 @@ public final class DefaultPlayerService implements PlayerService, AutoCloseable 
             throw new PlayerException("Library source does not provide streaming content");
         }
         return new ResolvedTitle(item, sourceItemId, streamingSource);
+    }
+
+    private StreamingSource streamingSource(SourceCatalogueItemId itemId) {
+        Objects.requireNonNull(itemId, "itemId must not be null");
+        Source source = sources.find(itemId.sourceId())
+                .orElseThrow(() -> new PlayerException("Source is not installed"));
+        if (!(source instanceof StreamingSource streamingSource)) {
+            throw new PlayerException("Source does not provide streaming content");
+        }
+        return streamingSource;
     }
 
     private static List<SourceEpisode> validatedEpisodes(

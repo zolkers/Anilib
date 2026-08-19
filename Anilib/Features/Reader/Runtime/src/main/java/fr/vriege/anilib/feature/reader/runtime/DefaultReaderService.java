@@ -113,6 +113,13 @@ public final class DefaultReaderService implements ReaderService, ReaderContentR
     }
 
     @Override
+    public synchronized List<SourceContentUnit> contentUnits(SourceCatalogueItemId itemId) {
+        ensureOpen();
+        PagedSource source = pagedSource(itemId);
+        return validatedUnits(source, itemId);
+    }
+
+    @Override
     public synchronized ReaderSession open(LibraryItemId libraryItemId) {
         return openSelected(libraryItemId, null);
     }
@@ -124,6 +131,37 @@ public final class DefaultReaderService implements ReaderService, ReaderContentR
         return openSelected(
                 libraryItemId,
                 Objects.requireNonNull(contentUnitId, "contentUnitId must not be null"));
+    }
+
+    @Override
+    public synchronized ReaderSession open(String title, SourceContentUnitId contentUnitId) {
+        ensureOpen();
+        String selectedTitle = Objects.requireNonNull(title, "title must not be null");
+        SourceContentUnitId selectedId = Objects.requireNonNull(
+                contentUnitId, "contentUnitId must not be null");
+        PagedSource source = pagedSource(selectedId.itemId());
+        SourceContentUnit unit = validatedUnits(source, selectedId.itemId()).stream()
+                .filter(candidate -> candidate.id().equals(selectedId))
+                .findFirst()
+                .orElseThrow(() -> new ReaderException("Requested content unit was not found for this title"));
+        List<SourcePageResource> pages = validatedPages(source, unit);
+        ReaderPagePipeline pipeline = new ReaderPagePipeline(source::readPage, pages, policy, pageExecutor);
+        LibraryItemId transientId = new LibraryItemId("transient-reader-" + java.util.UUID.randomUUID());
+        DefaultReaderSession[] holder = new DefaultReaderSession[1];
+        DefaultReaderSession session = new DefaultReaderSession(
+                library,
+                transientId,
+                selectedTitle,
+                unit,
+                pages.size(),
+                0,
+                pipeline,
+                clock,
+                () -> false,
+                () -> removeSession(holder[0]));
+        holder[0] = session;
+        sessions.add(session);
+        return session;
     }
 
     private ReaderSession openSelected(
@@ -220,6 +258,16 @@ public final class DefaultReaderService implements ReaderService, ReaderContentR
             }
         }
         return units;
+    }
+
+    private PagedSource pagedSource(SourceCatalogueItemId itemId) {
+        Objects.requireNonNull(itemId, "itemId must not be null");
+        Source source = sources.find(itemId.sourceId())
+                .orElseThrow(() -> new ReaderException("Source is not installed"));
+        if (!(source instanceof PagedSource pagedSource)) {
+            throw new ReaderException("Source does not provide paged content");
+        }
+        return pagedSource;
     }
 
     private SourceContentUnit selectUnit(LibraryItem item, List<SourceContentUnit> units) {
