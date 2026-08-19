@@ -64,7 +64,9 @@ public final class MiwayomiSourceBridge {
 
     public void requireHealthy() {
         Map<String, Object> health = object(get("/api/v1/health", Map.of()));
-        if (!"ok".equals(text(health, "status")) || !"miwayomi".equals(text(health, "service"))) {
+        String service = text(health, "service");
+        if (!"ok".equals(text(health, "status"))
+                || !("miwayomi".equals(service) || "anilib-desktop-engine".equals(service))) {
             throw new IllegalStateException("Extension engine returned an unexpected health response");
         }
     }

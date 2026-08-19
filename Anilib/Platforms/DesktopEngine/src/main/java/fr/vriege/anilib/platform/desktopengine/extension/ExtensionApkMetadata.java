@@ -23,6 +23,9 @@ public record ExtensionApkMetadata(
         if (versionCode < 0) {
             throw new IllegalArgumentException("versionCode must not be negative");
         }
+        if (!packageName.matches("[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+")) {
+            throw new IllegalArgumentException("Invalid extension package name: " + packageName);
+        }
         if (sourceClasses.isEmpty() && factoryClass.isEmpty()) {
             throw new IllegalArgumentException("Extension does not declare a source class or factory");
         }
