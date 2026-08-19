@@ -78,6 +78,7 @@ internal fun ExtensionRepositoriesScreen(
     var loading by remember { mutableStateOf(false) }
     var operationLabel by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
+    var feedback by remember { mutableStateOf<String?>(null) }
     var retry by remember { mutableStateOf<(() -> Unit)?>(null) }
     var selectedExtension by remember { mutableStateOf<ExtensionPackageMetadata?>(null) }
     val scope = rememberCoroutineScope()
@@ -97,6 +98,7 @@ internal fun ExtensionRepositoriesScreen(
         loading = true
         operationLabel = label
         error = null
+        feedback = null
         retry = null
         scope.launch {
             runCatching {
@@ -156,12 +158,13 @@ internal fun ExtensionRepositoriesScreen(
                 runCatching { presentation.removeInstalled(extension.packageName()) }
                     .onFailure { error = it.message ?: "Extension removal failed." }
             },
-            installApk = if (apkExtensionPlatform.available()) {
+            installApk = if (apkExtensionPlatform.installationSupported()) {
                 { installApkExtension(apkExtensionPlatform, extension, scope, { state ->
                     loading = state
                     operationLabel = if (state) apkExtensionPlatform.installProgressLabel() else null
                 }) { message, failure ->
                     error = failure
+                    feedback = message
                 } }
             } else {
                 null
@@ -243,6 +246,21 @@ internal fun ExtensionRepositoriesScreen(
             }
             error?.let { message ->
                 item { ExtensionFailure(message, retry) }
+            }
+            feedback?.let { message ->
+                item {
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        ),
+                    ) {
+                        Text(
+                            message,
+                            modifier = Modifier.fillMaxWidth().padding(14.dp),
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        )
+                    }
+                }
             }
             if (view.updates().isNotEmpty()) {
                 item {
@@ -337,17 +355,14 @@ internal fun ExtensionRepositoriesScreen(
                             runCatching { presentation.removeInstalled(extension.packageName()) }
                                 .onFailure { error = it.message ?: "Extension removal failed." }
                         },
-                        installApk = if (apkExtensionPlatform.available()) {
+                        installApk = if (apkExtensionPlatform.installationSupported()) {
                             {
-                                loading = true
-                                error = null
-                                apkExtensionPlatform.install(extension).whenComplete { message, failure ->
-                                    error = if (failure == null) {
-                                        message
-                                    } else {
-                                        failure.cause?.message ?: failure.message ?: "APK hand-off failed."
-                                    }
-                                    loading = false
+                                installApkExtension(apkExtensionPlatform, extension, scope, { state ->
+                                    loading = state
+                                    operationLabel = if (state) apkExtensionPlatform.installProgressLabel() else null
+                                }) { message, failure ->
+                                    error = failure
+                                    feedback = message
                                 }
                             }
                         } else {

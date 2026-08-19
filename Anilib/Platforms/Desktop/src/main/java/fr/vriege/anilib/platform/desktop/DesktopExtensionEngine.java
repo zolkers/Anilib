@@ -37,16 +37,25 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
     private static final Duration START_TIMEOUT = Duration.ofSeconds(30);
     private static final int START_ATTEMPTS = 3;
 
-    private final MiwayomiSourceBridge bridge;
-    private final Process process;
+    private final Path dataDirectory;
+    private final Path engineDirectory;
+    private final HttpTransport transport;
+    private volatile MiwayomiSourceBridge bridge;
+    private volatile Process process;
     private final List<AnilibPlugin> sourceBundles;
-    private final String diagnostic;
+    private volatile String diagnostic;
 
     private DesktopExtensionEngine(
+            Path dataDirectory,
+            Path engineDirectory,
+            HttpTransport transport,
             MiwayomiSourceBridge bridge,
             Process process,
             List<AnilibPlugin> sourceBundles,
             String diagnostic) {
+        this.dataDirectory = dataDirectory;
+        this.engineDirectory = engineDirectory;
+        this.transport = transport;
         this.bridge = bridge;
         this.process = process;
         this.sourceBundles = List.copyOf(sourceBundles);
@@ -60,13 +69,19 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
         Properties overrides = systemOverrides();
         if (overrides.isEmpty() && !Files.isRegularFile(configuration, LinkOption.NOFOLLOW_LINKS)) {
             return unavailable(
-                    "Desktop APK engine is not configured. See extension-engine/README.txt in the Anilib data folder.",
+                    data,
+                    transport,
+                    "Desktop APK compatibility is ready to install. Select Install for desktop on any APK source.",
                     engineDirectory);
         }
         try {
             Properties properties = overrides.isEmpty() ? load(configuration) : overrides;
             if (!Boolean.parseBoolean(properties.getProperty("enabled", "false"))) {
-                return unavailable("Desktop APK engine is disabled in engine.properties.", engineDirectory);
+                return unavailable(
+                        data,
+                        transport,
+                        "Desktop APK engine is disabled in engine.properties.",
+                        engineDirectory);
             }
             Path approvedJar = approvedJar(engineDirectory, properties);
             String expectedSha256 = expectedSha256(properties);
@@ -74,7 +89,11 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
             Path runtimeJar = prepareRuntimeCopy(engineDirectory, approvedJar, expectedSha256);
             return start(data, engineDirectory, runtimeJar, transport);
         } catch (RuntimeException exception) {
-            return unavailable("Desktop APK engine refused to start: " + exception.getMessage(), engineDirectory);
+            return unavailable(
+                    data,
+                    transport,
+                    "Desktop APK engine refused to start: " + exception.getMessage(),
+                    engineDirectory);
         }
     }
 
@@ -85,6 +104,11 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
     @Override
     public boolean available() {
         return bridge != null && process != null && process.isAlive();
+    }
+
+    @Override
+    public boolean installationSupported() {
+        return true;
     }
 
     @Override
@@ -102,20 +126,23 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
 
     @Override
     public String installProgressLabel() {
-        return "Installing APK in desktop engine";
+        return available()
+                ? "Installing APK in desktop engine"
+                : "Downloading verified desktop compatibility";
     }
 
     @Override
     public CompletableFuture<String> install(ExtensionPackageMetadata extensionPackage) {
-        if (!available()) {
-            return CompletableFuture.failedFuture(new IllegalStateException(diagnostic));
-        }
-        return extensionPackage.artifacts().stream()
-                .filter(artifact -> artifact.format() == ExtensionArtifactFormat.ANIYOMI_APK)
+        URI artifact = extensionPackage.artifacts().stream()
+                .filter(candidate -> candidate.format() == ExtensionArtifactFormat.ANIYOMI_APK)
                 .findFirst()
-                .map(artifact -> CompletableFuture.supplyAsync(() -> bridge.install(artifact.uri())))
-                .orElseGet(() -> CompletableFuture.failedFuture(
-                        new IllegalArgumentException("Extension does not publish an APK artifact")));
+                .orElseThrow(() -> new IllegalArgumentException("Extension does not publish an APK artifact"))
+                .uri();
+        return CompletableFuture.supplyAsync(() -> {
+            ensureAvailable();
+            String result = bridge.install(artifact);
+            return result + " Restart Anilib to activate the source on desktop.";
+        });
     }
 
     @Override
@@ -133,6 +160,23 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
             Thread.currentThread().interrupt();
             process.destroyForcibly();
         }
+    }
+
+    private synchronized void ensureAvailable() {
+        if (available()) {
+            return;
+        }
+        Path configuration = engineDirectory.resolve("engine.properties");
+        if (!Files.isRegularFile(configuration, LinkOption.NOFOLLOW_LINKS)) {
+            DesktopExtensionEngineInstaller.install(engineDirectory);
+        }
+        DesktopExtensionEngine started = open(dataDirectory, transport);
+        if (!started.available()) {
+            throw new IllegalStateException(started.diagnostic);
+        }
+        bridge = started.bridge;
+        process = started.process;
+        diagnostic = started.diagnostic;
     }
 
     private static DesktopExtensionEngine start(
@@ -159,6 +203,9 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
                 bridge.saveRepositories(repositories);
                 List<AnilibPlugin> sources = bridge.sourceBundles();
                 return new DesktopExtensionEngine(
+                        dataDirectory,
+                        engineDirectory,
+                        transport,
                         bridge,
                         process,
                         sources,
@@ -354,9 +401,20 @@ final class DesktopExtensionEngine implements ApkExtensionPlatform, AutoCloseabl
         environment.putAll(copy);
     }
 
-    private static DesktopExtensionEngine unavailable(String diagnostic, Path engineDirectory) {
+    private static DesktopExtensionEngine unavailable(
+            Path dataDirectory,
+            HttpTransport transport,
+            String diagnostic,
+            Path engineDirectory) {
         writeInstructions(engineDirectory);
-        return new DesktopExtensionEngine(null, null, List.of(), diagnostic);
+        return new DesktopExtensionEngine(
+                dataDirectory,
+                engineDirectory,
+                transport,
+                null,
+                null,
+                List.of(),
+                diagnostic);
     }
 
     private static void writeInstructions(Path engineDirectory) {

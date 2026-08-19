@@ -180,6 +180,9 @@ revision and run the same fixtures on packaged Android and desktop hosts.
 - [x] execute existing manga and anime APK sources on desktop through an optional
   checksum-pinned sidecar, explicit Source Bundles, loopback-only catalogue,
   chapter/page/episode/stream adapters, repository sync, and restart activation
+- [x] provision the pinned desktop compatibility sidecar on the first explicit
+  APK installation, with bounded download, official release URL, SHA-256
+  verification, atomic configuration, and no manual `engine.properties` step
 
 ## Remaining product work
 

@@ -28,6 +28,15 @@ final class DesktopReleaseRuleTest {
                     licenseFile.set(rootProject.file('LICENSE'))
                     writeDesktopReleaseChecksums MessageDigest.getInstance('SHA-256')
                     """);
+            Path engine = repository.resolve(
+                    "Anilib/Platforms/Desktop/src/main/java/fr/vriege/anilib/platform/desktop/"
+                            + "DesktopExtensionEngineInstaller.java");
+            write(engine, """
+                    miwayomi/miwayomi/releases/download/v0.2.9/miwayomi-all.jar
+                    475b95dabaaca9f283263a5eafa12bec3580b658caae70407ae227ae4fa0e9b7
+                    SIZE_BYTES = 102_140_165L HttpClient.Redirect.NORMAL
+                    Files.createTempFile StandardCopyOption.ATOMIC_MOVE
+                    """);
             Path workflow = repository.resolve(".github/workflows/desktop-release.yml");
             write(workflow, """
                     windows-2025 ubuntu-24.04 macos-15
@@ -43,7 +52,12 @@ final class DesktopReleaseRuleTest {
             check(rule.analyze(snapshot).stream()
                             .anyMatch(diagnostic -> diagnostic.message().contains("ubuntu-24.04")),
                     "a missing release host must produce an actionable diagnostic");
-            return 2;
+            Files.writeString(engine, "HttpClient.Redirect.NORMAL", StandardCharsets.UTF_8);
+            check(rule.analyze(snapshot).stream()
+                            .anyMatch(diagnostic -> diagnostic.message().contains(
+                                    "475b95dabaaca9f283263a5eafa12bec3580b658caae70407ae227ae4fa0e9b7")),
+                    "desktop APK compatibility must retain its pinned engine digest");
+            return 3;
         } catch (IOException exception) {
             throw new AssertionError("Unable to run desktop release rule test", exception);
         } finally {

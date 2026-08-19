@@ -391,8 +391,10 @@ still needs a complete, compatible host ABI before a real installed APK can
 reach that Android path.
 
 Desktop supplies the missing ecosystem ABI only through an optional external
-JVM sidecar. The platform adapter verifies a user-approved engine JAR by exact
-SHA-256, rejects links, launches a disposable copy with a reduced environment on
+JVM sidecar. Selecting an APK install explicitly authorizes Anilib to download
+the pinned Apache-2.0 Miwayomi release from its official GitHub asset; the
+platform adapter bounds its size, verifies its exact SHA-256, rejects links,
+persists the verified selection, and launches a disposable copy with a reduced environment on
 `127.0.0.1`, waits for a typed health response, synchronizes user-owned repository
 URLs, and owns process shutdown. Extension Repository Runtime maps the loopback
 protocol into ordinary explicit Source Bundles with the original unsigned

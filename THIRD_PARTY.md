@@ -13,6 +13,17 @@ adapters and are enforced by `AnilibJava`.
 | ComposeMediaPlayer | 0.11.4 | Shared video surface over platform-native media engines | Apache-2.0 |
 | Compose WebView Multiplatform | 2.0.3 | Android System WebView and desktop KCEF browser surface | Apache-2.0 |
 
+## Optional desktop compatibility runtime
+
+| Component | Version | Purpose | License |
+| --- | --- | --- | --- |
+| Miwayomi | 0.2.9 | Isolated loopback sidecar for existing Aniyomi and Mihon APK sources | Apache-2.0 |
+
+Miwayomi is not linked into Anilib or shipped inside its artifacts. The desktop
+application downloads the pinned official release only after an explicit APK
+installation action, enforces its published size and SHA-256 digest, and runs it
+out of process.
+
 ## Android application
 
 | Component | Version | Purpose | License |
@@ -27,6 +38,7 @@ Primary projects:
 - <https://github.com/JetBrains/compose-multiplatform>
 - <https://github.com/kdroidFilter/ComposeMediaPlayer>
 - <https://github.com/KevinnZou/compose-webview-multiplatform>
+- <https://github.com/miwayomi/miwayomi>
 - <https://android.googlesource.com/platform/tools/base>
 - <https://android.googlesource.com/platform/frameworks/support>
 
