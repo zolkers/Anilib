@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -25,11 +27,20 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CollectionsBookmark
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.NewReleases
+import androidx.compose.material.icons.outlined.Assessment
+import androidx.compose.material.icons.outlined.Backup
+import androidx.compose.material.icons.outlined.Category
+import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.Extension
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Sync
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -692,8 +703,6 @@ private fun AppDestination(
                 networkMaintenance,
                 browserDataController,
                 backupImportPicker,
-                { openMore(MoreDestination.EXTENSION_REPOSITORIES) },
-                { openMore(MoreDestination.TRACKING) },
                 { openMore(MoreDestination.BACKUP) },
                 { openMore(MoreDestination.DOWNLOADS) },
                 { openMore(MoreDestination.ABOUT) },
@@ -712,7 +721,6 @@ private fun AppDestination(
                 { openMore(MoreDestination.STATISTICS) },
                 { openMore(MoreDestination.EXTENSION_REPOSITORIES) },
                 { openMore(MoreDestination.SETTINGS) },
-                { openMore(MoreDestination.ABOUT) },
             )
         }
     }
@@ -1811,7 +1819,6 @@ private fun MorePage(
     openStatistics: () -> Unit,
     openExtensionRepositories: () -> Unit,
     openSettings: () -> Unit,
-    openAbout: () -> Unit,
 ) {
     var queue by remember(downloads) { mutableStateOf(downloads.queue()) }
     DisposableEffect(downloads) {
@@ -1823,45 +1830,107 @@ private fun MorePage(
     }
     Scaffold(topBar = { TopAppBar(title = { Text("More") }) }) { padding ->
         LazyColumn(modifier = Modifier.fillMaxSize().padding(padding)) {
+            item { MoreSection("Quick filters") }
             item {
-                MoreSwitchRow(
-                    "Downloaded only",
-                    "Use downloaded content without the online fallback",
-                    queue.offlineMode(),
-                    downloads::setOfflineMode,
-                )
+                MoreGroup {
+                    MoreSwitchRow(
+                        "Downloaded only",
+                        "Use downloaded content without the online fallback",
+                        queue.offlineMode(),
+                        Icons.Outlined.Download,
+                        downloads::setOfflineMode,
+                    )
+                    MoreSwitchRow(
+                        "Incognito mode",
+                        "Pause reading and watching history",
+                        settings.incognitoMode(),
+                        Icons.Outlined.VisibilityOff,
+                        setIncognitoMode,
+                    )
+                }
             }
+            item { MoreSection("Library") }
             item {
-                MoreSwitchRow(
-                    "Incognito mode",
-                    "Pause reading and watching history",
-                    settings.incognitoMode(),
-                    setIncognitoMode,
-                )
+                MoreGroup {
+                    MoreRow(
+                        "Download queue",
+                        if (pendingDownloads == 0) "No pending downloads" else "$pendingDownloads pending downloads",
+                        Icons.Outlined.Download,
+                        openDownloads,
+                    )
+                    MoreRow(
+                        "Categories",
+                        "Organize anime and manga in your library",
+                        Icons.Outlined.Category,
+                        openCategories,
+                    )
+                    MoreRow(
+                        "Statistics",
+                        "Library and reading activity",
+                        Icons.Outlined.Assessment,
+                        openStatistics,
+                    )
+                }
             }
-            item { HorizontalDivider() }
+            item { MoreSection("Services") }
             item {
-                MoreRow(
-                    "Download queue",
-                    if (pendingDownloads == 0) "No pending downloads" else "$pendingDownloads pending downloads",
-                    openDownloads,
-                )
+                MoreGroup {
+                    MoreRow(
+                        "Backup and restore",
+                        "Create or restore a local backup",
+                        Icons.Outlined.Backup,
+                        openBackup,
+                    )
+                    MoreRow(
+                        "Tracking",
+                        "Manage external tracking accounts",
+                        Icons.Outlined.Sync,
+                        openTracking,
+                    )
+                    MoreRow(
+                        "Extension repositories",
+                        "Add compatible extension repositories and install sources",
+                        Icons.Outlined.Extension,
+                        openExtensionRepositories,
+                    )
+                }
             }
-            item { MoreRow("Categories", "Organize anime and manga in your library", openCategories) }
-            item { MoreRow("Statistics", "Library and reading activity", openStatistics) }
-            item { MoreRow("Backup and restore", "Create or restore a local backup", openBackup) }
-            item { MoreRow("Tracking", "Manage external tracking accounts", openTracking) }
+            item { MoreSection("Application") }
             item {
-                MoreRow(
-                    "Extension repositories",
-                    "Bring your own Aniyomi-compatible repository URLs",
-                    openExtensionRepositories,
-                )
+                MoreGroup {
+                    MoreRow(
+                        "Settings",
+                        "$componentCount feature bundles active · appearance and app behavior",
+                        Icons.Outlined.Settings,
+                        openSettings,
+                    )
+                }
             }
-            item { HorizontalDivider() }
-            item { MoreRow("Settings", "Appearance, library, reader, player, and tracking", openSettings) }
-            item { MoreRow("About", "$componentCount feature bundles active", openAbout) }
+            item { Spacer(Modifier.height(24.dp)) }
         }
+    }
+}
+
+@Composable
+private fun MoreSection(label: String) {
+    Text(
+        label,
+        color = MaterialTheme.colorScheme.primary,
+        style = MaterialTheme.typography.labelLarge,
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 22.dp, bottom = 10.dp),
+    )
+}
+
+@Composable
+private fun MoreGroup(content: @Composable ColumnScope.() -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = 1.dp,
+    ) {
+        Column(content = content)
     }
 }
 
@@ -1870,15 +1939,18 @@ private fun MoreSwitchRow(
     title: String,
     summary: String,
     checked: Boolean,
+    icon: ImageVector,
     onCheckedChange: (Boolean) -> Unit,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onCheckedChange(!checked) }
-            .padding(horizontal = 24.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        MoreIcon(icon)
+        Spacer(Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
             Text(title, fontWeight = FontWeight.Medium)
             Spacer(Modifier.height(3.dp))
@@ -1889,16 +1961,49 @@ private fun MoreSwitchRow(
 }
 
 @Composable
-private fun MoreRow(title: String, summary: String, onClick: () -> Unit = {}) {
-    Column(
+private fun MoreRow(title: String, summary: String, icon: ImageVector, onClick: () -> Unit) {
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 24.dp, vertical = 18.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(title, fontWeight = FontWeight.Medium)
-        Spacer(Modifier.height(4.dp))
-        Text(summary, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        MoreIcon(icon)
+        Spacer(Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, fontWeight = FontWeight.Medium)
+            Spacer(Modifier.height(3.dp))
+            Text(
+                summary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Icon(
+            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun MoreIcon(icon: ImageVector) {
+    Surface(
+        modifier = Modifier.size(40.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.primaryContainer,
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.size(22.dp),
+            )
+        }
     }
 }
 

@@ -18,6 +18,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -138,7 +139,10 @@ internal fun ExtensionRepositoriesScreen(
             retry = retry,
             goBack = { selectedExtension = null },
             togglePinned = { pinned ->
-                runCatching { presentation.setPinned(extension.packageName(), pinned) }
+                runCatching {
+                    presentation.setPinned(extension.packageName(), pinned)
+                    view = presentation.snapshot()
+                }
                     .onFailure { error = it.message ?: "Extension pinning failed." }
             },
             install = { complete("Installing ${extension.displayName()}") { presentation.install(extension) } },
@@ -196,7 +200,12 @@ internal fun ExtensionRepositoriesScreen(
             item {
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Anilib ships with no source catalogue. Add only repository URLs and publisher keys you trust.",
+                    if (apkExtensionPlatform.available()) {
+                        "Choose an extension below and select Install on Android. " +
+                            "Portable Anilib Bundles work on every platform."
+                    } else {
+                        "This device installs portable Anilib Bundles. APK-only entries require Anilib on Android."
+                    },
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -307,7 +316,10 @@ internal fun ExtensionRepositoriesScreen(
                         busy = loading,
                         openDetails = { selectedExtension = extension },
                         togglePinned = { pinned ->
-                            runCatching { presentation.setPinned(extension.packageName(), pinned) }
+                            runCatching {
+                                presentation.setPinned(extension.packageName(), pinned)
+                                view = presentation.snapshot()
+                            }
                                 .onFailure { error = it.message ?: "Extension pinning failed." }
                         },
                         install = {
@@ -534,7 +546,7 @@ private fun ExtensionDetailScreen(
                 actions = {
                     IconButton(onClick = { togglePinned(!pinned) }) {
                         Icon(
-                            Icons.Default.PushPin,
+                            if (pinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
                             contentDescription = if (pinned) "Unpin extension" else "Pin extension",
                             tint = if (pinned) {
                                 MaterialTheme.colorScheme.primary
@@ -644,6 +656,18 @@ private fun ExtensionDetailScreen(
                     Text(extension.changelog().orElse("No changelog supplied by this repository."))
                 }
             }
+            if (installed == null && !portable && installApk == null) {
+                item {
+                    ExtensionDetailCard {
+                        Text("Android-only extension", fontWeight = FontWeight.Medium)
+                        Text(
+                            "This repository entry contains an APK. Open the same repository in Anilib on " +
+                                "Android to install it, or use a repository that publishes portable Anilib Bundles.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -673,11 +697,11 @@ private fun ExtensionDetailScreen(
                             TextButton(onClick = remove, enabled = !loading) { Text("Remove") }
                         }
                     }
-                    if (extension.artifacts().any {
+                    if (installed == null && extension.artifacts().any {
                             it.format() == ExtensionArtifactFormat.ANIYOMI_APK
                         } && installApk != null
                     ) {
-                        TextButton(onClick = installApk, enabled = !loading) { Text("Install APK") }
+                        Button(onClick = installApk, enabled = !loading) { Text("Install on Android") }
                     }
                 }
             }
@@ -842,7 +866,7 @@ private fun ExtensionPackageCard(
                     Text(extension.displayName(), fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
                     IconButton(onClick = { togglePinned(!pinned) }) {
                         Icon(
-                            Icons.Default.PushPin,
+                            if (pinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
                             contentDescription = if (pinned) "Unpin extension" else "Pin extension",
                             tint = if (pinned) {
                                 MaterialTheme.colorScheme.primary
@@ -869,6 +893,14 @@ private fun ExtensionPackageCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 val portable = extension.artifacts().any { it.format() == ExtensionArtifactFormat.ANILIB_BUNDLE }
+                val apk = extension.artifacts().any { it.format() == ExtensionArtifactFormat.ANIYOMI_APK }
+                if (installed == null && !portable && apk && installApk == null) {
+                    Text(
+                        "Android-only extension · install it from Anilib on Android",
+                        color = MaterialTheme.colorScheme.tertiary,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     when {
                         installed == null && portable -> Button(onClick = install, enabled = !busy) { Text("Install") }
@@ -890,10 +922,8 @@ private fun ExtensionPackageCard(
                             TextButton(onClick = remove) { Text("Remove") }
                         }
                     }
-                    if (extension.artifacts().any { it.format() == ExtensionArtifactFormat.ANIYOMI_APK }
-                        && installApk != null
-                    ) {
-                        TextButton(onClick = installApk, enabled = !busy) { Text("Install APK") }
+                    if (apk && installApk != null && installed == null) {
+                        Button(onClick = installApk, enabled = !busy) { Text("Install on Android") }
                     }
                 }
             }

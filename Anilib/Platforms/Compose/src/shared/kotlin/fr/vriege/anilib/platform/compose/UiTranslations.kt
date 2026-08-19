@@ -318,6 +318,41 @@ internal object UiTranslations {
                 "Les changements d’apparence s’appliquent immédiatement sur Android et le bureau.",
             "Application data" to "Données de l’application",
             "Application" to "Application",
+            "Add a compatible repository, then install an extension for this platform." to
+                "Ajoutez un dépôt compatible, puis installez une extension adaptée à cette plateforme.",
+            "Add compatible extension repositories and install sources" to
+                "Ajouter des dépôts d’extensions compatibles et installer des sources",
+            "Android-only extension" to "Extension réservée à Android",
+            "Android-only extension · install it from Anilib on Android" to
+                "Extension réservée à Android · installez-la depuis Anilib sur Android",
+            "Browse extensions" to "Parcourir les extensions",
+            ("Choose an extension below and select Install on Android. " +
+                "Portable Anilib Bundles work on every platform.") to
+                "Choisissez une extension ci-dessous puis Installer sur Android. " +
+                "Les Bundles Anilib portables fonctionnent sur toutes les plateformes.",
+            "Create or restore a local backup" to "Créer ou restaurer une sauvegarde locale",
+            "Downloaded only" to "Téléchargés uniquement",
+            "Install on Android" to "Installer sur Android",
+            "Library and reading activity" to "Bibliothèque et activité de lecture",
+            "Manage external tracking accounts" to "Gérer les comptes de suivi externes",
+            "No extensions installed" to "Aucune extension installée",
+            "No pending downloads" to "Aucun téléchargement en attente",
+            "Organize anime and manga in your library" to
+                "Organiser les anime et manga de votre bibliothèque",
+            "Pause reading and watching history" to "Suspendre l’historique de lecture et de visionnage",
+            "Pin" to "Épingler",
+            "Pin extension" to "Épingler l’extension",
+            "Quick filters" to "Filtres rapides",
+            "This device installs portable Anilib Bundles. APK-only entries require Anilib on Android." to
+                "Cet appareil installe les Bundles Anilib portables. Les entrées APK nécessitent Anilib sur Android.",
+            ("This repository entry contains an APK. Open the same repository in Anilib on Android to install it, " +
+                "or use a repository that publishes portable Anilib Bundles.") to
+                ("Cette entrée contient un APK. Ouvrez le même dépôt dans Anilib sur Android pour l’installer, " +
+                    "ou utilisez un dépôt publiant des Bundles Anilib portables."),
+            "Use downloaded content without the online fallback" to
+                "Utiliser le contenu téléchargé sans recours au réseau",
+            "Unpin" to "Désépingler",
+            "Unpin extension" to "Désépingler l’extension",
             "Automatic challenge retry" to "Nouvelle tentative automatique après un défi",
             "Average title progress" to "Progression moyenne des titres",
             "Average tracker score" to "Note moyenne des services de suivi",
@@ -402,6 +437,9 @@ internal object UiTranslations {
             Regex("^Categories: (\\d+)$") to "Catégories : \$1",
             Regex("^History entries: (\\d+)$") to "Entrées d’historique : \$1",
             Regex("^Titles with progress: (\\d+)$") to "Titres avec progression : \$1",
+            Regex("^(\\d+) pending downloads$") to "\$1 téléchargements en attente",
+            Regex("^(\\d+) feature bundles active · appearance and app behavior$") to
+                "\$1 bundles fonctionnels actifs · apparence et comportement de l’application",
         )
         exactPatterns.firstOrNull { it.first.matches(text) }?.let { return it.first.replace(text, it.second) }
         return when {

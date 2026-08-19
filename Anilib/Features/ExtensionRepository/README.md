@@ -37,6 +37,14 @@ published languages are visible by default. At least one available language
 must remain enabled, and pinned packages are ordered before the rest without
 changing repository metadata.
 
+The shared UI makes artifact support explicit. Android shows an `Install on
+Android` action for APK entries and hands the HTTPS artifact to the system
+package installer. Desktop explains that APK-only entries require Android
+instead of rendering an actionless card. Signed portable Anilib Bundles keep
+the ordinary `Install` action on both platforms. Pinning updates the
+filled/outlined icon and catalogue ordering immediately, and an empty Browse
+extension tab links directly to repository management.
+
 One entry may additionally advertise a portable artifact without breaking an
 Aniyomi client:
 

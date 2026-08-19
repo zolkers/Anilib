@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -1084,13 +1085,11 @@ private fun ExtensionList(
     }
     var expanded by remember(extensions) { mutableStateOf<Set<SourceId>>(emptySet()) }
     if (visible.isEmpty()) {
-        EmptyDiscovery(
-            if (query.isBlank()) {
-                "No extensions installed in this product configuration."
-            } else {
-                "No extensions match your search."
-            },
-        )
+        if (query.isBlank()) {
+            EmptyExtensions(manage)
+        } else {
+            EmptyDiscovery("No extensions match your search.")
+        }
         return
     }
     LazyColumn(modifier = Modifier.fillMaxSize()) {
@@ -1194,6 +1193,30 @@ private fun ExtensionList(
                 ExtensionDetails(extension)
             }
             HorizontalDivider(modifier = Modifier.padding(start = 72.dp))
+        }
+    }
+}
+
+@Composable
+private fun EmptyExtensions(manage: () -> Unit) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(
+            modifier = Modifier.padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Icon(
+                Icons.Outlined.Extension,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(56.dp),
+            )
+            Text("No extensions installed", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Add a compatible repository, then install an extension for this platform.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Button(onClick = manage) { Text("Browse extensions") }
         }
     }
 }

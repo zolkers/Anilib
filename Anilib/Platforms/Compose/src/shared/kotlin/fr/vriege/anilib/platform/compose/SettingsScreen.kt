@@ -20,17 +20,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.ChromeReaderMode
-import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material.icons.outlined.CollectionsBookmark
 import androidx.compose.material.icons.outlined.Download
-import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Storage
-import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.VideoSettings
 import androidx.compose.material3.AlertDialog
@@ -78,8 +75,6 @@ internal fun SettingsScreen(
     maintenance: NetworkMaintenance,
     browserDataController: BrowserDataController,
     diagnosticExportPicker: BackupImportPicker,
-    openExtensionRepositories: () -> Unit,
-    openTracking: () -> Unit,
     openBackup: () -> Unit,
     openDownloads: () -> Unit,
     openAbout: () -> Unit,
@@ -136,9 +131,6 @@ internal fun SettingsScreen(
     if (selected == null) {
         SettingsHome(
             openDestination = { destination = it },
-            openExtensionRepositories = openExtensionRepositories,
-            openTracking = openTracking,
-            openBackup = openBackup,
             openAbout = openAbout,
             goBack = goBack,
         )
@@ -219,9 +211,6 @@ internal fun SettingsScreen(
 @Composable
 private fun SettingsHome(
     openDestination: (SettingsDestination) -> Unit,
-    openExtensionRepositories: () -> Unit,
-    openTracking: () -> Unit,
-    openBackup: () -> Unit,
     openAbout: () -> Unit,
     goBack: () -> Unit,
 ) {
@@ -233,9 +222,6 @@ private fun SettingsHome(
     val reader = settingMatches(query, "Reader", "Reading mode controls display navigation")
     val player = settingMatches(query, "Player", "Playback decoder audio subtitles gestures")
     val downloads = settingMatches(query, "Downloads", "Wi-Fi queue storage offline")
-    val extensions = settingMatches(query, "Sources and repositories", "Extensions Git trust languages")
-    val tracking = settingMatches(query, "Tracking", "Accounts sync score privacy")
-    val backup = settingMatches(query, "Backup", "Automatic restore storage import")
     val advanced = settingMatches(query, "Data and storage", "Cookies cache WebView database cleanup")
     val about = settingMatches(query, "About", "Version licences diagnostics update channel")
     Scaffold(
@@ -316,37 +302,6 @@ private fun SettingsHome(
                                 "Network policy and download queue",
                                 { openDestination(SettingsDestination.DOWNLOADS) },
                                 Icons.Outlined.Download,
-                            )
-                        }
-                    }
-                }
-            }
-            if (extensions || tracking || backup) {
-                item { SettingsSection("Services") }
-                item {
-                    SettingsGroup {
-                        if (extensions) {
-                            SettingsRow(
-                                "Sources and repositories",
-                                "Languages, installed sources, trust, and repository URLs",
-                                openExtensionRepositories,
-                                Icons.Outlined.Extension,
-                            )
-                        }
-                        if (tracking) {
-                            SettingsRow(
-                                "Tracking",
-                                "Accounts, sync, score, and privacy",
-                                openTracking,
-                                Icons.Outlined.Sync,
-                            )
-                        }
-                        if (backup) {
-                            SettingsRow(
-                                "Backup",
-                                "Backups, restore, imports, and storage",
-                                openBackup,
-                                Icons.Outlined.Backup,
                             )
                         }
                     }

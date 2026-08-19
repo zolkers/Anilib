@@ -165,6 +165,13 @@ class UiRouteScreenshotTest {
                 ).forEach { tab ->
                     onNodeWithText(tab).performClick()
                     captureStable(tab)
+                    if (tab == "Anime extensions") {
+                        onNodeWithText("Browse extensions").performClick()
+                        waitForText("Extension repositories")
+                        captureStable("Extension installation entry point")
+                        goBack()
+                        onNodeWithText("Browse").performClick()
+                    }
                     if (tab == "Manga sources") {
                         onNodeWithText("Acceptance web").performClick()
                         waitForContentDescription("Open source website")
@@ -208,8 +215,10 @@ class UiRouteScreenshotTest {
                     captureStable("$destination settings")
                     goBack()
                 }
+                scrollToText("About")
+                onNodeWithText("About").performClick()
+                captureStable("About")
                 goBack()
-                visitMore("About", "About")
             }
         } finally {
             Locale.setDefault(previousLocale)
