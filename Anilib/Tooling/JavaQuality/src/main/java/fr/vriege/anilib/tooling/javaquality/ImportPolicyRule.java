@@ -42,13 +42,25 @@ public final class ImportPolicyRule implements AnilibJavaRule {
     private static boolean isAllowed(String imported, JavaSource source) {
         return imported.startsWith("java.")
                 || imported.startsWith("javax.")
+                || imported.startsWith("org.w3c.dom.")
+                || imported.startsWith("org.xml.sax.")
                 || imported.startsWith("fr.vriege.anilib.")
-                || isJdkHttpServer(imported, source);
+                || isJdkHttpServer(imported, source)
+                || isDesktopEngineDependency(imported, source);
     }
 
     private static boolean isJdkHttpServer(String imported, JavaSource source) {
         return (source.module().id().equals("tooling.architecture-tests")
                 || source.module().id().equals("platform.desktop-engine"))
                 && imported.startsWith("com.sun.net.httpserver.");
+    }
+
+    private static boolean isDesktopEngineDependency(String imported, JavaSource source) {
+        if (!source.module().id().equals("platform.desktop-engine")) {
+            return false;
+        }
+        return imported.startsWith("com.googlecode.d2j.dex.")
+                || imported.startsWith("net.dongliu.apk.parser.")
+                || imported.startsWith("org.objectweb.asm.");
     }
 }

@@ -17,6 +17,7 @@ public final class DesktopEngineSmoke {
     }
 
     public static void main(String[] arguments) throws Exception {
+        ExtensionRelocationSmoke.verify();
         Path data = Files.createTempDirectory("anilib-desktop-engine-");
         try (DesktopEngineServer server = DesktopEngineServer.open(
                 InetAddress.getLoopbackAddress(), 0, data)) {

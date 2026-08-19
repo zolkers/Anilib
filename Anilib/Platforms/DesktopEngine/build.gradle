@@ -2,6 +2,18 @@ plugins {
     id 'application'
 }
 
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'de.femtopedia.dex2jar:dex-translator:2.4.38'
+    implementation 'net.dongliu:apk-parser:2.6.10'
+    implementation 'org.ow2.asm:asm:9.10.1'
+    implementation 'org.ow2.asm:asm-commons:9.10.1'
+    implementation 'org.ow2.asm:asm-tree:9.10.1'
+}
+
 application {
     mainModule = 'fr.vriege.anilib.platform.desktopengine'
     mainClass = 'fr.vriege.anilib.platform.desktopengine.DesktopEngineMain'

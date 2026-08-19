@@ -24,6 +24,18 @@ application downloads the pinned official release only after an explicit APK
 installation action, enforces its published size and SHA-256 digest, and runs it
 out of process.
 
+## Anilib desktop extension engine
+
+| Component | Version | Purpose | License |
+| --- | --- | --- | --- |
+| dex2jar | 2.4.38 | Convert extension DEX bytecode into JVM classes | Apache-2.0 |
+| Apk Parser | 2.6.10 | Read APK manifests and extension entry points | Apache-2.0 |
+| ASM | 9.10.1 | Repair and relocate converted extension bytecode | BSD-3-Clause |
+
+These libraries are confined to the optional out-of-process DesktopEngine.
+They never enter the shared Kernel, Features, Android application, or portable
+source ABI.
+
 ## Android application
 
 | Component | Version | Purpose | License |

@@ -23,6 +23,7 @@ public final class BuildDependencyRule implements AnilibJavaRule {
     private static final String ANDROID_BUILD = "Anilib/Platforms/Android/build.gradle";
     private static final String COMPOSE_BUILD = "Anilib/Platforms/Compose/build.gradle";
     private static final String DESKTOP_BUILD = "Anilib/Platforms/Desktop/build.gradle";
+    private static final String DESKTOP_ENGINE_BUILD = "Anilib/Platforms/DesktopEngine/build.gradle";
     private static final String ROOT_BUILD = "build.gradle";
     private static final Map<String, Set<String>> ALLOWED_EXTERNAL_DEPENDENCIES = Map.ofEntries(
             Map.entry(
@@ -46,7 +47,15 @@ public final class BuildDependencyRule implements AnilibJavaRule {
                             "compose.desktop.currentOs",
                             "compose.uiTest",
                             "'org.jetbrains.kotlin:kotlin-test:2.4.10'",
-                            "'io.github.kevinnzou:compose-webview-multiplatform:2.0.3'")));
+                            "'io.github.kevinnzou:compose-webview-multiplatform:2.0.3'")),
+            Map.entry(
+                    DESKTOP_ENGINE_BUILD,
+                    Set.of(
+                            "'de.femtopedia.dex2jar:dex-translator:2.4.38'",
+                            "'net.dongliu:apk-parser:2.6.10'",
+                            "'org.ow2.asm:asm:9.10.1'",
+                            "'org.ow2.asm:asm-commons:9.10.1'",
+                            "'org.ow2.asm:asm-tree:9.10.1'")));
     private static final Map<String, Set<String>> ALLOWED_EXTERNAL_PLUGINS = Map.ofEntries(
             Map.entry(
                     ANDROID_BUILD,
@@ -78,7 +87,8 @@ public final class BuildDependencyRule implements AnilibJavaRule {
     private static final Set<String> ALLOWED_REPOSITORY_BUILDS = Set.of(
             ANDROID_BUILD,
             COMPOSE_BUILD,
-            DESKTOP_BUILD);
+            DESKTOP_BUILD,
+            DESKTOP_ENGINE_BUILD);
 
     public BuildDependencyRule() {
     }
