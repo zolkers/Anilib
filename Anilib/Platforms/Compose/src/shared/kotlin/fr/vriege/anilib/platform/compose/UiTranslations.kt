@@ -329,6 +329,8 @@ internal object UiTranslations {
             "About" to "À propos",
             "About Anilib" to "À propos d’Anilib",
             "Accent color" to "Couleur d’accentuation",
+            "An episode is completed automatically at this percentage" to
+                "Un épisode est automatiquement marqué comme vu à ce pourcentage",
             "Android and desktop use the same stream and subtitle policy." to
                 "Android et le bureau utilisent la même politique de flux et de sous-titres.",
             "Anime / Manga" to "Anime / Manga",
@@ -411,6 +413,7 @@ internal object UiTranslations {
             "Library and media" to "Bibliothèque et médias",
             "Library and updates" to "Bibliothèque et mises à jour",
             "Library updates" to "Mises à jour de la bibliothèque",
+            "Mark watched at (%)" to "Marquer comme vu à (%)",
             "Manage downloads" to "Gérer les téléchargements",
             "Navigation" to "Navigation",
             "Network and browser" to "Réseau et navigateur",

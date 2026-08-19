@@ -31,6 +31,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -1783,13 +1784,16 @@ private fun DetailsPage(
                     val metadata = listOfNotNull(
                         episode.episode().uploadedAt().map(dateTimeFormatter::format).orElse(null),
                         episode.episode().scanlator().orElse(null),
-                        playback?.let { "${it.positionMillis() / 60_000} min watched" },
+                        playback?.let {
+                            if (it.completed()) "Watched" else "${it.positionMillis() / 60_000} min watched"
+                        },
                     ).ifEmpty { listOf("Available") }.joinToString(" · ")
                     MediaUnitRow(
                         title = episode.episode().title(),
                         summary = metadata,
                         open = { watchEpisode(episode) },
                         download = { downloadEpisode(episode) },
+                        muted = playback?.completed() == true,
                     )
                 }
             }
@@ -1910,9 +1914,20 @@ private fun MediaContentHeading(label: String) {
 }
 
 @Composable
-private fun MediaUnitRow(title: String, summary: String, open: () -> Unit, download: () -> Unit) {
+private fun MediaUnitRow(
+    title: String,
+    summary: String,
+    open: () -> Unit,
+    download: () -> Unit,
+    muted: Boolean = false,
+) {
     Row(
-        modifier = Modifier.widthIn(max = 900.dp).fillMaxWidth().clickable(onClick = open).padding(vertical = 12.dp),
+        modifier = Modifier
+            .widthIn(max = 900.dp)
+            .fillMaxWidth()
+            .clickable(onClick = open)
+            .alpha(if (muted) 0.5f else 1f)
+            .padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {

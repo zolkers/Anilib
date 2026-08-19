@@ -13,6 +13,8 @@ public interface PlayerSession extends AutoCloseable {
 
     void setMediaPolicy(PlayerDecoderPolicy decoderPolicy, Optional<String> preferredAudioLanguage);
 
+    void setCompletionThresholdPercent(int thresholdPercent);
+
     void play();
 
     void pause();

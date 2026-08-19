@@ -156,6 +156,7 @@ public final class PlayerController implements AutoCloseable {
 
     private void applyPreferences(PlayerPreferences value) {
         session.setMediaPolicy(value.decoderPolicy(), value.preferredAudioLanguage());
+        session.setCompletionThresholdPercent(value.completionThresholdPercent());
         selectPreferredStream(value);
         selectPreferredSubtitle(value);
     }

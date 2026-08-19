@@ -11,7 +11,8 @@ public record PlayerPreferences(
         PlayerQualityPolicy qualityPolicy,
         Optional<String> preferredQuality,
         long introEndMillis,
-        long outroDurationMillis) {
+        long outroDurationMillis,
+        int completionThresholdPercent) {
     private static final long MAXIMUM_SKIP_MILLIS = 30L * 60L * 1000L;
 
     public PlayerPreferences {
@@ -32,6 +33,9 @@ public record PlayerPreferences(
         if (outroDurationMillis < 0 || outroDurationMillis > MAXIMUM_SKIP_MILLIS) {
             throw new IllegalArgumentException("outroDurationMillis must be between zero and 30 minutes");
         }
+        if (completionThresholdPercent < 1 || completionThresholdPercent > 100) {
+            throw new IllegalArgumentException("completionThresholdPercent must be between one and 100");
+        }
     }
 
     public static PlayerPreferences defaults() {
@@ -43,7 +47,8 @@ public record PlayerPreferences(
                 PlayerQualityPolicy.AUTOMATIC,
                 Optional.empty(),
                 0L,
-                0L);
+                0L,
+                85);
     }
 
     private static Optional<String> normalized(Optional<String> value, String name) {

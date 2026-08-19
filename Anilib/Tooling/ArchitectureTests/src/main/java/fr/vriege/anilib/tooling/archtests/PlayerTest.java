@@ -87,6 +87,7 @@ final class PlayerTest {
         Counter counter = new Counter();
         verifiesSelectionAndPersistence(counter);
         migratesLegacySecondProgress(counter);
+        completesPlaybackAtConfiguredThreshold(counter);
         verifiesPreferencePolicies(counter);
         verifiesPlaybackBackup(counter);
         suppressesIncognitoPersistence(counter);
@@ -145,6 +146,44 @@ final class PlayerTest {
                 .encodeToString(value.getBytes(StandardCharsets.UTF_8));
     }
 
+    private static void completesPlaybackAtConfiguredThreshold(Counter counter) {
+        Path directory = temporaryDirectory("anilib-player-completion-threshold");
+        try (StartedAnilib application = StandardAnilib.start(
+                directory,
+                List.of(sourcePlugin(new TestStreamingSource(false))))) {
+            LibraryItem item = animeItem("player-completion-threshold");
+            application.capability(LibraryCapabilities.CATALOG).save(item);
+            PlayerPresentation presentation = application.capability(PlayerUiCapabilities.PRESENTATION);
+            try (PlayerController controller = presentation.open(item.id(), FIRST_EPISODE.id())) {
+                PlayerPreferences defaults = controller.preferences();
+                controller.setPreferences(new PlayerPreferences(
+                        defaults.decoderPolicy(),
+                        defaults.preferredAudioLanguage(),
+                        defaults.subtitlePolicy(),
+                        defaults.preferredSubtitleLanguage(),
+                        defaults.qualityPolicy(),
+                        defaults.preferredQuality(),
+                        defaults.introEndMillis(),
+                        defaults.outroDurationMillis(),
+                        80), false);
+                controller.updatePlayback(79_999L, 100_000L);
+                counter.check(!controller.snapshot().playback().completed(),
+                        "Player must keep progress below the configured threshold unwatched");
+                controller.updatePlayback(80_000L, 100_000L);
+                counter.check(controller.snapshot().playback().completed(),
+                        "Player must mark progress at the configured threshold as watched");
+            }
+            EpisodeSnapshot episode = presentation.episodes(item.id()).stream()
+                    .filter(snapshot -> snapshot.episode().id().equals(FIRST_EPISODE.id()))
+                    .findFirst()
+                    .orElseThrow();
+            counter.check(episode.playback().orElseThrow().completed(),
+                    "watched state must remain visible in the episode list");
+        } finally {
+            deleteDirectory(directory);
+        }
+    }
+
     private static void verifiesPreferencePolicies(Counter counter) {
         Path directory = temporaryDirectory("anilib-player-preferences");
         RecordingBackend backend = new RecordingBackend();
@@ -164,7 +203,8 @@ final class PlayerTest {
                     PlayerQualityPolicy.HIGHEST,
                     Optional.empty(),
                     90_000L,
-                    60_000L);
+                    60_000L,
+                    85);
             try (PlayerController controller = presentation.open(item.id(), FIRST_EPISODE.id())) {
                 controller.setPreferences(preferences, true);
                 counter.check(controller.hasPreferenceOverride(),

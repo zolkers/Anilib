@@ -25,6 +25,7 @@ final class DefaultPlayerSession implements PlayerSession {
     private PlayerPlayback mediaPlayback;
     private PlayerDecoderPolicy decoderPolicy = PlayerDecoderPolicy.AUTOMATIC;
     private Optional<String> preferredAudioLanguage = Optional.empty();
+    private int completionThresholdPercent = 85;
     private boolean closed;
 
     DefaultPlayerSession(
@@ -133,6 +134,15 @@ final class DefaultPlayerSession implements PlayerSession {
     }
 
     @Override
+    public synchronized void setCompletionThresholdPercent(int thresholdPercent) {
+        ensureOpen();
+        if (thresholdPercent < 1 || thresholdPercent > 100) {
+            throw new IllegalArgumentException("thresholdPercent must be between one and 100");
+        }
+        completionThresholdPercent = thresholdPercent;
+    }
+
+    @Override
     public synchronized void play() {
         ensureOpen();
         mediaPlayback.play();
@@ -165,7 +175,9 @@ final class DefaultPlayerSession implements PlayerSession {
     @Override
     public synchronized void updatePlayback(long positionMillis, long durationMillis) {
         ensureOpen();
-        playback = service.updatePlayback(playback, positionMillis, durationMillis, false);
+        boolean completed = durationMillis > 0L
+                && (double) positionMillis / durationMillis >= completionThresholdPercent / 100.0d;
+        playback = service.updatePlayback(playback, positionMillis, durationMillis, completed);
     }
 
     @Override

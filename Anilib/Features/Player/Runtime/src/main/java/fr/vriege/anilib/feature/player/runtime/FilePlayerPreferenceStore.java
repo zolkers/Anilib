@@ -93,7 +93,11 @@ public final class FilePlayerPreferenceStore implements PlayerPreferenceStore {
                             defaults.qualityPolicy().name())),
                     optional(values, prefix + "preferredQuality", defaults.preferredQuality()),
                     longValue(values, prefix + "introEndMillis", defaults.introEndMillis()),
-                    longValue(values, prefix + "outroDurationMillis", defaults.outroDurationMillis()));
+                    longValue(values, prefix + "outroDurationMillis", defaults.outroDurationMillis()),
+                    intValue(
+                            values,
+                            prefix + "completionThresholdPercent",
+                            defaults.completionThresholdPercent()));
         } catch (IllegalArgumentException exception) {
             throw new IllegalStateException("Invalid player preference value", exception);
         }
@@ -111,6 +115,9 @@ public final class FilePlayerPreferenceStore implements PlayerPreferenceStore {
         putOptional(values, prefix + "preferredQuality", preferences.preferredQuality());
         values.put(prefix + "introEndMillis", Long.toString(preferences.introEndMillis()));
         values.put(prefix + "outroDurationMillis", Long.toString(preferences.outroDurationMillis()));
+        values.put(
+                prefix + "completionThresholdPercent",
+                Integer.toString(preferences.completionThresholdPercent()));
     }
 
     private Map<String, String> readRows() {
@@ -169,6 +176,11 @@ public final class FilePlayerPreferenceStore implements PlayerPreferenceStore {
     private static long longValue(Map<String, String> values, String key, long fallback) {
         String value = values.get(key);
         return value == null ? fallback : Long.parseLong(value);
+    }
+
+    private static int intValue(Map<String, String> values, String key, int fallback) {
+        String value = values.get(key);
+        return value == null ? fallback : Integer.parseInt(value);
     }
 
     private static String titlePrefix(LibraryItemId libraryItemId) {

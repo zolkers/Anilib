@@ -36,6 +36,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -170,11 +171,18 @@ internal fun EpisodeScreen(
 @Composable
 private fun EpisodeCard(episode: EpisodeSnapshot, open: () -> Unit) {
     val playback = episode.playback().orElse(null)
+    val watched = playback?.completed() == true
     Card(
         modifier = Modifier.fillMaxWidth().clickable(onClick = open),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        colors = CardDefaults.cardColors(
+            containerColor = if (watched) {
+                MaterialTheme.colorScheme.surfaceContainerLow
+            } else {
+                MaterialTheme.colorScheme.surfaceContainer
+            },
+        ),
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+        Column(modifier = Modifier.fillMaxWidth().alpha(if (watched) 0.55f else 1f).padding(16.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(episode.episode().title(), fontWeight = FontWeight.SemiBold)
@@ -183,7 +191,7 @@ private fun EpisodeCard(episode: EpisodeSnapshot, open: () -> Unit) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                if (playback?.completed() == true) {
+                if (watched) {
                     Text("Watched", color = MaterialTheme.colorScheme.primary)
                 }
             }
@@ -383,6 +391,9 @@ private fun PlayerPreferenceDialog(
     var outroSeconds by remember(controller) {
         mutableStateOf((initial.outroDurationMillis() / 1000L).toString())
     }
+    var completionThreshold by remember(controller) {
+        mutableStateOf(initial.completionThresholdPercent().toString())
+    }
     var titleOverride by remember(controller) { mutableStateOf(controller.hasPreferenceOverride()) }
     AlertDialog(
         onDismissRequest = close,
@@ -440,6 +451,13 @@ private fun PlayerPreferenceDialog(
                     label = { Text("Outro duration (seconds)") },
                     singleLine = true,
                 )
+                OutlinedTextField(
+                    value = completionThreshold,
+                    onValueChange = { completionThreshold = it.filter(Char::isDigit).take(3) },
+                    label = { Text("Mark watched at (%)") },
+                    supportingText = { Text("An episode is completed automatically at this percentage") },
+                    singleLine = true,
+                )
                 FilterChip(
                     selected = titleOverride,
                     onClick = { titleOverride = !titleOverride },
@@ -463,6 +481,7 @@ private fun PlayerPreferenceDialog(
                         quality,
                         introSeconds.toLongOrNull()?.coerceIn(0L, 1800L)?.times(1000L) ?: 0L,
                         outroSeconds.toLongOrNull()?.coerceIn(0L, 1800L)?.times(1000L) ?: 0L,
+                        completionThreshold.toIntOrNull()?.coerceIn(1, 100) ?: 85,
                     ),
                     titleOverride,
                 )
