@@ -51,10 +51,12 @@ import fr.vriege.anilib.kernel.StartedAnilib;
 
 import java.io.IOException;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -84,12 +86,63 @@ final class PlayerTest {
     static int run() {
         Counter counter = new Counter();
         verifiesSelectionAndPersistence(counter);
+        migratesLegacySecondProgress(counter);
         verifiesPreferencePolicies(counter);
         verifiesPlaybackBackup(counter);
         suppressesIncognitoPersistence(counter);
         cleansOrphanedPlaybackState(counter);
         rejectsInvalidSourceResults(counter);
         return counter.value;
+    }
+
+    private static void migratesLegacySecondProgress(Counter counter) {
+        Path directory = temporaryDirectory("anilib-player-legacy-seconds");
+        LibraryItem item = animeItem("player-legacy-seconds");
+        try {
+            try (StartedAnilib application = StandardAnilib.start(
+                    directory,
+                    List.of(sourcePlugin(new TestStreamingSource(false))))) {
+                application.capability(LibraryCapabilities.CATALOG).save(item);
+            }
+            String state = String.join("\t",
+                    "STATE",
+                    encoded(item.id().value()),
+                    SOURCE_ID.toString(),
+                    encoded(SOURCE_ITEM_ID.value()),
+                    encoded(FIRST_EPISODE.id().value()),
+                    "60",
+                    "120000",
+                    "false",
+                    "2026-08-19T10:00:00Z");
+            Files.writeString(
+                    directory.resolve("playback-state.anilib"),
+                    "ANILIB_PLAYBACK\t1\n" + state + "\n",
+                    StandardCharsets.UTF_8);
+            try (StartedAnilib restarted = StandardAnilib.start(
+                    directory,
+                    List.of(sourcePlugin(new TestStreamingSource(false))))) {
+                EpisodeSnapshot episode = restarted.capability(PlayerCapabilities.SERVICE)
+                        .episodes(item.id()).stream()
+                        .filter(snapshot -> snapshot.episode().id().equals(FIRST_EPISODE.id()))
+                        .findFirst()
+                        .orElseThrow();
+                counter.check(episode.playback().orElseThrow().positionMillis() == 60_000L,
+                        "legacy platform seconds must migrate to playback milliseconds");
+            }
+            counter.check(Files.readAllLines(
+                            directory.resolve("playback-state.anilib"),
+                            StandardCharsets.UTF_8).getFirst().equals("ANILIB_PLAYBACK\t2"),
+                    "legacy playback state must be rewritten with the current format");
+        } catch (IOException exception) {
+            throw new AssertionError("Unable to verify legacy Player progress migration", exception);
+        } finally {
+            deleteDirectory(directory);
+        }
+    }
+
+    private static String encoded(String value) {
+        return Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(value.getBytes(StandardCharsets.UTF_8));
     }
 
     private static void verifiesPreferencePolicies(Counter counter) {

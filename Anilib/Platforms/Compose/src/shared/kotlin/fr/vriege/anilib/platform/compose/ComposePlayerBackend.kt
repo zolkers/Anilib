@@ -82,7 +82,7 @@ internal class ComposePlayerPlayback(
         }
         PlayerPlaybackSnapshot(
             status,
-            player.currentTime.coerceAtLeast(0.0).roundToLong(),
+            secondsToMillis(player.currentTime),
             durationMillis(player),
             player.volume,
             player.playbackSpeed,
@@ -212,8 +212,11 @@ internal class ComposePlayerPlayback(
     }
 
     private fun durationMillis(player: VideoPlayerState): Long =
-        if (player.duration > 0.0) (player.duration * 1000.0).roundToLong()
+        if (player.duration > 0.0) secondsToMillis(player.duration)
         else PlaybackState.UNKNOWN_DURATION
+
+    private fun secondsToMillis(seconds: Double): Long =
+        (seconds.coerceAtLeast(0.0) * 1000.0).roundToLong()
 
     private fun ensureOpen() {
         if (closed) throw PlayerException("Player playback is closed")

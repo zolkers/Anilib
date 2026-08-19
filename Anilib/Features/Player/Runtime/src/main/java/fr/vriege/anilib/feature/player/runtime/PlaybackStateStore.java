@@ -25,7 +25,8 @@ import java.util.Objects;
 import java.util.Optional;
 
 final class PlaybackStateStore {
-    private static final String HEADER = "ANILIB_PLAYBACK\t1";
+    private static final String HEADER = "ANILIB_PLAYBACK\t2";
+    private static final String LEGACY_SECONDS_HEADER = "ANILIB_PLAYBACK\t1";
     private static final long MAXIMUM_FILE_BYTES = 64L * 1024L * 1024L;
     private static final int MAXIMUM_ENTRIES = 1_000_000;
     private static final Base64.Encoder ENCODER = Base64.getUrlEncoder().withoutPadding();
@@ -95,19 +96,28 @@ final class PlaybackStateStore {
                 throw new PlayerException("Playback state file exceeds the supported size");
             }
             List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
-            if (lines.isEmpty() || !lines.getFirst().equals(HEADER)) {
+            if (lines.isEmpty()
+                    || !lines.getFirst().equals(HEADER)
+                    && !lines.getFirst().equals(LEGACY_SECONDS_HEADER)) {
                 throw new PlayerException("Unsupported playback state format");
             }
+            boolean legacySeconds = lines.getFirst().equals(LEGACY_SECONDS_HEADER);
             if (lines.size() - 1 > MAXIMUM_ENTRIES) {
                 throw new PlayerException("Playback state contains too many entries");
             }
             for (int index = 1; index < lines.size(); index++) {
                 if (!lines.get(index).isBlank()) {
                     PlaybackState state = decode(lines.get(index));
+                    if (legacySeconds) {
+                        state = migrateLegacySeconds(state);
+                    }
                     if (states.putIfAbsent(Key.of(state), state) != null) {
                         throw new PlayerException("Playback state contains duplicate entries");
                     }
                 }
+            }
+            if (legacySeconds) {
+                persistAndReplace(new LinkedHashMap<>(states));
             }
         } catch (IOException exception) {
             throw new PlayerException("Unable to load playback state", exception);
@@ -175,6 +185,27 @@ final class PlaybackStateStore {
         } catch (IllegalArgumentException exception) {
             throw new PlayerException("Invalid playback state entry", exception);
         }
+    }
+
+    private static PlaybackState migrateLegacySeconds(PlaybackState state) {
+        long position = state.positionMillis();
+        long duration = state.durationMillis();
+        if (state.completed() || position <= 0L || duration <= 0L || position > duration / 1_000L) {
+            return state;
+        }
+        long migratedPosition;
+        try {
+            migratedPosition = Math.multiplyExact(position, 1_000L);
+        } catch (ArithmeticException ignored) {
+            migratedPosition = duration;
+        }
+        return new PlaybackState(
+                state.libraryItemId(),
+                state.episodeId(),
+                Math.min(migratedPosition, duration),
+                duration,
+                false,
+                state.updatedAt());
     }
 
     private static void moveAtomically(Path source, Path destination) throws IOException {
