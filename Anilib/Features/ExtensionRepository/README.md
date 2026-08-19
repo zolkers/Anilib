@@ -4,11 +4,14 @@ This removable vertical owns user-supplied source repository URLs. Standard
 starts it with an empty list: Anilib does not ship, recommend, or silently add a
 third-party catalogue.
 
-The runtime accepts the Aniyomi `index.json`/`index.min.json` shape, including
-`name`, `pkg`, `apk`, `lang`, `code`, `version`, `nsfw`, and `sources`. Index and
-artifact downloads require HTTPS, redirects are revalidated hop by hop, index
-size and nesting are bounded, duplicate packages are rejected, and URLs with
-credentials or fragments are invalid.
+The runtime detects and accepts both the Aniyomi legacy
+`index.json`/`index.min.json` shape and the Mihon v2 `index.pb` Protobuf shape.
+The Protobuf decoder is a bounded, dependency-free implementation of the
+published Mihon field numbers and retains package, version, content warning,
+APK, icon, source identity, language, and home-URL metadata. Index and artifact
+downloads require HTTPS, gzip expansion is bounded, redirects are revalidated
+hop by hop, duplicate packages are rejected, and URLs with credentials or
+fragments are invalid.
 
 Offline compatibility tests use synthetic entries matching the public
 [Yuzono anime](https://raw.githubusercontent.com/yuzono/anime-repo/repo/index.min.json)
@@ -26,7 +29,7 @@ ecosystem's identity cannot escape the managed extension directory.
 
 Users may paste either a direct HTTPS index URL or a GitHub repository URL such
 as `https://github.com/publisher/anilib-sources`. A GitHub repository is resolved
-dynamically through its default branch, trying `index.min.json` before
+dynamically through its default branch, trying `index.pb`, `index.min.json`, and
 `index.json`, then through the conventional publication branch `repo`. Relative
 Bundle URLs remain relative to the fetched raw index.
 

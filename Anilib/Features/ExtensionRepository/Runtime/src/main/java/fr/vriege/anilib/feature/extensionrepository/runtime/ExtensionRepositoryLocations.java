@@ -27,8 +27,10 @@ public final class ExtensionRepositoryLocations {
         String repository = requireGitHubSegment(stripGitSuffix(segments[2]), "repository");
         String root = "https://" + RAW_GITHUB_HOST + "/" + owner + "/" + repository + "/HEAD/";
         return List.of(
+                URI.create(root + "index.pb"),
                 URI.create(root + "index.min.json"),
                 URI.create(root + "index.json"),
+                URI.create(root.replace("/HEAD/", "/repo/") + "index.pb"),
                 URI.create(root.replace("/HEAD/", "/repo/") + "index.min.json"),
                 URI.create(root.replace("/HEAD/", "/repo/") + "index.json"));
     }

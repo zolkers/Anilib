@@ -7,6 +7,9 @@ import fr.vriege.anilib.feature.extensionrepository.ExtensionPackageMetadata;
 import fr.vriege.anilib.feature.extensionrepository.ExtensionSourceMetadata;
 import fr.vriege.anilib.foundation.validation.Preconditions;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -19,6 +22,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.zip.GZIPInputStream;
 
 public final class AniyomiRepositoryIndexParser {
     private static final int MAX_INDEX_CHARACTERS = 4 * 1024 * 1024;
@@ -26,6 +30,15 @@ public final class AniyomiRepositoryIndexParser {
     private static final int MAX_SOURCES_PER_PACKAGE = 100;
 
     public AniyomiRepositoryIndexParser() {
+    }
+
+    public List<ExtensionPackageMetadata> parse(URI indexUri, byte[] encodedContent) {
+        byte[] content = decompress(encodedContent);
+        int first = firstContentByte(content);
+        if (first == '[') {
+            return parse(indexUri, new String(content, StandardCharsets.UTF_8));
+        }
+        return new MihonRepositoryIndexParser().parse(indexUri, content);
     }
 
     public List<ExtensionPackageMetadata> parse(URI indexUri, String json) {
@@ -237,5 +250,43 @@ public final class AniyomiRepositoryIndexParser {
             throw new IllegalArgumentException("repository index must be an absolute HTTPS URI without credentials");
         }
         return uri;
+    }
+
+    private byte[] decompress(byte[] encodedContent) {
+        byte[] content = Preconditions.requireNonNull(encodedContent, "encodedContent").clone();
+        if (content.length > MAX_INDEX_CHARACTERS) {
+            throw new IllegalArgumentException("Extension repository index exceeds 4 MiB");
+        }
+        if (content.length < 2 || (content[0] & 0xff) != 0x1f || (content[1] & 0xff) != 0x8b) {
+            return content;
+        }
+        try (GZIPInputStream gzip = new GZIPInputStream(new ByteArrayInputStream(content));
+                ByteArrayOutputStream decoded = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[8192];
+            int read;
+            while ((read = gzip.read(buffer)) != -1) {
+                decoded.write(buffer, 0, read);
+                if (decoded.size() > MAX_INDEX_CHARACTERS) {
+                    throw new IllegalArgumentException("Decompressed extension index exceeds 4 MiB");
+                }
+            }
+            return decoded.toByteArray();
+        } catch (IOException exception) {
+            throw new IllegalArgumentException("Extension repository contains invalid gzip data", exception);
+        }
+    }
+
+    private int firstContentByte(byte[] content) {
+        int position = content.length >= 3
+                && (content[0] & 0xff) == 0xef
+                && (content[1] & 0xff) == 0xbb
+                && (content[2] & 0xff) == 0xbf ? 3 : 0;
+        while (position < content.length && Character.isWhitespace(content[position] & 0xff)) {
+            position++;
+        }
+        if (position == content.length) {
+            throw new IllegalArgumentException("Extension repository index is empty");
+        }
+        return content[position] & 0xff;
     }
 }

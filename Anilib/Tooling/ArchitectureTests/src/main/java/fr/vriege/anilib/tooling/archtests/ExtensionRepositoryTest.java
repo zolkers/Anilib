@@ -76,11 +76,13 @@ import java.util.Base64;
 import java.util.HexFormat;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 final class ExtensionRepositoryTest {
     private static final URI INDEX = URI.create("https://repo.example/extensions/index.min.json");
+    private static final URI PROTOBUF_INDEX = URI.create("https://repo.example/extensions/index.pb");
     private static final URI BUNDLE = URI.create("https://repo.example/extensions/example.jar");
     private static final String SHA_256 = "0123456789abcdef0123456789abcdef"
             + "0123456789abcdef0123456789abcdef";
@@ -91,6 +93,7 @@ final class ExtensionRepositoryTest {
     static int run() {
         Counter counter = new Counter();
         parsesAniyomiAndPortableArtifacts(counter);
+        parsesMihonProtobufRepositories(counter);
         selectsArtifactsByHostPlatform(counter);
         parsesPublicRepositoryShapes(counter);
         rejectsUnsafeMetadata(counter);
@@ -320,6 +323,46 @@ final class ExtensionRepositoryTest {
                 "Keiyoushi APK filenames must resolve through the public repository apk directory");
     }
 
+    private static void parsesMihonProtobufRepositories(Counter counter) {
+        byte[] index = gzip(mihonProtobufIndex());
+        ExtensionPackageMetadata extension = new AniyomiRepositoryIndexParser()
+                .parse(PROTOBUF_INDEX, index)
+                .getFirst();
+        counter.check(extension.packageName().equals("eu.kanade.tachiyomi.extension.en.example")
+                        && extension.displayName().equals("Example Manga")
+                        && extension.versionCode() == 42
+                        && extension.versionName().equals("1.6.42")
+                        && extension.adult()
+                        && extension.contentKind() == ExtensionContentKind.MANGA,
+                "Mihon v2 Protobuf package metadata must map into the shared extension catalogue");
+        counter.check(extension.sources().getFirst().sourceId().equals("6170936930338275444")
+                        && extension.sources().getFirst().baseUri().orElseThrow()
+                        .equals(URI.create("https://manga.example.test"))
+                        && extension.sources().get(1).baseUri().isEmpty(),
+                "Mihon v2 Protobuf source identities and home URLs must remain intact");
+        counter.check(extension.artifacts().getFirst().uri()
+                        .equals(URI.create("https://repo.example/apk/example.apk"))
+                        && extension.icon().orElseThrow()
+                        .equals(URI.create("https://repo.example/icon/example.png")),
+                "Mihon v2 Protobuf resource URLs must remain exact HTTPS locations");
+
+        Path directory = temporaryDirectory();
+        try {
+            RecordingClient client = new RecordingClient(index);
+            DefaultExtensionRepositoryService service = new DefaultExtensionRepositoryService(
+                    new FileExtensionRepositoryStore(directory.resolve("repositories.txt")),
+                    client);
+            service.add(PROTOBUF_INDEX);
+            ExtensionRepositorySnapshot snapshot = service.refresh(PROTOBUF_INDEX);
+            counter.check(snapshot.successful() && snapshot.packages().size() == 1
+                            && client.lastRequest.headers().get("accept")
+                            .contains("application/x-protobuf, application/json"),
+                    "repository refresh must negotiate and decode Mihon Protobuf indexes directly");
+        } finally {
+            deleteDirectory(directory);
+        }
+    }
+
     private static void rejectsUnsafeMetadata(Counter counter) {
         AniyomiRepositoryIndexParser parser = new AniyomiRepositoryIndexParser();
         counter.expectIllegalArgument(
@@ -368,8 +411,9 @@ final class ExtensionRepositoryTest {
             counter.check(snapshot.successful() && snapshot.packages().size() == 1,
                     "configured repository must refresh into a bounded catalogue");
             counter.check(client.lastRequest.uri().equals(INDEX)
-                            && client.lastRequest.headers().get("accept").contains("application/json"),
-                    "repository refresh must use the shared HTTP client and explicit JSON acceptance");
+                            && client.lastRequest.headers().get("accept")
+                            .contains("application/x-protobuf, application/json"),
+                    "repository refresh must use the shared HTTP client and explicit format acceptance");
             counter.check(service.packages().getFirst().adult(),
                     "Aniyomi nsfw metadata must survive catalogue refresh");
             DefaultExtensionRepositoryService reopened = new DefaultExtensionRepositoryService(
@@ -423,8 +467,10 @@ final class ExtensionRepositoryTest {
             counter.check(snapshot.successful() && snapshot.packages().size() == 1,
                     "a GitHub repository URL must resolve to its dynamic JSON index");
             counter.check(client.requests.equals(List.of(
+                            URI.create("https://raw.githubusercontent.com/example/anilib-sources/HEAD/index.pb"),
                             URI.create("https://raw.githubusercontent.com/example/anilib-sources/HEAD/index.min.json"),
                             URI.create("https://raw.githubusercontent.com/example/anilib-sources/HEAD/index.json"),
+                            URI.create("https://raw.githubusercontent.com/example/anilib-sources/repo/index.pb"),
                             URI.create("https://raw.githubusercontent.com/example/anilib-sources/repo/index.min.json"),
                             URI.create("https://raw.githubusercontent.com/example/anilib-sources/repo/index.json"))),
                     "GitHub resolution must search default and publication branches deterministically");
@@ -852,6 +898,79 @@ final class ExtensionRepositoryTest {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
         } catch (GeneralSecurityException exception) {
             throw new AssertionError("JDK must provide SHA-256", exception);
+        }
+    }
+
+    private static byte[] mihonProtobufIndex() {
+        ByteArrayOutputStream source = new ByteArrayOutputStream();
+        writeVarintField(source, 1, 6170936930338275444L);
+        writeStringField(source, 2, "Example Manga");
+        writeStringField(source, 3, "en");
+        writeStringField(source, 4, "https://manga.example.test");
+
+        ByteArrayOutputStream sourceWithoutWebPage = new ByteArrayOutputStream();
+        writeVarintField(sourceWithoutWebPage, 1, 2);
+        writeStringField(sourceWithoutWebPage, 2, "Example Mirror");
+        writeStringField(sourceWithoutWebPage, 3, "en");
+        writeStringField(sourceWithoutWebPage, 4, "about:blank");
+
+        ByteArrayOutputStream resources = new ByteArrayOutputStream();
+        writeStringField(resources, 1, "https://repo.example/apk/example.apk");
+        writeStringField(resources, 2, "https://repo.example/icon/example.png");
+
+        ByteArrayOutputStream extension = new ByteArrayOutputStream();
+        writeStringField(extension, 1, "Example Manga");
+        writeStringField(extension, 2, "eu.kanade.tachiyomi.extension.en.example");
+        writeMessageField(extension, 3, resources.toByteArray());
+        writeStringField(extension, 4, "1.6");
+        writeVarintField(extension, 5, 42);
+        writeStringField(extension, 6, "1.6.42");
+        writeVarintField(extension, 7, 2);
+        writeMessageField(extension, 8, source.toByteArray());
+        writeMessageField(extension, 8, sourceWithoutWebPage.toByteArray());
+
+        ByteArrayOutputStream extensionList = new ByteArrayOutputStream();
+        writeMessageField(extensionList, 1, extension.toByteArray());
+
+        ByteArrayOutputStream repository = new ByteArrayOutputStream();
+        writeStringField(repository, 1, "Example repository");
+        writeMessageField(repository, 101, extensionList.toByteArray());
+        return repository.toByteArray();
+    }
+
+    private static void writeStringField(ByteArrayOutputStream output, int field, String value) {
+        writeMessageField(output, field, value.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static void writeMessageField(ByteArrayOutputStream output, int field, byte[] value) {
+        writeVarint(output, ((long) field << 3) | 2);
+        writeVarint(output, value.length);
+        output.writeBytes(value);
+    }
+
+    private static void writeVarintField(ByteArrayOutputStream output, int field, long value) {
+        writeVarint(output, (long) field << 3);
+        writeVarint(output, value);
+    }
+
+    private static void writeVarint(ByteArrayOutputStream output, long value) {
+        long remaining = value;
+        while ((remaining & ~0x7fL) != 0) {
+            output.write((int) (remaining & 0x7f) | 0x80);
+            remaining >>>= 7;
+        }
+        output.write((int) remaining);
+    }
+
+    private static byte[] gzip(byte[] content) {
+        try {
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            try (GZIPOutputStream gzip = new GZIPOutputStream(output)) {
+                gzip.write(content);
+            }
+            return output.toByteArray();
+        } catch (IOException exception) {
+            throw new AssertionError("Unable to create a gzip Protobuf fixture", exception);
         }
     }
 

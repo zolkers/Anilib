@@ -95,7 +95,7 @@ public final class DefaultExtensionRepositoryService implements ExtensionReposit
             if (response.body().length > MAX_INDEX_BYTES) {
                 throw new IllegalArgumentException("Repository response exceeds 4 MiB");
             }
-            List<ExtensionPackageMetadata> packages = parser.parse(fetched.finalUri(), response.bodyAsUtf8());
+            List<ExtensionPackageMetadata> packages = parser.parse(fetched.finalUri(), response.body());
             snapshot = new ExtensionRepositorySnapshot(repository, fetchedAt, packages, java.util.Optional.empty());
         } catch (RuntimeException exception) {
             snapshot = new ExtensionRepositorySnapshot(
@@ -138,7 +138,7 @@ public final class DefaultExtensionRepositoryService implements ExtensionReposit
         URI current = initialUri;
         for (int redirects = 0; redirects <= MAX_REDIRECTS; redirects++) {
             HttpRequest request = HttpRequest.builder(current)
-                    .header("accept", "application/json")
+                    .header("accept", "application/x-protobuf, application/json")
                     .cache(HttpCachePolicy.refresh(CACHE_TTL))
                     .minimumInterval(MINIMUM_INTERVAL)
                     .build();
