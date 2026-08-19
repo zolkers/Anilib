@@ -66,7 +66,7 @@ public final class MiwayomiSourceBridge {
         Map<String, Object> health = object(get("/api/v1/health", Map.of()));
         String service = text(health, "service");
         if (!"ok".equals(text(health, "status"))
-                || !("miwayomi".equals(service) || "anilib-desktop-engine".equals(service))) {
+                || !("miwayomi".equals(service) || "anilib-desktop-extension-host".equals(service))) {
             throw new IllegalStateException("Extension engine returned an unexpected health response");
         }
     }

@@ -32,7 +32,7 @@ out of process.
 | Apk Parser | 2.6.10 | Read APK manifests and extension entry points | Apache-2.0 |
 | ASM | 9.10.1 | Repair and relocate converted extension bytecode | BSD-3-Clause |
 
-These libraries are confined to the optional out-of-process DesktopEngine.
+These libraries are confined to the optional out-of-process DesktopExtensionHost.
 They never enter the shared Kernel, Features, Android application, or portable
 source ABI.
 

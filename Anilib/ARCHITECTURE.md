@@ -455,7 +455,7 @@ still lacks an ABI contract remain installed but disabled with a visible report.
 This keeps Android compatibility optional and prevents it from becoming a hidden
 dependency of the portable Source SDK used by both products.
 
-`Platforms/DesktopEngine` is the in-repository successor to that transitional
+`Platforms/DesktopExtensionHost` is the in-repository successor to that transitional
 provider. It is an independently runnable Java 21 process with a versioned,
 loopback-only HTTP protocol and explicit capability discovery. Its internals are
 split by responsibility into protocol, server, APK installation, DEX conversion,

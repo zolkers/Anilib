@@ -46,17 +46,17 @@ public final class ImportPolicyRule implements AnilibJavaRule {
                 || imported.startsWith("org.xml.sax.")
                 || imported.startsWith("fr.vriege.anilib.")
                 || isJdkHttpServer(imported, source)
-                || isDesktopEngineDependency(imported, source);
+                || isDesktopExtensionHostDependency(imported, source);
     }
 
     private static boolean isJdkHttpServer(String imported, JavaSource source) {
         return (source.module().id().equals("tooling.architecture-tests")
-                || source.module().id().equals("platform.desktop-engine"))
+                || source.module().id().equals("platform.desktop-extension-host"))
                 && imported.startsWith("com.sun.net.httpserver.");
     }
 
-    private static boolean isDesktopEngineDependency(String imported, JavaSource source) {
-        if (!source.module().id().equals("platform.desktop-engine")) {
+    private static boolean isDesktopExtensionHostDependency(String imported, JavaSource source) {
+        if (!source.module().id().equals("platform.desktop-extension-host")) {
             return false;
         }
         return imported.startsWith("com.googlecode.d2j.dex.")
