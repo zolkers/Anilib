@@ -30,11 +30,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.automirrored.outlined.ChromeReaderMode
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.IconButton
@@ -701,7 +701,11 @@ private fun ReaderTopBar(
             Icon(Icons.Default.MoreVert, contentDescription = "Reader menu", tint = Color.White)
         }
         IconButton(onClick = openReadingMode) {
-            Icon(Icons.Default.SwapVert, contentDescription = "Reading mode", tint = Color.White)
+            Icon(
+                Icons.AutoMirrored.Outlined.ChromeReaderMode,
+                contentDescription = "Reading mode",
+                tint = Color.White,
+            )
         }
     }
 }
