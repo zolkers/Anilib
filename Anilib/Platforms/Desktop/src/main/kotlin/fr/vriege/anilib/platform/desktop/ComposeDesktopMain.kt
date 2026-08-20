@@ -25,6 +25,7 @@ import fr.vriege.anilib.feature.network.NetworkCapabilities
 import fr.vriege.anilib.feature.reader.ui.ReaderUiCapabilities
 import fr.vriege.anilib.feature.settings.ui.SettingsUiCapabilities
 import fr.vriege.anilib.feature.settings.SettingsCapabilities
+import fr.vriege.anilib.feature.settings.PlayerWindowMode
 import fr.vriege.anilib.feature.player.ui.PlayerUiCapabilities
 import fr.vriege.anilib.feature.downloads.ui.DownloadUiCapabilities
 import fr.vriege.anilib.feature.backup.ui.BackupUiCapabilities
@@ -79,17 +80,24 @@ fun main(arguments: Array<String>) {
     val crashShield = DesktopUiCrashShield.install(
         started.capability(SettingsCapabilities.DIAGNOSTICS),
     )
+    val settingsService = started.capability(SettingsCapabilities.SERVICE)
     try {
         application {
             val windowState = rememberWindowState()
             val playerFullscreen = remember { mutableStateOf(false) }
+            val playerWindowMode = remember { mutableStateOf(PlayerWindowMode.BORDERLESS) }
             val placementBeforeFullscreen = remember { mutableStateOf(WindowPlacement.Floating) }
             val setPlayerFullscreen: (Boolean) -> Unit = remember(windowState) {
                 { fullscreen ->
                     if (fullscreen != playerFullscreen.value) {
                         if (fullscreen) {
                             placementBeforeFullscreen.value = windowState.placement
-                            windowState.placement = WindowPlacement.Maximized
+                            playerWindowMode.value = settingsService.snapshot().playerWindowMode()
+                            windowState.placement = when (playerWindowMode.value) {
+                                PlayerWindowMode.WINDOWED -> windowState.placement
+                                PlayerWindowMode.FULLSCREEN -> WindowPlacement.Fullscreen
+                                PlayerWindowMode.BORDERLESS -> WindowPlacement.Maximized
+                            }
                         } else {
                             windowState.placement = placementBeforeFullscreen.value
                         }
@@ -119,7 +127,7 @@ fun main(arguments: Array<String>) {
                 },
                 title = "Anilib",
                 state = windowState,
-                undecorated = playerFullscreen.value,
+                undecorated = playerFullscreen.value && playerWindowMode.value == PlayerWindowMode.BORDERLESS,
                 onPreviewKeyEvent = { event ->
                     if (playerFullscreen.value && event.key == Key.Escape && event.type == KeyEventType.KeyDown) {
                         setPlayerFullscreen(false)

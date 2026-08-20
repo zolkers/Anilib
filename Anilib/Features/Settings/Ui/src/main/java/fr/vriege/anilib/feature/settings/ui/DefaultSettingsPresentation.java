@@ -10,6 +10,7 @@ import fr.vriege.anilib.feature.settings.SettingsSnapshot;
 import fr.vriege.anilib.feature.settings.AccentColor;
 import fr.vriege.anilib.feature.settings.LanguagePack;
 import fr.vriege.anilib.feature.settings.NavigationStyle;
+import fr.vriege.anilib.feature.settings.PlayerWindowMode;
 import fr.vriege.anilib.feature.settings.StartScreen;
 import fr.vriege.anilib.feature.settings.ThemeFamily;
 import fr.vriege.anilib.feature.settings.ThemeMode;
@@ -79,6 +80,11 @@ public final class DefaultSettingsPresentation implements SettingsPresentation {
     @Override
     public void setNavigationStyle(NavigationStyle navigationStyle) {
         service.replace(service.snapshot().withNavigationStyle(navigationStyle));
+    }
+
+    @Override
+    public void setPlayerWindowMode(PlayerWindowMode playerWindowMode) {
+        service.replace(service.snapshot().withPlayerWindowMode(playerWindowMode));
     }
 
     @Override
