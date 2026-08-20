@@ -103,6 +103,16 @@ internal fun MediaDetailsScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = toggleFavorite) {
+                        Icon(
+                            if (favorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            contentDescription = if (favorite) {
+                                "ui.remove.from.library"
+                            } else {
+                                "ui.add.to.library"
+                            },
+                        )
+                    }
                     manageCategories?.let { action ->
                         IconButton(onClick = action) {
                             Icon(
@@ -143,11 +153,9 @@ internal fun MediaDetailsScreen(
             item { MediaDetailsHero(model, artwork) }
             item {
                 MediaDetailsActions(
-                    favorite = favorite,
                     contentLabel = contentLabel,
                     canTrack = canTrack,
                     canOpenWeb = canOpenWeb,
-                    toggleFavorite = toggleFavorite,
                     track = track,
                     openWeb = openWeb,
                 )
@@ -205,11 +213,9 @@ private fun MediaDetailsHero(
 
 @Composable
 private fun MediaDetailsActions(
-    favorite: Boolean,
     contentLabel: String,
     canTrack: Boolean,
     canOpenWeb: Boolean,
-    toggleFavorite: () -> Unit,
     track: () -> Unit,
     openWeb: () -> Unit,
 ) {
@@ -217,12 +223,6 @@ private fun MediaDetailsActions(
         modifier = Modifier.widthIn(max = 720.dp).fillMaxWidth().padding(vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
     ) {
-        MediaDetailAction(
-            if (favorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-            if (favorite) "ui.in.library" else "ui.add.to.library",
-            true,
-            toggleFavorite,
-        )
         MediaDetailAction(Icons.Default.History, contentLabel, false) {}
         MediaDetailAction(Icons.Default.MoreHoriz, "Tracking", canTrack, track)
         MediaDetailAction(Icons.Default.Public, "WebView", canOpenWeb, openWeb)

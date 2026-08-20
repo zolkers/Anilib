@@ -790,6 +790,7 @@ private fun LibraryPageContent(
         .map { it.name() }
     var query by remember { mutableStateOf("") }
     var searching by remember { mutableStateOf(false) }
+    var favoritesOnly by remember { mutableStateOf(true) }
     var category by remember(presentation, kind) {
         mutableStateOf(
             overview.displayPreferences().defaultCategory().orElse(null)
@@ -815,7 +816,7 @@ private fun LibraryPageContent(
         .asSequence()
         .filter { query.isBlank() || it.title().contains(query, ignoreCase = true) }
         .filter { it.kind() == kind }
-        .filter { it.favorite() }
+        .filter { !favoritesOnly || it.favorite() }
         .filter {
             when (category) {
                 null -> true
@@ -950,6 +951,16 @@ private fun LibraryPageContent(
                     }
                 }
             }
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                FilterChip(
+                    selected = favoritesOnly,
+                    onClick = { favoritesOnly = !favoritesOnly },
+                    label = { Text("ui.favorites") },
+                )
+            }
             if (scopedCategories.isNotEmpty()) {
                 Row(
                     modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -984,7 +995,7 @@ private fun LibraryPageContent(
                 }
             }
             Spacer(Modifier.height(8.dp))
-            if (overview.titles().none { it.kind() == kind && it.favorite() }) {
+            if (overview.titles().none { it.kind() == kind && (!favoritesOnly || it.favorite()) }) {
                 EmptyPage(
                     UiTranslations.format(
                         "dynamic.empty.library.kind",
