@@ -221,6 +221,13 @@ class UiRouteScreenshotTest {
                     scrollToText(destination)
                     onAllNodes(hasText(destination) and hasClickAction()).onFirst().performClick()
                     captureStable("$destination settings")
+                    if (destination == "Appearance") {
+                        repeat(3) {
+                            onAllNodes(hasText("Navigation") and hasClickAction()).onFirst().performClick()
+                            waitForIdle()
+                            onNodeWithText("Appearance").fetchSemanticsNode()
+                        }
+                    }
                     goBack()
                 }
                 scrollToText("About")
