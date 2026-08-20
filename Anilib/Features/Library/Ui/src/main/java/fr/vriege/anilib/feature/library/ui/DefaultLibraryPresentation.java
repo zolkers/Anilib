@@ -289,6 +289,28 @@ public final class DefaultLibraryPresentation implements LibraryPresentation {
     }
 
     @Override
+    public synchronized void setTitleCategories(LibraryItemId id, Set<String> categories) {
+        Objects.requireNonNull(id, "id must not be null");
+        Set<String> selected = Set.copyOf(
+                Objects.requireNonNull(categories, "categories must not be null"));
+        LibraryItem item = catalog.find(id)
+                .orElseThrow(() -> new IllegalArgumentException("Unknown library title: " + id));
+        Map<String, LibraryCategory> configured = normalizedConfiguration().categories().stream()
+                .collect(Collectors.toUnmodifiableMap(LibraryCategory::name, category -> category));
+        if (!configured.keySet().containsAll(selected)) {
+            throw new IllegalArgumentException("categories contain an unknown library category");
+        }
+        boolean incompatible = selected.stream()
+                .map(configured::get)
+                .anyMatch(category -> !category.scope().supports(item.kind()));
+        if (incompatible) {
+            throw new IllegalArgumentException("Category and title library types must match");
+        }
+        LibraryItem categorized = item.withCategories(selected);
+        catalog.save(selected.isEmpty() ? categorized : categorized.withFavorite(true));
+    }
+
+    @Override
     public synchronized void deleteTitles(Set<LibraryItemId> ids) {
         Set<LibraryItemId> selected = validatedSelection(ids);
         catalog.replaceAll(catalog.snapshot().stream()

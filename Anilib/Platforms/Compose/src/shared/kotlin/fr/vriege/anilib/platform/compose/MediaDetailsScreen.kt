@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.Category
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -86,6 +87,7 @@ internal fun MediaDetailsScreen(
     openWeb: () -> Unit,
     download: () -> Unit,
     share: () -> Unit,
+    manageCategories: (() -> Unit)?,
     edit: (() -> Unit)?,
     openPrimary: () -> Unit,
     goBack: () -> Unit,
@@ -101,6 +103,14 @@ internal fun MediaDetailsScreen(
                     }
                 },
                 actions = {
+                    manageCategories?.let { action ->
+                        IconButton(onClick = action) {
+                            Icon(
+                                Icons.Outlined.Category,
+                                contentDescription = "ui.categories",
+                            )
+                        }
+                    }
                     edit?.let { action ->
                         IconButton(onClick = action) {
                             Icon(Icons.Default.Edit, contentDescription = "ui.edit")

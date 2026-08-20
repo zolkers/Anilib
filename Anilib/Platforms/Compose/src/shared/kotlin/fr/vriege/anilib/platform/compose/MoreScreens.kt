@@ -13,11 +13,18 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Category
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -96,7 +103,12 @@ internal fun CategoriesScreen(presentation: LibraryPresentation, goBack: () -> U
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    Button(onClick = { creating = true }) { Text("ui.create") }
+                    IconButton(onClick = { creating = true }) {
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = "ui.create.category",
+                        )
+                    }
                 }
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }
@@ -228,13 +240,41 @@ private fun CategoryCard(
                         )
                     }
                 }
-                TextButton(enabled = moveUp != null, onClick = { moveUp?.invoke() }) { Text("ui.up") }
-                TextButton(enabled = moveDown != null, onClick = { moveDown?.invoke() }) { Text("ui.down") }
+                IconButton(enabled = moveUp != null, onClick = { moveUp?.invoke() }) {
+                    Icon(
+                        Icons.Default.KeyboardArrowUp,
+                        contentDescription = "ui.up",
+                    )
+                }
+                IconButton(enabled = moveDown != null, onClick = { moveDown?.invoke() }) {
+                    Icon(
+                        Icons.Default.KeyboardArrowDown,
+                        contentDescription = "ui.down",
+                    )
+                }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = manageTitles) { Text("ui.manage.titles") }
-                TextButton(onClick = { editing = true }) { Text("ui.edit") }
-                TextButton(onClick = { confirmingDelete = true }) { Text("ui.delete") }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                IconButton(onClick = manageTitles) {
+                    Icon(
+                        Icons.Default.Category,
+                        contentDescription = "ui.manage.titles",
+                    )
+                }
+                IconButton(onClick = { editing = true }) {
+                    Icon(
+                        Icons.Default.Edit,
+                        contentDescription = "ui.edit",
+                    )
+                }
+                IconButton(onClick = { confirmingDelete = true }) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = "ui.delete",
+                    )
+                }
             }
         }
     }

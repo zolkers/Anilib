@@ -55,6 +55,8 @@ public interface LibraryPresentation {
 
     void setCategoryTitles(String category, Set<LibraryItemId> ids);
 
+    void setTitleCategories(LibraryItemId id, Set<String> categories);
+
     void deleteTitles(Set<LibraryItemId> ids);
 
     void editTitle(LibraryItemId id, String title, LibraryTitleMetadata metadata);

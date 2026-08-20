@@ -125,6 +125,15 @@ final class LibraryPresentationTest {
                         && !catalog.find(new LibraryItemId("beta")).orElseThrow()
                         .categories().contains("Archive"),
                 "category title management must replace the exact assignment set");
+        presentation.setFavorite(Set.of(new LibraryItemId("alpha")), false);
+        presentation.setTitleCategories(new LibraryItemId("alpha"), Set.of("Archive"));
+        presentation.setTitleCategories(new LibraryItemId("zulu"), Set.of());
+        counter.check(catalog.find(new LibraryItemId("alpha")).orElseThrow()
+                        .categories().equals(Set.of("Archive"))
+                        && catalog.find(new LibraryItemId("alpha")).orElseThrow().favorite()
+                        && catalog.find(new LibraryItemId("zulu")).orElseThrow()
+                        .categories().isEmpty(),
+                "title categories must replace assignments and add categorized titles to the library");
         presentation.deleteTitles(Set.of(new LibraryItemId("beta")));
         counter.check(catalog.find(new LibraryItemId("beta")).isEmpty()
                         && catalog.find(new LibraryItemId("alpha")).orElseThrow()

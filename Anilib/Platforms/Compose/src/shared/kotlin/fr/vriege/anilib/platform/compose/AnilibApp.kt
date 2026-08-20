@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -103,6 +104,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import fr.vriege.anilib.feature.library.LibraryCategory
 import fr.vriege.anilib.feature.library.LibraryProgress
 import fr.vriege.anilib.feature.library.LibraryTitleMetadata
 import fr.vriege.anilib.feature.library.LibraryDisplayDensity
@@ -1729,8 +1731,13 @@ private fun DetailsDestination(
                 discovery.source(SourceId.of(origin.sourceId())).orElse(null)?.displayName()
             }.getOrNull() ?: origin.sourceId()
         }.orElse("Local")
+        val categories = remember(details.id(), revision) {
+            presentation.library().categoryConfigurations()
+                .filter { it.scope().supports(details.kind()) }
+        }
         DetailsPage(
             details = details,
+            categories = categories,
             sourceName = sourceName,
             artwork = { modifier -> MediaArtwork(details, detailPlatform, modifier) },
             chapters = chapters,
@@ -1766,6 +1773,10 @@ private fun DetailsDestination(
                 presentation.editTitle(details.id(), title, metadata)
                 revision++
             },
+            setCategories = { selected ->
+                presentation.setTitleCategories(details.id(), selected)
+                revision++
+            },
             openTitleWeb = titlePage?.let { page -> ({ browserPage = page }) },
             openSourceWeb = sourcePage?.let { page -> ({ browserPage = page }) },
             share = {
@@ -1787,6 +1798,7 @@ private fun DetailsDestination(
 @Composable
 private fun DetailsPage(
     details: LibraryDetails,
+    categories: List<LibraryCategory>,
     sourceName: String,
     artwork: @Composable (Modifier) -> Unit,
     chapters: List<SourceContentUnit>,
@@ -1808,6 +1820,7 @@ private fun DetailsPage(
     track: () -> Unit,
     favorite: () -> Unit,
     edit: (String, LibraryTitleMetadata) -> Unit,
+    setCategories: (Set<String>) -> Unit,
     openTitleWeb: (() -> Unit)?,
     openSourceWeb: (() -> Unit)?,
     share: () -> Unit,
@@ -1815,6 +1828,7 @@ private fun DetailsPage(
     goBack: () -> Unit,
 ) {
     var editing by remember(details.id()) { mutableStateOf(false) }
+    var editingCategories by remember(details.id()) { mutableStateOf(false) }
     MediaDetailsScreen(
         model = MediaDetailsUiModel(
             title = details.title(),
@@ -1849,6 +1863,7 @@ private fun DetailsPage(
         openWeb = openTitleWeb ?: openSourceWeb ?: {},
         download = download,
         share = share,
+        manageCategories = { editingCategories = true },
         edit = { editing = true },
         openPrimary = if (canWatch) watch else ({ read(null) }),
         goBack = goBack,
@@ -1916,7 +1931,89 @@ private fun DetailsPage(
             },
         )
     }
+    if (editingCategories) {
+        TitleCategoriesDialog(
+            details = details,
+            categories = categories,
+            dismiss = { editingCategories = false },
+            save = { selected ->
+                setCategories(selected)
+                editingCategories = false
+            },
+        )
+    }
 }
+
+@Composable
+private fun TitleCategoriesDialog(
+    details: LibraryDetails,
+    categories: List<LibraryCategory>,
+    dismiss: () -> Unit,
+    save: (Set<String>) -> Unit,
+) {
+    var selected by remember(details.id(), categories) {
+        mutableStateOf<Set<String>>(
+            details.categories().filterTo(linkedSetOf()) { name ->
+                categories.any { it.name() == name }
+            },
+        )
+    }
+    var error by remember(details.id()) { mutableStateOf<String?>(null) }
+    AlertDialog(
+        onDismissRequest = dismiss,
+        title = { Text("ui.categories") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (categories.isEmpty()) {
+                    Text("ui.no.categories.for.this.library.type")
+                } else {
+                    Text(
+                        "ui.select.categories.for.this.title",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp)) {
+                        items(categories, key = LibraryCategory::name) { category ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        selected = selected.toggleCategory(category.name())
+                                    }
+                                    .padding(vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Checkbox(
+                                    checked = category.name() in selected,
+                                    onCheckedChange = {
+                                        selected = selected.toggleCategory(category.name())
+                                    },
+                                )
+                                Text(
+                                    category.name(),
+                                    modifier = Modifier.weight(1f).padding(start = 8.dp),
+                                )
+                            }
+                        }
+                    }
+                }
+                error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = categories.isNotEmpty(),
+                onClick = {
+                    runCatching { save(selected) }
+                        .onFailure { error = it.message ?: "ui.unable.to.update.categories" }
+                },
+            ) { Text("ui.save") }
+        },
+        dismissButton = { TextButton(onClick = dismiss) { Text("ui.cancel") } },
+    )
+}
+
+private fun Set<String>.toggleCategory(value: String): Set<String> =
+    if (value in this) this - value else this + value
 
 @Composable
 private fun RelatedTitlesSection(
