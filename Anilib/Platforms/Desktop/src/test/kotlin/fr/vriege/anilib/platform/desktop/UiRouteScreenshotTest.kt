@@ -53,16 +53,19 @@ import fr.vriege.anilib.platform.compose.BrowserPlatformBridge
 import fr.vriege.anilib.platform.compose.BrowserPlatformController
 import fr.vriege.anilib.platform.compose.BrowserRuntimeStatus
 import fr.vriege.anilib.platform.compose.ShareController
+import java.awt.image.BufferedImage
+import java.io.ByteArrayOutputStream
 import java.nio.file.Files
 import java.nio.file.Path
 import java.net.URI
-import java.util.Base64
 import java.util.Comparator
 import java.util.Locale
 import java.util.Optional
+import javax.imageio.ImageIO
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import androidx.compose.ui.test.ComposeUiTest
 
 @OptIn(ExperimentalTestApi::class)
@@ -136,6 +139,14 @@ class UiRouteScreenshotTest {
                 onNodeWithContentDescription("Read").performClick()
                 waitForContentDescription("Close reader")
                 captureStable("Reader with decoded local page")
+                onNodeWithContentDescription("Reading mode").performClick()
+                onNodeWithText("Vertical").performClick()
+                waitForContentDescription("Page 1")
+                assertContinuousPageFillsWidth("Vertical reader")
+                onNodeWithContentDescription("Reading mode").performClick()
+                onNodeWithText("Webtoon").performClick()
+                waitForContentDescription("Page 1")
+                assertContinuousPageFillsWidth("Webtoon reader")
                 onNodeWithContentDescription("Close reader").performClick()
                 goBack()
 
@@ -311,6 +322,18 @@ class UiRouteScreenshotTest {
         assertEquals(firstSemantics, root.printToString(maxDepth = 80), "$route semantics changed")
     }
 
+    private fun ComposeUiTest.assertContinuousPageFillsWidth(route: String) {
+        waitForIdle()
+        val image = onRoot(useUnmergedTree = true).captureToImage()
+        val pixels = image.toPixelMap()
+        val y = (image.height * 0.45f).toInt()
+        val filledSamples = listOf(0.25f, 0.5f, 0.75f).count { fraction ->
+            val color = pixels[(image.width * fraction).toInt(), y]
+            color.alpha > 0.8f && color.red + color.green + color.blue > 1.5f
+        }
+        assertTrue(filledSamples >= 2, "$route left a viewport-sized gap around an original-size page")
+    }
+
     @Composable
     private fun acceptanceBrowserController(): BrowserPlatformController =
         object : BrowserPlatformController {
@@ -341,9 +364,13 @@ class UiRouteScreenshotTest {
         }
 
     private fun prepareLocalContent(directory: Path) {
-        val image = Base64.getDecoder().decode(
-            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
-        )
+        val bitmap = BufferedImage(8, 8, BufferedImage.TYPE_INT_RGB)
+        for (x in 0 until bitmap.width) {
+            for (y in 0 until bitmap.height) bitmap.setRGB(x, y, 0xFFFFFF)
+        }
+        val encoded = ByteArrayOutputStream()
+        ImageIO.write(bitmap, "png", encoded)
+        val image = encoded.toByteArray()
         val legacyManga = Files.createDirectories(
             directory.resolve("local-content").resolve("Acceptance manga"),
         )
@@ -376,6 +403,7 @@ class UiRouteScreenshotTest {
             anime.resolve("episodes.json"),
             """[{"episode_number":1,"name":"First episode"}]""",
         )
+        Files.writeString(directory.resolve("reader-display.properties"), "scaleMode=ORIGINAL\n")
     }
 
     private class AcceptancePlayerBackend : PlayerBackend {

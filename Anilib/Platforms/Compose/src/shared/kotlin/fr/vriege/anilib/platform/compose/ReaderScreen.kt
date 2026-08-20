@@ -661,18 +661,23 @@ internal fun ReaderPageImage(
                     rotationZ = display.rotation().degrees().toFloat(),
                     transformOrigin = origin,
                 ),
-            contentScale = contentScale(display.scaleMode()),
+            contentScale = contentScale(display.scaleMode(), direction),
             colorFilter = readerColorFilter(display.colorFilter(), display.brightnessPercent()),
         )
     }
 }
 
-private fun contentScale(mode: ReaderScaleMode): ContentScale = when (mode) {
-    ReaderScaleMode.FIT -> ContentScale.Fit
-    ReaderScaleMode.FILL -> ContentScale.Crop
-    ReaderScaleMode.FIT_WIDTH -> ContentScale.FillWidth
-    ReaderScaleMode.FIT_HEIGHT -> ContentScale.FillHeight
-    ReaderScaleMode.ORIGINAL -> ContentScale.None
+private fun contentScale(mode: ReaderScaleMode, direction: ReadingDirection): ContentScale {
+    if (direction == ReadingDirection.VERTICAL || direction == ReadingDirection.WEBTOON) {
+        return ContentScale.FillWidth
+    }
+    return when (mode) {
+        ReaderScaleMode.FIT -> ContentScale.Fit
+        ReaderScaleMode.FILL -> ContentScale.Crop
+        ReaderScaleMode.FIT_WIDTH -> ContentScale.FillWidth
+        ReaderScaleMode.FIT_HEIGHT -> ContentScale.FillHeight
+        ReaderScaleMode.ORIGINAL -> ContentScale.None
+    }
 }
 
 private fun readerColorFilter(

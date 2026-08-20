@@ -51,7 +51,7 @@ internal fun ReaderContinuousPages(
 ) {
     val firstPage = initialPage.coerceIn(0, (pageCount - 1).coerceAtLeast(0))
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = firstPage)
-    val spacing = if (direction == ReadingDirection.WEBTOON) display.webtoonSpacingDp().dp else 12.dp
+    val spacing = if (direction == ReadingDirection.WEBTOON) display.webtoonSpacingDp().dp else 15.dp
 
     CrashSafeLaunchedEffect(listState, controller) {
         snapshotFlow { listState.firstVisibleItemIndex }
