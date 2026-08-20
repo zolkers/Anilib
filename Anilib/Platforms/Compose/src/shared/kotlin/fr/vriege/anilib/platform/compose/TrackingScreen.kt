@@ -154,52 +154,43 @@ internal fun TrackerAccountsScreen(
         )
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Tracking") },
-                navigationIcon = {
-                    IconButton(onClick = goBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-            )
-        },
-    ) { padding ->
+    AnilibSubScreenScaffold(title = "Tracking", goBack = goBack) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding),
         ) {
             item { TrackerSectionHeader("Synchronization") }
             item {
-                TrackerSyncSettings(
-                    preferences = preferences,
-                    synchronize = {
-                        scope.launch {
-                            runCatching {
-                                withContext(Dispatchers.IO) { presentation.synchronizeAll() }
-                            }.onSuccess {
-                                syncSummary = syncSummary(it)
-                                error = null
-                                revision++
-                            }.onFailure { error = it.message ?: "Synchronization failed." }
-                        }
-                    },
-                    save = {
-                        val replacement = it
-                        scope.launch {
-                            runCatching {
-                                withContext(Dispatchers.IO) {
-                                    presentation.saveSyncPreferences(replacement)
-                                }
-                            }.onSuccess {
-                                error = null
-                                revision++
-                            }.onFailure { failure ->
-                                error = failure.message ?: "Unable to save synchronization preferences."
+                AnilibGroup(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    TrackerSyncSettings(
+                        preferences = preferences,
+                        synchronize = {
+                            scope.launch {
+                                runCatching {
+                                    withContext(Dispatchers.IO) { presentation.synchronizeAll() }
+                                }.onSuccess {
+                                    syncSummary = syncSummary(it)
+                                    error = null
+                                    revision++
+                                }.onFailure { error = it.message ?: "Synchronization failed." }
                             }
-                        }
-                    },
-                )
+                        },
+                        save = {
+                            val replacement = it
+                            scope.launch {
+                                runCatching {
+                                    withContext(Dispatchers.IO) {
+                                        presentation.saveSyncPreferences(replacement)
+                                    }
+                                }.onSuccess {
+                                    error = null
+                                    revision++
+                                }.onFailure { failure ->
+                                    error = failure.message ?: "Unable to save synchronization preferences."
+                                }
+                            }
+                        },
+                    )
+                }
             }
             syncSummary?.let { summary ->
                 item {
@@ -246,29 +237,37 @@ internal fun TrackerAccountsScreen(
                 }
             }
             if (accounts.isNotEmpty()) item { TrackerSectionHeader("Services") }
-            items(accounts, key = { it.descriptor().id().value() }) { account ->
-                TrackerAccountRow(
-                    account = account,
-                    activate = {
-                        error = null
-                        if (account.authenticated()
-                            && account.descriptor().authentication() != TrackerAuthentication.NONE
-                        ) {
-                            logout = account
-                        } else if (account.descriptor().authentication() == TrackerAuthentication.OAUTH) {
-                            scope.launch {
-                                runCatching {
-                                    withContext(Dispatchers.IO) {
-                                        presentation.beginAuthorization(account.descriptor().id())
+            if (accounts.isNotEmpty()) item {
+                AnilibGroup(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    accounts.forEach { account ->
+                        TrackerAccountRow(
+                            account = account,
+                            activate = {
+                                error = null
+                                if (account.authenticated()
+                                    && account.descriptor().authentication() != TrackerAuthentication.NONE
+                                ) {
+                                    logout = account
+                                } else if (account.descriptor().authentication() == TrackerAuthentication.OAUTH) {
+                                    scope.launch {
+                                        runCatching {
+                                            withContext(Dispatchers.IO) {
+                                                presentation.beginAuthorization(account.descriptor().id())
+                                            }
+                                        }.onSuccess { webAuthorization = account to it }
+                                            .onFailure {
+                                                error = it.message ?: "Unable to open provider sign-in."
+                                            }
                                     }
-                                }.onSuccess { webAuthorization = account to it }
-                                    .onFailure { error = it.message ?: "Unable to open provider sign-in." }
-                            }
-                        } else if (account.descriptor().authentication() != TrackerAuthentication.NONE) {
-                            login = account
-                        }
-                    },
-                )
+                                } else if (
+                                    account.descriptor().authentication() != TrackerAuthentication.NONE
+                                ) {
+                                    login = account
+                                }
+                            },
+                        )
+                    }
+                }
             }
             error?.let { message ->
                 item {
@@ -370,13 +369,7 @@ private fun TrackerSyncSettings(
 
 @Composable
 private fun TrackerSectionHeader(label: String) {
-    Text(
-        label,
-        color = MaterialTheme.colorScheme.secondary,
-        style = MaterialTheme.typography.labelLarge,
-        fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 18.dp, bottom = 8.dp),
-    )
+    AnilibSection(label)
 }
 
 @Composable

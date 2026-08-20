@@ -394,7 +394,7 @@ private fun SettingsDetail(
     goBack: () -> Unit,
 ) {
     var choosingLanguage by remember { mutableStateOf(false) }
-    Scaffold(topBar = { SettingsTopBar(destination.title, goBack) }) { padding ->
+    AnilibSubScreenScaffold(title = destination.title, goBack = goBack) { padding ->
         LazyColumn(modifier = Modifier.fillMaxSize().padding(padding)) {
             when (destination) {
                 SettingsDestination.GENERAL -> {
@@ -814,33 +814,14 @@ private fun NetworkPolicyDialog(maintenance: NetworkMaintenance, close: () -> Un
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun SettingsTopBar(title: String, goBack: () -> Unit) {
-    TopAppBar(
-        title = { Text(title) },
-        navigationIcon = {
-            IconButton(onClick = goBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-            }
-        },
-    )
-}
-
 @Composable
 private fun SettingsSection(label: String) {
-    Text(
-        label,
-        color = MaterialTheme.colorScheme.secondary,
-        style = MaterialTheme.typography.labelLarge,
-        fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 18.dp, bottom = 8.dp),
-    )
+    AnilibSection(label)
 }
 
 @Composable
 private fun SettingsGroup(content: @Composable ColumnScope.() -> Unit) {
-    Column(modifier = Modifier.fillMaxWidth(), content = content)
+    AnilibGroup(modifier = Modifier.padding(horizontal = 16.dp), content = content)
 }
 
 @Composable

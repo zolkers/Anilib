@@ -108,24 +108,16 @@ internal fun ExtensionRepositoriesScreen(
         if (view.repositories().isNotEmpty()) refresh()
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("repositories.title") },
-                navigationIcon = {
-                    IconButton(onClick = goBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    IconButton(onClick = ::refresh, enabled = !loading) {
-                        Icon(Icons.Default.Refresh, contentDescription = "repositories.refresh")
-                    }
-                    IconButton(onClick = { adding = true }) {
-                        Icon(Icons.Default.Add, contentDescription = "repository.add")
-                    }
-                },
-            )
+    AnilibSubScreenScaffold(
+        title = "repositories.title",
+        goBack = goBack,
+        actions = {
+            IconButton(onClick = ::refresh, enabled = !loading) {
+                Icon(Icons.Default.Refresh, contentDescription = "repositories.refresh")
+            }
+            IconButton(onClick = { adding = true }) {
+                Icon(Icons.Default.Add, contentDescription = "repository.add")
+            }
         },
     ) { padding ->
         LazyColumn(
@@ -449,18 +441,7 @@ private fun ExtensionSourcesDetailScreen(
         }
     }
     val multiLanguage = extension.sources().map { it.languageTag() }.distinct().size > 1
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(extension.displayName()) },
-                navigationIcon = {
-                    IconButton(onClick = goBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-            )
-        },
-    ) { padding ->
+    AnilibSubScreenScaffold(title = extension.displayName(), goBack = goBack) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),

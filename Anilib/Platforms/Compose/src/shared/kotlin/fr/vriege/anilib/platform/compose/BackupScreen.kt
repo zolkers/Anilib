@@ -1,5 +1,6 @@
 package fr.vriege.anilib.platform.compose
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,24 +11,20 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Switch
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -138,80 +135,44 @@ internal fun BackupScreen(
         Unit
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Backup and restore") },
-                navigationIcon = {
-                    IconButton(onClick = goBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-            )
-        },
-    ) { padding ->
-        Column(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp),
+    AnilibSubScreenScaffold(title = "Backup and restore", goBack = goBack) { padding ->
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text(
-                "Create a local backup of your library, history, progress, and source settings.",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(12.dp))
-            Button(onClick = createBackup, modifier = Modifier.fillMaxWidth()) {
-                Text("Create backup")
+            item {
+                BackupOverview(
+                    directory = presentation.backupDirectory().toString(),
+                    importEnabled = pendingImport == null && !importBusy,
+                    create = createBackup,
+                    editPolicy = { editingPolicy = true },
+                    chooseBackup = chooseBackup,
+                )
             }
-            TextButton(onClick = { editingPolicy = true }, modifier = Modifier.fillMaxWidth()) {
-                Text("Backup schedule, content, retention, and destination")
-            }
-            Spacer(Modifier.height(12.dp))
-            OutlinedButton(
-                onClick = chooseBackup,
-                enabled = pendingImport == null && !importBusy,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Icon(Icons.Default.UploadFile, contentDescription = null)
-                Text("Import backup", modifier = Modifier.padding(start = 6.dp))
-            }
-            Text(
-                "Anilib and Aniyomi formats are detected automatically.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp),
-            )
-            Text(
-                presentation.backupDirectory().toString(),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(vertical = 10.dp),
-            )
-            message?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
-            error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-            Spacer(Modifier.height(8.dp))
+            message?.let { value -> item { Text(value, color = MaterialTheme.colorScheme.primary) } }
+            error?.let { value -> item { Text(value, color = MaterialTheme.colorScheme.error) } }
             if (backups.isEmpty()) {
-                EmptyPage("No local backups yet.")
+                item { EmptyPage("No local backups yet.") }
             } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    items(backups, key = { it.path().toString() }) { backup ->
-                        BackupCard(
-                            backup = backup,
-                            restore = { requestRestore(backup) },
-                            delete = { pendingDelete = backup },
-                            export = {
-                                importPicker.export(
-                                    backup.path(),
-                                    { destination ->
-                                        message = "Backup exported: $destination"
-                                        error = null
-                                    },
-                                    { failure -> error = failure },
-                                )
-                            },
-                            share = {
-                                importPicker.share(backup.path()) { failure -> error = failure }
-                            },
-                        )
-                    }
+                items(backups, key = { it.path().toString() }) { backup ->
+                    BackupCard(
+                        backup = backup,
+                        restore = { requestRestore(backup) },
+                        delete = { pendingDelete = backup },
+                        export = {
+                            importPicker.export(
+                                backup.path(),
+                                { destination ->
+                                    message = "Backup exported: $destination"
+                                    error = null
+                                },
+                                { failure -> error = failure },
+                            )
+                        },
+                        share = {
+                            importPicker.share(backup.path()) { failure -> error = failure }
+                        },
+                    )
                 }
             }
         }
@@ -332,6 +293,50 @@ internal fun BackupScreen(
 }
 
 @Composable
+private fun BackupOverview(
+    directory: String,
+    importEnabled: Boolean,
+    create: () -> Unit,
+    editPolicy: () -> Unit,
+    chooseBackup: () -> Unit,
+) {
+    AnilibGroup {
+        Column(Modifier.fillMaxWidth().padding(16.dp)) {
+            Text(
+                "Create a local backup of your library, history, progress, and source settings.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Button(onClick = create, modifier = Modifier.fillMaxWidth().padding(top = 14.dp)) {
+                Text("Create backup")
+            }
+            TextButton(onClick = editPolicy, modifier = Modifier.fillMaxWidth()) {
+                Text("Backup schedule, content, retention, and destination")
+            }
+            OutlinedButton(
+                onClick = chooseBackup,
+                enabled = importEnabled,
+                modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+            ) {
+                Icon(Icons.Default.UploadFile, contentDescription = null)
+                Text("Import backup", modifier = Modifier.padding(start = 6.dp))
+            }
+            Text(
+                "Anilib and Aniyomi formats are detected automatically.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+            Text(
+                directory,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 10.dp),
+            )
+        }
+    }
+}
+
+@Composable
 private fun BackupCard(
     backup: BackupFileSnapshot,
     restore: () -> Unit,
@@ -339,10 +344,7 @@ private fun BackupCard(
     export: () -> Unit,
     share: () -> Unit,
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-    ) {
+    AnilibGroup {
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
             Text(backup.path().fileName.toString(), fontWeight = FontWeight.SemiBold)
             Text(
@@ -355,7 +357,10 @@ private fun BackupCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(top = 8.dp),
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
