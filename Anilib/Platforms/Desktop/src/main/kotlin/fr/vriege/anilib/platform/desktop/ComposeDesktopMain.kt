@@ -92,6 +92,9 @@ fun main(arguments: Array<String>) {
         application {
             val initialApplicationWindowMode = settingsService.snapshot().applicationWindowMode()
             val windowState = rememberWindowState(placement = initialApplicationWindowMode.placement())
+            val intendedWindowPlacement = remember {
+                mutableStateOf(initialApplicationWindowMode.placement())
+            }
             val applicationWindowMode = remember { mutableStateOf(initialApplicationWindowMode) }
             val applicationFullscreen = remember { mutableStateOf(false) }
             val applicationPlacementBeforeFullscreen = remember { mutableStateOf(WindowPlacement.Floating) }
@@ -107,14 +110,15 @@ fun main(arguments: Array<String>) {
                         if (fullscreen) {
                             applicationPlacementBeforeFullscreen.value = windowState.placement
                             applicationModeBeforeApplicationFullscreen.value = applicationWindowMode.value
-                            windowState.placement = WindowPlacement.Fullscreen
+                            intendedWindowPlacement.value = WindowPlacement.Fullscreen
                         } else if (
                             applicationModeBeforeApplicationFullscreen.value == applicationWindowMode.value
                         ) {
-                            windowState.placement = applicationPlacementBeforeFullscreen.value
+                            intendedWindowPlacement.value = applicationPlacementBeforeFullscreen.value
                         } else {
-                            windowState.placement = applicationWindowMode.value.placement()
+                            intendedWindowPlacement.value = applicationWindowMode.value.placement()
                         }
+                        windowState.placement = intendedWindowPlacement.value
                         applicationFullscreen.value = fullscreen
                     }
                 }
@@ -126,16 +130,17 @@ fun main(arguments: Array<String>) {
                             placementBeforeFullscreen.value = windowState.placement
                             applicationModeBeforeFullscreen.value = applicationWindowMode.value
                             playerWindowMode.value = settingsService.snapshot().playerWindowMode()
-                            windowState.placement = when (playerWindowMode.value) {
+                            intendedWindowPlacement.value = when (playerWindowMode.value) {
                                 PlayerWindowMode.WINDOWED -> windowState.placement
                                 PlayerWindowMode.FULLSCREEN -> WindowPlacement.Fullscreen
                                 PlayerWindowMode.BORDERLESS -> WindowPlacement.Maximized
                             }
                         } else if (applicationModeBeforeFullscreen.value == applicationWindowMode.value) {
-                            windowState.placement = placementBeforeFullscreen.value
+                            intendedWindowPlacement.value = placementBeforeFullscreen.value
                         } else {
-                            windowState.placement = applicationWindowMode.value.placement()
+                            intendedWindowPlacement.value = applicationWindowMode.value.placement()
                         }
+                        windowState.placement = intendedWindowPlacement.value
                         playerFullscreen.value = fullscreen
                     }
                 }
@@ -144,7 +149,8 @@ fun main(arguments: Array<String>) {
                 val observation = settingsService.observe { settings ->
                     applicationWindowMode.value = settings.applicationWindowMode()
                     if (!playerFullscreen.value && !applicationFullscreen.value) {
-                        windowState.placement = settings.applicationWindowMode().placement()
+                        intendedWindowPlacement.value = settings.applicationWindowMode().placement()
+                        windowState.placement = intendedWindowPlacement.value
                     }
                 }
                 onDispose { observation.close() }
@@ -249,6 +255,7 @@ fun main(arguments: Array<String>) {
                     },
                 ) {
                     LaunchedEffect(window) {
+                        windowState.placement = intendedWindowPlacement.value
                         window.isVisible = true
                         window.toFront()
                         window.requestFocus()
