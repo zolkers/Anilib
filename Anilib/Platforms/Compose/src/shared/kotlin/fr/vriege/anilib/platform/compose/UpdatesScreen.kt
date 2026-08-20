@@ -3,32 +3,42 @@ package fr.vriege.anilib.platform.compose
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material.icons.filled.SelectAll
+import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.ExpandLess
+import androidx.compose.material.icons.outlined.ExpandMore
+import androidx.compose.material.icons.outlined.Movie
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -40,8 +50,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import fr.vriege.anilib.feature.library.MediaKind
 import fr.vriege.anilib.feature.downloads.ui.DownloadPresentation
+import fr.vriege.anilib.feature.library.LibraryItemId
+import fr.vriege.anilib.feature.library.MediaKind
 import fr.vriege.anilib.feature.updates.LibraryUpdateEvent
 import fr.vriege.anilib.feature.updates.LibraryUpdateEventId
 import fr.vriege.anilib.feature.updates.LibraryUpdatePolicy
@@ -54,7 +65,6 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
-import fr.vriege.anilib.feature.library.LibraryItemId
 
 private val updateDateFormatter = DateTimeFormatter
     .ofLocalizedDateTime(FormatStyle.MEDIUM)
@@ -65,7 +75,6 @@ private val updateDayFormatter = DateTimeFormatter
     .withLocale(Locale.getDefault())
     .withZone(ZoneId.systemDefault())
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun UpdatesScreen(
     presentation: UpdatePresentation,
@@ -76,6 +85,7 @@ internal fun UpdatesScreen(
     var kind by remember { mutableStateOf<MediaKind?>(null) }
     var unreadOnly by remember { mutableStateOf(false) }
     var showSkipped by remember { mutableStateOf(false) }
+    var scheduleExpanded by remember { mutableStateOf(false) }
     var selection by remember { mutableStateOf<Set<LibraryUpdateEventId>>(emptySet()) }
     DisposableEffect(presentation) {
         val registration = presentation.observe { revision++ }
@@ -92,234 +102,287 @@ internal fun UpdatesScreen(
             .onFailure { commandError = it.message ?: "Library update command failed." }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Updates") },
-                actions = {
-                    if (snapshot.unreadCount() > 0) {
-                        IconButton(onClick = { command(presentation::markAllRead) }) {
-                            Icon(Icons.Default.DoneAll, contentDescription = "Mark all read")
-                        }
-                    }
-                    TextButton(onClick = {
-                        selection = if (selection.isEmpty()) events.map(LibraryUpdateEvent::id).toSet() else emptySet()
-                    }) { Text(if (selection.isEmpty()) "Select" else "Clear") }
-                    IconButton(
-                        onClick = {
-                            if (running) {
-                                command { presentation.cancel() }
-                            } else {
-                                command { presentation.refresh() }
-                            }
-                        },
-                    ) {
-                        Icon(
-                            if (running) Icons.Default.Cancel else Icons.Default.Refresh,
-                            contentDescription = if (running) "Cancel update" else "Refresh library",
-                        )
-                    }
-                },
-            )
+    AnilibSubScreenScaffold(
+        title = "Updates",
+        actions = {
+            if (snapshot.unreadCount() > 0) {
+                IconButton(onClick = { command(presentation::markAllRead) }) {
+                    Icon(Icons.Default.DoneAll, contentDescription = "Mark all read")
+                }
+            }
+            IconButton(onClick = {
+                selection = if (selection.isEmpty()) {
+                    events.map(LibraryUpdateEvent::id).toSet()
+                } else {
+                    emptySet()
+                }
+            }) {
+                Icon(
+                    Icons.Default.SelectAll,
+                    contentDescription = if (selection.isEmpty()) "Select" else "Clear",
+                )
+            }
+            IconButton(onClick = {
+                if (running) command { presentation.cancel() } else command { presentation.refresh() }
+            }) {
+                Icon(
+                    if (running) Icons.Default.Cancel else Icons.Default.Refresh,
+                    contentDescription = if (running) "Cancel update" else "Refresh library",
+                )
+            }
         },
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+        Box(
+            modifier = Modifier.fillMaxSize().padding(padding),
+            contentAlignment = Alignment.TopCenter,
         ) {
-            item {
-                UpdateScheduleCard(snapshot.policy()) { policy -> command { presentation.configure(policy) } }
-            }
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    FilterChip(selected = kind == null, onClick = { kind = null }, label = { Text("All") })
-                    FilterChip(
-                        selected = kind == MediaKind.ANIME,
-                        onClick = { kind = MediaKind.ANIME },
-                        label = { Text("Anime") },
-                    )
-                    FilterChip(
-                        selected = kind == MediaKind.MANGA,
-                        onClick = { kind = MediaKind.MANGA },
-                        label = { Text("Manga") },
-                    )
-                    FilterChip(
-                        selected = unreadOnly,
-                        onClick = { unreadOnly = !unreadOnly },
-                        label = { Text("Unread") },
-                    )
-                    FilterChip(
-                        selected = showSkipped,
-                        onClick = { showSkipped = !showSkipped },
-                        label = { Text("Skipped (${snapshot.skippedTitles().size})") },
-                    )
-                }
-            }
-            if (selection.isNotEmpty()) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth()
+                    .widthIn(max = 900.dp)
+                    .padding(horizontal = 16.dp),
+                contentPadding = PaddingValues(bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
                 item {
-                    SelectionActions(
-                        count = selection.size,
-                        markRead = { command { presentation.setEventsRead(selection, true) } },
-                        markUnread = { command { presentation.setEventsRead(selection, false) } },
-                        remove = {
-                            command { presentation.removeEvents(selection) }
-                            selection = emptySet()
-                        },
-                        exclude = {
-                            val itemIds = events.filter { selection.contains(it.id()) }
-                                .map(LibraryUpdateEvent::libraryItemId)
-                                .toSet()
-                            command {
-                                presentation.configure(copyPolicy(
-                                    snapshot.policy(),
-                                    includedTitles = snapshot.policy().includedTitles() - itemIds,
-                                    excludedTitles = snapshot.policy().excludedTitles() + itemIds,
-                                ))
-                            }
-                        },
-                        download = {
-                            events.filter { selection.contains(it.id()) }
-                                .filter { downloads.canEnqueue(it.libraryItemId()) }
-                                .forEach { event ->
-                                    command { downloads.enqueue(event.libraryItemId(), event.sourceContentId()) }
-                                }
-                        },
+                    UpdateScheduleCard(
+                        policy = snapshot.policy(),
+                        expanded = scheduleExpanded,
+                        lastRun = snapshot.lastRunAt().orElse(null)?.let(updateDateFormatter::format),
+                        nextRun = snapshot.nextRunAt().orElse(null)?.let(updateDateFormatter::format),
+                        toggle = { scheduleExpanded = !scheduleExpanded },
+                        configure = { policy -> command { presentation.configure(policy) } },
                     )
                 }
-            }
-            if (running) {
+                if (running) {
+                    item { UpdateProgress(snapshot.completedTitles(), snapshot.totalTitles(), snapshot.activeTitles()) }
+                }
                 item {
-                    Column {
-                        LinearProgressIndicator(
-                            progress = {
-                                if (snapshot.totalTitles() == 0) 0f else
-                                    snapshot.completedTitles().toFloat() / snapshot.totalTitles()
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        Text(
-                            "${snapshot.completedTitles()} / ${snapshot.totalTitles()} titles" +
-                                snapshot.activeTitles().firstOrNull()?.let { " • $it" }.orEmpty(),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 6.dp),
-                        )
-                    }
+                    UpdateFilters(
+                        kind = kind,
+                        unreadOnly = unreadOnly,
+                        showSkipped = showSkipped,
+                        skippedCount = snapshot.skippedTitles().size,
+                        selectKind = { kind = it },
+                        toggleUnread = { unreadOnly = !unreadOnly },
+                        toggleSkipped = { showSkipped = !showSkipped },
+                    )
                 }
-            }
-            commandError?.let { message -> item { Text(message, color = MaterialTheme.colorScheme.error) } }
-            items(snapshot.failures(), key = { "failure-${it.libraryItemId().value()}" }) { failure ->
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
-                    Column(Modifier.fillMaxWidth().padding(16.dp)) {
-                        Text(failure.title(), fontWeight = FontWeight.SemiBold)
-                        Text(failure.message(), color = MaterialTheme.colorScheme.onErrorContainer)
-                    }
-                }
-            }
-            if (showSkipped) {
-                if (snapshot.skippedTitles().isEmpty()) {
-                    item { EmptyPage("No titles are currently skipped by the update policy.") }
-                } else {
-                    items(snapshot.skippedTitles(), key = { "skip-${it.libraryItemId().value()}" }) { skipped ->
-                        SkippedTitleCard(skipped) {
-                            command {
-                                presentation.configure(copyPolicy(
-                                    snapshot.policy(),
-                                    includedTitles = snapshot.policy().includedTitles() + skipped.libraryItemId(),
-                                    excludedTitles = snapshot.policy().excludedTitles() - skipped.libraryItemId(),
-                                ))
-                            }
+                if (selection.isNotEmpty()) {
+                    item {
+                        AnilibGroup {
+                            SelectionActions(
+                                count = selection.size,
+                                markRead = { command { presentation.setEventsRead(selection, true) } },
+                                markUnread = { command { presentation.setEventsRead(selection, false) } },
+                                remove = {
+                                    command { presentation.removeEvents(selection) }
+                                    selection = emptySet()
+                                },
+                                exclude = {
+                                    val itemIds = events.filter { selection.contains(it.id()) }
+                                        .map(LibraryUpdateEvent::libraryItemId)
+                                        .toSet()
+                                    command {
+                                        presentation.configure(copyPolicy(
+                                            snapshot.policy(),
+                                            includedTitles = snapshot.policy().includedTitles() - itemIds,
+                                            excludedTitles = snapshot.policy().excludedTitles() + itemIds,
+                                        ))
+                                    }
+                                },
+                                download = {
+                                    events.filter { selection.contains(it.id()) }
+                                        .filter { downloads.canEnqueue(it.libraryItemId()) }
+                                        .forEach { event ->
+                                            command {
+                                                downloads.enqueue(event.libraryItemId(), event.sourceContentId())
+                                            }
+                                        }
+                                },
+                            )
                         }
                     }
                 }
-            } else if (snapshot.events().isEmpty()) {
-                item {
-                    Spacer(Modifier.height(24.dp))
-                    EmptyPage("No new chapters or episodes yet. Refresh once to establish the library baseline.")
+                commandError?.let { message -> item { UpdateMessageSurface(message) } }
+                items(snapshot.failures(), key = { "failure-${it.libraryItemId().value()}" }) { failure ->
+                    UpdateMessageSurface("${failure.title()}\n${failure.message()}")
                 }
-            } else if (events.isEmpty()) {
-                item { EmptyPage("No updates match the active filters.") }
-            } else {
-                events.groupBy { eventDate(it) }.forEach { (date, datedEvents) ->
-                    item(key = "date-$date") {
-                        Text(date, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
-                    }
-                    items(
-                        datedEvents,
-                        key = { "${it.libraryItemId().value()}-${it.sourceContentId()}" },
-                    ) { event ->
-                        UpdateEventCard(
-                            event = event,
-                            selected = selection.contains(event.id()),
-                            selectionMode = selection.isNotEmpty(),
-                            select = {
-                                selection = if (selection.contains(event.id())) {
-                                    selection - event.id()
-                                } else {
-                                    selection + event.id()
+                if (showSkipped) {
+                    if (snapshot.skippedTitles().isEmpty()) {
+                        item { EmptyPage("No titles are currently skipped by the update policy.") }
+                    } else {
+                        items(snapshot.skippedTitles(), key = { "skip-${it.libraryItemId().value()}" }) { skipped ->
+                            SkippedTitleCard(skipped) {
+                                command {
+                                    presentation.configure(copyPolicy(
+                                        snapshot.policy(),
+                                        includedTitles = snapshot.policy().includedTitles() + skipped.libraryItemId(),
+                                        excludedTitles = snapshot.policy().excludedTitles() - skipped.libraryItemId(),
+                                    ))
                                 }
-                            },
-                            canDownload = downloads.canEnqueue(event.libraryItemId()),
-                            download = {
-                                command { downloads.enqueue(event.libraryItemId(), event.sourceContentId()) }
-                            },
-                        )
+                            }
+                        }
+                    }
+                } else if (snapshot.events().isEmpty()) {
+                    item {
+                        Spacer(Modifier.height(24.dp))
+                        EmptyPage("No new chapters or episodes yet. Refresh once to establish the library baseline.")
+                    }
+                } else if (events.isEmpty()) {
+                    item { EmptyPage("No updates match the active filters.") }
+                } else {
+                    events.groupBy(::eventDate).forEach { (date, datedEvents) ->
+                        item(key = "date-$date") {
+                            Text(
+                                date,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(start = 8.dp, top = 12.dp, bottom = 2.dp),
+                            )
+                        }
+                        items(
+                            datedEvents,
+                            key = { "${it.libraryItemId().value()}-${it.sourceContentId()}" },
+                        ) { event ->
+                            UpdateEventCard(
+                                event = event,
+                                selected = selection.contains(event.id()),
+                                selectionMode = selection.isNotEmpty(),
+                                select = {
+                                    selection = if (selection.contains(event.id())) {
+                                        selection - event.id()
+                                    } else {
+                                        selection + event.id()
+                                    }
+                                },
+                                canDownload = downloads.canEnqueue(event.libraryItemId()),
+                                download = {
+                                    command {
+                                        downloads.enqueue(event.libraryItemId(), event.sourceContentId())
+                                    }
+                                },
+                            )
+                        }
                     }
                 }
-            }
-            item {
-                val lastRun = snapshot.lastRunAt().orElse(null)
-                val nextRun = snapshot.nextRunAt().orElse(null)
-                Text(
-                    listOfNotNull(
-                        lastRun?.let { "Last: ${updateDateFormatter.format(it)}" },
-                        nextRun?.let { "Next: ${updateDateFormatter.format(it)}" },
-                    ).joinToString(" • ").ifEmpty { "Automatic updates are disabled." },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = 14.dp),
-                )
             }
         }
     }
 }
 
 @Composable
-private fun UpdateScheduleCard(policy: LibraryUpdatePolicy, configure: (LibraryUpdatePolicy) -> Unit) {
-    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
-        Column(Modifier.fillMaxWidth().padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Column {
-                    Text("Library update schedule", fontWeight = FontWeight.SemiBold)
-                    Text(intervalLabel(policy.interval()), color = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun UpdateScheduleCard(
+    policy: LibraryUpdatePolicy,
+    expanded: Boolean,
+    lastRun: String?,
+    nextRun: String?,
+    toggle: () -> Unit,
+    configure: (LibraryUpdatePolicy) -> Unit,
+) {
+    AnilibGroup {
+        Row(
+            modifier = Modifier.fillMaxWidth().clickable(onClick = toggle).padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            AnilibLeadingIcon(Icons.Outlined.Schedule)
+            Spacer(Modifier.width(16.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Library updates", fontWeight = FontWeight.Medium)
+                Text(
+                    scheduleSummary(policy, lastRun, nextRun),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+            Icon(
+                if (expanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+                contentDescription = if (expanded) "Collapse" else "Expand",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (expanded) {
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+                Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
+                    UpdateInterval.entries.forEach { interval ->
+                        FilterChip(
+                            selected = policy.interval() == interval,
+                            onClick = { configure(copyPolicy(policy, interval = interval)) },
+                            label = { Text(intervalLabel(interval)) },
+                            modifier = Modifier.padding(end = 6.dp),
+                        )
+                    }
                 }
-            }
-            Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
-                UpdateInterval.entries.forEach { interval ->
-                    FilterChip(
-                        selected = policy.interval() == interval,
-                        onClick = { configure(copyPolicy(policy, interval = interval)) },
-                        label = { Text(intervalLabel(interval)) },
-                        modifier = Modifier.padding(end = 6.dp),
-                    )
+                UpdateSwitch("Favorites only", policy.favoritesOnly()) {
+                    configure(copyPolicy(policy, favoritesOnly = it))
                 }
-            }
-            UpdateSwitch("Favorites only", policy.favoritesOnly()) {
-                configure(copyPolicy(policy, favoritesOnly = it))
-            }
-            UpdateSwitch("Skip completed titles", policy.skipCompleted()) {
-                configure(copyPolicy(policy, skipCompleted = it))
-            }
-            UpdateSwitch("Skip titles not started", policy.skipNotStarted()) {
-                configure(copyPolicy(policy, skipNotStarted = it))
+                UpdateSwitch("Skip completed titles", policy.skipCompleted()) {
+                    configure(copyPolicy(policy, skipCompleted = it))
+                }
+                UpdateSwitch("Skip titles not started", policy.skipNotStarted()) {
+                    configure(copyPolicy(policy, skipNotStarted = it))
+                }
             }
         }
+    }
+}
+
+private fun scheduleSummary(policy: LibraryUpdatePolicy, lastRun: String?, nextRun: String?): String {
+    val timing = nextRun?.let { "Next: $it" } ?: lastRun?.let { "Last: $it" }
+    return listOfNotNull(intervalLabel(policy.interval()), timing).joinToString(" • ")
+}
+
+@Composable
+private fun UpdateProgress(completed: Int, total: Int, activeTitles: List<String>) {
+    AnilibGroup {
+        Column(Modifier.fillMaxWidth().padding(16.dp)) {
+            Text("Updating library", fontWeight = FontWeight.SemiBold)
+            LinearProgressIndicator(
+                progress = { if (total == 0) 0f else completed.toFloat() / total },
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+            )
+            Text(
+                "$completed / $total titles" + activeTitles.firstOrNull()?.let { " • $it" }.orEmpty(),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun UpdateFilters(
+    kind: MediaKind?,
+    unreadOnly: Boolean,
+    showSkipped: Boolean,
+    skippedCount: Int,
+    selectKind: (MediaKind?) -> Unit,
+    toggleUnread: () -> Unit,
+    toggleSkipped: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        FilterChip(selected = kind == null, onClick = { selectKind(null) }, label = { Text("All") })
+        FilterChip(
+            selected = kind == MediaKind.ANIME,
+            onClick = { selectKind(MediaKind.ANIME) },
+            label = { Text("Anime") },
+        )
+        FilterChip(
+            selected = kind == MediaKind.MANGA,
+            onClick = { selectKind(MediaKind.MANGA) },
+            label = { Text("Manga") },
+        )
+        FilterChip(selected = unreadOnly, onClick = toggleUnread, label = { Text("Unread") })
+        FilterChip(
+            selected = showSkipped,
+            onClick = toggleSkipped,
+            label = { Text("Skipped ($skippedCount)") },
+        )
     }
 }
 
@@ -330,7 +393,7 @@ private fun UpdateSwitch(label: String, checked: Boolean, update: (Boolean) -> U
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text(label)
+        Text(label, modifier = Modifier.weight(1f))
         Switch(checked = checked, onCheckedChange = update)
     }
 }
@@ -344,32 +407,40 @@ private fun UpdateEventCard(
     canDownload: Boolean,
     download: () -> Unit,
 ) {
-    Card(
+    Surface(
         modifier = Modifier.fillMaxWidth().clickable(onClick = select),
-        colors = CardDefaults.cardColors(
-            containerColor = if (event.read()) {
-                MaterialTheme.colorScheme.surfaceContainer
-            } else {
-                MaterialTheme.colorScheme.primaryContainer
-            },
-        ),
+        shape = RoundedCornerShape(18.dp),
+        color = if (event.read()) {
+            MaterialTheme.colorScheme.surfaceContainerLow
+        } else {
+            MaterialTheme.colorScheme.primaryContainer
+        },
+        tonalElevation = 1.dp,
     ) {
-        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
             if (selectionMode) {
                 Checkbox(checked = selected, onCheckedChange = { select() })
+            } else {
+                AnilibLeadingIcon(
+                    if (event.kind() == MediaKind.ANIME) Icons.Outlined.Movie else
+                        Icons.AutoMirrored.Outlined.MenuBook,
+                )
+                Spacer(Modifier.width(14.dp))
             }
             Column(Modifier.weight(1f)) {
                 Text(event.libraryTitle(), fontWeight = FontWeight.SemiBold)
-            Text(event.contentTitle(), color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(
-                "${if (event.kind() == MediaKind.ANIME) "Episode" else "Chapter"} • " +
-                    updateDateFormatter.format(event.publishedAt().orElse(event.discoveredAt())),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp),
-            )
+                Text(event.contentTitle(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    "${if (event.kind() == MediaKind.ANIME) "Episode" else "Chapter"} • " +
+                        updateDateFormatter.format(event.publishedAt().orElse(event.discoveredAt())),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 3.dp),
+                )
             }
-            TextButton(onClick = download, enabled = canDownload && !selectionMode) { Text("Download") }
+            IconButton(onClick = download, enabled = canDownload && !selectionMode) {
+                Icon(Icons.Outlined.Download, contentDescription = "Download")
+            }
         }
     }
 }
@@ -383,7 +454,10 @@ private fun SelectionActions(
     exclude: () -> Unit,
     download: () -> Unit,
 ) {
-    Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
+    Row(
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Text("$count selected", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(12.dp))
         TextButton(onClick = markRead) { Text("Read") }
         TextButton(onClick = markUnread) { Text("Unread") }
@@ -395,7 +469,7 @@ private fun SelectionActions(
 
 @Composable
 private fun SkippedTitleCard(skipped: LibraryUpdateSkip, include: () -> Unit) {
-    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
+    AnilibGroup {
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -406,6 +480,21 @@ private fun SkippedTitleCard(skipped: LibraryUpdateSkip, include: () -> Unit) {
             }
             TextButton(onClick = include) { Text("Always include") }
         }
+    }
+}
+
+@Composable
+private fun UpdateMessageSurface(message: String) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.errorContainer,
+    ) {
+        Text(
+            message,
+            color = MaterialTheme.colorScheme.onErrorContainer,
+            modifier = Modifier.padding(16.dp),
+        )
     }
 }
 

@@ -2,35 +2,42 @@ package fr.vriege.anilib.platform.compose
 
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.outlined.AutoMode
+import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -85,62 +92,65 @@ internal fun DownloadsScreen(presentation: DownloadPresentation, goBack: () -> U
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Download queue") },
-                navigationIcon = {
-                    IconButton(onClick = goBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-            )
+    AnilibSubScreenScaffold(
+        title = "Download queue",
+        goBack = goBack,
+        actions = {
+            IconButton(onClick = { command(presentation::pauseAll) }) {
+                Icon(Icons.Default.Pause, contentDescription = "Pause all")
+            }
+            IconButton(onClick = { command(presentation::resumeAll) }, enabled = !queue.offlineMode()) {
+                Icon(Icons.Default.PlayArrow, contentDescription = "Resume all")
+            }
+            IconButton(onClick = { confirmRemoveAll = true }, enabled = queue.jobs().isNotEmpty()) {
+                Icon(Icons.Default.Delete, contentDescription = "Delete all")
+            }
         },
     ) { padding ->
-        Column(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp),
+        Box(
+            modifier = Modifier.fillMaxSize().padding(padding),
+            contentAlignment = Alignment.TopCenter,
         ) {
-            DownloadQueueControls(
-                offlineMode = queue.offlineMode(),
-                pauseAll = { command(presentation::pauseAll) },
-                resumeAll = { command(presentation::resumeAll) },
-                removeAll = { confirmRemoveAll = true },
-                openStorage = { storageDialog = true },
-                openAutomation = { automationDialog = true },
-                setOfflineMode = { enabled -> command { presentation.setOfflineMode(enabled) } },
-            )
-            Text(
-                text = "${formatBytes(queue.usedStorageBytes())} of " +
-                    "${formatBytes(queue.maximumStorageBytes())} used",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            LinearProgressIndicator(
-                progress = {
-                    (queue.usedStorageBytes().toDouble() / queue.maximumStorageBytes()).toFloat()
-                },
-                modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth()
+                    .widthIn(max = 900.dp)
+                    .padding(horizontal = 16.dp),
+                contentPadding = PaddingValues(bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                DownloadFilter.entries.forEach { value ->
-                    FilterChip(
-                        selected = filter == value,
-                        onClick = { filter = value },
-                        label = { Text(value.label) },
+                item {
+                    DownloadQueueControls(
+                        offlineMode = queue.offlineMode(),
+                        usedStorageBytes = queue.usedStorageBytes(),
+                        maximumStorageBytes = queue.maximumStorageBytes(),
+                        openStorage = { storageDialog = true },
+                        openAutomation = { automationDialog = true },
+                        setOfflineMode = { enabled -> command { presentation.setOfflineMode(enabled) } },
                     )
                 }
-            }
-            commandError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-            repairMessage?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
-            Spacer(Modifier.height(8.dp))
-            if (queue.jobs().isEmpty()) {
-                EmptyPage("Your download queue is empty.")
-            } else if (jobs.isEmpty()) {
-                EmptyPage("No downloads match the active filter.")
-            } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        DownloadFilter.entries.forEach { value ->
+                            FilterChip(
+                                selected = filter == value,
+                                onClick = { filter = value },
+                                label = { Text(value.label) },
+                            )
+                        }
+                    }
+                }
+                commandError?.let { message -> item { DownloadMessageSurface(message, true) } }
+                repairMessage?.let { message -> item { DownloadMessageSurface(message, false) } }
+                if (queue.jobs().isEmpty()) {
+                    item { EmptyPage("Your download queue is empty.") }
+                } else if (jobs.isEmpty()) {
+                    item { EmptyPage("No downloads match the active filter.") }
+                } else {
                     jobs.groupBy { it.libraryItemId() }.values.forEach { group ->
                         item(key = "group-${group.first().libraryItemId().value()}") {
                             Row(
@@ -152,15 +162,19 @@ internal fun DownloadsScreen(presentation: DownloadPresentation, goBack: () -> U
                                     fontWeight = FontWeight.Bold,
                                     modifier = Modifier.weight(1f),
                                 )
-                                TextButton(onClick = {
+                                IconButton(onClick = {
                                     command { presentation.pauseTitle(group.first().libraryItemId()) }
-                                }) { Text("Pause") }
-                                TextButton(onClick = {
+                                }) { Icon(Icons.Default.Pause, contentDescription = "Pause title") }
+                                IconButton(onClick = {
                                     command { presentation.resumeTitle(group.first().libraryItemId()) }
-                                }) { Text("Resume") }
-                                TextButton(onClick = {
+                                }, enabled = !queue.offlineMode()) {
+                                    Icon(Icons.Default.PlayArrow, contentDescription = "Resume title")
+                                }
+                                IconButton(onClick = {
                                     confirmRemoveTitle = group.first().libraryItemId() to group.first().title()
-                                }) { Text("Delete") }
+                                }) {
+                                    Icon(Icons.Default.Delete, contentDescription = "Delete title downloads")
+                                }
                             }
                         }
                         items(group, key = { it.id().toString() }) { job ->
@@ -273,35 +287,75 @@ internal fun DownloadsScreen(presentation: DownloadPresentation, goBack: () -> U
 @Composable
 private fun DownloadQueueControls(
     offlineMode: Boolean,
-    pauseAll: () -> Unit,
-    resumeAll: () -> Unit,
-    removeAll: () -> Unit,
+    usedStorageBytes: Long,
+    maximumStorageBytes: Long,
     openStorage: () -> Unit,
     openAutomation: () -> Unit,
     setOfflineMode: (Boolean) -> Unit,
 ) {
-    Row(
+    AnilibGroup {
+        Column(Modifier.fillMaxWidth().padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Offline mode", fontWeight = FontWeight.Medium)
+                    Text(
+                        "Use downloaded content without the online fallback",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+                Switch(checked = offlineMode, onCheckedChange = setOfflineMode)
+            }
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 14.dp),
+                color = MaterialTheme.colorScheme.outlineVariant,
+            )
+            Text("Storage", fontWeight = FontWeight.Medium)
+            Text(
+                "${formatBytes(usedStorageBytes)} of ${formatBytes(maximumStorageBytes)} used",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            LinearProgressIndicator(
+                progress = {
+                    if (maximumStorageBytes <= 0L) 0f else
+                        (usedStorageBytes.toDouble() / maximumStorageBytes).toFloat().coerceIn(0f, 1f)
+                },
+                modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+            )
+            Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                TextButton(onClick = openStorage, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Outlined.Storage, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Storage")
+                }
+                TextButton(onClick = openAutomation, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Outlined.AutoMode, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Automatic")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DownloadMessageSurface(message: String, error: Boolean) {
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
+        shape = RoundedCornerShape(18.dp),
+        color = if (error) MaterialTheme.colorScheme.errorContainer else
+            MaterialTheme.colorScheme.primaryContainer,
     ) {
-        Row {
-            IconButton(onClick = pauseAll) {
-                Icon(Icons.Default.Pause, contentDescription = "Pause all")
-            }
-            IconButton(onClick = resumeAll, enabled = !offlineMode) {
-                Icon(Icons.Default.PlayArrow, contentDescription = "Resume all")
-            }
-            IconButton(onClick = removeAll) {
-                Icon(Icons.Default.Delete, contentDescription = "Delete all")
-            }
-            TextButton(onClick = openStorage) { Text("Storage") }
-            TextButton(onClick = openAutomation) { Text("Automatic") }
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Offline mode", fontWeight = FontWeight.Medium)
-            Switch(checked = offlineMode, onCheckedChange = setOfflineMode)
-        }
+        Text(
+            message,
+            color = if (error) MaterialTheme.colorScheme.onErrorContainer else
+                MaterialTheme.colorScheme.onPrimaryContainer,
+            modifier = Modifier.padding(16.dp),
+        )
     }
 }
 
@@ -501,10 +555,7 @@ private fun DownloadJobCard(
     cancel: () -> Unit,
     remove: () -> Unit,
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-    ) {
+    AnilibGroup {
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
             Text(job.title(), fontWeight = FontWeight.SemiBold)
             Text(job.contentUnit().title(), color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -530,14 +581,20 @@ private fun DownloadJobCard(
             if (error != null) {
                 Text(error, color = MaterialTheme.colorScheme.error)
             }
-            Row(modifier = Modifier.align(Alignment.End)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.End,
+            ) {
                 TextButton(onClick = { setPriority(nextPriority(job.priority())) }) {
                     Text(job.priority().name.lowercase().replaceFirstChar(Char::uppercase))
                 }
-                TextButton(onClick = { move((job.queuePosition() - 1).coerceAtLeast(0)) }) {
-                    Text("↑")
+                IconButton(onClick = { move((job.queuePosition() - 1).coerceAtLeast(0)) }) {
+                    Icon(Icons.Default.ArrowUpward, contentDescription = "Move up")
                 }
-                TextButton(onClick = { move(job.queuePosition() + 1) }) { Text("↓") }
+                IconButton(onClick = { move(job.queuePosition() + 1) }) {
+                    Icon(Icons.Default.ArrowDownward, contentDescription = "Move down")
+                }
                 when (job.status()) {
                     DownloadStatus.QUEUED,
                     DownloadStatus.DOWNLOADING,

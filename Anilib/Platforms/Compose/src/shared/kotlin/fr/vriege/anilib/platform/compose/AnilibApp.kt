@@ -2225,9 +2225,9 @@ private fun MorePage(
     }
     Scaffold(topBar = { TopAppBar(title = { Text("More") }) }) { padding ->
         LazyColumn(modifier = Modifier.fillMaxSize().padding(padding)) {
-            item { MoreSection("Quick filters") }
+            item { AnilibSection("Quick filters") }
             item {
-                MoreGroup {
+                AnilibGroup(modifier = Modifier.padding(horizontal = 16.dp)) {
                     MoreSwitchRow(
                         "Downloaded only",
                         "Use downloaded content without the online fallback",
@@ -2244,9 +2244,9 @@ private fun MorePage(
                     )
                 }
             }
-            item { MoreSection("Library") }
+            item { AnilibSection("Library") }
             item {
-                MoreGroup {
+                AnilibGroup(modifier = Modifier.padding(horizontal = 16.dp)) {
                     MoreRow(
                         "History",
                         "Recently watched episodes and read chapters",
@@ -2273,9 +2273,9 @@ private fun MorePage(
                     )
                 }
             }
-            item { MoreSection("Services") }
+            item { AnilibSection("Services") }
             item {
-                MoreGroup {
+                AnilibGroup(modifier = Modifier.padding(horizontal = 16.dp)) {
                     MoreRow(
                         "Backup and restore",
                         "Create or restore a local backup",
@@ -2296,9 +2296,9 @@ private fun MorePage(
                     )
                 }
             }
-            item { MoreSection("Application") }
+            item { AnilibSection("Application") }
             item {
-                MoreGroup {
+                AnilibGroup(modifier = Modifier.padding(horizontal = 16.dp)) {
                     MoreRow(
                         "Settings",
                         "$componentCount feature bundles active · appearance and app behavior",
@@ -2309,29 +2309,6 @@ private fun MorePage(
             }
             item { Spacer(Modifier.height(24.dp)) }
         }
-    }
-}
-
-@Composable
-private fun MoreSection(label: String) {
-    Text(
-        label,
-        color = MaterialTheme.colorScheme.primary,
-        style = MaterialTheme.typography.labelLarge,
-        fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 22.dp, bottom = 10.dp),
-    )
-}
-
-@Composable
-private fun MoreGroup(content: @Composable ColumnScope.() -> Unit) {
-    Surface(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        tonalElevation = 1.dp,
-    ) {
-        Column(content = content)
     }
 }
 
@@ -2350,7 +2327,7 @@ private fun MoreSwitchRow(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        MoreIcon(icon)
+        AnilibLeadingIcon(icon)
         Spacer(Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
             Text(title, fontWeight = FontWeight.Medium)
@@ -2370,7 +2347,7 @@ private fun MoreRow(title: String, summary: String, icon: ImageVector, onClick: 
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        MoreIcon(icon)
+        AnilibLeadingIcon(icon)
         Spacer(Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(title, fontWeight = FontWeight.Medium)
@@ -2387,24 +2364,6 @@ private fun MoreRow(title: String, summary: String, icon: ImageVector, onClick: 
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-    }
-}
-
-@Composable
-private fun MoreIcon(icon: ImageVector) {
-    Surface(
-        modifier = Modifier.size(40.dp),
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.primaryContainer,
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(
-                icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.size(22.dp),
-            )
-        }
     }
 }
 
