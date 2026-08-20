@@ -30,6 +30,7 @@ kotlin {
     sourceSets {
         desktopMain {
             kotlin.srcDir('src/shared/kotlin')
+            resources.srcDir('src/shared/resources')
             dependencies {
                 implementation project(':Anilib:Framework:Localization:Api')
                 implementation project(':Anilib:Features:Library:Api')
@@ -67,6 +68,7 @@ kotlin {
         }
         androidMain {
             kotlin.srcDir('src/shared/kotlin')
+            resources.srcDir('src/shared/resources')
             dependencies {
                 implementation project(':Anilib:Framework:Localization:Api')
                 implementation project(':Anilib:Features:Library:Api')

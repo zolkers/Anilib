@@ -152,7 +152,7 @@ internal fun BackupScreen(
             message?.let { value -> item { Text(value, color = MaterialTheme.colorScheme.primary) } }
             error?.let { value -> item { Text(value, color = MaterialTheme.colorScheme.error) } }
             if (backups.isEmpty()) {
-                item { EmptyPage("No local backups yet.") }
+                item { EmptyPage("ui.no.local.backups") }
             } else {
                 items(backups, key = { it.path().toString() }) { backup ->
                     BackupCard(
@@ -268,7 +268,7 @@ internal fun BackupScreen(
     pendingDelete?.let { backup ->
         AlertDialog(
             onDismissRequest = { pendingDelete = null },
-            title = { Text("Delete backup?") },
+            title = { Text("ui.delete.backup.2") },
             text = { Text(backup.path().fileName.toString()) },
             confirmButton = {
                 TextButton(
@@ -283,10 +283,10 @@ internal fun BackupScreen(
                             }.onFailure { error = it.message ?: "Backup deletion failed." }
                         }
                     },
-                ) { Text("Delete") }
+                ) { Text("ui.delete") }
             },
             dismissButton = {
-                TextButton(onClick = { pendingDelete = null }) { Text("Cancel") }
+                TextButton(onClick = { pendingDelete = null }) { Text("ui.cancel") }
             },
         )
     }
@@ -303,14 +303,14 @@ private fun BackupOverview(
     AnilibGroup {
         Column(Modifier.fillMaxWidth().padding(16.dp)) {
             Text(
-                "Create a local backup of your library, history, progress, and source settings.",
+                "ui.create.a.local.backup.of.your.library.history.progress.and.source.settings",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Button(onClick = create, modifier = Modifier.fillMaxWidth().padding(top = 14.dp)) {
-                Text("Create backup")
+                Text("ui.create.backup")
             }
             TextButton(onClick = editPolicy, modifier = Modifier.fillMaxWidth()) {
-                Text("Backup schedule, content, retention, and destination")
+                Text("ui.backup.schedule.content.retention.and.destination")
             }
             OutlinedButton(
                 onClick = chooseBackup,
@@ -318,10 +318,10 @@ private fun BackupOverview(
                 modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
             ) {
                 Icon(Icons.Default.UploadFile, contentDescription = null)
-                Text("Import backup", modifier = Modifier.padding(start = 6.dp))
+                Text("ui.import.backup", modifier = Modifier.padding(start = 6.dp))
             }
             Text(
-                "Anilib and Aniyomi formats are detected automatically.",
+                "ui.anilib.and.aniyomi.formats.are.detected.automatically",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 6.dp),
@@ -352,8 +352,13 @@ private fun BackupCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                "${backup.sectionCount()} sections • ${backup.entryCount()} entries • " +
+                UiTranslations.format(
+                    "dynamic.backup.summary",
+                    LocalLanguagePack.current,
+                    backup.sectionCount(),
+                    backup.entryCount(),
                     formatBackupBytes(backup.sizeBytes()),
+                ),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Row(
@@ -364,14 +369,14 @@ private fun BackupCard(
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                TextButton(onClick = export) { Text("Export") }
-                TextButton(onClick = share) { Text("Share") }
+                TextButton(onClick = export) { Text("ui.export") }
+                TextButton(onClick = share) { Text("ui.share") }
                 OutlinedButton(onClick = restore) {
                     Icon(Icons.Default.Restore, contentDescription = null)
-                    Text("Restore", modifier = Modifier.padding(start = 6.dp))
+                    Text("ui.restore", modifier = Modifier.padding(start = 6.dp))
                 }
                 IconButton(onClick = delete) {
-                    Icon(Icons.Default.Delete, contentDescription = "Delete backup")
+                    Icon(Icons.Default.Delete, contentDescription = "ui.delete.backup")
                 }
             }
         }
@@ -392,30 +397,35 @@ private fun BackupPolicyDialog(
     var validationError by remember(policy) { mutableStateOf<String?>(null) }
     AlertDialog(
         onDismissRequest = dismiss,
-        title = { Text("Backup policy") },
+        title = { Text("ui.backup.policy") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Schedule", fontWeight = FontWeight.Medium)
+                Text("ui.schedule", fontWeight = FontWeight.Medium)
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     BackupSchedule.entries.forEach { value ->
                         TextButton(onClick = { schedule = value }) {
-                            Text(if (schedule == value) "• ${backupScheduleName(value)}" else backupScheduleName(value))
+                            val label = UiTranslations.translate(backupScheduleKey(value), LocalLanguagePack.current)
+                            Text(if (schedule == value) "• $label" else label)
                         }
                     }
                 }
                 OutlinedTextField(
                     value = retention,
                     onValueChange = { retention = it },
-                    label = { Text("Backups to keep (1–100)") },
+                    label = { Text("ui.backups.to.keep.1100") },
                     singleLine = true,
                 )
-                Text("Included content", fontWeight = FontWeight.Medium)
+                Text("ui.included.content", fontWeight = FontWeight.Medium)
                 options.forEach { option ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(option.displayName())
                             Text(
-                                "${option.entryCount()} entries",
+                                UiTranslations.format(
+                                    "dynamic.entries.count",
+                                    LocalLanguagePack.current,
+                                    option.entryCount(),
+                                ),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
@@ -430,11 +440,11 @@ private fun BackupPolicyDialog(
                 OutlinedTextField(
                     value = destination,
                     onValueChange = { destination = it },
-                    label = { Text("Automatic backup folder") },
+                    label = { Text("ui.automatic.backup.folder") },
                     singleLine = true,
                 )
                 Text(
-                    "Export uses the native document picker (including Android SAF).",
+                    "ui.export.uses.the.native.document.picker.including.android.saf",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 validationError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
@@ -450,15 +460,17 @@ private fun BackupPolicyDialog(
                 }.onFailure {
                     validationError = it.message ?: "Invalid backup policy."
                 }
-            }) { Text("Save") }
+            }) { Text("ui.save") }
         },
-        dismissButton = { TextButton(onClick = dismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = dismiss) { Text("ui.cancel") } },
     )
 }
 
-private fun backupScheduleName(schedule: BackupSchedule): String = schedule.name
-    .lowercase()
-    .replaceFirstChar(Char::uppercase)
+private fun backupScheduleKey(schedule: BackupSchedule): String = when (schedule) {
+    BackupSchedule.MANUAL -> "ui.backup.schedule.manual"
+    BackupSchedule.DAILY -> "ui.backup.schedule.daily"
+    BackupSchedule.WEEKLY -> "ui.backup.schedule.weekly"
+}
 
 @Composable
 private fun RestoreDialog(
@@ -469,19 +481,31 @@ private fun RestoreDialog(
 ) {
     AlertDialog(
         onDismissRequest = dismiss,
-        title = { Text("Restore backup?") },
+        title = { Text("ui.restore.backup") },
         text = {
             Column {
-                Text("Existing entries are updated; newer entries not in this backup are kept.")
+                Text("ui.existing.entries.are.updated.newer.entries.not.in.this.backup.are.kept")
                 Spacer(Modifier.height(10.dp))
                 inspection.sections().forEach { section ->
-                    val availability = if (section.restorable()) "" else " (not installed)"
-                    Text("• ${section.displayName()}: ${section.entryCount()}$availability")
+                    val availability = if (section.restorable()) {
+                        ""
+                    } else {
+                        UiTranslations.translate("ui.not.installed.parenthetical", LocalLanguagePack.current)
+                    }
+                    Text(
+                        UiTranslations.format(
+                            "dynamic.backup.section",
+                            LocalLanguagePack.current,
+                            section.displayName(),
+                            section.entryCount(),
+                            availability,
+                        ),
+                    )
                 }
             }
         },
-        confirmButton = { TextButton(onClick = confirm, enabled = enabled) { Text("Restore") } },
-        dismissButton = { TextButton(onClick = dismiss, enabled = enabled) { Text("Cancel") } },
+        confirmButton = { TextButton(onClick = confirm, enabled = enabled) { Text("ui.restore") } },
+        dismissButton = { TextButton(onClick = dismiss, enabled = enabled) { Text("ui.cancel") } },
     )
 }
 
@@ -494,27 +518,48 @@ private fun AniyomiImportDialog(
 ) {
     AlertDialog(
         onDismissRequest = dismiss,
-        title = { Text("Import Aniyomi backup?") },
+        title = { Text("ui.import.aniyomi.backup") },
         text = {
             Column {
-                Text("Existing titles from the same source are merged; other Anilib titles are kept.")
+                Text("ui.existing.titles.from.the.same.source.are.merged.other.anilib.titles.are.kept")
                 Spacer(Modifier.height(10.dp))
-                Text("Manga: ${inspection.mangaCount()}")
-                Text("Anime: ${inspection.animeCount()}")
-                Text("Categories: ${inspection.categoryCount()}")
-                Text("History entries: ${inspection.historyCount()}")
-                Text("Titles with progress: ${inspection.progressCount()}")
+                Text(UiTranslations.format("dynamic.manga.count", LocalLanguagePack.current, inspection.mangaCount()))
+                Text(UiTranslations.format("dynamic.anime.count", LocalLanguagePack.current, inspection.animeCount()))
+                Text(
+                    UiTranslations.format(
+                        "dynamic.categories.count",
+                        LocalLanguagePack.current,
+                        inspection.categoryCount(),
+                    ),
+                )
+                Text(
+                    UiTranslations.format(
+                        "dynamic.history.entries",
+                        LocalLanguagePack.current,
+                        inspection.historyCount(),
+                    ),
+                )
+                Text(
+                    UiTranslations.format(
+                        "dynamic.titles.with.progress",
+                        LocalLanguagePack.current,
+                        inspection.progressCount(),
+                    ),
+                )
                 if (inspection.skippedEntryCount() > 0) {
                     Text(
-                        "${inspection.skippedEntryCount()} unsupported preference, tracker, or extension " +
-                            "entries will be skipped.",
+                        UiTranslations.format(
+                            "dynamic.unsupported.backup.entries",
+                            LocalLanguagePack.current,
+                            inspection.skippedEntryCount(),
+                        ),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
         },
-        confirmButton = { TextButton(onClick = confirm, enabled = enabled) { Text("Import") } },
-        dismissButton = { TextButton(onClick = dismiss, enabled = enabled) { Text("Cancel") } },
+        confirmButton = { TextButton(onClick = confirm, enabled = enabled) { Text("ui.import") } },
+        dismissButton = { TextButton(onClick = dismiss, enabled = enabled) { Text("ui.cancel") } },
     )
 }
 

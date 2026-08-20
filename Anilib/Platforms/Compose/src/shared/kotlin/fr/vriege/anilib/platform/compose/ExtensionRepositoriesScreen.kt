@@ -63,6 +63,7 @@ import fr.vriege.anilib.feature.extensionrepository.ui.InstalledApkExtension
 import fr.vriege.anilib.feature.discovery.ui.DiscoveryPresentation
 import fr.vriege.anilib.feature.source.SourceDescriptor
 import fr.vriege.anilib.feature.source.SourceId
+import fr.vriege.anilib.feature.settings.LanguagePack
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CoroutineScope
@@ -135,7 +136,7 @@ internal fun ExtensionRepositoriesScreen(
                 }
             }
             if (view.repositories().isEmpty() && !loading) {
-                item { EmptyPage("No extension repository configured.") }
+                item { EmptyPage("ui.no.extension.repository.configured") }
             } else {
                 items(view.repositories(), key = { it.indexUri().toString() }) { repository ->
                     RepositoryCard(repository) {
@@ -253,7 +254,7 @@ internal fun ExtensionDiscoveryList(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            Text("Add a repository to discover extensions.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("ui.add.a.repository.to.discover.extensions", color = MaterialTheme.colorScheme.onSurfaceVariant)
             TextButton(onClick = manageRepositories) { Text("repositories.manage") }
         }
         return
@@ -270,7 +271,18 @@ internal fun ExtensionDiscoveryList(
             }
         }
         if (!refreshing && packages.isEmpty()) {
-            item { EmptyPage("No ${kind.name.lowercase()} extension found in the configured repositories.") }
+            item {
+                EmptyPage(
+                    UiTranslations.format(
+                        "dynamic.no.extension.kind",
+                        LocalLanguagePack.current,
+                        UiTranslations.translate(
+                            if (kind == ExtensionContentKind.ANIME) "ui.anime" else "ui.manga",
+                            LocalLanguagePack.current,
+                        ).lowercase(),
+                    ),
+                )
+            }
         }
         items(packages, key = { it.packageName() }) { extension ->
             val installedPortable = view.installed().firstOrNull {
@@ -312,7 +324,7 @@ internal fun ExtensionDiscoveryList(
                         )
                         if (blockedByAdultPolicy) {
                             Text(
-                                "18+ · enable adult content in Settings to install",
+                                "extension.adult.install.blocked",
                                 color = MaterialTheme.colorScheme.tertiary,
                             )
                         }
@@ -663,14 +675,14 @@ private fun ExtensionRepositoryCatalogueScreen(
                 title = { Text("repositories.title") },
                 navigationIcon = {
                     IconButton(onClick = goBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "ui.back")
                     }
                 },
                 actions = {
                     if (view.availableLanguages().isNotEmpty()) {
-                        TextButton(onClick = { filteringLanguages = true }) { Text("Languages") }
+                        TextButton(onClick = { filteringLanguages = true }) { Text("ui.languages") }
                     }
-                    TextButton(onClick = { trusting = true }) { Text("Trust key") }
+                    TextButton(onClick = { trusting = true }) { Text("ui.trust.key") }
                     IconButton(onClick = { refresh() }, enabled = !loading) {
                         Icon(Icons.Default.Refresh, contentDescription = "repositories.refresh")
                     }
@@ -700,7 +712,7 @@ private fun ExtensionRepositoryCatalogueScreen(
                     Column(modifier = Modifier.weight(1f)) {
                         Text("settings.auto_updates.title", fontWeight = FontWeight.Medium)
                         Text(
-                            "Checks every 6 hours; only the same package and signing key update silently.",
+                            "ui.checks.every.6.hours.only.the.same.package.and.signing.key.update.silently",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -759,7 +771,13 @@ private fun ExtensionRepositoryCatalogueScreen(
                             },
                             enabled = !loading,
                         ) {
-                            Text("Update all (${view.updates().size})")
+                            Text(
+                                UiTranslations.format(
+                                    "dynamic.update.all",
+                                    LocalLanguagePack.current,
+                                    view.updates().size,
+                                ),
+                            )
                         }
                     }
                 }
@@ -796,7 +814,7 @@ private fun ExtensionRepositoryCatalogueScreen(
                 }
                 .sortedBy { metadataByPackage[it]?.displayName()?.lowercase(Locale.ROOT) ?: it }
             if (installedApkPackages.isNotEmpty() || view.installed().isNotEmpty()) {
-                item { SectionTitle("Installed extensions") }
+                item { SectionTitle("ui.installed.extensions") }
                 item {
                     OutlinedTextField(
                         value = installedQuery,
@@ -809,7 +827,7 @@ private fun ExtensionRepositoryCatalogueScreen(
                 }
             }
             if (visibleInstalledApks.isNotEmpty()) {
-                item { SectionTitle("Installed APK extensions") }
+                item { SectionTitle("ui.installed.apk.extensions") }
                 items(visibleInstalledApks, key = { it.packageName() }) { extension ->
                     val runtime = apkRuntimeReports.getValue(extension.packageName())
                     ApkExtensionCard(
@@ -835,7 +853,7 @@ private fun ExtensionRepositoryCatalogueScreen(
                 }
             }
             if (visibleEnginePackages.isNotEmpty()) {
-                item { SectionTitle("Installed desktop extensions") }
+                item { SectionTitle("ui.installed.desktop.extensions") }
                 items(visibleEnginePackages, key = { it }) { packageName ->
                     InstalledEngineExtensionCard(
                         packageName = packageName,
@@ -852,7 +870,7 @@ private fun ExtensionRepositoryCatalogueScreen(
                 }
             }
             if (visibleInstalledBundles.isNotEmpty()) {
-                item { SectionTitle("Installed Anilib Bundles") }
+                item { SectionTitle("ui.installed.anilib.bundles") }
                 items(visibleInstalledBundles, key = { it.packageName() }) { installed ->
                     InstalledExtensionCard(
                         installed = installed,
@@ -871,10 +889,10 @@ private fun ExtensionRepositoryCatalogueScreen(
                 visibleInstalledApks.isEmpty() && visibleEnginePackages.isEmpty() &&
                 visibleInstalledBundles.isEmpty()
             ) {
-                item { EmptyPage("No installed extension matches your search.") }
+                item { EmptyPage("ui.no.installed.extension.matches.search") }
             }
             if (view.trustedKeyIds().isNotEmpty()) {
-                item { SectionTitle("Trusted publishers") }
+                item { SectionTitle("ui.trusted.publishers") }
                 items(view.trustedKeyIds(), key = { it }) { keyId ->
                     TrustedKeyCard(keyId) {
                         runCatching { presentation.forgetTrust(keyId) }
@@ -882,9 +900,9 @@ private fun ExtensionRepositoryCatalogueScreen(
                     }
                 }
             }
-            item { SectionTitle("Repositories") }
+            item { SectionTitle("ui.repositories") }
             if (view.repositories().isEmpty()) {
-                item { EmptyPage("No extension repository configured.") }
+                item { EmptyPage("ui.no.extension.repository.configured") }
             } else {
                 items(view.repositories(), key = { it.indexUri().toString() }) { repository ->
                     RepositoryCard(repository) {
@@ -893,7 +911,7 @@ private fun ExtensionRepositoryCatalogueScreen(
                 }
             }
             if (view.packages().isNotEmpty()) {
-                item { SectionTitle("Available extensions") }
+                item { SectionTitle("ui.available.extensions") }
                 val availablePackages = view.packages().filter { extension ->
                     extension.packageName() !in installedApkPackages && view.installed().none {
                         it.packageName() == extension.packageName()
@@ -1072,17 +1090,39 @@ private fun ApkExtensionCard(
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
             Text(extension.displayName(), fontWeight = FontWeight.Medium)
             Text(
-                "${extension.contentKind().name.lowercase()} - v${extension.versionName()}" +
-                    " - external library ${extension.libraryVersion()}"
-                    + if (extension.adult()) " - 18+" else ""
-                    + if (extension.torrent()) " - torrent" else "",
+                UiTranslations.format(
+                    "dynamic.apk.extension.metadata",
+                    LocalLanguagePack.current,
+                    UiTranslations.translate(
+                        if (extension.contentKind() == ExtensionContentKind.ANIME) "ui.anime" else "ui.manga",
+                        LocalLanguagePack.current,
+                    ),
+                    extension.versionName(),
+                    extension.libraryVersion(),
+                    if (extension.adult()) " · 18+" else "",
+                    if (extension.torrent()) {
+                        UiTranslations.translate("ui.torrent.suffix", LocalLanguagePack.current)
+                    } else {
+                        ""
+                    },
+                ),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                "${extension.sourceEntrypoints().size} source entrypoint(s)"
-                    + if (extension.sourceFactory().isPresent) " - factory" else ""
-                    + " - "
-                    + apkCompatibility(extension.compatibility()),
+                UiTranslations.format(
+                    "dynamic.apk.source.summary",
+                    LocalLanguagePack.current,
+                    extension.sourceEntrypoints().size,
+                    if (extension.sourceFactory().isPresent) {
+                        UiTranslations.translate("ui.factory.suffix", LocalLanguagePack.current)
+                    } else {
+                        ""
+                    },
+                    UiTranslations.translate(
+                        apkCompatibilityKey(extension.compatibility()),
+                        LocalLanguagePack.current,
+                    ),
+                ),
                 color = if (extension.compatibility() == ApkExtensionCompatibility.COMPATIBLE_METADATA) {
                     MaterialTheme.colorScheme.primary
                 } else {
@@ -1091,12 +1131,16 @@ private fun ApkExtensionCard(
             )
             extension.signingCertificateSha256().firstOrNull()?.let { certificate ->
                 Text(
-                    "Signing certificate ${certificate.take(16)}...",
+                    UiTranslations.format(
+                        "dynamic.signing.certificate",
+                        LocalLanguagePack.current,
+                        certificate.take(16),
+                    ),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             Text(
-                apkRuntimeStatus(runtime),
+                apkRuntimeStatus(runtime, LocalLanguagePack.current),
                 color = when (runtime.state()) {
                     ApkExtensionRuntimeState.ACTIVE -> MaterialTheme.colorScheme.primary
                     ApkExtensionRuntimeState.HOST_ABI_AVAILABLE -> MaterialTheme.colorScheme.tertiary
@@ -1109,10 +1153,10 @@ private fun ApkExtensionCard(
                 if (runtime.state() == ApkExtensionRuntimeState.TRUST_REQUIRED &&
                     extension.signingCertificateSha256().isNotEmpty()
                 ) {
-                    TextButton(onClick = trust) { Text("Trust certificate") }
+                    TextButton(onClick = trust) { Text("ui.trust.certificate") }
                 }
                 if (runtime.trustedCertificateSha256().isPresent) {
-                    TextButton(onClick = forgetTrust) { Text("Forget trust") }
+                    TextButton(onClick = forgetTrust) { Text("ui.forget.trust") }
                 }
                 TextButton(onClick = uninstall) { Text("extension.uninstall") }
             }
@@ -1186,11 +1230,15 @@ private fun ConfirmExtensionRemovalDialog(
         title = { Text("extension.uninstall.confirm") },
         text = {
             Text(
-                "${target.displayName} and every source provided by this extension will be removed from Anilib.",
+                UiTranslations.format(
+                    "dynamic.uninstall.extension.body",
+                    LocalLanguagePack.current,
+                    target.displayName,
+                ),
             )
         },
         confirmButton = { Button(onClick = confirm) { Text("extension.uninstall") } },
-        dismissButton = { TextButton(onClick = dismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = dismiss) { Text("ui.cancel") } },
     )
 }
 
@@ -1209,30 +1257,42 @@ private fun ConfirmRepositoryRemovalDialog(
                 Text(repository, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         },
-        confirmButton = { Button(onClick = confirm) { Text("Remove") } },
-        dismissButton = { TextButton(onClick = dismiss) { Text("Cancel") } },
+        confirmButton = { Button(onClick = confirm) { Text("ui.remove") } },
+        dismissButton = { TextButton(onClick = dismiss) { Text("ui.cancel") } },
     )
 }
 
-private fun apkRuntimeStatus(runtime: ApkExtensionRuntimeReport): String = when (runtime.state()) {
-    ApkExtensionRuntimeState.UNSUPPORTED_PLATFORM -> "APK extension runtime unavailable on this platform"
-    ApkExtensionRuntimeState.INCOMPATIBLE_METADATA -> "Runtime blocked by incompatible metadata"
-    ApkExtensionRuntimeState.TRUST_REQUIRED -> "Explicit signing-certificate trust required"
-    ApkExtensionRuntimeState.HOST_ABI_MISSING ->
-        "Trusted; ${runtime.missingHostClasses().size} required host ABI classes are missing"
-    ApkExtensionRuntimeState.HOST_ABI_AVAILABLE ->
-        "Trusted; host ABI available, restart Anilib to activate"
-    ApkExtensionRuntimeState.ACTIVATION_FAILED ->
-        "Activation failed: ${runtime.activationFailure().orElse("unknown APK runtime error")}"
-    ApkExtensionRuntimeState.ACTIVE -> "Active through the Anilib Source registry"
+private fun apkRuntimeStatus(runtime: ApkExtensionRuntimeReport, language: LanguagePack): String =
+    when (runtime.state()) {
+        ApkExtensionRuntimeState.UNSUPPORTED_PLATFORM ->
+            UiTranslations.translate("ui.apk.runtime.unsupported.platform", language)
+        ApkExtensionRuntimeState.INCOMPATIBLE_METADATA ->
+            UiTranslations.translate("ui.apk.runtime.incompatible.metadata", language)
+        ApkExtensionRuntimeState.TRUST_REQUIRED ->
+            UiTranslations.translate("ui.apk.runtime.trust.required", language)
+        ApkExtensionRuntimeState.HOST_ABI_MISSING -> UiTranslations.format(
+            "dynamic.apk.runtime.host.abi.missing",
+            language,
+            runtime.missingHostClasses().size,
+        )
+        ApkExtensionRuntimeState.HOST_ABI_AVAILABLE ->
+            UiTranslations.translate("ui.apk.runtime.host.abi.available", language)
+        ApkExtensionRuntimeState.ACTIVATION_FAILED -> UiTranslations.format(
+            "dynamic.apk.runtime.activation.failed",
+            language,
+            runtime.activationFailure().orElse(
+                UiTranslations.translate("ui.apk.runtime.unknown.error", language),
+            ),
+        )
+        ApkExtensionRuntimeState.ACTIVE -> UiTranslations.translate("ui.apk.runtime.active", language)
 }
 
-private fun apkCompatibility(compatibility: ApkExtensionCompatibility): String = when (compatibility) {
+private fun apkCompatibilityKey(compatibility: ApkExtensionCompatibility): String = when (compatibility) {
     ApkExtensionCompatibility.COMPATIBLE_METADATA ->
-        "detected; Aniyomi execution runtime still required"
-    ApkExtensionCompatibility.UNSUPPORTED_LIBRARY -> "unsupported Aniyomi library version"
-    ApkExtensionCompatibility.MISSING_ENTRYPOINT -> "missing source entrypoint metadata"
-    ApkExtensionCompatibility.UNSIGNED -> "unsigned package"
+        "ui.apk.compatibility.detected"
+    ApkExtensionCompatibility.UNSUPPORTED_LIBRARY -> "ui.apk.compatibility.unsupported.library"
+    ApkExtensionCompatibility.MISSING_ENTRYPOINT -> "ui.apk.compatibility.missing.entrypoint"
+    ApkExtensionCompatibility.UNSIGNED -> "ui.apk.compatibility.unsigned"
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -1267,7 +1327,7 @@ private fun ExtensionDetailScreen(
                 title = { Text(extension.displayName()) },
                 navigationIcon = {
                     IconButton(onClick = goBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "ui.back")
                     }
                 },
                 actions = {
@@ -1317,18 +1377,22 @@ private fun ExtensionDetailScreen(
                     ExtensionDetailCard {
                         Text("settings.adult.title", fontWeight = FontWeight.Medium)
                         Text(
-                            "This extension remains listed, but installation requires enabling adult content " +
-                                "in Settings.",
+                            "extension.adult.install.explanation",
                             color = MaterialTheme.colorScheme.tertiary,
                         )
                     }
                 }
             }
-            item { SectionTitle("Versions") }
+            item { SectionTitle("ui.versions") }
             item {
                 ExtensionDetailCard {
                     Text(
-                        "Available: ${extension.versionName()} (${extension.versionCode()})",
+                        UiTranslations.format(
+                            "dynamic.available.version",
+                            LocalLanguagePack.current,
+                            extension.versionName(),
+                            extension.versionCode(),
+                        ),
                         fontWeight = FontWeight.Medium,
                     )
                     Text(
@@ -1340,12 +1404,17 @@ private fun ExtensionDetailScreen(
                     )
                 }
             }
-            item { SectionTitle("Permissions and sources") }
+            item { SectionTitle("ui.permissions.and.sources") }
             items(extension.sources(), key = { it.sourceId() }) { source ->
                 ExtensionDetailCard {
                     Text(source.displayName(), fontWeight = FontWeight.Medium)
                     Text(
-                        "Source ${source.sourceId()} · ${source.languageTag()}",
+                        UiTranslations.format(
+                            "dynamic.source.language",
+                            LocalLanguagePack.current,
+                            source.sourceId(),
+                            source.languageTag(),
+                        ),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
@@ -1355,7 +1424,7 @@ private fun ExtensionDetailScreen(
                     )
                 }
             }
-            item { SectionTitle("Trust and artifacts") }
+            item { SectionTitle("ui.trust.and.artifacts") }
             items(extension.artifacts(), key = { it.format().name }) { artifact ->
                 val keyId = artifact.signingKeyId().orElse(null)
                 ExtensionDetailCard {
@@ -1377,19 +1446,26 @@ private fun ExtensionDetailScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     artifact.requiredApiVersion().orElse(null)?.let {
-                        Text("Required Source API $it", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            UiTranslations.format("dynamic.required.source.api", LocalLanguagePack.current, it),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
             }
             installed?.signingKeyId()?.orElse(null)?.let { keyId ->
                 item {
                     Text(
-                        "Installed publisher identity: $keyId",
+                        UiTranslations.format(
+                            "dynamic.installed.publisher",
+                            LocalLanguagePack.current,
+                            keyId,
+                        ),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
-            item { SectionTitle("Changelog") }
+            item { SectionTitle("ui.changelog") }
             item {
                 ExtensionDetailCard {
                     Text(extension.changelog().orElse("No changelog supplied by this repository."))
@@ -1398,10 +1474,10 @@ private fun ExtensionDetailScreen(
             if (installed == null && !apkInstalled && !portable && installApk == null) {
                 item {
                     ExtensionDetailCard {
-                        Text("Android-only extension", fontWeight = FontWeight.Medium)
+                        Text("ui.android.only.extension", fontWeight = FontWeight.Medium)
                         Text(
-                            "This repository entry contains an APK. Open the same repository in Anilib on " +
-                                "Android to install it, or use a repository that publishes portable Anilib Bundles.",
+                            "ui.this.repository.entry.contains.an.apk.open.the.same.repository.in.anilib.on.android." +
+                                "to.install.it.or.use.a.repository.that.publishes.portable.anilib.bundles",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -1431,9 +1507,9 @@ private fun ExtensionDetailScreen(
                                 })
                             }
                             if (extension.versionCode() > installed.versionCode() && portable) {
-                                Button(onClick = update, enabled = !loading) { Text("Update") }
+                                Button(onClick = update, enabled = !loading) { Text("ui.update") }
                             }
-                            TextButton(onClick = remove, enabled = !loading) { Text("Remove") }
+                            TextButton(onClick = remove, enabled = !loading) { Text("ui.remove") }
                         }
                     }
                     if (installed == null && !apkInstalled && !portable && extension.artifacts().any {
@@ -1471,7 +1547,7 @@ private fun ExtensionFailure(message: String, retry: (() -> Unit)?) {
         Column(modifier = Modifier.fillMaxWidth().padding(14.dp)) {
             Text(message, color = MaterialTheme.colorScheme.onErrorContainer)
             retry?.let { action ->
-                TextButton(onClick = action) { Text("Retry") }
+                TextButton(onClick = action) { Text("ui.retry") }
             }
         }
     }
@@ -1506,22 +1582,26 @@ private fun ApkCertificateTrustDialog(
     val certificate = extension.signingCertificateSha256().firstOrNull() ?: return
     AlertDialog(
         onDismissRequest = dismiss,
-        title = { Text("Trust ${extension.displayName()}?") },
+        title = {
+            Text(UiTranslations.format("dynamic.trust", LocalLanguagePack.current, extension.displayName()))
+        },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    "This trusts the current APK signing certificate for ${extension.packageName()}. " +
-                        "It authorizes a future restart-time code load once the Aniyomi host ABI is available; " +
-                        "nothing is executed now.",
+                    UiTranslations.format(
+                        "dynamic.trust.apk.body",
+                        LocalLanguagePack.current,
+                        extension.packageName(),
+                    ),
                 )
                 Text("SHA-256", fontWeight = FontWeight.SemiBold)
                 Text(certificate)
             }
         },
         confirmButton = {
-            Button(onClick = { trust(certificate) }) { Text("Trust certificate") }
+            Button(onClick = { trust(certificate) }) { Text("ui.trust.certificate") }
         },
-        dismissButton = { TextButton(onClick = dismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = dismiss) { Text("ui.cancel") } },
     )
 }
 
@@ -1543,7 +1623,7 @@ private fun TrustedKeyCard(keyId: String, forget: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(keyId, modifier = Modifier.weight(1f))
-            TextButton(onClick = forget) { Text("Forget") }
+            TextButton(onClick = forget) { Text("ui.forget") }
         }
     }
 }
@@ -1578,7 +1658,7 @@ private fun RepositoryCard(repository: ExtensionRepositoryRow, remove: () -> Uni
                 },
             )
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = remove) { Text("Remove") }
+                TextButton(onClick = remove) { Text("ui.remove") }
             }
         }
     }
@@ -1633,13 +1713,18 @@ private fun ExtensionPackageCard(
                     }
                 }
                 Text(
-                    "$formats · ${extension.sources().size} source(s)"
-                        + if (extension.adult()) " · 18+" else "",
+                    UiTranslations.format(
+                        "dynamic.artifact.formats",
+                        LocalLanguagePack.current,
+                        formats,
+                        extension.sources().size,
+                        if (extension.adult()) " · 18+" else "",
+                    ),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 if (blockedByAdultPolicy) {
                     Text(
-                        "Listed · enable adult content in Settings to install",
+                        "extension.adult.listed",
                         color = MaterialTheme.colorScheme.tertiary,
                         style = MaterialTheme.typography.bodySmall,
                     )
@@ -1651,14 +1736,14 @@ private fun ExtensionPackageCard(
                 }.orElse(false)
                 if (installed == null && !apkInstalled && !portable && apk && installApk == null) {
                     Text(
-                        "Android-only extension · install it from Anilib on Android",
+                        "ui.android.only.extension.install.it.from.anilib.on.android",
                         color = MaterialTheme.colorScheme.tertiary,
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
                 if (apkInstalled) {
                     Text(
-                        "Installed · sources active in Browse",
+                        "ui.installed.sources.active.in.browse",
                         color = MaterialTheme.colorScheme.primary,
                         style = MaterialTheme.typography.bodySmall,
                     )
@@ -1682,9 +1767,9 @@ private fun ExtensionPackageCard(
                                 )
                             }
                             if (extension.versionCode() > installed.versionCode() && portable) {
-                                Button(onClick = update, enabled = !busy) { Text("Update") }
+                                Button(onClick = update, enabled = !busy) { Text("ui.update") }
                             }
-                            TextButton(onClick = remove) { Text("Remove") }
+                            TextButton(onClick = remove) { Text("ui.remove") }
                         }
                     }
                     if (apk && installApk != null && installed == null && !apkInstalled) {
@@ -1727,7 +1812,7 @@ private fun ExtensionLanguageDialog(
                 }
             }
         },
-        confirmButton = { TextButton(onClick = dismiss) { Text("Done") } },
+        confirmButton = { TextButton(onClick = dismiss) { Text("ui.done") } },
     )
 }
 
@@ -1754,7 +1839,7 @@ private fun InstalledExtensionCard(
                 TextButton(onClick = { toggle(installed.state() == ExtensionInstallationState.DISABLED) }) {
                     Text(if (installed.state() == ExtensionInstallationState.ENABLED) "Disable" else "Enable")
                 }
-                TextButton(onClick = remove) { Text("Remove") }
+                TextButton(onClick = remove) { Text("ui.remove") }
             }
         }
     }
@@ -1804,21 +1889,21 @@ private fun AddRepositoryDialog(dismiss: () -> Unit, add: (String) -> Unit) {
         title = { Text("repository.add") },
         text = {
             Column {
-                Text("Paste a trusted GitHub repository URL or a direct HTTPS JSON index URL.")
+                Text("ui.paste.a.trusted.github.repository.url.or.a.direct.https.json.index.url")
                 Spacer(Modifier.height(12.dp))
                 OutlinedTextField(
                     value = url,
                     onValueChange = { url = it },
-                    label = { Text("GitHub repository or index URL") },
+                    label = { Text("ui.github.repository.or.index.url") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
         },
         confirmButton = {
-            Button(onClick = { add(url.trim()) }, enabled = url.isNotBlank()) { Text("Add") }
+            Button(onClick = { add(url.trim()) }, enabled = url.isNotBlank()) { Text("ui.add") }
         },
-        dismissButton = { TextButton(onClick = dismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = dismiss) { Text("ui.cancel") } },
     )
 }
 
@@ -1828,15 +1913,15 @@ private fun TrustKeyDialog(dismiss: () -> Unit, trust: (String, String) -> Unit)
     var publicKey by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = dismiss,
-        title = { Text("Trust publisher key") },
+        title = { Text("ui.trust.publisher.key") },
         text = {
             Column {
-                Text("Only import an Ed25519 key fingerprinted by a publisher you trust.")
+                Text("ui.only.import.an.ed25519.key.fingerprinted.by.a.publisher.you.trust")
                 Spacer(Modifier.height(12.dp))
                 OutlinedTextField(
                     value = keyId,
                     onValueChange = { keyId = it },
-                    label = { Text("Key ID") },
+                    label = { Text("ui.key.id") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -1844,7 +1929,7 @@ private fun TrustKeyDialog(dismiss: () -> Unit, trust: (String, String) -> Unit)
                 OutlinedTextField(
                     value = publicKey,
                     onValueChange = { publicKey = it },
-                    label = { Text("Base64 X.509 public key") },
+                    label = { Text("ui.base64.x.509.public.key") },
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -1854,9 +1939,9 @@ private fun TrustKeyDialog(dismiss: () -> Unit, trust: (String, String) -> Unit)
                 onClick = { trust(keyId.trim(), publicKey.trim()) },
                 enabled = keyId.isNotBlank() && publicKey.isNotBlank(),
             ) {
-                Text("Trust")
+                Text("ui.trust")
             }
         },
-        dismissButton = { TextButton(onClick = dismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = dismiss) { Text("ui.cancel") } },
     )
 }

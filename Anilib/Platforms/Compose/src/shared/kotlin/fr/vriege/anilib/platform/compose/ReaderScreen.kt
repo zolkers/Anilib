@@ -81,6 +81,7 @@ import fr.vriege.anilib.feature.reader.ReaderPageTransition
 import fr.vriege.anilib.feature.reader.ReaderRotation
 import fr.vriege.anilib.feature.reader.ReaderScaleMode
 import fr.vriege.anilib.feature.reader.ui.ReaderController
+import fr.vriege.anilib.feature.settings.LanguagePack
 import fr.vriege.anilib.feature.source.SourceContentUnit
 import fr.vriege.anilib.feature.source.SourceContentUnitId
 import kotlinx.coroutines.Dispatchers
@@ -571,7 +572,7 @@ private suspend fun PointerInputScope.detectReaderPinchGestures(
 
 @Composable
 private fun ReaderControlsHandle(showControls: () -> Unit, modifier: Modifier = Modifier) {
-    val description = UiTranslations.translate("Show reader controls", LocalLanguagePack.current)
+    val description = UiTranslations.translate("ui.show.reader.controls", LocalLanguagePack.current)
     IconButton(
         onClick = showControls,
         modifier = modifier
@@ -664,7 +665,11 @@ internal fun ReaderPageImage(
     Box(modifier = modifier.clipToBounds()) {
         Image(
             bitmap = image,
-            contentDescription = "Page ${pageIndex + 1}",
+            contentDescription = UiTranslations.format(
+                "dynamic.page",
+                LocalLanguagePack.current,
+                pageIndex + 1,
+            ),
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer(
@@ -794,7 +799,7 @@ private fun ReaderTopBar(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(onClick = closeReader) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Close reader", tint = Color.White)
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "ui.close.reader", tint = Color.White)
         }
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -812,18 +817,18 @@ private fun ReaderTopBar(
             )
         }
         IconButton(onClick = openSettings) {
-            Icon(Icons.Default.Settings, contentDescription = "Reader settings", tint = Color.White)
+            Icon(Icons.Default.Settings, contentDescription = "ui.reader.settings", tint = Color.White)
         }
         IconButton(onClick = openChapters) {
-            Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Chapters", tint = Color.White)
+            Icon(Icons.AutoMirrored.Filled.List, contentDescription = "ui.chapters", tint = Color.White)
         }
         IconButton(onClick = openMenu) {
-            Icon(Icons.Default.MoreVert, contentDescription = "Reader menu", tint = Color.White)
+            Icon(Icons.Default.MoreVert, contentDescription = "ui.reader.menu", tint = Color.White)
         }
         IconButton(onClick = openReadingMode) {
             Icon(
                 Icons.AutoMirrored.Outlined.ChromeReaderMode,
-                contentDescription = "Reading mode",
+                contentDescription = "ui.reading.mode",
                 tint = Color.White,
             )
         }
@@ -838,42 +843,42 @@ private fun ReaderModeDialog(
 ) {
     AlertDialog(
         onDismissRequest = close,
-        title = { Text("Reading mode") },
+        title = { Text("ui.reading.mode") },
         text = {
             Column {
                 ReadingDirection.entries.forEach { direction ->
                     TextButton(onClick = { select(direction) }) {
                         Text(
                             (if (direction == current) "✓ " else "") +
-                                readingDirectionLabel(direction),
+                                UiTranslations.translate(readingDirectionKey(direction), LocalLanguagePack.current),
                         )
                     }
                 }
             }
         },
-        confirmButton = { TextButton(onClick = close) { Text("Close") } },
+        confirmButton = { TextButton(onClick = close) { Text("ui.close") } },
     )
 }
 
-private fun readingDirectionLabel(direction: ReadingDirection): String = when (direction) {
-    ReadingDirection.LEFT_TO_RIGHT -> "Left to right"
-    ReadingDirection.RIGHT_TO_LEFT -> "Right to left"
-    ReadingDirection.VERTICAL -> "Vertical"
-    ReadingDirection.WEBTOON -> "Webtoon"
+private fun readingDirectionKey(direction: ReadingDirection): String = when (direction) {
+    ReadingDirection.LEFT_TO_RIGHT -> "ui.left.to.right"
+    ReadingDirection.RIGHT_TO_LEFT -> "ui.right.to.left"
+    ReadingDirection.VERTICAL -> "ui.vertical"
+    ReadingDirection.WEBTOON -> "ui.webtoon"
 }
 
-private enum class InteractionSlot(val label: String) {
-    LEFT_TAP("Left tap"),
-    CENTER_TAP("Center tap"),
-    RIGHT_TAP("Right tap"),
-    TOP_TAP("Top tap"),
-    BOTTOM_TAP("Bottom tap"),
-    SWIPE_LEFT("Swipe left"),
-    SWIPE_RIGHT("Swipe right"),
-    SWIPE_UP("Swipe up"),
-    SWIPE_DOWN("Swipe down"),
-    DOUBLE_TAP("Double tap"),
-    LONG_PRESS("Long press"),
+private enum class InteractionSlot(val labelKey: String) {
+    LEFT_TAP("ui.left.tap"),
+    CENTER_TAP("ui.center.tap"),
+    RIGHT_TAP("ui.right.tap"),
+    TOP_TAP("ui.top.tap"),
+    BOTTOM_TAP("ui.bottom.tap"),
+    SWIPE_LEFT("ui.swipe.left"),
+    SWIPE_RIGHT("ui.swipe.right"),
+    SWIPE_UP("ui.swipe.up"),
+    SWIPE_DOWN("ui.swipe.down"),
+    DOUBLE_TAP("ui.double.tap"),
+    LONG_PRESS("ui.long.press"),
 }
 
 @Composable
@@ -889,7 +894,7 @@ private fun ReaderChapterDialog(
 ) {
     AlertDialog(
         onDismissRequest = close,
-        title = { Text("Chapters") },
+        title = { Text("ui.chapters") },
         text = {
             if (loading) {
                 Box(
@@ -899,7 +904,7 @@ private fun ReaderChapterDialog(
                     CircularProgressIndicator()
                 }
             } else if (units.isEmpty()) {
-                Text("No chapter list is available.")
+                Text("ui.no.chapter.list.is.available")
             } else {
                 LazyColumn(modifier = Modifier.heightIn(max = 520.dp)) {
                     items(units.size) { index ->
@@ -913,14 +918,14 @@ private fun ReaderChapterDialog(
                                 TextButton(onClick = { setRead(unit.id(), !read) }) {
                                     Text(if (read) "Mark unread" else "Mark read")
                                 }
-                                TextButton(onClick = { download(unit.id()) }) { Text("Download") }
+                                TextButton(onClick = { download(unit.id()) }) { Text("ui.download") }
                             }
                         }
                     }
                 }
             }
         },
-        confirmButton = { TextButton(onClick = close) { Text("Close") } },
+        confirmButton = { TextButton(onClick = close) { Text("ui.close") } },
     )
 }
 
@@ -942,20 +947,20 @@ private fun ReaderMenuDialog(
         title = { Text(current.title()) },
         text = {
             Column {
-                TextButton(onClick = previousChapter) { Text("Previous chapter") }
-                TextButton(onClick = nextChapter) { Text("Next chapter") }
+                TextButton(onClick = previousChapter) { Text("ui.previous.chapter") }
+                TextButton(onClick = nextChapter) { Text("ui.next.chapter") }
                 TextButton(onClick = { setRead(!read) }) {
                     Text(if (read) "Mark chapter unread" else "Mark chapter read")
                 }
-                TextButton(onClick = download) { Text("Download chapter") }
-                TextButton(onClick = openChapters) { Text("All chapters") }
-                TextButton(onClick = openSettings) { Text("Reader settings") }
+                TextButton(onClick = download) { Text("ui.download.chapter") }
+                TextButton(onClick = openChapters) { Text("ui.all.chapters") }
+                TextButton(onClick = openSettings) { Text("ui.reader.settings") }
                 if (!message.isNullOrBlank()) {
                     Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         },
-        confirmButton = { TextButton(onClick = close) { Text("Close") } },
+        confirmButton = { TextButton(onClick = close) { Text("ui.close") } },
     )
 }
 
@@ -973,101 +978,180 @@ private fun ReaderSettingsDialog(
 ) {
     AlertDialog(
         onDismissRequest = close,
-        title = { Text("Reader settings") },
+        title = { Text("ui.reader.settings") },
         text = {
             LazyColumn(modifier = Modifier.heightIn(max = 520.dp)) {
-                item { Text("Display", fontWeight = FontWeight.SemiBold) }
+                item { Text("ui.display", fontWeight = FontWeight.SemiBold) }
                 item {
                     TextButton(onClick = { setTitleOverride(!titleOverride) }) {
-                        Text("Apply to this title: ${enabledLabel(titleOverride)}")
+                        Text(
+                            UiTranslations.format(
+                                "dynamic.apply.to.title",
+                                LocalLanguagePack.current,
+                                enabledLabel(titleOverride, LocalLanguagePack.current),
+                            ),
+                        )
                     }
                 }
                 item {
                     TextButton(onClick = { updateDirection(nextDirection(direction)) }) {
-                        Text("Reading mode: ${direction.name.replace('_', ' ').lowercase()}")
+                        Text(
+                            UiTranslations.format(
+                                "dynamic.reading.mode",
+                                LocalLanguagePack.current,
+                                UiTranslations.translate(readingDirectionKey(direction), LocalLanguagePack.current),
+                            ),
+                        )
                     }
                 }
                 item {
                     TextButton(onClick = {
                         updateDisplay(withScaleMode(display, nextScaleMode(display.scaleMode())))
                     }) {
-                        Text("Scale: ${display.scaleMode().name.replace('_', ' ').lowercase()}")
+                        Text(
+                            UiTranslations.format(
+                                "dynamic.scale",
+                                LocalLanguagePack.current,
+                                display.scaleMode().name.replace('_', ' ').lowercase(),
+                            ),
+                        )
                     }
                 }
                 item {
                     TextButton(onClick = { updateDisplay(withCropBorders(display, !display.cropBorders())) }) {
-                        Text("Crop borders: ${enabledLabel(display.cropBorders())}")
+                        Text(
+                            UiTranslations.format(
+                                "dynamic.crop.borders",
+                                LocalLanguagePack.current,
+                                enabledLabel(display.cropBorders(), LocalLanguagePack.current),
+                            ),
+                        )
                     }
                 }
                 item {
                     TextButton(onClick = { updateDisplay(withSplitPages(display, !display.splitPages())) }) {
-                        Text("Split pages: ${enabledLabel(display.splitPages())}")
+                        Text(
+                            UiTranslations.format(
+                                "dynamic.split.pages",
+                                LocalLanguagePack.current,
+                                enabledLabel(display.splitPages(), LocalLanguagePack.current),
+                            ),
+                        )
                     }
                 }
                 item {
                     TextButton(onClick = { updateDisplay(withRotation(display, nextRotation(display.rotation()))) }) {
-                        Text("Rotation: ${display.rotation().degrees()}°")
+                        Text(
+                            UiTranslations.format(
+                                "dynamic.rotation.degrees",
+                                LocalLanguagePack.current,
+                                display.rotation().degrees(),
+                            ),
+                        )
                     }
                 }
                 item {
                     TextButton(onClick = { updateDisplay(withDualPage(display, !display.dualPage())) }) {
-                        Text("Dual page: ${enabledLabel(display.dualPage())}")
+                        Text(
+                            UiTranslations.format(
+                                "dynamic.dual.page",
+                                LocalLanguagePack.current,
+                                enabledLabel(display.dualPage(), LocalLanguagePack.current),
+                            ),
+                        )
                     }
                 }
                 item {
                     TextButton(onClick = {
                         updateDisplay(withWebtoonSpacing(display, nextSpacing(display.webtoonSpacingDp())))
                     }) {
-                        Text("Webtoon spacing: ${display.webtoonSpacingDp()} dp")
+                        Text(
+                            UiTranslations.format(
+                                "dynamic.webtoon.spacing",
+                                LocalLanguagePack.current,
+                                display.webtoonSpacingDp(),
+                            ),
+                        )
                     }
                 }
                 item {
                     TextButton(onClick = {
                         updateDisplay(withColorFilter(display, nextColorFilter(display.colorFilter())))
                     }) {
-                        Text("Color filter: ${display.colorFilter().name.lowercase()}")
+                        Text(
+                            UiTranslations.format(
+                                "dynamic.color.filter",
+                                LocalLanguagePack.current,
+                                display.colorFilter().name.lowercase(),
+                            ),
+                        )
                     }
                 }
                 item {
                     TextButton(onClick = {
                         updateDisplay(withBrightness(display, nextBrightness(display.brightnessPercent())))
                     }) {
-                        Text("Brightness: ${display.brightnessPercent()}%")
+                        Text(
+                            UiTranslations.format(
+                                "dynamic.brightness.percent",
+                                LocalLanguagePack.current,
+                                display.brightnessPercent(),
+                            ),
+                        )
                     }
                 }
                 item {
                     TextButton(onClick = {
                         updateDisplay(withTransition(display, nextTransition(display.transition())))
                     }) {
-                        Text("Transition: ${display.transition().name.lowercase()}")
+                        Text(
+                            UiTranslations.format(
+                                "dynamic.transition",
+                                LocalLanguagePack.current,
+                                display.transition().name.lowercase(),
+                            ),
+                        )
                     }
                 }
                 item {
                     TextButton(onClick = {
                         updateDisplay(withOrientation(display, nextOrientation(display.orientationPolicy())))
                     }) {
-                        Text("Orientation: ${display.orientationPolicy().name.lowercase()}")
+                        Text(
+                            UiTranslations.format(
+                                "dynamic.orientation",
+                                LocalLanguagePack.current,
+                                display.orientationPolicy().name.lowercase(),
+                            ),
+                        )
                     }
                 }
-                item { Text("Interactions", fontWeight = FontWeight.SemiBold) }
+                item { Text("ui.interactions", fontWeight = FontWeight.SemiBold) }
                 items(InteractionSlot.entries.size) { index ->
                     val slot = InteractionSlot.entries[index]
                     val action = interaction(interactions, slot)
                     TextButton(onClick = {
                         updateInteractions(withInteraction(interactions, slot, nextAction(action)))
                     }) {
-                        Text("${slot.label}: ${action.name.replace('_', ' ').lowercase()}")
+                        Text(
+                            UiTranslations.format(
+                                "dynamic.interaction.action",
+                                LocalLanguagePack.current,
+                                UiTranslations.translate(slot.labelKey, LocalLanguagePack.current),
+                                UiTranslations.translate(readerActionKey(action), LocalLanguagePack.current),
+                            ),
+                        )
                     }
                 }
             }
         },
-        confirmButton = { TextButton(onClick = close) { Text("Done") } },
+        confirmButton = { TextButton(onClick = close) { Text("ui.done") } },
         dismissButton = {
             TextButton(onClick = {
                 updateDisplay(ReaderDisplayPreferences.defaults())
                 updateInteractions(ReaderInteractionPreferences.defaults())
                 updateDirection(ReaderDisplayPreferences.defaults().readingDirection())
-            }) { Text("Reset") }
+            }) { Text("ui.reset") }
         },
     )
 }
@@ -1260,7 +1344,17 @@ private fun nextDirection(value: ReadingDirection): ReadingDirection {
     return values[(value.ordinal + 1) % values.size]
 }
 
-private fun enabledLabel(value: Boolean) = if (value) "on" else "off"
+private fun enabledLabel(value: Boolean, language: LanguagePack): String =
+    UiTranslations.translate(if (value) "ui.on" else "ui.off", language)
+
+private fun readerActionKey(action: ReaderInteractionAction): String = when (action) {
+    ReaderInteractionAction.PREVIOUS_PAGE -> "ui.previous.page"
+    ReaderInteractionAction.NEXT_PAGE -> "ui.next.page"
+    ReaderInteractionAction.TOGGLE_CONTROLS -> "ui.toggle.controls"
+    ReaderInteractionAction.TOGGLE_ZOOM -> "ui.toggle.zoom"
+    ReaderInteractionAction.OPEN_MENU -> "ui.open.menu"
+    ReaderInteractionAction.NONE -> "ui.none"
+}
 
 private fun interaction(
     preferences: ReaderInteractionPreferences,
@@ -1377,13 +1471,13 @@ private fun ReaderPageError(message: String?, retry: () -> Unit) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("This page could not be displayed.", color = Color.White)
+        Text("ui.this.page.could.not.be.displayed", color = Color.White)
         if (!message.isNullOrBlank()) {
             Spacer(Modifier.height(8.dp))
             Text(message, color = Color.White.copy(alpha = 0.68f))
         }
         Spacer(Modifier.height(10.dp))
-        TextButton(onClick = retry) { Text("Retry", color = Color.White) }
+        TextButton(onClick = retry) { Text("ui.retry", color = Color.White) }
     }
 }
 

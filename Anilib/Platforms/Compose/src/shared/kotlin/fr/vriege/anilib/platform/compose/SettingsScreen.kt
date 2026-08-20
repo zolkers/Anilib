@@ -171,10 +171,10 @@ internal fun SettingsScreen(
                     runMaintenance(action)
                     confirmation = null
                 }) {
-                    Text("Clear")
+                    Text("ui.clear")
                 }
             },
-            dismissButton = { TextButton(onClick = { confirmation = null }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { confirmation = null }) { Text("ui.cancel") } },
         )
     }
     if (networkPolicyDialog) {
@@ -198,11 +198,15 @@ internal fun SettingsScreen(
     resetPlan?.let { plan ->
         AlertDialog(
             onDismissRequest = { resetPlan = null },
-            title = { Text("Confirm safe reset") },
+            title = { Text("ui.confirm.safe.reset") },
             text = {
                 Text(
-                    "Remove ${plan.targets().size} allowlisted targets and reclaim " +
-                        "${formatDiagnosticBytes(plan.reclaimableBytes())}?",
+                    UiTranslations.format(
+                        "dynamic.safe.reset.summary",
+                        LocalLanguagePack.current,
+                        plan.targets().size,
+                        formatDiagnosticBytes(plan.reclaimableBytes()),
+                    ),
                 )
             },
             confirmButton = {
@@ -212,9 +216,9 @@ internal fun SettingsScreen(
                         resetPlan = null
                         diagnosticsDialog = false
                     }
-                }) { Text("Reset") }
+                }) { Text("ui.reset") }
             },
-            dismissButton = { TextButton(onClick = { resetPlan = null }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { resetPlan = null }) { Text("ui.cancel") } },
         )
     }
 }
@@ -243,17 +247,17 @@ private fun SettingsHome(
         topBar = {
             TopAppBar(
                 title = {
-                    if (!searching) Text("Settings") else OutlinedTextField(
+                    if (!searching) Text("ui.settings") else OutlinedTextField(
                         value = query,
                         onValueChange = { query = it },
-                        placeholder = { Text("Search settings") },
+                        placeholder = { Text("ui.search.settings") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
                 },
                 navigationIcon = {
                     IconButton(onClick = goBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "ui.back")
                     }
                 },
                 actions = {
@@ -272,29 +276,29 @@ private fun SettingsHome(
     ) { padding ->
         LazyColumn(modifier = Modifier.fillMaxSize().padding(padding)) {
             if (general || appearance || privacy) {
-                item { SettingsSection("Application") }
+                item { SettingsSection("ui.application") }
                 item {
                     SettingsGroup {
                         if (general) {
                             SettingsRow(
-                                "General",
-                                "Language and start screen",
+                                "ui.general",
+                                "ui.language.and.start.screen",
                                 { openDestination(SettingsDestination.GENERAL) },
                                 Icons.Outlined.Language,
                             )
                         }
                         if (appearance) {
                             SettingsRow(
-                                "Appearance",
-                                "Theme and visual preferences",
+                                "ui.appearance",
+                                "ui.theme.and.visual.preferences",
                                 { openDestination(SettingsDestination.APPEARANCE) },
                                 Icons.Outlined.Palette,
                             )
                         }
                         if (privacy) {
                             SettingsRow(
-                                "Content and privacy",
-                                "Adult content and incognito mode",
+                                "ui.content.and.privacy",
+                                "ui.adult.content.and.incognito.mode",
                                 { openDestination(SettingsDestination.PRIVACY) },
                                 Icons.Outlined.Security,
                             )
@@ -303,45 +307,45 @@ private fun SettingsHome(
                 }
             }
             if (library || reader || player || downloads || tracking) {
-                item { SettingsSection("Library and media") }
+                item { SettingsSection("ui.library.and.media") }
                 item {
                     SettingsGroup {
                         if (library) {
                             SettingsRow(
-                                "Library and updates",
-                                "Refresh and content policies",
+                                "ui.library.and.updates",
+                                "ui.refresh.and.content.policies",
                                 { openDestination(SettingsDestination.LIBRARY) },
                                 Icons.Outlined.CollectionsBookmark,
                             )
                         }
                         if (reader) {
                             SettingsRow(
-                                "Reader",
-                                "Reading behavior and per-title controls",
+                                "ui.reader",
+                                "ui.reading.behavior.and.per.title.controls",
                                 { openDestination(SettingsDestination.READER) },
                                 Icons.AutoMirrored.Outlined.ChromeReaderMode,
                             )
                         }
                         if (player) {
                             SettingsRow(
-                                "Player",
-                                "Playback behavior and per-episode controls",
+                                "ui.player",
+                                "ui.playback.behavior.and.per.episode.controls",
                                 { openDestination(SettingsDestination.PLAYER) },
                                 Icons.Outlined.VideoSettings,
                             )
                         }
                         if (downloads) {
                             SettingsRow(
-                                "Downloads",
-                                "Network policy and download queue",
+                                "ui.downloads",
+                                "ui.network.policy.and.download.queue",
                                 { openDestination(SettingsDestination.DOWNLOADS) },
                                 Icons.Outlined.Download,
                             )
                         }
                         if (tracking) {
                             SettingsRow(
-                                "Tracking",
-                                "Link AniList, Kitsu, and synchronize progress",
+                                "ui.tracking",
+                                "ui.link.anilist.kitsu.and.synchronize.progress",
                                 openTracking,
                                 Icons.Outlined.Person,
                             )
@@ -350,21 +354,21 @@ private fun SettingsHome(
                 }
             }
             if (advanced || about) {
-                item { SettingsSection("Advanced") }
+                item { SettingsSection("ui.advanced") }
                 item {
                     SettingsGroup {
                         if (advanced) {
                             SettingsRow(
-                                "Data and storage",
-                                "Network, browser, and unused data",
+                                "ui.data.and.storage",
+                                "ui.network.browser.and.unused.data",
                                 { openDestination(SettingsDestination.ADVANCED) },
                                 Icons.Outlined.Storage,
                             )
                         }
                         if (about) {
                             SettingsRow(
-                                "About",
-                                "Version, updates, project, and help",
+                                "ui.about",
+                                "ui.version.updates.project.and.help",
                                 openAbout,
                                 Icons.Outlined.Info,
                             )
@@ -398,159 +402,165 @@ private fun SettingsDetail(
         LazyColumn(modifier = Modifier.fillMaxSize().padding(padding)) {
             when (destination) {
                 SettingsDestination.GENERAL -> {
-                    item { SettingsSection("Navigation") }
+                    item { SettingsSection("ui.navigation") }
                     item {
-                        SettingsRow("Start screen", settings.startScreen().displayName()) {
+                        SettingsRow("ui.start.screen", settings.startScreen().displayName()) {
                             presentation.setStartScreen(settings.startScreen().next())
                         }
                     }
                     item {
-                        SettingsRow("Language", languageLabel(settings.languagePack())) {
+                        SettingsRow("ui.language", languageLabel(settings.languagePack())) {
                             choosingLanguage = true
                         }
                     }
-                    item { SettingsHint("Start screen changes apply the next time Anilib opens.") }
+                    item { SettingsHint("ui.start.screen.changes.apply.the.next.time.anilib.opens") }
                 }
                 SettingsDestination.APPEARANCE -> {
-                    item { SettingsSection("Theme") }
+                    item { SettingsSection("ui.theme") }
                     item {
-                        SettingsRow("Theme", themeLabel(settings)) {
+                        SettingsRow("ui.theme", themeLabel(settings)) {
                             presentation.setThemeMode(settings.themeMode().next())
                         }
                     }
                     item {
-                        SettingsRow("Theme family", settings.themeFamily().displayName()) {
+                        SettingsRow("ui.theme.family", settings.themeFamily().displayName()) {
                             presentation.setThemeFamily(settings.themeFamily().next())
                         }
                     }
                     item {
-                        SettingsRow("Accent color", settings.accentColor().displayName()) {
+                        SettingsRow("ui.accent.color", settings.accentColor().displayName()) {
                             presentation.setAccentColor(settings.accentColor().next())
                         }
                     }
                     item {
-                        SettingsRow("Typography", typographyLabel(settings.typographyScale())) {
+                        SettingsRow("ui.typography", typographyLabel(settings.typographyScale())) {
                             presentation.setTypographyScale(settings.typographyScale().next())
                         }
                     }
                     item {
                         SettingsSwitchRow(
-                            "Reduce motion",
-                            "Disable reader page transitions and nonessential animation",
+                            "ui.reduce.motion",
+                            "ui.disable.reader.page.transitions.and.nonessential.animation",
                             settings.reducedMotion(),
                             presentation::setReducedMotion,
                         )
                     }
                     item {
-                        SettingsRow("Navigation", settings.navigationStyle().displayName()) {
+                        SettingsRow("ui.navigation", settings.navigationStyle().displayName()) {
                             presentation.setNavigationStyle(settings.navigationStyle().next())
                         }
                     }
-                    item { SettingsHint("Appearance changes apply immediately on Android and desktop.") }
+                    item { SettingsHint("ui.appearance.changes.apply.immediately.on.android.and.desktop") }
                 }
                 SettingsDestination.PRIVACY -> {
-                    item { SettingsSection("Content") }
+                    item { SettingsSection("ui.content") }
                     item {
                         SettingsSwitchRow(
-                            "Show adult content",
-                            "Allow sources and titles marked as adult",
+                            "ui.show.adult.content",
+                            "ui.allow.sources.and.titles.marked.as.adult",
                             settings.showAdultContent(),
                             presentation::setShowAdultContent,
                         )
                     }
-                    item { SettingsSection("Privacy") }
+                    item { SettingsSection("ui.privacy") }
                     item {
                         SettingsSwitchRow(
-                            "Incognito mode",
-                            "Do not write new reader or player history and progress",
+                            "ui.incognito.mode",
+                            "ui.do.not.write.new.reader.or.player.history.and.progress",
                             settings.incognitoMode(),
                             presentation::setIncognitoMode,
                         )
                     }
                 }
                 SettingsDestination.LIBRARY -> {
-                    item { SettingsSection("Library updates") }
+                    item { SettingsSection("ui.library.updates") }
                     item {
                         SettingsSwitchRow(
-                            "Wi-Fi only updates",
-                            "Refresh the library automatically only on Wi-Fi",
+                            "ui.wi.fi.only.updates",
+                            "ui.refresh.the.library.automatically.only.on.wi.fi",
                             settings.updateOnlyOnWifi(),
                             presentation::setUpdateOnlyOnWifi,
                         )
                     }
-                    item { SettingsHint("Schedule and skip controls remain available on the Updates screen.") }
+                    item { SettingsHint("ui.schedule.and.skip.controls.remain.available.on.the.updates.screen") }
                 }
                 SettingsDestination.READER -> {
-                    item { SettingsSection("Reader behavior") }
-                    item { SettingsRow("Reading direction", "Choose LTR, RTL, vertical, or webtoon in Reader") }
-                    item { SettingsRow("Prefetch and retry", "Managed by the shared Reader pipeline") }
-                    item { SettingsHint("Direction and position are retained per title.") }
+                    item { SettingsSection("ui.reader.behavior") }
+                    item { SettingsRow("ui.reading.direction", "ui.choose.ltr.rtl.vertical.or.webtoon.in.reader") }
+                    item { SettingsRow("ui.prefetch.and.retry", "ui.managed.by.the.shared.reader.pipeline") }
+                    item { SettingsHint("ui.direction.and.position.are.retained.per.title") }
                 }
                 SettingsDestination.PLAYER -> {
-                    item { SettingsSection("Player behavior") }
-                    item { SettingsRow("Quality and subtitles", "Choose them from the episode screen") }
-                    item { SettingsRow("Resume", "Playback position is retained per episode") }
-                    item { SettingsHint("Android and desktop use the same stream and subtitle policy.") }
+                    item { SettingsSection("ui.player.behavior") }
+                    item { SettingsRow("ui.quality.and.subtitles", "ui.choose.them.from.the.episode.screen") }
+                    item { SettingsRow("ui.resume", "ui.playback.position.is.retained.per.episode") }
+                    item { SettingsHint("ui.android.and.desktop.use.the.same.stream.and.subtitle.policy") }
                 }
                 SettingsDestination.DOWNLOADS -> {
-                    item { SettingsSection("Network") }
+                    item { SettingsSection("ui.network") }
                     item {
                         SettingsSwitchRow(
-                            "Wi-Fi only downloads",
-                            "Keep queued downloads off metered connections",
+                            "ui.wi.fi.only.downloads",
+                            "ui.keep.queued.downloads.off.metered.connections",
                             settings.downloadOnlyOnWifi(),
                             presentation::setDownloadOnlyOnWifi,
                         )
                     }
-                    item { SettingsSection("Queue and storage") }
-                    item { SettingsRow("Manage downloads", "Queue, offline mode, and storage usage", openDownloads) }
-                }
-                SettingsDestination.ADVANCED -> {
-                    item { SettingsSection("Network and browser") }
+                    item { SettingsSection("ui.queue.and.storage") }
                     item {
                         SettingsRow(
-                            "Network policy",
-                            "User agent, proxy, DNS-over-HTTPS, timeout, cache, and diagnostics",
+                            "ui.manage.downloads",
+                            "ui.queue.offline.mode.and.storage.usage",
+                            openDownloads,
+                        )
+                    }
+                }
+                SettingsDestination.ADVANCED -> {
+                    item { SettingsSection("ui.network.and.browser") }
+                    item {
+                        SettingsRow(
+                            "ui.network.policy",
+                            "ui.user.agent.proxy.dns.over.https.timeout.cache.and.diagnostics",
                             openNetworkPolicy,
                         )
                     }
                     item {
                         SettingsRow(
-                            "Browser settings",
-                            "JavaScript, storage, files, pop-ups, downloads, challenge retry, and text zoom",
+                            "ui.browser.settings",
+                            "ui.javascript.storage.files.pop.ups.downloads.challenge.retry.and.text.zoom",
                             openBrowserSettings,
                         )
                     }
                     item {
-                        SettingsRow("Clear cookies", "Sign out browser sessions for every source") {
+                        SettingsRow("ui.clear.cookies", "ui.sign.out.browser.sessions.for.every.source") {
                             requestMaintenance(MaintenanceAction.COOKIES)
                         }
                     }
                     item {
-                        SettingsRow("Clear network cache", "Remove cached HTTP responses") {
+                        SettingsRow("ui.clear.network.cache", "ui.remove.cached.http.responses") {
                             requestMaintenance(MaintenanceAction.CACHE)
                         }
                     }
                     item {
-                        SettingsRow("Clear WebView data", "Remove browser cookies, cache, and site storage") {
+                        SettingsRow("ui.clear.webview.data", "ui.remove.browser.cookies.cache.and.site.storage") {
                             requestMaintenance(MaintenanceAction.BROWSER_DATA)
                         }
                     }
-                    item { SettingsSection("Application data") }
+                    item { SettingsSection("ui.application.data") }
                     item {
                         SettingsRow(
-                            "Storage and diagnostics",
-                            "Inspect storage, logs, crash reports, export, and safe reset",
+                            "ui.storage.and.diagnostics",
+                            "ui.inspect.storage.logs.crash.reports.export.and.safe.reset",
                             openDiagnostics,
                         )
                     }
                     item {
-                        SettingsRow("Clean database", "Remove records for titles no longer in the library") {
+                        SettingsRow("ui.clean.database", "ui.remove.records.for.titles.no.longer.in.the.library") {
                             requestMaintenance(MaintenanceAction.UNUSED_DATA)
                         }
                     }
-                    item { SettingsRow("Backup and restore", "Protect or import your library", openBackup) }
-                    item { SettingsRow("About Anilib", "Version, updates, project, and help", openAbout) }
+                    item { SettingsRow("ui.backup.and.restore", "ui.protect.or.import.your.library", openBackup) }
+                    item { SettingsRow("ui.about.anilib", "ui.version.updates.project.and.help", openAbout) }
                     result?.let { message -> item { SettingsResult(message) } }
                 }
             }
@@ -576,7 +586,7 @@ private fun LanguageDialog(
 ) {
     AlertDialog(
         onDismissRequest = close,
-        title = { Text("Choose language") },
+        title = { Text("ui.choose.language") },
         text = {
             Column {
                 LanguagePack.entries.forEach { language ->
@@ -599,7 +609,7 @@ private fun LanguageDialog(
                 }
             }
         },
-        confirmButton = { TextButton(onClick = close) { Text("Cancel") } },
+        confirmButton = { TextButton(onClick = close) { Text("ui.cancel") } },
     )
 }
 
@@ -619,24 +629,24 @@ private fun BrowserSettingsDialog(
     var error by remember { mutableStateOf<String?>(null) }
     AlertDialog(
         onDismissRequest = close,
-        title = { Text("Browser settings") },
+        title = { Text("ui.browser.settings") },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                SettingsSwitchRow("JavaScript", "Allow website scripts", javaScript) { javaScript = it }
-                SettingsSwitchRow("DOM storage", "Allow website local storage", domStorage) { domStorage = it }
-                SettingsSwitchRow("File chooser", "Allow user-initiated file selection", fileChooser) {
+                SettingsSwitchRow("ui.javascript", "ui.allow.website.scripts", javaScript) { javaScript = it }
+                SettingsSwitchRow("ui.dom.storage", "ui.allow.website.local.storage", domStorage) { domStorage = it }
+                SettingsSwitchRow("ui.file.chooser", "ui.allow.user.initiated.file.selection", fileChooser) {
                     fileChooser = it
                 }
-                SettingsSwitchRow("Pop-ups", "Open requested windows in the current browser", popups) {
+                SettingsSwitchRow("ui.pop.ups", "ui.open.requested.windows.in.the.current.browser", popups) {
                     popups = it
                 }
-                SettingsSwitchRow("Downloads", "Hand downloads to the platform", downloads) { downloads = it }
+                SettingsSwitchRow("ui.downloads", "ui.hand.downloads.to.the.platform", downloads) { downloads = it }
                 SettingsSwitchRow(
-                    "Automatic challenge retry",
-                    "Retry the source as soon as all completion cookies exist",
+                    "ui.automatic.challenge.retry",
+                    "source.cookies.retry",
                     challengeRetry,
                 ) { challengeRetry = it }
-                OutlinedTextField(textZoom, { textZoom = it }, label = { Text("Text zoom (50–200%)") })
+                OutlinedTextField(textZoom, { textZoom = it }, label = { Text("ui.text.zoom.50200") })
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }
         },
@@ -656,9 +666,9 @@ private fun BrowserSettingsDialog(
                     save(it)
                     close()
                 }.onFailure { error = it.message ?: "Invalid browser settings" }
-            }) { Text("Save") }
+            }) { Text("ui.save") }
         },
-        dismissButton = { TextButton(onClick = close) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = close) { Text("ui.cancel") } },
     )
 }
 
@@ -678,14 +688,21 @@ private fun DiagnosticsDialog(
     }
     AlertDialog(
         onDismissRequest = close,
-        title = { Text("Storage and diagnostics") },
+        title = { Text("ui.storage.and.diagnostics") },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 val current = snapshot
                 if (current == null) {
-                    SettingsHint(UiTranslations.translate("Loading…", LocalLanguagePack.current))
+                    SettingsHint(UiTranslations.translate("ui.loading", LocalLanguagePack.current))
                 } else {
-                    Text("${formatDiagnosticBytes(current.totalBytes())} in ${current.totalFiles()} files")
+                    Text(
+                        UiTranslations.format(
+                            "dynamic.storage.files",
+                            LocalLanguagePack.current,
+                            formatDiagnosticBytes(current.totalBytes()),
+                            current.totalFiles(),
+                        ),
+                    )
                     Text(current.dataDirectory().toString(), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     current.storage().forEach { usage ->
                         SettingsRow(
@@ -693,9 +710,9 @@ private fun DiagnosticsDialog(
                             "${formatDiagnosticBytes(usage.bytes())} · ${usage.files()} files",
                         )
                     }
-                    SettingsSection("Reports")
+                    SettingsSection("ui.reports")
                     if (current.reports().isEmpty()) {
-                        SettingsHint("No log or crash report is available.")
+                        SettingsHint("ui.no.log.or.crash.report.is.available")
                     } else {
                         current.reports().forEach { report ->
                             SettingsRow(
@@ -717,7 +734,7 @@ private fun DiagnosticsDialog(
                             )
                         }.onFailure { feedback = it.message ?: "Diagnostics export failed" }
                     }
-                }) { Text("Export diagnostics") }
+                }) { Text("ui.export.diagnostics") }
                 TextButton(onClick = {
                     scope.launch {
                         requestReset(withContext(Dispatchers.IO) {
@@ -730,21 +747,21 @@ private fun DiagnosticsDialog(
                             )
                         })
                     }
-                }) { Text("Clear cache and reports") }
+                }) { Text("ui.clear.cache.and.reports") }
                 TextButton(onClick = {
                     scope.launch {
                         requestReset(withContext(Dispatchers.IO) {
                             presentation.planReset(setOf(DiagnosticResetArea.SETTINGS))
                         })
                     }
-                }) { Text("Reset settings") }
+                }) { Text("ui.reset.settings") }
                 feedback?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
             }
         },
         confirmButton = {
-            TextButton(onClick = { revision++ }) { Text("Refresh") }
+            TextButton(onClick = { revision++ }) { Text("ui.refresh") }
         },
-        dismissButton = { TextButton(onClick = close) { Text("Close") } },
+        dismissButton = { TextButton(onClick = close) { Text("ui.close") } },
     )
 }
 
@@ -768,28 +785,28 @@ private fun NetworkPolicyDialog(maintenance: NetworkMaintenance, close: () -> Un
     var feedback by remember { mutableStateOf<String?>(null) }
     AlertDialog(
         onDismissRequest = close,
-        title = { Text("Network policy") },
+        title = { Text("ui.network.policy") },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                OutlinedTextField(userAgent, { userAgent = it }, label = { Text("User agent") })
-                OutlinedTextField(proxy, { proxy = it }, label = { Text("HTTP proxy (optional)") })
-                OutlinedTextField(doh, { doh = it }, label = { Text("DNS-over-HTTPS URL (optional)") })
-                OutlinedTextField(timeout, { timeout = it }, label = { Text("Timeout in seconds") })
+                OutlinedTextField(userAgent, { userAgent = it }, label = { Text("ui.user.agent") })
+                OutlinedTextField(proxy, { proxy = it }, label = { Text("ui.http.proxy.optional") })
+                OutlinedTextField(doh, { doh = it }, label = { Text("ui.dns.over.https.url.optional") })
+                OutlinedTextField(timeout, { timeout = it }, label = { Text("ui.timeout.in.seconds") })
                 SettingsSwitchRow(
-                    "Response cache",
-                    "Read and write shared HTTP cache entries",
+                    "ui.response.cache",
+                    "ui.read.and.write.shared.http.cache.entries",
                     cacheEnabled,
                     { cacheEnabled = it },
                 )
-                SettingsSection("Per-source diagnostic")
-                OutlinedTextField(sourceId, { sourceId = it }, label = { Text("Source ID") })
-                OutlinedTextField(endpoint, { endpoint = it }, label = { Text("HTTPS endpoint") })
+                SettingsSection("ui.per.source.diagnostic")
+                OutlinedTextField(sourceId, { sourceId = it }, label = { Text("ui.source.id") })
+                OutlinedTextField(endpoint, { endpoint = it }, label = { Text("ui.https.endpoint") })
                 TextButton(onClick = {
                     feedback = runCatching {
                         val diagnostic = maintenance.diagnose(sourceId, URI.create(endpoint))
                         "${diagnostic.sourceId()}: ${diagnostic.message()} in ${diagnostic.elapsed().toMillis()} ms"
                     }.fold({ it }, { it.message ?: "Diagnostic failed" })
-                }) { Text("Run diagnostic") }
+                }) { Text("ui.run.diagnostic") }
                 feedback?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
             }
         },
@@ -808,9 +825,9 @@ private fun NetworkPolicyDialog(maintenance: NetworkMaintenance, close: () -> Un
                     close()
                     "Saved"
                 }.exceptionOrNull()?.message ?: feedback
-            }) { Text("Save") }
+            }) { Text("ui.save") }
         },
-        dismissButton = { TextButton(onClick = close) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = close) { Text("ui.cancel") } },
     )
 }
 

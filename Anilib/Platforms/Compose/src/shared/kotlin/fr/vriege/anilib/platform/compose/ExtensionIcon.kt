@@ -46,9 +46,9 @@ internal fun ExtensionIcon(
     size: Dp = 48.dp,
 ) {
     val environment = LocalExtensionIconEnvironment.current
-    val description = "$displayName · ${UiTranslations.translate("Extension icon", LocalLanguagePack.current)}"
+    val description = "$displayName · ${UiTranslations.translate("ui.extension.icon", LocalLanguagePack.current)}"
     val unavailableDescription =
-        "$displayName · ${UiTranslations.translate("Extension icon unavailable", LocalLanguagePack.current)}"
+        "$displayName · ${UiTranslations.translate("ui.extension.icon.unavailable", LocalLanguagePack.current)}"
     var image by remember(iconUri, environment) { mutableStateOf<ImageBitmap?>(null) }
     var failed by remember(iconUri, environment) { mutableStateOf(false) }
 

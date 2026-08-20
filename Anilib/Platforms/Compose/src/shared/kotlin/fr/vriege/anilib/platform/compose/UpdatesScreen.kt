@@ -107,7 +107,7 @@ internal fun UpdatesScreen(
         actions = {
             if (snapshot.unreadCount() > 0) {
                 IconButton(onClick = { command(presentation::markAllRead) }) {
-                    Icon(Icons.Default.DoneAll, contentDescription = "Mark all read")
+                    Icon(Icons.Default.DoneAll, contentDescription = "ui.mark.all.read")
                 }
             }
             IconButton(onClick = {
@@ -211,7 +211,7 @@ internal fun UpdatesScreen(
                 }
                 if (showSkipped) {
                     if (snapshot.skippedTitles().isEmpty()) {
-                        item { EmptyPage("No titles are currently skipped by the update policy.") }
+                        item { EmptyPage("ui.no.titles.skipped.by.update.policy") }
                     } else {
                         items(snapshot.skippedTitles(), key = { "skip-${it.libraryItemId().value()}" }) { skipped ->
                             SkippedTitleCard(skipped) {
@@ -228,10 +228,10 @@ internal fun UpdatesScreen(
                 } else if (snapshot.events().isEmpty()) {
                     item {
                         Spacer(Modifier.height(24.dp))
-                        EmptyPage("No new chapters or episodes yet. Refresh once to establish the library baseline.")
+                        EmptyPage("ui.no.updates.refresh.for.baseline")
                     }
                 } else if (events.isEmpty()) {
-                    item { EmptyPage("No updates match the active filters.") }
+                    item { EmptyPage("ui.no.updates.match.filters") }
                 } else {
                     events.groupBy(::eventDate).forEach { (date, datedEvents) ->
                         item(key = "date-$date") {
@@ -289,7 +289,7 @@ private fun UpdateScheduleCard(
             AnilibLeadingIcon(Icons.Outlined.Schedule)
             Spacer(Modifier.width(16.dp))
             Column(Modifier.weight(1f)) {
-                Text("Library updates", fontWeight = FontWeight.Medium)
+                Text("ui.library.updates", fontWeight = FontWeight.Medium)
                 Text(
                     scheduleSummary(policy, lastRun, nextRun),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -338,13 +338,19 @@ private fun scheduleSummary(policy: LibraryUpdatePolicy, lastRun: String?, nextR
 private fun UpdateProgress(completed: Int, total: Int, activeTitles: List<String>) {
     AnilibGroup {
         Column(Modifier.fillMaxWidth().padding(16.dp)) {
-            Text("Updating library", fontWeight = FontWeight.SemiBold)
+            Text("ui.updating.library", fontWeight = FontWeight.SemiBold)
             LinearProgressIndicator(
                 progress = { if (total == 0) 0f else completed.toFloat() / total },
                 modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
             )
             Text(
-                "$completed / $total titles" + activeTitles.firstOrNull()?.let { " • $it" }.orEmpty(),
+                UiTranslations.format(
+                    "dynamic.update.progress",
+                    LocalLanguagePack.current,
+                    completed,
+                    total,
+                    activeTitles.firstOrNull()?.let { " • $it" }.orEmpty(),
+                ),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 6.dp),
             )
@@ -366,22 +372,22 @@ private fun UpdateFilters(
         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        FilterChip(selected = kind == null, onClick = { selectKind(null) }, label = { Text("All") })
+        FilterChip(selected = kind == null, onClick = { selectKind(null) }, label = { Text("ui.all") })
         FilterChip(
             selected = kind == MediaKind.ANIME,
             onClick = { selectKind(MediaKind.ANIME) },
-            label = { Text("Anime") },
+                    label = { Text("ui.anime") },
         )
         FilterChip(
             selected = kind == MediaKind.MANGA,
             onClick = { selectKind(MediaKind.MANGA) },
-            label = { Text("Manga") },
+                    label = { Text("ui.manga") },
         )
-        FilterChip(selected = unreadOnly, onClick = toggleUnread, label = { Text("Unread") })
+        FilterChip(selected = unreadOnly, onClick = toggleUnread, label = { Text("ui.unread") })
         FilterChip(
             selected = showSkipped,
             onClick = toggleSkipped,
-            label = { Text("Skipped ($skippedCount)") },
+            label = { Text(UiTranslations.format("dynamic.skipped", LocalLanguagePack.current, skippedCount)) },
         )
     }
 }
@@ -431,15 +437,22 @@ private fun UpdateEventCard(
                 Text(event.libraryTitle(), fontWeight = FontWeight.SemiBold)
                 Text(event.contentTitle(), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(
-                    "${if (event.kind() == MediaKind.ANIME) "Episode" else "Chapter"} • " +
+                    UiTranslations.format(
+                        "dynamic.update.event.kind",
+                        LocalLanguagePack.current,
+                        UiTranslations.translate(
+                            if (event.kind() == MediaKind.ANIME) "ui.episode" else "ui.chapter",
+                            LocalLanguagePack.current,
+                        ),
                         updateDateFormatter.format(event.publishedAt().orElse(event.discoveredAt())),
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 3.dp),
                 )
             }
             IconButton(onClick = download, enabled = canDownload && !selectionMode) {
-                Icon(Icons.Outlined.Download, contentDescription = "Download")
+                Icon(Icons.Outlined.Download, contentDescription = "ui.download")
             }
         }
     }
@@ -458,12 +471,16 @@ private fun SelectionActions(
         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("$count selected", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(12.dp))
-        TextButton(onClick = markRead) { Text("Read") }
-        TextButton(onClick = markUnread) { Text("Unread") }
-        TextButton(onClick = download) { Text("Download") }
-        TextButton(onClick = exclude) { Text("Exclude titles") }
-        TextButton(onClick = remove) { Text("Remove") }
+        Text(
+            UiTranslations.format("dynamic.selected.count", LocalLanguagePack.current, count),
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(12.dp),
+        )
+        TextButton(onClick = markRead) { Text("ui.read") }
+        TextButton(onClick = markUnread) { Text("ui.unread") }
+        TextButton(onClick = download) { Text("ui.download") }
+        TextButton(onClick = exclude) { Text("ui.exclude.titles") }
+        TextButton(onClick = remove) { Text("ui.remove") }
     }
 }
 
@@ -478,7 +495,7 @@ private fun SkippedTitleCard(skipped: LibraryUpdateSkip, include: () -> Unit) {
                 Text(skipped.title(), fontWeight = FontWeight.SemiBold)
                 Text(skipReasonLabel(skipped.reason()), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            TextButton(onClick = include) { Text("Always include") }
+            TextButton(onClick = include) { Text("ui.always.include") }
         }
     }
 }

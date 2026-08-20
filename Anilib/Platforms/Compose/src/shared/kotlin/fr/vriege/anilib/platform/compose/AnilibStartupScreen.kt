@@ -34,10 +34,10 @@ fun AnilibStartupScreen(
                 )
                 if (errorMessage == null) {
                     CircularProgressIndicator()
-                    Text("Loading…")
+                    Text("ui.loading")
                 } else {
                     Text(
-                        text = "Anilib could not start",
+                        text = "ui.anilib.could.not.start",
                         style = MaterialTheme.typography.titleLarge,
                     )
                     Text(
@@ -46,7 +46,7 @@ fun AnilibStartupScreen(
                         color = MaterialTheme.colorScheme.error,
                     )
                     Button(onClick = retry) {
-                        Text("Retry")
+                        Text("ui.retry")
                     }
                 }
             }

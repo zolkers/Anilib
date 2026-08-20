@@ -51,6 +51,7 @@ import com.multiplatform.webview.web.WebView
 import com.multiplatform.webview.web.rememberWebViewState
 import fr.vriege.anilib.feature.library.LibraryItemId
 import fr.vriege.anilib.feature.library.MediaKind
+import fr.vriege.anilib.feature.settings.LanguagePack
 import fr.vriege.anilib.feature.tracker.TrackerAccount
 import fr.vriege.anilib.feature.tracker.TrackerAuthentication
 import fr.vriege.anilib.feature.tracker.TrackerAuthorization
@@ -133,8 +134,16 @@ internal fun TrackerAccountsScreen(
     logout?.let { account ->
         AlertDialog(
             onDismissRequest = { logout = null },
-            title = { Text("Disconnect ${account.descriptor().name()}?") },
-            text = { Text("Local progress stays on this device, but synchronization with the service stops.") },
+            title = {
+                Text(
+                    UiTranslations.format(
+                        "dynamic.disconnect",
+                        LocalLanguagePack.current,
+                        account.descriptor().name(),
+                    ),
+                )
+            },
+            text = { Text("ui.local.progress.stays.on.this.device.but.synchronization.with.the.service.stops") },
             confirmButton = {
                 TextButton(onClick = {
                     scope.launch {
@@ -148,9 +157,9 @@ internal fun TrackerAccountsScreen(
                             revision++
                         }.onFailure { error = it.message ?: "Unable to sign out." }
                     }
-                }) { Text("Disconnect") }
+                }) { Text("ui.disconnect") }
             },
-            dismissButton = { TextButton(onClick = { logout = null }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { logout = null }) { Text("ui.cancel") } },
         )
     }
 
@@ -158,7 +167,7 @@ internal fun TrackerAccountsScreen(
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding),
         ) {
-            item { TrackerSectionHeader("Synchronization") }
+            item { TrackerSectionHeader("ui.synchronization") }
             item {
                 AnilibGroup(modifier = Modifier.padding(horizontal = 16.dp)) {
                     TrackerSyncSettings(
@@ -202,7 +211,7 @@ internal fun TrackerAccountsScreen(
                 }
             }
             if (conflicts.isNotEmpty()) {
-                item { TrackerSectionHeader("Synchronization conflicts") }
+                item { TrackerSectionHeader("ui.synchronization.conflicts") }
                 items(conflicts, key = { conflictKey(it) }) { conflict ->
                     TrackerConflictCard(
                         conflict = conflict,
@@ -230,13 +239,13 @@ internal fun TrackerAccountsScreen(
             if (accounts.isEmpty()) {
                 item {
                     Text(
-                        text = "No tracker bundle is enabled in this product configuration.",
+                        text = "ui.no.tracker.bundle.enabled",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(24.dp),
                     )
                 }
             }
-            if (accounts.isNotEmpty()) item { TrackerSectionHeader("Services") }
+            if (accounts.isNotEmpty()) item { TrackerSectionHeader("ui.services") }
             if (accounts.isNotEmpty()) item {
                 AnilibGroup(modifier = Modifier.padding(horizontal = 16.dp)) {
                     accounts.forEach { account ->
@@ -306,7 +315,7 @@ private fun TrackerAccountRow(account: TrackerAccount, activate: () -> Unit) {
         if (account.authenticated() && authentication != TrackerAuthentication.NONE) {
             Icon(
                 Icons.Default.CheckCircle,
-                contentDescription = "Connected",
+                contentDescription = "ui.connected",
                 tint = Color(0xFF4CAF50),
             )
         }
@@ -428,16 +437,20 @@ private fun TrackerConflictCard(
         Column(modifier = Modifier.padding(16.dp)) {
             Text(conflict.localEntry().title(), fontWeight = FontWeight.SemiBold)
             Text(
-                "Local ${trackerProgress(conflict.localEntry())} · " +
-                    "Remote ${trackerProgress(conflict.remoteEntry())}",
+                UiTranslations.format(
+                    "dynamic.tracker.conflict.progress",
+                    LocalLanguagePack.current,
+                    trackerProgress(conflict.localEntry()),
+                    trackerProgress(conflict.remoteEntry()),
+                ),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton(onClick = { resolve(TrackerConflictResolution.KEEP_LOCAL) }) {
-                    Text("Keep local")
+                    Text("ui.keep.local")
                 }
                 TextButton(onClick = { resolve(TrackerConflictResolution.KEEP_REMOTE) }) {
-                    Text("Keep remote")
+                    Text("ui.keep.remote")
                 }
             }
         }
@@ -456,14 +469,16 @@ private fun TrackerLoginDialog(
     var secret by remember(account) { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = dismiss,
-        title = { Text("Sign in to ${account.descriptor().name()}") },
+        title = {
+            Text(UiTranslations.format("dynamic.sign.in", LocalLanguagePack.current, account.descriptor().name()))
+        },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (authentication == TrackerAuthentication.USERNAME_PASSWORD) {
                     OutlinedTextField(
                         value = identity,
                         onValueChange = { identity = it },
-                        label = { Text("Username") },
+                        label = { Text("ui.username") },
                         singleLine = true,
                     )
                 }
@@ -483,10 +498,10 @@ private fun TrackerLoginDialog(
                     && (authentication != TrackerAuthentication.USERNAME_PASSWORD || identity.isNotBlank()),
                 onClick = { submit(credentials(authentication, identity, secret)) },
             ) {
-                Text("Sign in")
+                Text("ui.sign.in")
             }
         },
-        dismissButton = { TextButton(onClick = dismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = dismiss) { Text("ui.cancel") } },
     )
 }
 
@@ -585,8 +600,8 @@ internal fun TitleTrackingScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Tracking") },
-                navigationIcon = { TextButton(onClick = goBack) { Text("Back") } },
+                title = { Text("ui.tracking") },
+                navigationIcon = { TextButton(onClick = goBack) { Text("ui.back") } },
             )
         },
     ) { padding ->
@@ -601,12 +616,12 @@ internal fun TitleTrackingScreen(
                 ) {
                     Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
                     TextButton(onClick = { action { presentation.synchronize(itemId) } }) {
-                        Text("Sync")
+                        Text("ui.sync")
                     }
                 }
             }
             if (accounts.isEmpty()) {
-                item { EmptyPage("Sign in to an installed tracking service from More > Tracking.") }
+                item { EmptyPage("ui.sign.in.tracking.from.more") }
             }
             items(accounts, key = { it.descriptor().id().value() }) { account ->
                 val entry = entries[account.descriptor().id()]
@@ -661,7 +676,7 @@ private fun UnboundTrackerCard(account: TrackerAccount, search: () -> Unit) {
             TrackerProviderIcon(account)
             Spacer(Modifier.size(12.dp))
             Text(account.descriptor().name(), fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-            TextButton(onClick = search) { Text("Add tracking") }
+            TextButton(onClick = search) { Text("ui.add.tracking") }
         }
     }
 }
@@ -700,15 +715,17 @@ private fun TrackerEntryCard(
     if (confirmingRemove) {
         AlertDialog(
             onDismissRequest = { confirmingRemove = false },
-            title = { Text("Remove ${descriptor.name()} tracking?") },
-            text = { Text("The remote list entry will be deleted before the local binding is removed.") },
+            title = {
+                Text(UiTranslations.format("dynamic.remove.tracking", LocalLanguagePack.current, descriptor.name()))
+            },
+            text = { Text("ui.the.remote.list.entry.will.be.deleted.before.the.local.binding.is.removed") },
             confirmButton = {
                 TextButton(onClick = {
                     confirmingRemove = false
                     remove()
-                }) { Text("Remove") }
+                }) { Text("ui.remove") }
             },
-            dismissButton = { TextButton(onClick = { confirmingRemove = false }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { confirmingRemove = false }) { Text("ui.cancel") } },
         )
     }
     Card(
@@ -725,18 +742,52 @@ private fun TrackerEntryCard(
                 }
             }
             Spacer(Modifier.height(12.dp))
-            Text("Status: ${readable(entry.status())}")
-            Text("Progress: ${trackerProgress(entry)}")
-            Text("Score: ${entry.score().let { if (it.isPresent) it.orElse(0.0).toString() else "Not set" }}")
+            Text(
+                UiTranslations.format(
+                    "dynamic.status",
+                    LocalLanguagePack.current,
+                    UiTranslations.translate(trackerStatusKey(entry.status()), LocalLanguagePack.current),
+                ),
+            )
+            Text(UiTranslations.format("dynamic.progress", LocalLanguagePack.current, trackerProgress(entry)))
+            Text(
+                UiTranslations.format(
+                    "dynamic.score",
+                    LocalLanguagePack.current,
+                    entry.score().let {
+                        if (it.isPresent) {
+                            it.orElse(0.0).toString()
+                        } else {
+                            UiTranslations.translate("ui.not.set", LocalLanguagePack.current)
+                        }
+                    },
+                ),
+            )
             if (descriptor.supportsDates()) {
-                Text("Started: ${entry.startDate().map(LocalDate::toString).orElse("Not set")}")
-                Text("Finished: ${entry.finishDate().map(LocalDate::toString).orElse("Not set")}")
+                Text(
+                    UiTranslations.format(
+                        "dynamic.started",
+                        LocalLanguagePack.current,
+                        entry.startDate().map(LocalDate::toString).orElse(
+                            UiTranslations.translate("ui.not.set", LocalLanguagePack.current),
+                        ),
+                    ),
+                )
+                Text(
+                    UiTranslations.format(
+                        "dynamic.finished",
+                        LocalLanguagePack.current,
+                        entry.finishDate().map(LocalDate::toString).orElse(
+                            UiTranslations.translate("ui.not.set", LocalLanguagePack.current),
+                        ),
+                    ),
+                )
             }
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = { editing = true }) { Text("Edit") }
-                TextButton(onClick = refresh) { Text("Refresh") }
-                TextButton(onClick = { confirmingRemove = true }) { Text("Remove") }
+                TextButton(onClick = { editing = true }) { Text("ui.edit") }
+                TextButton(onClick = refresh) { Text("ui.refresh") }
+                TextButton(onClick = { confirmingRemove = true }) { Text("ui.remove") }
             }
         }
     }
@@ -760,24 +811,37 @@ private fun TrackerEditDialog(
     var finishDate by remember(entry) { mutableStateOf(entry.finishDate().map(LocalDate::toString).orElse("")) }
     var privateEntry by remember(entry) { mutableStateOf(entry.privateEntry()) }
     var validationError by remember(entry) { mutableStateOf<String?>(null) }
+    val language = LocalLanguagePack.current
     AlertDialog(
         onDismissRequest = dismiss,
-        title = { Text("Edit ${descriptor.name()} tracking") },
+        title = {
+            Text(UiTranslations.format("dynamic.edit.tracking", LocalLanguagePack.current, descriptor.name()))
+        },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(entry.title(), fontWeight = FontWeight.SemiBold)
-                Text("Status", style = MaterialTheme.typography.labelLarge)
+                Text("ui.status", style = MaterialTheme.typography.labelLarge)
                 EnumChoiceRow(
                     values = descriptor.statuses(),
                     selected = status,
-                    label = ::readable,
+                    label = { UiTranslations.translate(trackerStatusKey(it), language) },
                     choose = { status = it },
                 )
                 OutlinedTextField(
                     value = progress,
                     onValueChange = { progress = it },
                     label = {
-                        Text(if (entry.totalUnits() >= 0) "Progress / ${entry.totalUnits()}" else "Progress")
+                        Text(
+                            if (entry.totalUnits() >= 0) {
+                                UiTranslations.format(
+                                    "dynamic.progress.total",
+                                    LocalLanguagePack.current,
+                                    entry.totalUnits(),
+                                )
+                            } else {
+                                UiTranslations.translate("ui.progress", LocalLanguagePack.current)
+                            },
+                        )
                     },
                     singleLine = true,
                 )
@@ -785,7 +849,15 @@ private fun TrackerEditDialog(
                     OutlinedTextField(
                         value = score,
                         onValueChange = { score = it },
-                        label = { Text("Score (blank or ${scoreRange(descriptor.scores())})") },
+                        label = {
+                            Text(
+                                UiTranslations.format(
+                                    "dynamic.score.range",
+                                    LocalLanguagePack.current,
+                                    scoreRange(descriptor.scores()),
+                                ),
+                            )
+                        },
                         singleLine = true,
                     )
                 }
@@ -793,19 +865,19 @@ private fun TrackerEditDialog(
                     OutlinedTextField(
                         value = startDate,
                         onValueChange = { startDate = it },
-                        label = { Text("Start date (YYYY-MM-DD, optional)") },
+                        label = { Text("ui.start.date.yyyy.mm.dd.optional") },
                         singleLine = true,
                     )
                     OutlinedTextField(
                         value = finishDate,
                         onValueChange = { finishDate = it },
-                        label = { Text("Finish date (YYYY-MM-DD, optional)") },
+                        label = { Text("ui.finish.date.yyyy.mm.dd.optional") },
                         singleLine = true,
                     )
                 }
                 if (descriptor.supportsPrivateEntries()) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Private entry", modifier = Modifier.weight(1f))
+                        Text("ui.private.entry", modifier = Modifier.weight(1f))
                         Switch(checked = privateEntry, onCheckedChange = { privateEntry = it })
                     }
                 }
@@ -818,7 +890,11 @@ private fun TrackerEditDialog(
                     val progressValue = progress.toDouble()
                     require(progressValue >= 0.0 && progressValue.isFinite()) { "Progress must be non-negative." }
                     require(entry.totalUnits() < 0 || progressValue <= entry.totalUnits()) {
-                        "Progress must not exceed ${entry.totalUnits()}."
+                        UiTranslations.format(
+                            "dynamic.progress.maximum",
+                            language,
+                            entry.totalUnits(),
+                        )
                     }
                     val scoreValue = if (score.isBlank()) {
                         OptionalDouble.empty()
@@ -839,9 +915,9 @@ private fun TrackerEditDialog(
                 }.onFailure {
                     validationError = it.message ?: "Invalid tracking values."
                 }
-            }) { Text("Save") }
+            }) { Text("ui.save") }
         },
-        dismissButton = { TextButton(onClick = dismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = dismiss) { Text("ui.cancel") } },
     )
 }
 
@@ -864,16 +940,40 @@ private fun TrackerSearchScreen(
     selected?.let { result ->
         AlertDialog(
             onDismissRequest = { selected = null },
-            title = { Text("Track ${result.title()}?") },
+            title = { Text(UiTranslations.format("dynamic.track", LocalLanguagePack.current, result.title())) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("Provider: ${account.descriptor().name()}")
-                    Text("Media: ${readableEnum(result.kind())}")
                     Text(
-                        if (result.totalUnits() >= 0) "Length: ${result.totalUnits()} units"
-                        else "Length: unknown",
+                        UiTranslations.format(
+                            "dynamic.provider",
+                            LocalLanguagePack.current,
+                            account.descriptor().name(),
+                        ),
                     )
-                    result.remoteUri().orElse(null)?.let { Text("Remote page: $it") }
+                    Text(
+                        UiTranslations.format(
+                            "dynamic.media",
+                            LocalLanguagePack.current,
+                            UiTranslations.translate(
+                                if (result.kind().name == "ANIME") "ui.anime" else "ui.manga",
+                                LocalLanguagePack.current,
+                            ),
+                        ),
+                    )
+                    Text(
+                        if (result.totalUnits() >= 0) {
+                            UiTranslations.format(
+                                "dynamic.length.units",
+                                LocalLanguagePack.current,
+                                result.totalUnits(),
+                            )
+                        } else {
+                            UiTranslations.translate("ui.length.unknown", LocalLanguagePack.current)
+                        },
+                    )
+                    result.remoteUri().orElse(null)?.let {
+                        Text(UiTranslations.format("dynamic.remote.page", LocalLanguagePack.current, it))
+                    }
                 }
             },
             confirmButton = {
@@ -884,16 +984,16 @@ private fun TrackerSearchScreen(
                         }.onSuccess { bound() }
                             .onFailure { error = it.message ?: "Unable to add tracking." }
                     }
-                }) { Text("Add tracking") }
+                }) { Text("ui.add.tracking") }
             },
-            dismissButton = { TextButton(onClick = { selected = null }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { selected = null }) { Text("ui.cancel") } },
         )
     }
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(account.descriptor().name()) },
-                navigationIcon = { TextButton(onClick = close) { Text("Back") } },
+                navigationIcon = { TextButton(onClick = close) { Text("ui.back") } },
             )
         },
     ) { padding ->
@@ -901,7 +1001,7 @@ private fun TrackerSearchScreen(
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
-                label = { Text("Search title") },
+                label = { Text("ui.search.title") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -921,7 +1021,7 @@ private fun TrackerSearchScreen(
                     }
                 },
             ) {
-                Text("Search")
+                Text("ui.search")
             }
             error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1012,10 +1112,18 @@ private fun TrackerAuthorizationScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Sign in to ${account.descriptor().name()}") },
+                title = {
+                    Text(
+                        UiTranslations.format(
+                            "dynamic.sign.in",
+                            LocalLanguagePack.current,
+                            account.descriptor().name(),
+                        ),
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = close) {
-                        Icon(Icons.Default.Close, contentDescription = "Close browser")
+                        Icon(Icons.Default.Close, contentDescription = "ui.close.browser")
                     }
                 },
             )
@@ -1078,10 +1186,16 @@ private fun secretLabel(authentication: TrackerAuthentication): String = when (a
 private fun trackerProgress(entry: TrackerEntry): String =
     if (entry.totalUnits() >= 0) "${entry.progress()} / ${entry.totalUnits()}" else entry.progress().toString()
 
-private fun readable(value: TrackerStatus): String = value.name
-    .replace('_', ' ')
-    .lowercase()
-    .replaceFirstChar(Char::uppercase)
+private fun trackerStatusKey(value: TrackerStatus): String = when (value) {
+    TrackerStatus.WATCHING -> "ui.tracker.status.watching"
+    TrackerStatus.READING -> "ui.tracker.status.reading"
+    TrackerStatus.COMPLETED -> "ui.tracker.status.completed"
+    TrackerStatus.ON_HOLD -> "ui.tracker.status.on.hold"
+    TrackerStatus.PLANNING -> "ui.tracker.status.planning"
+    TrackerStatus.DROPPED -> "ui.tracker.status.dropped"
+    TrackerStatus.REWATCHING -> "ui.tracker.status.rewatching"
+    TrackerStatus.REREADING -> "ui.tracker.status.rereading"
+}
 
 private fun readableEnum(value: Enum<*>): String = value.name
     .replace('_', ' ')

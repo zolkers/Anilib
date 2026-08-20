@@ -227,11 +227,11 @@ internal fun DiscoveryScreen(
                             value = globalQuery,
                             onValueChange = { globalQuery = it },
                             singleLine = true,
-                            placeholder = { Text("Search all sources") },
+                            placeholder = { Text("ui.search.all.sources") },
                             modifier = Modifier.fillMaxWidth(),
                         )
                     } else {
-                        Text("Browse")
+                        Text("ui.browse")
                     }
                 },
                 navigationIcon = {
@@ -240,24 +240,24 @@ internal fun DiscoveryScreen(
                             globalSearch = false
                             globalQuery = ""
                         }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Close search")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "ui.close.search")
                         }
                     }
                 },
                 actions = {
                     if (section.extensionTab() && !globalSearch) {
                         IconButton(onClick = manageExtensions) {
-                            Icon(Icons.Default.Settings, contentDescription = "Manage extension repositories")
+                            Icon(Icons.Default.Settings, contentDescription = "ui.manage.extension.repositories")
                         }
                     }
                     if (section.sourceTab() && !globalSearch) {
                         TextButton(onClick = { filteringSourceLanguages = true }) {
-                            Text("Languages")
+                            Text("ui.languages")
                         }
                     }
                     if (section.sourceTab() && !globalSearch) {
                         IconButton(onClick = { globalSearch = true }) {
-                            Icon(Icons.Default.Search, contentDescription = "Global search")
+                            Icon(Icons.Default.Search, contentDescription = "ui.global.search")
                         }
                     }
                 },
@@ -296,7 +296,7 @@ internal fun DiscoveryScreen(
                     trailingIcon = {
                         if (globalQuery.isNotEmpty()) {
                             IconButton(onClick = { globalQuery = "" }) {
-                                Icon(Icons.Default.Close, contentDescription = "Close search")
+                                Icon(Icons.Default.Close, contentDescription = "ui.close.search")
                             }
                         }
                     },
@@ -485,11 +485,11 @@ private fun SourceList(
                     }
                     Box {
                         IconButton(onClick = { menuExpanded = true }) {
-                            Icon(Icons.Default.MoreVert, contentDescription = "Source actions")
+                            Icon(Icons.Default.MoreVert, contentDescription = "ui.source.actions")
                         }
                         DropdownMenu(menuExpanded, onDismissRequest = { menuExpanded = false }) {
                             DropdownMenuItem(
-                                text = { Text("Popular") },
+                                text = { Text("ui.popular") },
                                 onClick = {
                                     menuExpanded = false
                                     open(source, SourceListing.POPULAR)
@@ -497,7 +497,7 @@ private fun SourceList(
                             )
                             if (supportsLatest(source.id())) {
                                 DropdownMenuItem(
-                                    text = { Text("Latest") },
+                                    text = { Text("ui.latest") },
                                     onClick = {
                                         menuExpanded = false
                                         open(source, SourceListing.LATEST)
@@ -505,7 +505,7 @@ private fun SourceList(
                                 )
                             }
                             DropdownMenuItem(
-                                text = { Text("Open in WebView") },
+                                text = { Text("ui.open.in.webview") },
                                 onClick = {
                                     menuExpanded = false
                                     openWeb(source)
@@ -522,7 +522,7 @@ private fun SourceList(
                             )
                             if (updateAvailable) {
                                 DropdownMenuItem(
-                                    text = { Text("Update extension") },
+                                    text = { Text("ui.update.extension") },
                                     enabled = source.id() !in updatingSources,
                                     onClick = {
                                         menuExpanded = false
@@ -548,7 +548,7 @@ private fun SourceLanguageDialog(
 ) {
     AlertDialog(
         onDismissRequest = dismiss,
-        title = { Text("Source languages") },
+        title = { Text("ui.source.languages") },
         text = {
             LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp)) {
                 items(available, key = { it }) { language ->
@@ -568,7 +568,7 @@ private fun SourceLanguageDialog(
                 }
             }
         },
-        confirmButton = { TextButton(onClick = dismiss) { Text("Done") } },
+        confirmButton = { TextButton(onClick = dismiss) { Text("ui.done") } },
     )
 }
 
@@ -658,7 +658,15 @@ private fun SourceCatalogueScreen(
                                 query = it
                                 page = 1
                             },
-                            placeholder = { Text("Search in ${source.displayName()}") },
+                            placeholder = {
+                                Text(
+                                    UiTranslations.format(
+                                        "dynamic.search.in",
+                                        LocalLanguagePack.current,
+                                        source.displayName(),
+                                    ),
+                                )
+                            },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                         )
@@ -682,7 +690,7 @@ private fun SourceCatalogueScreen(
                             navigateUp()
                         }
                     }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "ui.back")
                     }
                 },
                 actions = {
@@ -701,17 +709,17 @@ private fun SourceCatalogueScreen(
                                 }
                             }
                         }) {
-                            Icon(Icons.Default.Refresh, contentDescription = "Rescan source")
+                            Icon(Icons.Default.Refresh, contentDescription = "ui.rescan.source")
                         }
                     }
                     if (sourceWebPage != null) {
                         IconButton(onClick = { openWebPage(sourceWebPage) }) {
-                            Icon(Icons.Default.Public, contentDescription = "Open source website")
+                            Icon(Icons.Default.Public, contentDescription = "ui.open.source.website")
                         }
                     }
                     if (!searchActive) {
                         IconButton(onClick = { searchActive = true }) {
-                            Icon(Icons.Default.Search, contentDescription = "Search")
+                            Icon(Icons.Default.Search, contentDescription = "ui.search")
                         }
                     }
                     IconButton(onClick = {
@@ -731,17 +739,17 @@ private fun SourceCatalogueScreen(
                     }) {
                         Icon(
                             if (grid) Icons.AutoMirrored.Filled.ViewList else Icons.Default.GridView,
-                            contentDescription = "Display mode",
+                            contentDescription = "ui.display.mode",
                         )
                     }
                     if (definitions.isNotEmpty()) {
                         IconButton(onClick = { showFilters = !showFilters }) {
-                            Icon(Icons.Default.Tune, contentDescription = "Filters")
+                            Icon(Icons.Default.Tune, contentDescription = "ui.filters")
                         }
                     }
                     if (preferenceDefinitions.isNotEmpty()) {
                         IconButton(onClick = { showPreferences = !showPreferences }) {
-                            Icon(Icons.Default.Settings, contentDescription = "Source settings")
+                            Icon(Icons.Default.Settings, contentDescription = "ui.source.settings")
                         }
                     }
                 },
@@ -756,20 +764,20 @@ private fun SourceCatalogueScreen(
                 FilterChip(
                     selected = selectedListing == SourceListing.POPULAR,
                     onClick = { selectedListing = SourceListing.POPULAR; page = 1 },
-                    label = { Text("Popular") },
+                    label = { Text("ui.popular") },
                 )
                 if (presentation.supportsLatest(source.id())) {
                     FilterChip(
                         selected = selectedListing == SourceListing.LATEST,
                         onClick = { selectedListing = SourceListing.LATEST; page = 1 },
-                        label = { Text("Latest") },
+                        label = { Text("ui.latest") },
                     )
                 }
                 if (definitions.isNotEmpty()) {
                     FilterChip(
                         selected = showFilters,
                         onClick = { showFilters = !showFilters },
-                        label = { Text("Filter") },
+                        label = { Text("ui.filter") },
                         leadingIcon = { Icon(Icons.Default.Tune, contentDescription = null) },
                     )
                 }
@@ -955,11 +963,18 @@ private fun CatalogueItemMenu(
     var expanded by remember(item.id()) { mutableStateOf(false) }
     Box {
         IconButton(onClick = { expanded = true }) {
-            Icon(Icons.Default.MoreVert, contentDescription = "Actions for ${item.title()}")
+            Icon(
+                Icons.Default.MoreVert,
+                contentDescription = UiTranslations.format(
+                    "dynamic.actions.for",
+                    LocalLanguagePack.current,
+                    item.title(),
+                ),
+            )
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             DropdownMenuItem(
-                text = { Text("Add to Library") },
+                text = { Text("ui.add.to.library") },
                 leadingIcon = { Icon(Icons.Default.Add, contentDescription = null) },
                 onClick = {
                     expanded = false
@@ -968,7 +983,7 @@ private fun CatalogueItemMenu(
             )
             webPage?.let { page ->
                 DropdownMenuItem(
-                    text = { Text("Open in WebView") },
+                    text = { Text("ui.open.in.webview") },
                     leadingIcon = { Icon(Icons.Default.Public, contentDescription = null) },
                     onClick = {
                         expanded = false
@@ -987,9 +1002,12 @@ private fun Pagination(page: Int, hasNext: Boolean, select: (Int) -> Unit) {
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        TextButton(onClick = { select(page - 1) }, enabled = page > 1) { Text("Previous") }
-        Text("Page $page", modifier = Modifier.padding(horizontal = 16.dp))
-        TextButton(onClick = { select(page + 1) }, enabled = hasNext) { Text("Next") }
+        TextButton(onClick = { select(page - 1) }, enabled = page > 1) { Text("ui.previous") }
+        Text(
+            UiTranslations.format("dynamic.page", LocalLanguagePack.current, page),
+            modifier = Modifier.padding(horizontal = 16.dp),
+        )
+        TextButton(onClick = { select(page + 1) }, enabled = hasNext) { Text("ui.next") }
     }
 }
 
@@ -1003,7 +1021,7 @@ private fun FilterPanel(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text("Filters", fontWeight = FontWeight.SemiBold)
+        Text("ui.filters", fontWeight = FontWeight.SemiBold)
         definitions.forEach { definition ->
             val value = values[definition.id()] ?: definition.defaultValue()
             when (definition.type()) {
@@ -1031,7 +1049,7 @@ private fun FilterPanel(
                 -> OptionChips(definition, definition.options(), value, values, update)
             }
         }
-        TextButton(onClick = { update(emptyMap()) }) { Text("Reset") }
+        TextButton(onClick = { update(emptyMap()) }) { Text("ui.reset") }
     }
     HorizontalDivider()
 }
@@ -1064,7 +1082,7 @@ private fun PreferencePanel(
     update: (String, String) -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Text("Source settings", fontWeight = FontWeight.SemiBold)
+        Text("ui.source.settings", fontWeight = FontWeight.SemiBold)
         preferences.forEach { snapshot ->
             when (snapshot.definition().type()) {
                 SourcePreferenceType.SWITCH -> SwitchRow(
@@ -1189,7 +1207,7 @@ private fun ExtensionList(
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         item {
             Text(
-                "Installed",
+                "extension.installed",
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 14.dp),
@@ -1238,7 +1256,7 @@ private fun ExtensionList(
                 )
                 Box {
                     IconButton(onClick = { menuExpanded = true }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "Extension actions")
+                        Icon(Icons.Default.MoreVert, contentDescription = "extension.actions")
                     }
                     DropdownMenu(menuExpanded, onDismissRequest = { menuExpanded = false }) {
                         DropdownMenuItem(
@@ -1265,7 +1283,7 @@ private fun ExtensionList(
                         }
                         if (updateAvailable) {
                             DropdownMenuItem(
-                                text = { Text("Update") },
+                                text = { Text("ui.update") },
                                 enabled = source.id() !in updatingSources,
                                 onClick = {
                                     menuExpanded = false
@@ -1274,7 +1292,7 @@ private fun ExtensionList(
                             )
                         }
                         DropdownMenuItem(
-                            text = { Text("Manage repositories") },
+                            text = { Text("repositories.manage") },
                             onClick = {
                                 menuExpanded = false
                                 manage()
@@ -1305,9 +1323,9 @@ private fun EmptyExtensions(manage: () -> Unit) {
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(56.dp),
             )
-            Text("No extensions installed", style = MaterialTheme.typography.titleMedium)
+            Text("extensions.installed.empty", style = MaterialTheme.typography.titleMedium)
             Text(
-                "Add a compatible repository, then install an extension for this platform.",
+                "ui.add.a.compatible.repository.then.install.an.extension.for.this.platform",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Button(onClick = manage) { Text("extensions.browse") }
@@ -1326,22 +1344,27 @@ private fun ExtensionDetails(extension: InstalledSourceExtension) {
             Text(extension.source().displayName(), fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(6.dp))
             Text(
-                "Bundle ${manifest.component().id()} - ${manifest.component().version()}",
+                UiTranslations.format(
+                    "dynamic.bundle.identity",
+                    LocalLanguagePack.current,
+                    manifest.component().id(),
+                    manifest.component().version(),
+                ),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(8.dp))
-            Text("Permissions", fontWeight = FontWeight.Medium)
+            Text("ui.permissions", fontWeight = FontWeight.Medium)
             if (manifest.permissions().isEmpty()) {
-                Text("No sensitive permissions", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("ui.no.sensitive.permissions", color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
                 if (SourcePermission.NETWORK in manifest.permissions()) {
-                    Text("Network", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("ui.network", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     manifest.networkOrigins().sorted().forEach { origin ->
                         Text("  $origin", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
                 if (SourcePermission.CLEARTEXT_NETWORK in manifest.permissions()) {
-                    Text("Cleartext network", color = MaterialTheme.colorScheme.error)
+                    Text("ui.cleartext.network", color = MaterialTheme.colorScheme.error)
                 }
             }
         }
@@ -1469,7 +1492,7 @@ private fun MigrationContent(
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text("Batch migration", fontWeight = FontWeight.SemiBold)
+                Text("ui.batch.migration", fontWeight = FontWeight.SemiBold)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TextButton(
                         onClick = {
@@ -1518,7 +1541,13 @@ private fun MigrationContent(
                     onClick = { buildPreview() },
                     enabled = !working && selectedIds.isNotEmpty() && selectedTarget != null,
                 ) {
-                    Text("Preview ${selectedIds.size} selected")
+                    Text(
+                        UiTranslations.format(
+                            "dynamic.preview.selected",
+                            LocalLanguagePack.current,
+                            selectedIds.size,
+                        ),
+                    )
                 }
             }
             HorizontalDivider()
@@ -1529,7 +1558,7 @@ private fun MigrationContent(
                     Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
                         Text(operation ?: "Migration in progress", fontWeight = FontWeight.Medium)
                         Text("$completed / $total", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        TextButton(onClick = { cancellation.set(true) }) { Text("Cancel") }
+                        TextButton(onClick = { cancellation.set(true) }) { Text("ui.cancel") }
                     }
                 }
             }
@@ -1568,7 +1597,7 @@ private fun MigrationContent(
         if (previews.isNotEmpty()) {
             item {
                 Text(
-                    "Migration preview",
+                    "ui.migration.preview",
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.padding(16.dp),
                 )
@@ -1592,13 +1621,13 @@ private fun MigrationContent(
                 ) {
                     Icon(Icons.Default.Check, contentDescription = null)
                     Spacer(Modifier.width(6.dp))
-                    Text("Migrate previewed titles")
+                    Text("ui.migrate.previewed.titles")
                 }
             }
         }
         if (outcomes.isNotEmpty()) {
             item {
-                Text("Migration results", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(16.dp))
+                Text("ui.migration.results", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(16.dp))
             }
             items(outcomes, key = { it.preview.title.id().value() }) { outcome ->
                 Text(
@@ -1616,7 +1645,7 @@ private fun MigrationContent(
             if (failed.isNotEmpty()) {
                 item {
                     TextButton(onClick = { migrate(failed) }, enabled = !working) {
-                        Text("Retry ${failed.size} failed")
+                        Text(UiTranslations.format("dynamic.retry.failed", LocalLanguagePack.current, failed.size))
                     }
                 }
             }
@@ -1652,20 +1681,26 @@ private fun MigrationPreviewCard(
         Column(modifier = Modifier.fillMaxWidth().padding(14.dp)) {
             Text(preview.title.title(), fontWeight = FontWeight.Medium)
             Text(
-                "Current: ${preview.currentSource}",
+                UiTranslations.format("dynamic.current", LocalLanguagePack.current, preview.currentSource),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                "Target: ${preview.targetSource}",
+                UiTranslations.format("dynamic.target", LocalLanguagePack.current, preview.targetSource),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             if (candidate == null) {
                 Text(
-                    preview.error ?: "No compatible candidate found",
+                    preview.error ?: UiTranslations.translate(
+                        "ui.no.compatible.candidate",
+                        LocalLanguagePack.current,
+                    ),
                     color = MaterialTheme.colorScheme.error,
                 )
             } else {
-                Text("Match: ${candidate.title()}", fontWeight = FontWeight.Medium)
+                Text(
+                    UiTranslations.format("dynamic.match", LocalLanguagePack.current, candidate.title()),
+                    fontWeight = FontWeight.Medium,
+                )
                 Text(
                     candidate.description(),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1675,7 +1710,13 @@ private fun MigrationPreviewCard(
                 if (preview.candidates.size > 1) {
                     Box {
                         TextButton(onClick = { expanded = true }) {
-                            Text("Choose match (${preview.candidates.size})")
+                            Text(
+                                UiTranslations.format(
+                                    "dynamic.choose.match",
+                                    LocalLanguagePack.current,
+                                    preview.candidates.size,
+                                ),
+                            )
                         }
                         DropdownMenu(expanded, onDismissRequest = { expanded = false }) {
                             preview.candidates.forEachIndexed { index, option ->
@@ -1726,7 +1767,7 @@ private fun DiscoveryFailure(message: String, retry: () -> Unit) {
             modifier = Modifier.padding(28.dp),
         ) {
             Text(message, color = MaterialTheme.colorScheme.error)
-            Button(onClick = retry) { Text("Retry") }
+            Button(onClick = retry) { Text("ui.retry") }
         }
     }
 }

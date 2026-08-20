@@ -97,13 +97,13 @@ internal fun DownloadsScreen(presentation: DownloadPresentation, goBack: () -> U
         goBack = goBack,
         actions = {
             IconButton(onClick = { command(presentation::pauseAll) }) {
-                Icon(Icons.Default.Pause, contentDescription = "Pause all")
+                Icon(Icons.Default.Pause, contentDescription = "ui.pause.all")
             }
             IconButton(onClick = { command(presentation::resumeAll) }, enabled = !queue.offlineMode()) {
-                Icon(Icons.Default.PlayArrow, contentDescription = "Resume all")
+                Icon(Icons.Default.PlayArrow, contentDescription = "ui.resume.all")
             }
             IconButton(onClick = { confirmRemoveAll = true }, enabled = queue.jobs().isNotEmpty()) {
-                Icon(Icons.Default.Delete, contentDescription = "Delete all")
+                Icon(Icons.Default.Delete, contentDescription = "ui.delete.all")
             }
         },
     ) { padding ->
@@ -147,9 +147,9 @@ internal fun DownloadsScreen(presentation: DownloadPresentation, goBack: () -> U
                 commandError?.let { message -> item { DownloadMessageSurface(message, true) } }
                 repairMessage?.let { message -> item { DownloadMessageSurface(message, false) } }
                 if (queue.jobs().isEmpty()) {
-                    item { EmptyPage("Your download queue is empty.") }
+                    item { EmptyPage("ui.download.queue.empty") }
                 } else if (jobs.isEmpty()) {
-                    item { EmptyPage("No downloads match the active filter.") }
+                    item { EmptyPage("ui.no.downloads.match.filter") }
                 } else {
                     jobs.groupBy { it.libraryItemId() }.values.forEach { group ->
                         item(key = "group-${group.first().libraryItemId().value()}") {
@@ -164,16 +164,16 @@ internal fun DownloadsScreen(presentation: DownloadPresentation, goBack: () -> U
                                 )
                                 IconButton(onClick = {
                                     command { presentation.pauseTitle(group.first().libraryItemId()) }
-                                }) { Icon(Icons.Default.Pause, contentDescription = "Pause title") }
+                                }) { Icon(Icons.Default.Pause, contentDescription = "ui.pause.title") }
                                 IconButton(onClick = {
                                     command { presentation.resumeTitle(group.first().libraryItemId()) }
                                 }, enabled = !queue.offlineMode()) {
-                                    Icon(Icons.Default.PlayArrow, contentDescription = "Resume title")
+                                    Icon(Icons.Default.PlayArrow, contentDescription = "ui.resume.title")
                                 }
                                 IconButton(onClick = {
                                     confirmRemoveTitle = group.first().libraryItemId() to group.first().title()
                                 }) {
-                                    Icon(Icons.Default.Delete, contentDescription = "Delete title downloads")
+                                    Icon(Icons.Default.Delete, contentDescription = "ui.delete.title.downloads")
                                 }
                             }
                         }
@@ -200,16 +200,16 @@ internal fun DownloadsScreen(presentation: DownloadPresentation, goBack: () -> U
     if (confirmRemoveAll) {
         AlertDialog(
             onDismissRequest = { confirmRemoveAll = false },
-            title = { Text("Delete all downloads?") },
-            text = { Text("Completed files and partial data will be permanently removed.") },
+            title = { Text("ui.delete.all.downloads") },
+            text = { Text("ui.completed.files.and.partial.data.will.be.permanently.removed") },
             confirmButton = {
                 TextButton(onClick = {
                     command(presentation::removeAll)
                     confirmRemoveAll = false
-                }) { Text("Delete all") }
+                }) { Text("ui.delete.all") }
             },
             dismissButton = {
-                TextButton(onClick = { confirmRemoveAll = false }) { Text("Cancel") }
+                TextButton(onClick = { confirmRemoveAll = false }) { Text("ui.cancel") }
             },
         )
     }
@@ -269,16 +269,18 @@ internal fun DownloadsScreen(presentation: DownloadPresentation, goBack: () -> U
     confirmRemoveTitle?.let { (itemId, title) ->
         AlertDialog(
             onDismissRequest = { confirmRemoveTitle = null },
-            title = { Text("Delete downloads for $title?") },
-            text = { Text("All completed files and partial jobs for this title will be removed.") },
+            title = {
+                Text(UiTranslations.format("dynamic.delete.downloads.question", LocalLanguagePack.current, title))
+            },
+            text = { Text("ui.all.completed.files.and.partial.jobs.for.this.title.will.be.removed") },
             confirmButton = {
                 TextButton(onClick = {
                     command { presentation.removeTitle(itemId) }
                     confirmRemoveTitle = null
-                }) { Text("Delete") }
+                }) { Text("ui.delete") }
             },
             dismissButton = {
-                TextButton(onClick = { confirmRemoveTitle = null }) { Text("Cancel") }
+                TextButton(onClick = { confirmRemoveTitle = null }) { Text("ui.cancel") }
             },
         )
     }
@@ -300,9 +302,9 @@ private fun DownloadQueueControls(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text("Offline mode", fontWeight = FontWeight.Medium)
+                    Text("ui.offline.mode", fontWeight = FontWeight.Medium)
                     Text(
-                        "Use downloaded content without the online fallback",
+                        "ui.use.downloaded.content.without.the.online.fallback",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodyMedium,
                     )
@@ -313,9 +315,14 @@ private fun DownloadQueueControls(
                 modifier = Modifier.padding(vertical = 14.dp),
                 color = MaterialTheme.colorScheme.outlineVariant,
             )
-            Text("Storage", fontWeight = FontWeight.Medium)
+            Text("ui.storage", fontWeight = FontWeight.Medium)
             Text(
-                "${formatBytes(usedStorageBytes)} of ${formatBytes(maximumStorageBytes)} used",
+                UiTranslations.format(
+                    "dynamic.storage.used",
+                    LocalLanguagePack.current,
+                    formatBytes(usedStorageBytes),
+                    formatBytes(maximumStorageBytes),
+                ),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodyMedium,
             )
@@ -330,12 +337,12 @@ private fun DownloadQueueControls(
                 TextButton(onClick = openStorage, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Outlined.Storage, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
-                    Text("Storage")
+                    Text("ui.storage")
                 }
                 TextButton(onClick = openAutomation, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Outlined.AutoMode, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
-                    Text("Automatic")
+                    Text("ui.automatic")
                 }
             }
         }
@@ -391,7 +398,7 @@ private fun AutomaticDownloadDialog(
     var error by remember(presentation) { mutableStateOf<String?>(null) }
     AlertDialog(
         onDismissRequest = close,
-        title = { Text("Automatic downloads") },
+        title = { Text("ui.automatic.downloads") },
         text = {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 item {
@@ -406,21 +413,21 @@ private fun AutomaticDownloadDialog(
                         OutlinedTextField(
                             value = episodeLimit,
                             onValueChange = { episodeLimit = it },
-                            label = { Text("Episode limit") },
+                            label = { Text("ui.episode.limit") },
                             modifier = Modifier.weight(1f),
                             singleLine = true,
                         )
                         OutlinedTextField(
                             value = chapterLimit,
                             onValueChange = { chapterLimit = it },
-                            label = { Text("Chapter limit") },
+                            label = { Text("ui.chapter.limit") },
                             modifier = Modifier.weight(1f),
                             singleLine = true,
                         )
                     }
                 }
                 item {
-                    Text("Cleanup policy", fontWeight = FontWeight.Medium)
+                    Text("ui.cleanup.policy", fontWeight = FontWeight.Medium)
                     Row(modifier = Modifier.horizontalScroll(rememberScrollState())) {
                         DownloadCleanupPolicy.entries.forEach { value ->
                             FilterChip(
@@ -439,7 +446,7 @@ private fun AutomaticDownloadDialog(
                         OutlinedTextField(
                             value = retention,
                             onValueChange = { retention = it },
-                            label = { Text("Completed items retained per title") },
+                            label = { Text("ui.completed.items.retained.per.title") },
                             singleLine = true,
                         )
                     }
@@ -448,14 +455,14 @@ private fun AutomaticDownloadDialog(
                     OutlinedTextField(
                         value = categoryRules,
                         onValueChange = { categoryRules = it },
-                        label = { Text("Category rules") },
-                        supportingText = { Text("One per line: category:episodes:chapters") },
+                        label = { Text("ui.category.rules") },
+                        supportingText = { Text("ui.one.per.line.category.episodes.chapters") },
                         minLines = 3,
                     )
                     error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                     Row {
-                        TextButton(onClick = synchronize) { Text("Run now") }
-                        TextButton(onClick = clean) { Text("Clean now") }
+                        TextButton(onClick = synchronize) { Text("ui.run.now") }
+                        TextButton(onClick = clean) { Text("ui.clean.now") }
                     }
                 }
             }
@@ -474,9 +481,9 @@ private fun AutomaticDownloadDialog(
                         parseAutomaticRules(categoryRules),
                     )
                 }.fold(save) { it.message ?: "Invalid automatic download rules." }
-            }) { Text("Save") }
+            }) { Text("ui.save") }
         },
-        dismissButton = { TextButton(onClick = close) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = close) { Text("ui.cancel") } },
     )
 }
 
@@ -513,7 +520,7 @@ private fun DownloadStorageDialog(
     var location by remember(presentation) { mutableStateOf(storage.location().toString()) }
     AlertDialog(
         onDismissRequest = close,
-        title = { Text("Download storage") },
+        title = { Text("ui.download.storage") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
@@ -523,23 +530,23 @@ private fun DownloadStorageDialog(
                 OutlinedTextField(
                     value = location,
                     onValueChange = { location = it },
-                    label = { Text("Storage directory") },
+                    label = { Text("ui.storage.directory") },
                     singleLine = true,
                 )
                 Text(
-                    "Changing this path validates the destination, copies every indexed page, " +
-                        "then removes the old managed copies.",
+                    "ui.changing.this.path.validates.the.destination.copies.every.indexed.page.then.removes." +
+                        "the.old.managed.copies",
                 )
-                TextButton(onClick = repair) { Text("Repair download index") }
+                TextButton(onClick = repair) { Text("ui.repair.download.index") }
             }
         },
         confirmButton = {
             TextButton(onClick = {
                 migrate(location)
                 close()
-            }) { Text("Migrate") }
+            }) { Text("ui.migrate") }
         },
-        dismissButton = { TextButton(onClick = close) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = close) { Text("ui.cancel") } },
     )
 }
 
@@ -565,8 +572,14 @@ private fun DownloadJobCard(
                 modifier = Modifier.fillMaxWidth(),
             )
             Text(
-                text = "${formatStatus(job.status())} • ${job.completedPages()} / " +
-                    "${job.totalPages()} pages • ${formatBytes(job.downloadedBytes())}",
+                text = UiTranslations.format(
+                    "dynamic.download.progress",
+                    LocalLanguagePack.current,
+                    formatStatus(job.status()),
+                    job.completedPages(),
+                    job.totalPages(),
+                    formatBytes(job.downloadedBytes()),
+                ),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 6.dp),
             )
@@ -590,41 +603,41 @@ private fun DownloadJobCard(
                     Text(job.priority().name.lowercase().replaceFirstChar(Char::uppercase))
                 }
                 IconButton(onClick = { move((job.queuePosition() - 1).coerceAtLeast(0)) }) {
-                    Icon(Icons.Default.ArrowUpward, contentDescription = "Move up")
+                    Icon(Icons.Default.ArrowUpward, contentDescription = "ui.move.up")
                 }
                 IconButton(onClick = { move(job.queuePosition() + 1) }) {
-                    Icon(Icons.Default.ArrowDownward, contentDescription = "Move down")
+                    Icon(Icons.Default.ArrowDownward, contentDescription = "ui.move.down")
                 }
                 when (job.status()) {
                     DownloadStatus.QUEUED,
                     DownloadStatus.DOWNLOADING,
                     -> IconButton(onClick = pause) {
-                        Icon(Icons.Default.Pause, contentDescription = "Pause")
+                        Icon(Icons.Default.Pause, contentDescription = "ui.pause")
                     }
                     DownloadStatus.PAUSED,
                     DownloadStatus.FAILED,
                     -> IconButton(onClick = resume, enabled = !offlineMode) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = "Resume")
+                        Icon(Icons.Default.PlayArrow, contentDescription = "ui.resume")
                     }
                     else -> Unit
                 }
                 if (job.status() == DownloadStatus.FAILED && job.hasPartialData()) {
                     TextButton(onClick = { retry(DownloadRecoveryMode.RESTART) }) {
-                        Text("Restart")
+                        Text("ui.restart")
                     }
                 }
                 if (job.status() != DownloadStatus.COMPLETED &&
                     job.status() != DownloadStatus.CANCELLED
                 ) {
                     IconButton(onClick = cancel) {
-                        Icon(Icons.Default.Cancel, contentDescription = "Cancel")
+                        Icon(Icons.Default.Cancel, contentDescription = "ui.cancel")
                     }
                 }
                 if (job.status() == DownloadStatus.COMPLETED ||
                     job.status() == DownloadStatus.CANCELLED
                 ) {
                     IconButton(onClick = remove) {
-                        Icon(Icons.Default.Delete, contentDescription = "Remove")
+                        Icon(Icons.Default.Delete, contentDescription = "ui.remove")
                     }
                 }
             }

@@ -57,13 +57,21 @@ internal fun RemoteArtwork(
         image?.let {
             Image(
                 bitmap = it,
-                contentDescription = "$title cover",
+                contentDescription = UiTranslations.format(
+                    "dynamic.title.cover",
+                    LocalLanguagePack.current,
+                    title,
+                ),
                 modifier = Modifier.fillMaxSize(),
                 contentScale = contentScale,
             )
         } ?: Icon(
             Icons.Outlined.Image,
-            contentDescription = if (failed) "$title cover unavailable" else "$title cover",
+            contentDescription = UiTranslations.format(
+                if (failed) "dynamic.title.cover.unavailable" else "dynamic.title.cover",
+                LocalLanguagePack.current,
+                title,
+            ),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }

@@ -39,7 +39,7 @@ internal fun AnilibSubScreenScaffold(
                 navigationIcon = {
                     goBack?.let { navigateBack ->
                         IconButton(onClick = navigateBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "ui.back")
                         }
                     }
                 },

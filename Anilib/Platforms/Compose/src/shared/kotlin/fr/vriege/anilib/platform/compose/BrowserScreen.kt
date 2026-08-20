@@ -154,22 +154,22 @@ internal fun BrowserScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = closeBrowser) {
-                        Icon(Icons.Default.Close, contentDescription = "Close browser")
+                        Icon(Icons.Default.Close, contentDescription = "ui.close.browser")
                     }
                 },
                 actions = {
                     IconButton(onClick = navigator::navigateBack, enabled = navigator.canGoBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Previous page")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "ui.previous.page")
                     }
                     IconButton(onClick = navigator::navigateForward, enabled = navigator.canGoForward) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Next page")
+                        Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "ui.next.page")
                     }
                     IconButton(onClick = navigator::reload) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Reload")
+                        Icon(Icons.Default.Refresh, contentDescription = "ui.reload")
                     }
                     if (page.completionCookies().isNotEmpty()) {
                         IconButton(onClick = checkChallenge) {
-                            Icon(Icons.Default.CheckCircle, contentDescription = "Check web challenge")
+                            Icon(Icons.Default.CheckCircle, contentDescription = "ui.check.web.challenge")
                         }
                     }
                 },
@@ -198,7 +198,7 @@ internal fun BrowserScreen(
                         modifier = Modifier.weight(1f),
                     )
                     TextButton(onClick = checkChallenge) {
-                        Text("Check")
+                        Text("ui.check")
                     }
                 }
             }
@@ -208,7 +208,7 @@ internal fun BrowserScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(message, modifier = Modifier.weight(1f))
-                    TextButton(onClick = { platformMessage = null }) { Text("Dismiss") }
+                    TextButton(onClick = { platformMessage = null }) { Text("ui.dismiss") }
                 }
             }
             state.errorsForCurrentRequest.lastOrNull { it.isFromMainFrame }?.let { failure ->
@@ -217,11 +217,16 @@ internal fun BrowserScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = "Page failed to load (${failure.code}): ${failure.description}",
+                        text = UiTranslations.format(
+                            "dynamic.browser.page.failure",
+                            LocalLanguagePack.current,
+                            failure.code,
+                            failure.description,
+                        ),
                         color = MaterialTheme.colorScheme.error,
                         modifier = Modifier.weight(1f),
                     )
-                    TextButton(onClick = navigator::reload) { Text("Retry") }
+                    TextButton(onClick = navigator::reload) { Text("ui.retry") }
                 }
             }
             WebView(
@@ -243,11 +248,11 @@ internal fun BrowserInitializing(close: () -> Unit) {
         topBar = {
             TopAppBar(
                 title = {
-                    Text(UiTranslations.translate("Loading…", LocalLanguagePack.current))
+                    Text(UiTranslations.translate("ui.loading", LocalLanguagePack.current))
                 },
                 navigationIcon = {
                     IconButton(onClick = close) {
-                        Icon(Icons.Default.Close, contentDescription = "Close browser")
+                        Icon(Icons.Default.Close, contentDescription = "ui.close.browser")
                     }
                 },
             )
@@ -268,10 +273,10 @@ internal fun BrowserUnavailable(message: String, close: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("WebView unavailable") },
+                title = { Text("ui.webview.unavailable") },
                 navigationIcon = {
                     IconButton(onClick = close) {
-                        Icon(Icons.Default.Close, contentDescription = "Close browser")
+                        Icon(Icons.Default.Close, contentDescription = "ui.close.browser")
                     }
                 },
             )

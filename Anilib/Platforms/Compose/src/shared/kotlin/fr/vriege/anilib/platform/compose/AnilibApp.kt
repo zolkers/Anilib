@@ -816,12 +816,14 @@ private fun LibraryPageContent(
                         OutlinedTextField(
                             value = query,
                             onValueChange = { query = it },
-                            placeholder = { Text("Search ${kind.name.lowercase()}") },
+                            placeholder = {
+                                Text(if (kind == MediaKind.ANIME) "library.search.anime" else "library.search.manga")
+                            },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                         )
                     } else {
-                        Text(if (kind == MediaKind.ANIME) "Anime" else "Manga")
+                        Text(if (kind == MediaKind.ANIME) "ui.anime" else "ui.manga")
                     }
                 },
                 actions = {
@@ -829,12 +831,12 @@ private fun LibraryPageContent(
                         searching = !searching
                         if (!searching) query = ""
                     }) {
-                        Icon(Icons.Default.Search, contentDescription = "Search library")
+                        Icon(Icons.Default.Search, contentDescription = "ui.search.library")
                     }
                     IconButton(onClick = {
                         update { presentation.setSort(overview.displayPreferences().sort().next()) }
                     }) {
-                        Icon(Icons.Default.SortByAlpha, contentDescription = "Sort library")
+                        Icon(Icons.Default.SortByAlpha, contentDescription = "ui.sort.library")
                     }
                     IconButton(onClick = {
                         update {
@@ -853,14 +855,14 @@ private fun LibraryPageContent(
                             } else {
                                 Icons.Default.GridView
                             },
-                            contentDescription = "Change library layout",
+                            contentDescription = "ui.change.library.layout",
                         )
                     }
                     IconButton(onClick = {
                         selectionMode = !selectionMode
                         if (!selectionMode) selected = emptySet()
                     }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "Select library titles")
+                        Icon(Icons.Default.MoreVert, contentDescription = "ui.select.library.titles")
                     }
                 },
             )
@@ -876,7 +878,10 @@ private fun LibraryPageContent(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("${selected.size} selected", fontWeight = FontWeight.SemiBold)
+                    Text(
+                        UiTranslations.format("dynamic.selected.count", LocalLanguagePack.current, selected.size),
+                        fontWeight = FontWeight.SemiBold,
+                    )
                     IconButton(
                         enabled = titles.isNotEmpty(),
                         onClick = {
@@ -887,25 +892,25 @@ private fun LibraryPageContent(
                             }
                         },
                     ) {
-                        Icon(Icons.Default.SelectAll, contentDescription = "All")
+                        Icon(Icons.Default.SelectAll, contentDescription = "ui.all")
                     }
                     IconButton(
                         enabled = selected.isNotEmpty(),
                         onClick = { update { presentation.setFavorite(selected, true) } },
                     ) {
-                        Icon(Icons.Default.Favorite, contentDescription = "Favorite")
+                        Icon(Icons.Default.Favorite, contentDescription = "ui.favorite")
                     }
                     IconButton(
                         enabled = selected.isNotEmpty(),
                         onClick = { update { presentation.setFavorite(selected, false) } },
                     ) {
-                        Icon(Icons.Default.FavoriteBorder, contentDescription = "Unfavorite")
+                        Icon(Icons.Default.FavoriteBorder, contentDescription = "ui.unfavorite")
                     }
                     IconButton(
                         enabled = selected.isNotEmpty() && overview.categories().isNotEmpty(),
                         onClick = { categoryAction = true },
                     ) {
-                        Icon(Icons.Outlined.Category, contentDescription = "Category")
+                        Icon(Icons.Outlined.Category, contentDescription = "ui.category")
                     }
                     IconButton(
                         enabled = selected.isNotEmpty(),
@@ -919,19 +924,19 @@ private fun LibraryPageContent(
                             }
                         },
                     ) {
-                        Icon(Icons.Outlined.Download, contentDescription = "Download")
+                        Icon(Icons.Outlined.Download, contentDescription = "ui.download")
                     }
                     IconButton(
                         enabled = selected.isNotEmpty(),
                         onClick = { migrating = true },
                     ) {
-                        Icon(Icons.Outlined.Sync, contentDescription = "Migrate")
+                        Icon(Icons.Outlined.Sync, contentDescription = "ui.migrate")
                     }
                     IconButton(
                         enabled = selected.isNotEmpty(),
                         onClick = { confirmingDelete = true },
                     ) {
-                        Icon(Icons.Default.Delete, contentDescription = "Delete")
+                        Icon(Icons.Default.Delete, contentDescription = "ui.delete")
                     }
                 }
             }
@@ -942,7 +947,7 @@ private fun LibraryPageContent(
                 FilterChip(
                     selected = favoritesOnly,
                     onClick = { favoritesOnly = !favoritesOnly },
-                    label = { Text("Favorites") },
+                    label = { Text("ui.favorites") },
                 )
             }
             if (overview.categories().isNotEmpty()) {
@@ -956,7 +961,7 @@ private fun LibraryPageContent(
                             category = null
                             update { presentation.setDefaultCategory(Optional.empty()) }
                         },
-                        label = { Text("All categories") },
+                        label = { Text("ui.all.categories") },
                     )
                     FilterChip(
                         selected = category == "",
@@ -964,7 +969,7 @@ private fun LibraryPageContent(
                             category = ""
                             update { presentation.setDefaultCategory(Optional.empty()) }
                         },
-                        label = { Text("Default") },
+                        label = { Text("ui.default") },
                     )
                     overview.categories().forEach { value ->
                         FilterChip(
@@ -980,9 +985,18 @@ private fun LibraryPageContent(
             }
             Spacer(Modifier.height(8.dp))
             if (overview.titles().none { it.kind() == kind && it.favorite() }) {
-                EmptyPage("Add shortcuts from Explore to keep your ${kind.name.lowercase()} here.")
+                EmptyPage(
+                    UiTranslations.format(
+                        "dynamic.empty.library.kind",
+                        LocalLanguagePack.current,
+                        UiTranslations.translate(
+                            if (kind == MediaKind.ANIME) "ui.anime" else "ui.manga",
+                            LocalLanguagePack.current,
+                        ).lowercase(),
+                    ),
+                )
             } else if (titles.isEmpty()) {
-                EmptyPage("No titles match the active library filters.")
+                EmptyPage("ui.no.titles.match.library.filters")
             } else {
                 if (overview.displayPreferences().mode() == LibraryDisplayMode.GRID) {
                     LazyVerticalGrid(
@@ -1035,19 +1049,21 @@ private fun LibraryPageContent(
     if (confirmingDelete) {
         AlertDialog(
             onDismissRequest = { confirmingDelete = false },
-            title = { Text("Delete ${selected.size} titles?") },
-            text = { Text("This removes the selected titles from your library.") },
+            title = {
+                Text(UiTranslations.format("dynamic.delete.titles", LocalLanguagePack.current, selected.size))
+            },
+            text = { Text("ui.this.removes.the.selected.titles.from.your.library") },
             confirmButton = {
                 TextButton(onClick = {
                     update { presentation.deleteTitles(selected) }
                     selected = emptySet()
                     selectionMode = false
                     confirmingDelete = false
-                }) { Text("Delete") }
+                }) { Text("ui.delete") }
             },
             dismissButton = {
                 TextButton(onClick = { confirmingDelete = false }) {
-                    Text("Cancel")
+                    Text("ui.cancel")
                 }
             },
         )
@@ -1079,7 +1095,7 @@ private fun BulkCategoryDialog(
 ) {
     AlertDialog(
         onDismissRequest = dismiss,
-        title = { Text("Update categories") },
+        title = { Text("ui.update.categories") },
         text = {
             Column {
                 categories.forEach { category ->
@@ -1089,10 +1105,10 @@ private fun BulkCategoryDialog(
                     ) {
                         Text(category, modifier = Modifier.weight(1f))
                         TextButton(onClick = { add(category) }) {
-                            Text("Add")
+                            Text("ui.add")
                         }
                         TextButton(onClick = { remove(category) }) {
-                            Text("Remove")
+                            Text("ui.remove")
                         }
                     }
                 }
@@ -1100,7 +1116,7 @@ private fun BulkCategoryDialog(
         },
         confirmButton = {},
         dismissButton = {
-            TextButton(onClick = dismiss) { Text("Close") }
+            TextButton(onClick = dismiss) { Text("ui.close") }
         },
     )
 }
@@ -1117,6 +1133,7 @@ private fun BulkMigrationDialog(
     var targetSource by remember(cards) { mutableStateOf<SourceId?>(null) }
     var loading by remember(cards) { mutableStateOf(false) }
     var error by remember(cards) { mutableStateOf<String?>(null) }
+    val language = LocalLanguagePack.current
     val scope = rememberCrashSafeCoroutineScope()
     val current = cards.getOrNull(index)
     if (current == null) {
@@ -1142,9 +1159,9 @@ private fun BulkMigrationDialog(
                 }
             }.onSuccess { values ->
                 candidates = values
-                if (values.isEmpty()) error = "No migration candidates found."
+                if (values.isEmpty()) error = UiTranslations.translate("ui.no.migration.candidates", language)
             }.onFailure { failure ->
-                error = failure.message ?: "Unable to load migration candidates."
+                error = failure.message ?: UiTranslations.translate("ui.unable.load.migration.candidates", language)
             }
             loading = false
         }
@@ -1161,22 +1178,28 @@ private fun BulkMigrationDialog(
                 candidates = emptyList()
                 if (index >= cards.size) completed()
             }.onFailure { failure ->
-                error = failure.message ?: "Unable to migrate ${current.title()}."
+                error = failure.message ?: UiTranslations.format(
+                    "dynamic.unable.migrate",
+                    language,
+                    current.title(),
+                )
             }
             loading = false
         }
     }
     AlertDialog(
         onDismissRequest = dismiss,
-        title = { Text("Migrate ${index + 1} of ${cards.size}") },
+        title = {
+            Text(UiTranslations.format("dynamic.migrate.sequence", language, index + 1, cards.size))
+        },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(current.title(), fontWeight = FontWeight.SemiBold)
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 if (loading) {
-                    Text("Loading…")
+                    Text("ui.loading")
                 } else if (targetSource == null) {
-                    Text("Choose a target source")
+                    Text("ui.choose.a.target.source")
                     sources.take(12).forEach { source ->
                         TextButton(onClick = { selectSource(source.id()) }) {
                             Text("${source.displayName()} · ${source.languageTag()}")
@@ -1186,7 +1209,7 @@ private fun BulkMigrationDialog(
                     TextButton(onClick = {
                         targetSource = null
                         candidates = emptyList()
-                    }) { Text("Change source") }
+                    }) { Text("ui.change.source") }
                     candidates.take(12).forEach { candidate ->
                         TextButton(onClick = { migrate(candidate) }) {
                             Text(candidate.title())
@@ -1197,7 +1220,7 @@ private fun BulkMigrationDialog(
         },
         confirmButton = {},
         dismissButton = {
-            TextButton(onClick = dismiss) { Text("Cancel") }
+            TextButton(onClick = dismiss) { Text("ui.cancel") }
         },
     )
 }
@@ -1277,7 +1300,7 @@ private fun LibraryTitleCard(
             if (card.favorite()) {
                 Icon(
                     imageVector = Icons.Default.Favorite,
-                    contentDescription = "In Library",
+                    contentDescription = "ui.in.library",
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(horizontal = 8.dp).size(22.dp),
                 )
@@ -1420,17 +1443,17 @@ private fun HistoryPage(
                         OutlinedTextField(
                             value = query,
                             onValueChange = { query = it },
-                            placeholder = { Text("Search history") },
+                            placeholder = { Text("ui.search.history") },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                         )
                     } else {
-                        Text("History")
+                        Text("ui.history")
                     }
                 },
                 navigationIcon = {
                     IconButton(onClick = goBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "ui.back")
                     }
                 },
                 actions = {
@@ -1438,7 +1461,7 @@ private fun HistoryPage(
                         searching = !searching
                         if (!searching) query = ""
                     }) {
-                        Icon(Icons.Default.Search, contentDescription = "Search history")
+                        Icon(Icons.Default.Search, contentDescription = "ui.search.history")
                     }
                     IconButton(
                         enabled = history.entries().any { it.kind() == kind },
@@ -1453,7 +1476,7 @@ private fun HistoryPage(
                             revision++
                         },
                     ) {
-                        Icon(Icons.Default.DeleteSweep, contentDescription = "Clear history")
+                        Icon(Icons.Default.DeleteSweep, contentDescription = "ui.clear.history")
                     }
                 },
             )
@@ -1466,21 +1489,21 @@ private fun HistoryPage(
                 Tab(
                     selected = kind == MediaKind.ANIME,
                     onClick = { kind = MediaKind.ANIME },
-                    text = { Text("Anime") },
+                        text = { Text("ui.anime") },
                 )
                 Tab(
                     selected = kind == MediaKind.MANGA,
                     onClick = { kind = MediaKind.MANGA },
-                    text = { Text("Manga") },
+                        text = { Text("ui.manga") },
                 )
             }
             resumeError?.let {
                 Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp))
             }
             if (history.entries().isEmpty()) {
-                EmptyPage("Titles you open will appear here.")
+                EmptyPage("ui.opened.titles.appear.here")
             } else if (entries.isEmpty()) {
-                EmptyPage("No history entries match your search.")
+                EmptyPage("ui.no.history.entries.match.search")
             } else {
                 LazyColumn(
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 18.dp),
@@ -1588,11 +1611,11 @@ private fun HistoryCard(
         IconButton(onClick = toggleFavorite) {
             Icon(
                 if (card?.favorite() == true) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                contentDescription = "Toggle favorite",
+                contentDescription = "ui.toggle.favorite",
             )
         }
         IconButton(onClick = remove) {
-            Icon(Icons.Default.Delete, contentDescription = "Remove history entry")
+            Icon(Icons.Default.Delete, contentDescription = "ui.remove.history.entry")
         }
     }
 }
@@ -1784,18 +1807,26 @@ private fun DetailsPage(
             status = formatEnum(details.publicationStatus()),
             sourceName = sourceName,
             description = details.description(),
-            genres = details.genres(),
+        genres = details.genres(),
         ),
         artwork = artwork,
         favorite = details.favorite(),
         contentLabel = when (details.kind()) {
-            MediaKind.ANIME -> "${episodes.size} episodes"
-            MediaKind.MANGA, MediaKind.NOVEL, MediaKind.OTHER -> "${chapters.size} chapters"
+            MediaKind.ANIME -> UiTranslations.format(
+                "dynamic.episodes.count",
+                LocalLanguagePack.current,
+                episodes.size,
+            )
+            MediaKind.MANGA, MediaKind.NOVEL, MediaKind.OTHER -> UiTranslations.format(
+                "dynamic.chapters.count",
+                LocalLanguagePack.current,
+                chapters.size,
+            )
         },
         canTrack = canTrack,
         canOpenWeb = openTitleWeb != null || openSourceWeb != null,
         canDownload = canDownload,
-        primaryLabel = if (canWatch) "Watch" else "Read",
+        primaryLabel = if (canWatch) "ui.watch" else "ui.read",
         canOpenPrimary = canWatch || canRead,
         errors = listOfNotNull(readerError, downloadError, unitError),
         toggleFavorite = favorite,
@@ -1808,7 +1839,11 @@ private fun DetailsPage(
         goBack = goBack,
     ) {
             if (chapters.isNotEmpty()) {
-                item { MediaContentHeading("${chapters.size} chapters") }
+                item {
+                    MediaContentHeading(
+                        UiTranslations.format("dynamic.chapters.count", LocalLanguagePack.current, chapters.size),
+                    )
+                }
                 items(chapters, key = { it.id().value() }) { chapter ->
                     MediaUnitRow(
                         title = chapter.title(),
@@ -1819,14 +1854,26 @@ private fun DetailsPage(
                 }
             }
             if (episodes.isNotEmpty()) {
-                item { MediaContentHeading("${episodes.size} episodes") }
+                item {
+                    MediaContentHeading(
+                        UiTranslations.format("dynamic.episodes.count", LocalLanguagePack.current, episodes.size),
+                    )
+                }
                 items(episodes, key = { it.episode().id().value() }) { episode ->
                     val playback = episode.playback().orElse(null)
                     val metadata = listOfNotNull(
                         episode.episode().uploadedAt().map(mediaDateTimeFormatter::format).orElse(null),
                         episode.episode().scanlator().orElse(null),
                         playback?.let {
-                            if (it.completed()) "Watched" else "Progress: ${formatMediaPosition(it.positionMillis())}"
+                            if (it.completed()) {
+                                UiTranslations.translate("ui.watched", LocalLanguagePack.current)
+                            } else {
+                                UiTranslations.format(
+                                    "dynamic.progress",
+                                    LocalLanguagePack.current,
+                                    formatMediaPosition(it.positionMillis()),
+                                )
+                            }
                         },
                     ).ifEmpty { listOf("Available") }.joinToString(" · ")
                     MediaUnitRow(
@@ -1872,7 +1919,7 @@ private fun RelatedTitlesSection(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                "Related titles",
+                "ui.related.titles",
                 modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
@@ -1918,7 +1965,7 @@ private fun RelatedTitleCard(card: LibraryCard, open: () -> Unit) {
                     ) {
                         Icon(
                             Icons.Default.Favorite,
-                            contentDescription = "In Library",
+                            contentDescription = "ui.in.library",
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(6.dp).size(16.dp),
                         )
@@ -1977,13 +2024,17 @@ private fun MediaArtwork(details: LibraryDetails, platform: DetailPlatform, modi
     when {
         image != null -> Image(
             image!!,
-            contentDescription = "${details.title()} artwork",
+            contentDescription = UiTranslations.format(
+                "dynamic.title.artwork",
+                LocalLanguagePack.current,
+                details.title(),
+            ),
             modifier = modifier,
             contentScale = ContentScale.Crop,
         )
-        location == null -> MediaArtworkPlaceholder("No artwork", modifier)
-        failed -> MediaArtworkPlaceholder("Artwork unavailable", modifier)
-        else -> MediaArtworkPlaceholder("Loading artwork", modifier)
+        location == null -> MediaArtworkPlaceholder("ui.no.artwork", modifier)
+        failed -> MediaArtworkPlaceholder("ui.artwork.unavailable", modifier)
+        else -> MediaArtworkPlaceholder("ui.loading.artwork", modifier)
     }
 }
 
@@ -2012,17 +2063,23 @@ private fun EditLibraryTitleDialog(
     var error by remember(details.id()) { mutableStateOf<String?>(null) }
     AlertDialog(
         onDismissRequest = dismiss,
-        title = { Text("Edit title") },
+        title = { Text("ui.edit.title") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(title, { title = it }, label = { Text("Title") })
-                OutlinedTextField(description, { description = it }, label = { Text("Description") })
-                OutlinedTextField(authors, { authors = it }, label = { Text("Authors") })
-                OutlinedTextField(artists, { artists = it }, label = { Text("Artists") })
-                OutlinedTextField(genres, { genres = it }, label = { Text("Genres") })
-                OutlinedTextField(artwork, { artwork = it }, label = { Text("Artwork URL") })
+                OutlinedTextField(title, { title = it }, label = { Text("ui.title") })
+                OutlinedTextField(description, { description = it }, label = { Text("ui.description") })
+                OutlinedTextField(authors, { authors = it }, label = { Text("ui.authors") })
+                OutlinedTextField(artists, { artists = it }, label = { Text("ui.artists") })
+                OutlinedTextField(genres, { genres = it }, label = { Text("ui.genres") })
+                OutlinedTextField(artwork, { artwork = it }, label = { Text("ui.artwork.url") })
                 TextButton(onClick = { status = status.next() }) {
-                    Text("Status: ${formatEnum(status)}")
+                    Text(
+                        UiTranslations.format(
+                            "dynamic.status",
+                            LocalLanguagePack.current,
+                            formatEnum(status),
+                        ),
+                    )
                 }
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }
@@ -2047,10 +2104,10 @@ private fun EditLibraryTitleDialog(
                         error = failure.message ?: "Unable to edit this title."
                     }
                 },
-            ) { Text("Save") }
+            ) { Text("ui.save") }
         },
         dismissButton = {
-            TextButton(onClick = dismiss) { Text("Cancel") }
+            TextButton(onClick = dismiss) { Text("ui.cancel") }
         },
     )
 }
@@ -2107,85 +2164,97 @@ private fun MorePage(
     val pendingDownloads = queue.jobs().count {
         it.status() != DownloadStatus.COMPLETED && it.status() != DownloadStatus.CANCELLED
     }
-    Scaffold(topBar = { TopAppBar(title = { Text("More") }) }) { padding ->
+    Scaffold(topBar = { TopAppBar(title = { Text("ui.more") }) }) { padding ->
         LazyColumn(modifier = Modifier.fillMaxSize().padding(padding)) {
-            item { AnilibSection("Quick filters") }
+            item { AnilibSection("ui.quick.filters") }
             item {
                 AnilibGroup(modifier = Modifier.padding(horizontal = 16.dp)) {
                     MoreSwitchRow(
-                        "Downloaded only",
-                        "Use downloaded content without the online fallback",
+                        "ui.downloaded.only",
+                        "ui.use.downloaded.content.without.the.online.fallback",
                         queue.offlineMode(),
                         Icons.Outlined.Download,
                         downloads::setOfflineMode,
                     )
                     MoreSwitchRow(
-                        "Incognito mode",
-                        "Pause reading and watching history",
+                        "ui.incognito.mode",
+                        "ui.pause.reading.and.watching.history",
                         settings.incognitoMode(),
                         Icons.Outlined.VisibilityOff,
                         setIncognitoMode,
                     )
                 }
             }
-            item { AnilibSection("Library") }
+            item { AnilibSection("ui.library") }
             item {
                 AnilibGroup(modifier = Modifier.padding(horizontal = 16.dp)) {
                     MoreRow(
-                        "History",
-                        "Recently watched episodes and read chapters",
+                        "ui.history",
+                        "ui.recently.watched.and.read",
                         Icons.Default.History,
                         openHistory,
                     )
                     MoreRow(
-                        "Download queue",
-                        if (pendingDownloads == 0) "No pending downloads" else "$pendingDownloads pending downloads",
+                        "ui.download.queue",
+                        if (pendingDownloads == 0) {
+                            "ui.no.pending.downloads"
+                        } else {
+                            UiTranslations.format(
+                                "dynamic.pending.downloads",
+                                LocalLanguagePack.current,
+                                pendingDownloads,
+                            )
+                        },
                         Icons.Outlined.Download,
                         openDownloads,
                     )
                     MoreRow(
-                        "Categories",
-                        "Organize anime and manga in your library",
+                        "ui.categories",
+                        "ui.organize.anime.and.manga.in.your.library",
                         Icons.Outlined.Category,
                         openCategories,
                     )
                     MoreRow(
-                        "Statistics",
-                        "Library and reading activity",
+                        "ui.statistics",
+                        "ui.library.and.reading.activity",
                         Icons.Outlined.Assessment,
                         openStatistics,
                     )
                 }
             }
-            item { AnilibSection("Services") }
+            item { AnilibSection("ui.services") }
             item {
                 AnilibGroup(modifier = Modifier.padding(horizontal = 16.dp)) {
                     MoreRow(
-                        "Backup and restore",
-                        "Create or restore a local backup",
+                        "ui.backup.and.restore",
+                        "ui.create.or.restore.a.local.backup",
                         Icons.Outlined.Backup,
                         openBackup,
                     )
                     MoreRow(
-                        "Tracking",
-                        "Manage external tracking accounts",
+                        "ui.tracking",
+                        "ui.manage.external.tracking.accounts",
                         Icons.Outlined.Sync,
                         openTracking,
                     )
                     MoreRow(
-                        "Extension repositories",
-                        "Add compatible extension repositories and install sources",
+                        "ui.extension.repositories",
+                        "ui.add.compatible.extension.repositories.and.install.sources",
                         Icons.Outlined.Extension,
                         openExtensionRepositories,
                     )
                 }
             }
-            item { AnilibSection("Application") }
+            item { AnilibSection("ui.application") }
             item {
                 AnilibGroup(modifier = Modifier.padding(horizontal = 16.dp)) {
                     MoreRow(
-                        "Settings",
-                        "$componentCount feature bundles active · appearance and app behavior",
+                        "ui.settings",
+                        UiTranslations.format(
+                            "dynamic.bundle.count",
+                            LocalLanguagePack.current,
+                            componentCount,
+                        ),
                         Icons.Outlined.Settings,
                         openSettings,
                     )
@@ -2255,9 +2324,9 @@ private fun MoreRow(title: String, summary: String, icon: ImageVector, onClick: 
 private fun MissingDetails(openLibrary: () -> Unit) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("This title is no longer in the library.")
+            Text("ui.this.title.is.no.longer.in.the.library")
             Spacer(Modifier.height(12.dp))
-            Button(onClick = openLibrary) { Text("Back to library") }
+            Button(onClick = openLibrary) { Text("ui.back.to.library") }
         }
     }
 }
@@ -2298,11 +2367,11 @@ private enum class AppSection {
 
 private fun AppSection.label(language: LanguagePack): String {
     val source = when (this) {
-        AppSection.ANIME -> "Anime"
-        AppSection.MANGA -> "Manga"
-        AppSection.UPDATES -> "Updates"
-        AppSection.BROWSE -> "Explore"
-        AppSection.MORE -> "More"
+        AppSection.ANIME -> "ui.anime"
+        AppSection.MANGA -> "ui.manga"
+        AppSection.UPDATES -> "ui.updates"
+        AppSection.BROWSE -> "ui.explore"
+        AppSection.MORE -> "ui.more"
     }
     return UiTranslations.translate(source, language)
 }

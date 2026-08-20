@@ -64,18 +64,18 @@ internal fun CrashRecoveryDialog(
 ) {
     AlertDialog(
         onDismissRequest = continueApplication,
-        title = { Text("Anilib recovered from an error") },
+        title = { Text("ui.anilib.recovered.from.an.error") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(message)
-                Text("A diagnostic report was saved. You can continue or return to the library.")
+                Text("ui.a.diagnostic.report.was.saved.you.can.continue.or.return.to.the.library")
             }
         },
         confirmButton = {
-            TextButton(onClick = continueApplication) { Text("Continue") }
+            TextButton(onClick = continueApplication) { Text("ui.continue") }
         },
         dismissButton = {
-            TextButton(onClick = returnToLibrary) { Text("Return to library") }
+            TextButton(onClick = returnToLibrary) { Text("ui.return.to.library") }
         },
     )
 }
@@ -106,7 +106,7 @@ internal fun UiNoticeDialog(
         },
         dismissButton = {
             if (retry != null) {
-                TextButton(onClick = dismiss) { Text("Close") }
+                TextButton(onClick = dismiss) { Text("ui.close") }
             }
         },
     )

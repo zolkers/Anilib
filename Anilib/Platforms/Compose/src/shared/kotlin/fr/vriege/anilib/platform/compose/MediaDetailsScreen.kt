@@ -97,20 +97,20 @@ internal fun MediaDetailsScreen(
                 title = { Text(model.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = {
                     IconButton(onClick = goBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "ui.back")
                     }
                 },
                 actions = {
                     edit?.let { action ->
                         IconButton(onClick = action) {
-                            Icon(Icons.Default.Edit, contentDescription = "Edit")
+                            Icon(Icons.Default.Edit, contentDescription = "ui.edit")
                         }
                     }
                     IconButton(onClick = share) {
-                        Icon(Icons.Default.Share, contentDescription = "Share")
+                        Icon(Icons.Default.Share, contentDescription = "ui.share")
                     }
                     IconButton(onClick = download, enabled = canDownload) {
-                        Icon(Icons.Outlined.Download, contentDescription = "Download")
+                        Icon(Icons.Outlined.Download, contentDescription = "ui.download")
                     }
                 },
             )
@@ -281,7 +281,14 @@ internal fun MediaUnitRow(
             Text(summary, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         IconButton(onClick = download) {
-            Icon(Icons.Outlined.Download, contentDescription = "Download $title")
+            Icon(
+                Icons.Outlined.Download,
+                contentDescription = UiTranslations.format(
+                    "dynamic.download.title",
+                    LocalLanguagePack.current,
+                    title,
+                ),
+            )
         }
     }
     HorizontalDivider(modifier = Modifier.widthIn(max = 900.dp).fillMaxWidth())

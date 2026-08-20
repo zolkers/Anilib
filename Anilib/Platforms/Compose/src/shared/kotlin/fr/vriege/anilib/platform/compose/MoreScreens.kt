@@ -64,7 +64,7 @@ internal fun CategoriesScreen(presentation: LibraryPresentation, goBack: () -> U
             error = failure.message ?: "Unable to update categories."
             false
         }
-    MoreScaffold("Categories", goBack) { padding ->
+    MoreScaffold("ui.categories", goBack) { padding ->
         val uncategorized = overview.titles().count { it.categories().isEmpty() }
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 24.dp),
@@ -76,17 +76,22 @@ internal fun CategoriesScreen(presentation: LibraryPresentation, goBack: () -> U
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Organize your library", fontWeight = FontWeight.SemiBold)
+                        Text("ui.organize.your.library", fontWeight = FontWeight.SemiBold)
                         Text(
-                            "Each category can use its own layout, density, sort and update policy.",
+                            "ui.each.category.can.use.its.own.layout.density.sort.and.update.policy",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    Button(onClick = { creating = true }) { Text("Create") }
+                    Button(onClick = { creating = true }) { Text("ui.create") }
                 }
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }
-            item { SummaryCard("Default", "$uncategorized titles") }
+            item {
+                SummaryCard(
+                    "ui.default",
+                    UiTranslations.format("dynamic.titles.count", LocalLanguagePack.current, uncategorized),
+                )
+            }
             overview.categoryConfigurations().forEachIndexed { index, category ->
                 val count = overview.titles().count { category.name() in it.categories() }
                 item(key = category.name()) {
@@ -106,7 +111,7 @@ internal fun CategoriesScreen(presentation: LibraryPresentation, goBack: () -> U
                 }
             }
             if (overview.categories().isEmpty() && uncategorized == 0) {
-                item { EmptyPage("Categories will appear when titles are added to the library.") }
+                item { EmptyPage("ui.categories.appear.after.adding.titles") }
             }
         }
     }
@@ -148,7 +153,10 @@ private fun CategoryCard(
             Row(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(category.name(), fontWeight = FontWeight.Medium)
-                    Text("$count titles", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        UiTranslations.format("dynamic.titles.count", LocalLanguagePack.current, count),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                     Text(
                         "${category.displayMode().displayLabel()} · " +
                             "${category.density().densityLabel()} · ${category.sort().sortLabel()}",
@@ -156,7 +164,7 @@ private fun CategoryCard(
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(
-                            "Library updates",
+                            "ui.library.updates",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Text(
@@ -169,12 +177,12 @@ private fun CategoryCard(
                         )
                     }
                 }
-                TextButton(enabled = index > 0, onClick = { move(index - 1) }) { Text("Up") }
-                TextButton(enabled = index < lastIndex, onClick = { move(index + 1) }) { Text("Down") }
+                TextButton(enabled = index > 0, onClick = { move(index - 1) }) { Text("ui.up") }
+                TextButton(enabled = index < lastIndex, onClick = { move(index + 1) }) { Text("ui.down") }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = { editing = true }) { Text("Edit") }
-                TextButton(onClick = { confirmingDelete = true }) { Text("Delete") }
+                TextButton(onClick = { editing = true }) { Text("ui.edit") }
+                TextButton(onClick = { confirmingDelete = true }) { Text("ui.delete") }
             }
         }
     }
@@ -192,16 +200,18 @@ private fun CategoryCard(
     if (confirmingDelete) {
         AlertDialog(
             onDismissRequest = { confirmingDelete = false },
-            title = { Text("Delete ${category.name()}?") },
-            text = { Text("Titles stay in the library and lose this category assignment.") },
+            title = {
+                Text(UiTranslations.format("dynamic.delete.category", LocalLanguagePack.current, category.name()))
+            },
+            text = { Text("ui.titles.stay.in.the.library.and.lose.this.category.assignment") },
             confirmButton = {
                 TextButton(onClick = {
                     delete()
                     confirmingDelete = false
-                }) { Text("Delete") }
+                }) { Text("ui.delete") }
             },
             dismissButton = {
-                TextButton(onClick = { confirmingDelete = false }) { Text("Cancel") }
+                TextButton(onClick = { confirmingDelete = false }) { Text("ui.cancel") }
             },
         )
     }
@@ -231,7 +241,7 @@ private fun CategoryEditorDialog(
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("Category name") },
+                    label = { Text("ui.category.name") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -257,7 +267,7 @@ private fun CategoryEditorDialog(
                 },
             ) { Text(confirmLabel) }
         },
-        dismissButton = { TextButton(onClick = dismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = dismiss) { Text("ui.cancel") } },
     )
 }
 
@@ -340,7 +350,7 @@ internal fun StatisticsScreen(
             error = it.message ?: "Unable to calculate library statistics."
         }
     }
-    MoreScaffold("Statistics", goBack) { padding ->
+    MoreScaffold("ui.statistics", goBack) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 24.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -348,54 +358,117 @@ internal fun StatisticsScreen(
             error?.let { item { Text(it, color = MaterialTheme.colorScheme.error) } }
             val value = snapshot
             if (value == null && error == null) {
-                item { Text("Calculating statistics…") }
+                item { Text("ui.calculating.statistics") }
             } else if (value != null) {
-                item { StatisticsHeading("Library") }
-                item { SummaryCard("Titles", "${value.totalTitles} total") }
-                item { SummaryCard("Anime / Manga", "${value.animeTitles} / ${value.mangaTitles}") }
-                item { SummaryCard("Favorites", "${value.favoriteTitles} titles") }
-                item { SummaryCard("Categories", "${value.categoryCount} custom categories") }
-                item { StatisticsHeading("Publication status") }
-                value.statuses.forEach { (label, count) ->
-                    item(key = "status-$label") { SummaryCard(label, "$count titles") }
-                }
-                item { StatisticsHeading("Sources and languages") }
-                value.sources.forEach { (label, count) ->
-                    item(key = "source-$label") { SummaryCard(label, "$count titles") }
-                }
-                value.languages.forEach { (label, count) ->
-                    item(key = "language-$label") { SummaryCard("Language $label", "$count titles") }
-                }
-                item { StatisticsHeading("Scores") }
+                item { StatisticsHeading("ui.library") }
                 item {
                     SummaryCard(
-                        "Average tracker score",
+                        "ui.titles",
+                        UiTranslations.format("dynamic.total.count", LocalLanguagePack.current, value.totalTitles),
+                    )
+                }
+                item { SummaryCard("ui.anime.manga", "${value.animeTitles} / ${value.mangaTitles}") }
+                item {
+                    SummaryCard(
+                        "ui.favorites",
+                        UiTranslations.format("dynamic.titles.count", LocalLanguagePack.current, value.favoriteTitles),
+                    )
+                }
+                item {
+                    SummaryCard(
+                        "ui.categories",
+                        UiTranslations.format(
+                            "dynamic.custom.categories",
+                            LocalLanguagePack.current,
+                            value.categoryCount,
+                        ),
+                    )
+                }
+                item { StatisticsHeading("ui.publication.status") }
+                value.statuses.forEach { (label, count) ->
+                    item(key = "status-$label") {
+                        SummaryCard(
+                            label,
+                            UiTranslations.format("dynamic.titles.count", LocalLanguagePack.current, count),
+                        )
+                    }
+                }
+                item { StatisticsHeading("ui.sources.and.languages") }
+                value.sources.forEach { (label, count) ->
+                    item(key = "source-$label") {
+                        SummaryCard(
+                            label,
+                            UiTranslations.format("dynamic.titles.count", LocalLanguagePack.current, count),
+                        )
+                    }
+                }
+                value.languages.forEach { (label, count) ->
+                    item(key = "language-$label") {
+                        SummaryCard(
+                            UiTranslations.format("dynamic.language", LocalLanguagePack.current, label),
+                            UiTranslations.format("dynamic.titles.count", LocalLanguagePack.current, count),
+                        )
+                    }
+                }
+                item { StatisticsHeading("ui.scores") }
+                item {
+                    SummaryCard(
+                        "ui.average.tracker.score",
                         value.averageScore?.let { String.format(Locale.ROOT, "%.2f / 10", it) }
-                            ?: "No scored entries",
+                            ?: UiTranslations.translate("ui.no.scored.entries", LocalLanguagePack.current),
                     )
                 }
                 value.scoreBuckets.forEach { (label, count) ->
-                    item(key = "score-$label") { SummaryCard(label, "$count entries") }
+                    item(key = "score-$label") {
+                        SummaryCard(
+                            label,
+                            UiTranslations.format("dynamic.entries.count", LocalLanguagePack.current, count),
+                        )
+                    }
                 }
-                item { StatisticsHeading("Duration and progress") }
-                item { SummaryCard("Watched", durationLabel(value.watchedMillis)) }
-                item { SummaryCard("Known episode duration", durationLabel(value.knownDurationMillis)) }
+                item { StatisticsHeading("ui.duration.and.progress") }
+                item { SummaryCard("ui.watched", durationLabel(value.watchedMillis)) }
+                item { SummaryCard("ui.known.episode.duration", durationLabel(value.knownDurationMillis)) }
                 item {
                     SummaryCard(
-                        "Average title progress",
+                        "ui.average.title.progress",
                         value.averageProgress?.let { "${(it * 100.0).toInt()}%" }
-                            ?: "No measurable progress",
+                            ?: UiTranslations.translate("ui.no.measurable.progress", LocalLanguagePack.current),
                     )
                 }
-                item { SummaryCard("Started", "${value.startedTitles} titles") }
-                item { StatisticsHeading("Activity") }
-                item { SummaryCard("Last 7 days", "${value.activity7Days} visits") }
-                item { SummaryCard("Last 30 days", "${value.activity30Days} visits") }
-                item { SummaryCard("Last 365 days", "${value.activity365Days} visits") }
+                item {
+                    SummaryCard(
+                        "ui.started",
+                        UiTranslations.format("dynamic.titles.count", LocalLanguagePack.current, value.startedTitles),
+                    )
+                }
+                item { StatisticsHeading("ui.activity") }
+                item {
+                    SummaryCard(
+                        "ui.last.7.days",
+                        UiTranslations.format("dynamic.visits.count", LocalLanguagePack.current, value.activity7Days),
+                    )
+                }
+                item {
+                    SummaryCard(
+                        "ui.last.30.days",
+                        UiTranslations.format("dynamic.visits.count", LocalLanguagePack.current, value.activity30Days),
+                    )
+                }
+                item {
+                    SummaryCard(
+                        "ui.last.365.days",
+                        UiTranslations.format("dynamic.visits.count", LocalLanguagePack.current, value.activity365Days),
+                    )
+                }
                 if (value.unavailableEpisodeSources > 0) {
                     item {
                         Text(
-                            "Duration excludes ${value.unavailableEpisodeSources} unavailable anime sources.",
+                            UiTranslations.format(
+                                "dynamic.duration.excludes.sources",
+                                LocalLanguagePack.current,
+                                value.unavailableEpisodeSources,
+                            ),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -549,7 +622,7 @@ internal fun AboutScreen(
     val uriHandler = LocalUriHandler.current
     val platformController = LocalApplicationUpdatePlatformController.current
     val available = snapshot.availableRelease().orElse(null)
-    MoreScaffold("About", goBack) { padding ->
+    MoreScaffold("ui.about", goBack) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -560,13 +633,16 @@ internal fun AboutScreen(
         ) {
             Text("Anilib", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
             Text(
-                "A cross-platform anime and manga library built from explicit, removable feature bundles.",
+                "ui.a.cross.platform.anime.and.manga.library.built.from.explicit.removable.feature.bundles",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            SummaryCard("Runtime", "$componentCount feature bundles active")
-            SummaryCard("Version", snapshot.currentVersion().display())
             SummaryCard(
-                "Update channel",
+                "ui.runtime",
+                UiTranslations.format("dynamic.feature.bundles.active", LocalLanguagePack.current, componentCount),
+            )
+            SummaryCard("ui.version", snapshot.currentVersion().display())
+            SummaryCard(
+                "ui.update.channel",
                 "${snapshot.channel().name.lowercase().replaceFirstChar(Char::uppercase)} · " +
                     snapshot.platform().name.lowercase(),
             )
@@ -584,8 +660,8 @@ internal fun AboutScreen(
                     }
                 }
             }
-            SummaryCard("Source format", "Signed portable Anilib Bundles")
-            SummaryCard("Platforms", "Android and desktop")
+            SummaryCard("ui.source.format", "ui.signed.portable.anilib.bundles")
+            SummaryCard("ui.platforms", "ui.android.and.desktop")
             snapshot.error().orElse(null)?.let { error ->
                 Text(error, color = MaterialTheme.colorScheme.error)
             }
@@ -601,20 +677,31 @@ internal fun AboutScreen(
                         }
                     },
                 ) {
-                    Text(if (checking) "Checking…" else "Check for updates")
+                    Text(if (checking) "ui.checking" else "ui.check.for.updates")
                 }
             } else {
                 Text(
-                    "Anilib ${available.version().display()} is available.",
+                    UiTranslations.format(
+                        "dynamic.app.version.available",
+                        LocalLanguagePack.current,
+                        available.version().display(),
+                    ),
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.SemiBold,
                 )
                 if (available.changelog().isNotBlank()) {
-                    SummaryCard("Changelog", available.changelog())
+                    SummaryCard("ui.changelog", available.changelog())
                 }
                 available.artifact().orElse(null)?.let { artifact ->
                     if (installing) {
-                        Text("Downloaded $downloadedBytes of ${artifact.sizeBytes()} bytes")
+                        Text(
+                            UiTranslations.format(
+                                "dynamic.downloaded.bytes",
+                                LocalLanguagePack.current,
+                                downloadedBytes,
+                                artifact.sizeBytes(),
+                            ),
+                        )
                     }
                     Button(
                         enabled = !installing,
@@ -644,34 +731,34 @@ internal fun AboutScreen(
                     }
                 }
                 Button(onClick = { uriHandler.openUri(available.releasePage().toString()) }) {
-                    Text("Open release")
+                    Text("ui.open.release")
                 }
                 TextButton(onClick = { uriHandler.openUri(available.licensePage().toString()) }) {
-                    Text("Licence")
+                    Text("ui.licence")
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton(onClick = { uriHandler.openUri("https://github.com/zolkers/Anilib") }) {
-                    Text("Project")
+                    Text("ui.project")
                 }
                 TextButton(onClick = { uriHandler.openUri("https://github.com/zolkers/Anilib/issues") }) {
-                    Text("Help")
+                    Text("ui.help")
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton(onClick = {
                     uriHandler.openUri("https://github.com/zolkers/Anilib/blob/main/THIRD_PARTY.md")
                 }) {
-                    Text("Third-party notices")
+                    Text("ui.third.party.notices")
                 }
                 TextButton(onClick = {
                     uriHandler.openUri("https://github.com/zolkers/Anilib/blob/main/PRIVACY.md")
                 }) {
-                    Text("Privacy")
+                    Text("ui.privacy")
                 }
             }
             Text(
-                "Copyright 2026 Victor Riegert · Apache License 2.0",
+                "ui.copyright.2026.victor.riegert.apache.license.2.0",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }

@@ -98,7 +98,7 @@ internal fun PlayerSelectionScreen(
                 title = { Text(snapshot.episode().title()) },
                 navigationIcon = {
                     IconButton(onClick = goBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "ui.back")
                     }
                 },
             )
@@ -134,7 +134,7 @@ internal fun PlayerSelectionScreen(
                     )
                 }
             }
-            item { Text("Video quality", fontWeight = FontWeight.SemiBold) }
+            item { Text("ui.video.quality", fontWeight = FontWeight.SemiBold) }
             items(snapshot.streams(), key = { it.id() }) { stream ->
                 Card(
                     modifier = Modifier.fillMaxWidth().clickable {
@@ -161,13 +161,13 @@ internal fun PlayerSelectionScreen(
                 }
             }
             item {
-                Text("Subtitles", fontWeight = FontWeight.SemiBold)
+                Text("ui.subtitles", fontWeight = FontWeight.SemiBold)
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     item {
                         FilterChip(
                             selected = snapshot.selectedSubtitleId().isEmpty,
                             onClick = { command { controller.selectSubtitle(Optional.empty()) } },
-                            label = { Text("Off") },
+                            label = { Text("ui.off") },
                         )
                     }
                     items(snapshot.selectedStream().subtitles(), key = { it.id() }) { subtitle ->
@@ -229,7 +229,7 @@ internal fun PlayerLoadingScreen(title: String, goBack: () -> Unit) {
                 title = { Text(title) },
                 navigationIcon = {
                     IconButton(onClick = goBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "ui.back")
                     }
                 },
             )
@@ -245,7 +245,7 @@ internal fun PlayerLoadingScreen(title: String, goBack: () -> Unit) {
             ) {
                 CircularProgressIndicator(color = Color.White)
             }
-            Text("Resolving playable streams…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("ui.resolving.playable.streams", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -281,36 +281,54 @@ private fun PlayerPreferenceDialog(
     var titleOverride by remember(controller) { mutableStateOf(controller.hasPreferenceOverride()) }
     AlertDialog(
         onDismissRequest = close,
-        title = { Text("Player preferences") },
+        title = { Text("ui.player.preferences") },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 TextButton(onClick = { decoder = nextValue(decoder, PlayerDecoderPolicy.entries) }) {
-                    Text("Decoder: ${decoder.name.lowercase().replaceFirstChar(Char::uppercase)}")
+                    Text(
+                        UiTranslations.format(
+                            "dynamic.decoder",
+                            LocalLanguagePack.current,
+                            decoder.name.lowercase().replaceFirstChar(Char::uppercase),
+                        ),
+                    )
                 }
                 OutlinedTextField(
                     value = audioLanguage,
                     onValueChange = { audioLanguage = it },
-                    label = { Text("Preferred audio language") },
+                    label = { Text("ui.preferred.audio.language") },
                     singleLine = true,
                 )
                 TextButton(onClick = {
                     subtitlePolicy = nextValue(subtitlePolicy, PlayerSubtitlePolicy.entries)
                 }) {
-                    Text("Subtitles: ${subtitlePolicy.name.lowercase().replace('_', ' ')}")
+                    Text(
+                        UiTranslations.format(
+                            "dynamic.subtitles",
+                            LocalLanguagePack.current,
+                            subtitlePolicy.name.lowercase().replace('_', ' '),
+                        ),
+                    )
                 }
                 OutlinedTextField(
                     value = subtitleLanguage,
                     onValueChange = { subtitleLanguage = it },
-                    label = { Text("Preferred subtitle language") },
+                    label = { Text("ui.preferred.subtitle.language") },
                     singleLine = true,
                 )
                 TextButton(onClick = {
                     qualityPolicy = nextValue(qualityPolicy, PlayerQualityPolicy.entries)
                 }) {
-                    Text("Quality: ${qualityPolicy.name.lowercase()}")
+                    Text(
+                        UiTranslations.format(
+                            "dynamic.quality",
+                            LocalLanguagePack.current,
+                            qualityPolicy.name.lowercase(),
+                        ),
+                    )
                 }
                 if (qualityPolicy == PlayerQualityPolicy.PREFERRED) {
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -326,29 +344,29 @@ private fun PlayerPreferenceDialog(
                 OutlinedTextField(
                     value = introSeconds,
                     onValueChange = { introSeconds = it.filter(Char::isDigit).take(4) },
-                    label = { Text("Intro ends after (seconds)") },
+                    label = { Text("ui.intro.ends.after.seconds") },
                     singleLine = true,
                 )
                 OutlinedTextField(
                     value = outroSeconds,
                     onValueChange = { outroSeconds = it.filter(Char::isDigit).take(4) },
-                    label = { Text("Outro duration (seconds)") },
+                    label = { Text("ui.outro.duration.seconds") },
                     singleLine = true,
                 )
                 OutlinedTextField(
                     value = completionThreshold,
                     onValueChange = { completionThreshold = it.filter(Char::isDigit).take(3) },
-                    label = { Text("Mark watched at (%)") },
-                    supportingText = { Text("An episode is completed automatically at this percentage") },
+                    label = { Text("ui.mark.watched.at") },
+                    supportingText = { Text("ui.an.episode.is.completed.automatically.at.this.percentage") },
                     singleLine = true,
                 )
                 FilterChip(
                     selected = titleOverride,
                     onClick = { titleOverride = !titleOverride },
-                    label = { Text("Use only for this title") },
+                    label = { Text("ui.use.only.for.this.title") },
                 )
                 if (controller.hasPreferenceOverride()) {
-                    TextButton(onClick = clearOverride) { Text("Clear title override") }
+                    TextButton(onClick = clearOverride) { Text("ui.clear.title.override") }
                 }
             }
         },
@@ -369,9 +387,9 @@ private fun PlayerPreferenceDialog(
                     ),
                     titleOverride,
                 )
-            }) { Text("Save") }
+            }) { Text("ui.save") }
         },
-        dismissButton = { TextButton(onClick = close) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = close) { Text("ui.cancel") } },
     )
 }
 
@@ -384,10 +402,10 @@ private fun PlayerSessionError(message: String, goBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Player") },
+                title = { Text("ui.player") },
                 navigationIcon = {
                     IconButton(onClick = goBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "ui.back")
                     }
                 },
             )

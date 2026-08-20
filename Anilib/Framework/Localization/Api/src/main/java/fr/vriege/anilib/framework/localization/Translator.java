@@ -8,8 +8,8 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * Resolves user-facing source messages across feature-owned translation
- * catalogs with a safe source-text fallback.
+ * Resolves user-facing keys or compatibility messages across feature-owned
+ * translation catalogs with a safe source-text fallback.
  *
  * <p>Catalogs are consulted in constructor order. Each component may contribute
  * at most one catalog; duplicate owner identities are rejected. If no catalog
@@ -66,5 +66,15 @@ public final class Translator {
             }
         }
         return source;
+    }
+
+    public String format(String languageTag, String key, List<String> arguments) {
+        Objects.requireNonNull(arguments, "arguments");
+        String result = translate(languageTag, key);
+        for (int index = 0; index < arguments.size(); index++) {
+            String argument = Objects.requireNonNull(arguments.get(index), "argument");
+            result = result.replace("{" + index + "}", argument);
+        }
+        return result;
     }
 }

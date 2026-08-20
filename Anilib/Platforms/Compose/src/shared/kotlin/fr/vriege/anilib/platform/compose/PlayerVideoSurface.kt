@@ -318,7 +318,7 @@ internal fun PlayerVideoSurface(
                         valueRange = 0f..1000f,
                     )
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Volume", color = Color.White, style = MaterialTheme.typography.bodySmall)
+                        Text("ui.volume", color = Color.White, style = MaterialTheme.typography.bodySmall)
                         Slider(
                             value = volume,
                             onValueChange = {
@@ -347,7 +347,7 @@ internal fun PlayerVideoSurface(
                                 revealControls()
                                 controller.seekTo(preferences.introEndMillis())
                             }) {
-                                Text("Skip intro", color = Color.White)
+                                Text("ui.skip.intro", color = Color.White)
                             }
                         }
                         val playbackState = bridge.snapshot()
@@ -362,14 +362,28 @@ internal fun PlayerVideoSurface(
                                 controller.seekTo(playbackState.durationMillis())
                                 controller.markCompleted()
                             }) {
-                                Text("Skip outro", color = Color.White)
+                                Text("ui.skip.outro", color = Color.White)
                             }
                         }
                         TextButton(onClick = { execute(leftAction) }) {
-                            Text("L: ${leftAction.label}", color = Color.White)
+                            Text(
+                                UiTranslations.format(
+                                    "dynamic.left.short",
+                                    LocalLanguagePack.current,
+                                    UiTranslations.translate(leftAction.labelKey, LocalLanguagePack.current),
+                                ),
+                                color = Color.White,
+                            )
                         }
                         TextButton(onClick = { execute(rightAction) }) {
-                            Text("R: ${rightAction.label}", color = Color.White)
+                            Text(
+                                UiTranslations.format(
+                                    "dynamic.right.short",
+                                    LocalLanguagePack.current,
+                                    UiTranslations.translate(rightAction.labelKey, LocalLanguagePack.current),
+                                ),
+                                color = Color.White,
+                            )
                         }
                         TextButton(onClick = ::cycleSpeed) {
                             Text("${bridge.snapshot().playbackSpeed()}×", color = Color.White)
@@ -397,7 +411,7 @@ internal fun PlayerVideoSurface(
                                 revealControls()
                                 advancedMenu = true
                             }) {
-                                Text("Advanced", color = Color.White)
+                                Text("ui.advanced", color = Color.White)
                             }
                         }
                         IconButton(onClick = ::cycleOrientation) {
@@ -467,7 +481,7 @@ private fun PlayerAdvancedDialog(controller: PlayerController, close: () -> Unit
     }
     AlertDialog(
         onDismissRequest = close,
-        title = { Text("Desktop player controls") },
+        title = { Text("ui.desktop.player.controls") },
         text = {
             Column {
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
@@ -477,10 +491,10 @@ private fun PlayerAdvancedDialog(controller: PlayerController, close: () -> Unit
                     }
                 }
                 if (PlayerAdvancedCapability.RESTART in capabilities) {
-                    TextButton(onClick = { command(controller::restart) }) { Text("Restart") }
+                    TextButton(onClick = { command(controller::restart) }) { Text("ui.restart") }
                 }
                 if (PlayerAdvancedCapability.FRAME_STEP in capabilities) {
-                    TextButton(onClick = { command(controller::frameStep) }) { Text("Next frame") }
+                    TextButton(onClick = { command(controller::frameStep) }) { Text("ui.next.frame") }
                 }
                 if (PlayerAdvancedCapability.AUDIO_DELAY in capabilities) {
                     DelayControl("Audio delay", state.audioDelayMillis()) {
@@ -496,7 +510,15 @@ private fun PlayerAdvancedDialog(controller: PlayerController, close: () -> Unit
                     TextButton(onClick = {
                         command { controller.setAspectRatio(nextAspectRatio(state.aspectRatio())) }
                     }) {
-                        Text("Aspect ratio: ${state.aspectRatio().orElse("Auto")}")
+                        Text(
+                            UiTranslations.format(
+                                "dynamic.aspect.ratio",
+                                LocalLanguagePack.current,
+                                state.aspectRatio().orElse(
+                                    UiTranslations.translate("ui.automatic", LocalLanguagePack.current),
+                                ),
+                            ),
+                        )
                     }
                 }
                 if (PlayerAdvancedCapability.DEINTERLACE in capabilities) {
@@ -508,14 +530,17 @@ private fun PlayerAdvancedDialog(controller: PlayerController, close: () -> Unit
                 }
             }
         },
-        confirmButton = { TextButton(onClick = close) { Text("Done") } },
+        confirmButton = { TextButton(onClick = close) { Text("ui.done") } },
     )
 }
 
 @Composable
 private fun DelayControl(label: String, delayMillis: Long, update: (Long) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text("$label: ${delayMillis}ms", modifier = Modifier.weight(1f))
+        Text(
+            UiTranslations.format("dynamic.delay.milliseconds", LocalLanguagePack.current, label, delayMillis),
+            modifier = Modifier.weight(1f),
+        )
         TextButton(onClick = { update((delayMillis - 50L).coerceAtLeast(-600_000L)) }) {
             Text("-50")
         }
@@ -531,13 +556,13 @@ private fun nextAspectRatio(current: Optional<String>): Optional<String> {
     return Optional.ofNullable(next)
 }
 
-private enum class PlayerCustomAction(val label: String) {
-    SEEK_BACK("-10s"),
-    SEEK_FORWARD("+10s"),
-    PLAY_PAUSE("Play"),
-    SPEED("Speed"),
-    MUTE("Mute"),
-    ORIENTATION("Rotate"),
+private enum class PlayerCustomAction(val labelKey: String) {
+    SEEK_BACK("ui.seek.back.ten.seconds"),
+    SEEK_FORWARD("ui.seek.forward.ten.seconds"),
+    PLAY_PAUSE("ui.play.pause"),
+    SPEED("ui.speed"),
+    MUTE("ui.mute"),
+    ORIENTATION("ui.rotate"),
 }
 
 @Composable
@@ -550,18 +575,30 @@ private fun PlayerCustomButtonDialog(
 ) {
     AlertDialog(
         onDismissRequest = close,
-        title = { Text("Custom player buttons") },
+        title = { Text("ui.custom.player.buttons") },
         text = {
             Column {
                 TextButton(onClick = { updateLeft(nextCustomAction(left)) }) {
-                    Text("Left button: ${left.label}")
+                    Text(
+                        UiTranslations.format(
+                            "dynamic.left.button",
+                            LocalLanguagePack.current,
+                            UiTranslations.translate(left.labelKey, LocalLanguagePack.current),
+                        ),
+                    )
                 }
                 TextButton(onClick = { updateRight(nextCustomAction(right)) }) {
-                    Text("Right button: ${right.label}")
+                    Text(
+                        UiTranslations.format(
+                            "dynamic.right.button",
+                            LocalLanguagePack.current,
+                            UiTranslations.translate(right.labelKey, LocalLanguagePack.current),
+                        ),
+                    )
                 }
             }
         },
-        confirmButton = { TextButton(onClick = close) { Text("Done") } },
+        confirmButton = { TextButton(onClick = close) { Text("ui.done") } },
     )
 }
 
@@ -576,7 +613,7 @@ private fun UnavailablePlayerSurface() {
         modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Color.Black),
         contentAlignment = Alignment.Center,
     ) {
-        Text("No media backend is available.", color = Color.White)
+        Text("ui.no.media.backend.is.available", color = Color.White)
     }
 }
 

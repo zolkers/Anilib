@@ -21,20 +21,47 @@ final class LocalizationRuleTest {
                     "Anilib/Platforms/Compose/src/shared/kotlin/fr/vriege/anilib/platform/compose");
             Files.createDirectories(root);
             Files.writeString(root.resolve("UiTranslations.kt"),
-                    "LanguagePack.FRENCH Save Enregistrer Details Détails", StandardCharsets.UTF_8);
+                    "TranslationCatalog.resources()", StandardCharsets.UTF_8);
+            Path platformCatalog = repository.resolve("Anilib/Platforms/Compose/src/shared/resources/"
+                    + "META-INF/anilib/i18n/platform-compose");
+            writeCatalog(
+                    platformCatalog,
+                    "action.save=Save\ndynamic.progress=Progress: {0}\nfield.details=Details\n",
+                    "action.save=Enregistrer\ndynamic.progress=Progression : {0}\nfield.details=Détails\n");
             Path featureUi = repository.resolve("Anilib/Features/Library/Ui/src/main/java/example");
             Files.createDirectories(featureUi);
             Path featureCatalog = featureUi.resolve("LibraryTranslationCatalog.java");
-            Files.writeString(featureCatalog, "Favorite Ajouter aux favoris", StandardCharsets.UTF_8);
+            Files.writeString(featureCatalog, "TranslationCatalog.resources()", StandardCharsets.UTF_8);
+            writeCatalog(
+                    repository.resolve("Anilib/Features/Library/Ui/src/main/resources/"
+                            + "META-INF/anilib/i18n/library"),
+                    "library.favorite=Favorite\n",
+                    "library.favorite=Ajouter aux favoris\n");
             Path screen = root.resolve("Screen.kt");
-            Files.writeString(screen, "fun screen() { Text(\"Save\") }", StandardCharsets.UTF_8);
+            Files.writeString(screen, "fun screen() { Text(\"action.save\") }", StandardCharsets.UTF_8);
             LocalizationRule rule = new LocalizationRule();
             RepositorySnapshot snapshot = new RepositorySnapshot(
                     repository, List.of(), List.of(), List.of(), List.of());
             check(rule.analyze(snapshot).isEmpty(), "catalogued shared UI text must pass localization");
-            Files.writeString(screen, "fun screen() { SettingsRow(\"Save\", \"Details\") }",
+            Files.writeString(screen, "fun screen() { SettingsRow(\"action.save\", \"field.details\") }",
                     StandardCharsets.UTF_8);
             check(rule.analyze(snapshot).isEmpty(), "catalogued settings descriptions must pass localization");
+            Files.writeString(screen,
+                    "fun screen() { Text(UiTranslations.format(\"dynamic.progress\", language, position)) }",
+                    StandardCharsets.UTF_8);
+            check(rule.analyze(snapshot).isEmpty(), "catalogued dynamic UI text must pass localization");
+            Files.writeString(screen, "fun screen() { MoreRow(\"action.save\", \"field.details\") }",
+                    StandardCharsets.UTF_8);
+            check(rule.analyze(snapshot).isEmpty(), "custom UI components must accept catalogued keys");
+            Files.writeString(screen, "fun screen() { MoreRow(\"action.save\", \"Raw summary\") }",
+                    StandardCharsets.UTF_8);
+            check(rule.analyze(snapshot).stream().anyMatch(diagnostic ->
+                            diagnostic.message().contains("Raw summary")),
+                    "custom UI component summaries must use resource keys");
+            Files.writeString(screen, "fun screen() { Text(\"Progress: $position\") }", StandardCharsets.UTF_8);
+            check(rule.analyze(snapshot).stream().anyMatch(diagnostic ->
+                            diagnostic.message().contains("parameterized translation key")),
+                    "raw interpolated UI text must fail the quality gate");
             Files.writeString(screen, "fun screen() { SettingsRow(\"Save\", \"Untranslated detail\") }",
                     StandardCharsets.UTF_8);
             check(rule.analyze(snapshot).stream().anyMatch(diagnostic ->
@@ -44,16 +71,41 @@ final class LocalizationRuleTest {
             check(rule.analyze(snapshot).stream().anyMatch(diagnostic ->
                             diagnostic.message().contains("Untranslated action")),
                     "new untranslated shared UI text must fail the quality gate");
+            Files.writeString(featureCatalog, "TranslationCatalog.french(Map.entry())", StandardCharsets.UTF_8);
+            check(rule.analyze(snapshot).stream().anyMatch(diagnostic ->
+                            diagnostic.message().contains("Translation maps must live")),
+                    "hardcoded translation maps must fail the quality gate");
+            Files.writeString(featureCatalog, "TranslationCatalog.resources()", StandardCharsets.UTF_8);
+            Files.writeString(
+                    platformCatalog.resolve("en.properties"),
+                    "action.save=Save\ndynamic.progress=Progress: {0}\nfield.details=Details\naction.save=Duplicate\n",
+                    StandardCharsets.UTF_8);
+            check(rule.analyze(snapshot).stream().anyMatch(diagnostic ->
+                            diagnostic.message().contains("Duplicate translation key")),
+                    "duplicate resource keys must fail the quality gate");
+            Files.writeString(
+                    platformCatalog.resolve("en.properties"),
+                    "action.save=Save\ndynamic.progress=Progress: {0}\nfield.details=Details\n",
+                    StandardCharsets.UTF_8);
             Files.delete(featureCatalog);
             check(rule.analyze(snapshot).stream().anyMatch(diagnostic ->
                             diagnostic.message().contains("exactly one translation catalog")),
                     "a feature UI without its own catalog must fail the quality gate");
-            return 5;
+            return 11;
         } catch (IOException exception) {
             throw new AssertionError("Unable to test localization rule", exception);
         } finally {
             deleteDirectory(repository);
         }
+    }
+
+    private static void writeCatalog(
+            Path directory,
+            String english,
+            String french) throws IOException {
+        Files.createDirectories(directory);
+        Files.writeString(directory.resolve("en.properties"), english, StandardCharsets.UTF_8);
+        Files.writeString(directory.resolve("fr.properties"), french, StandardCharsets.UTF_8);
     }
 
     private static Path temporaryDirectory() {

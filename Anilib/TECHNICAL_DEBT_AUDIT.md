@@ -123,19 +123,15 @@ failure boundary.
 - **Owners:** `Features/ExtensionRepository/Runtime`, its `Ui` module, then the
   Compose adapter.
 
-### TD-05 — Localization still depends on raw display text
+### TD-05 — Resolved: resource-keyed localization
 
-- **Priority:** P1
-- **Evidence:** `UiTranslations.kt` is 607 lines and translates many dynamic
-  labels through prefixes and regular expressions. This is useful as a migration
-  layer but fragile when English punctuation or wording changes.
-- **Risk:** a harmless copy edit silently breaks French, and feature-owned text
-  cannot be validated independently.
-- **Target:** feature-owned translation keys with typed arguments and complete
-  English/French resource sets. Compose receives resolved text or a typed text
-  reference, never uses English as an identifier.
-- **Done when:** the prefix/regex compatibility table is empty, every feature
-  owns its keys, and JavaQuality rejects missing, duplicate, and unused keys.
+- **Status:** resolved.
+- **Implementation:** every feature `Ui` owns one UTF-8 `en.properties` /
+  `fr.properties` pair and a resource-backed catalog. Compose owns only its
+  platform catalog, uses keys for static UI text, and resolves dynamic values
+  through numbered resource templates.
+- **Guard:** AnilibJava rejects hardcoded translation maps, raw static UI text,
+  missing feature catalogs, non-semantic keys, and mismatched language sets.
 - **Owners:** `Framework/Localization`, every feature `Ui`, and
   `Platforms/Compose` for final resolution.
 

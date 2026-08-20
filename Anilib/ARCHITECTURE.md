@@ -317,10 +317,13 @@ UTF-8 `en.properties` and `fr.properties` files below the owning feature's
 `META-INF/anilib/i18n` resources; AnilibJava rejects mismatched key sets. The
 Compose adapter explicitly assembles selected catalogs, uses English resources
 as the fallback, and resolves the persisted system, English, or French choice
-immediately. English message lookup remains only as a migration alias while UI
-call sites move to stable keys. There is no resource scanning or hidden runtime
-registry. AnilibJava checks both visible labels and settings descriptions and
-rejects a feature UI without its own catalog.
+immediately. Static UI call sites use stable keys; dynamic labels use numbered
+resource templates such as `{0}` rather than language-specific prefix or regex
+tables in platform code. English message lookup remains only as a compatibility
+alias for external presentation values. There is no resource scanning or hidden
+runtime registry. AnilibJava checks visible labels, accessibility descriptions,
+settings descriptions, semantic key syntax, matching language sets, resource-
+backed catalog factories, and rejects a feature UI without its own catalog.
 
 Database cleanup is coordinated by Settings without taking ownership of feature
 state. Downloads, Player, Tracker, and Updates register narrow cleanup callbacks

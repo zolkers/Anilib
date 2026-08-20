@@ -5,16 +5,16 @@ import fr.vriege.anilib.framework.localization.TranslationCatalog;
 import fr.vriege.anilib.framework.localization.Translator;
 
 import java.util.List;
-import java.util.Map;
 
 final class LocalizationTest {
     private LocalizationTest() {
     }
 
     static int run() {
-        TranslationCatalog catalog = TranslationCatalog.french(
+        TranslationCatalog catalog = TranslationCatalog.resources(
                 "feature.example",
-                Map.of("Save", "Enregistrer"));
+                LocalizationTest.class,
+                "META-INF/anilib/i18n/localization-test");
         Translator translator = new Translator(List.of(catalog));
         check("Enregistrer".equals(translator.translate("fr-FR", "Save")),
                 "French regional tags must resolve the feature translation");
@@ -22,8 +22,14 @@ final class LocalizationTest {
                 "English must keep the source message");
         check("Missing".equals(translator.translate("fr", "Missing")),
                 "missing translations must safely fall back to English");
-        check(catalog.french().get("Save").equals("Enregistrer"),
-                "catalog messages must remain readable by their owner");
+        check("Progression : 03:20".equals(translator.translate("fr", "Progress: 03:20")),
+                "resource templates must translate dynamic values without hardcoded maps");
+        check("VOSTFR, VF, VA · Progression : 03:20".equals(
+                        translator.translate("fr", "VOSTFR, VF, VA · Progress: 03:20")),
+                "resource templates must translate progress embedded in episode metadata");
+        check("Progression : 03:20".equals(
+                        translator.format("fr", "history.progress", List.of("03:20"))),
+                "dynamic UI must format explicit resource keys");
         Translator resources = new Translator(List.of(ExtensionRepositoryTranslationCatalog.catalog()));
         check("Browse extensions".equals(resources.translate("en", "extensions.browse")),
                 "resource keys must resolve to their English message");
@@ -33,7 +39,7 @@ final class LocalizationTest {
                 "English messages must remain a compatible migration alias");
         checkThrows(() -> new Translator(List.of(catalog, catalog)),
                 "duplicate feature catalogs must be rejected");
-        return 8;
+        return 10;
     }
 
     private static void check(boolean condition, String message) {

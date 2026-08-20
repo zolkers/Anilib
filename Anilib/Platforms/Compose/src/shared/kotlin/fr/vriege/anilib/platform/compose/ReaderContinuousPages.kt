@@ -146,11 +146,11 @@ private fun ReaderContinuousPage(
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Text("This page could not be displayed.", color = Color.White)
+                    Text("ui.this.page.could.not.be.displayed", color = Color.White)
                     failure.message?.takeIf(String::isNotBlank)?.let {
                         Text(it, color = Color.White.copy(alpha = 0.68f))
                     }
-                    TextButton(onClick = { retry++ }) { Text("Retry", color = Color.White) }
+                    TextButton(onClick = { retry++ }) { Text("ui.retry", color = Color.White) }
                 }
             },
         )
