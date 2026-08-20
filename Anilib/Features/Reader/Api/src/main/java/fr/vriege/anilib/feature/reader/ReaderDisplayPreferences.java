@@ -12,13 +12,15 @@ public record ReaderDisplayPreferences(
         ReaderColorFilter colorFilter,
         int brightnessPercent,
         ReaderPageTransition transition,
-        ReaderOrientationPolicy orientationPolicy) {
+        ReaderOrientationPolicy orientationPolicy,
+        ReadingDirection readingDirection) {
     public ReaderDisplayPreferences {
         Objects.requireNonNull(scaleMode, "scaleMode must not be null");
         Objects.requireNonNull(rotation, "rotation must not be null");
         Objects.requireNonNull(colorFilter, "colorFilter must not be null");
         Objects.requireNonNull(transition, "transition must not be null");
         Objects.requireNonNull(orientationPolicy, "orientationPolicy must not be null");
+        Objects.requireNonNull(readingDirection, "readingDirection must not be null");
         if (webtoonSpacingDp < 0 || webtoonSpacingDp > 96) {
             throw new IllegalArgumentException("webtoonSpacingDp must be between 0 and 96");
         }
@@ -41,6 +43,22 @@ public record ReaderDisplayPreferences(
                 ReaderColorFilter.NONE,
                 100,
                 ReaderPageTransition.FADE,
-                ReaderOrientationPolicy.SYSTEM);
+                ReaderOrientationPolicy.SYSTEM,
+                ReadingDirection.LEFT_TO_RIGHT);
+    }
+
+    public ReaderDisplayPreferences withReadingDirection(ReadingDirection direction) {
+        return new ReaderDisplayPreferences(
+                scaleMode,
+                cropBorders,
+                splitPages,
+                rotation,
+                dualPage,
+                webtoonSpacingDp,
+                colorFilter,
+                brightnessPercent,
+                transition,
+                orientationPolicy,
+                Objects.requireNonNull(direction, "direction must not be null"));
     }
 }

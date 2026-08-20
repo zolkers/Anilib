@@ -449,6 +449,7 @@ internal fun ReaderScreen(
                 },
                 updateDirection = {
                     controller.setDirection(it)
+                    display = display.withReadingDirection(it)
                     splitSecondHalf = false
                     revision++
                 },
@@ -460,6 +461,10 @@ internal fun ReaderScreen(
                         controller.clearDisplayOverride()
                         titleDisplayOverride = false
                         display = controller.display()
+                        controller.setDirection(display.readingDirection())
+                        splitSecondHalf = false
+                        continuousScrollTarget = null
+                        revision++
                     }
                 },
                 close = { settingsMenu = false },
@@ -471,6 +476,7 @@ internal fun ReaderScreen(
                 select = {
                     continuousPageIndex = snapshot.currentPageIndex()
                     controller.setDirection(it)
+                    display = display.withReadingDirection(it)
                     splitSecondHalf = false
                     continuousScrollTarget = null
                     readingModeMenu = false
@@ -1060,6 +1066,7 @@ private fun ReaderSettingsDialog(
             TextButton(onClick = {
                 updateDisplay(ReaderDisplayPreferences.defaults())
                 updateInteractions(ReaderInteractionPreferences.defaults())
+                updateDirection(ReaderDisplayPreferences.defaults().readingDirection())
             }) { Text("Reset") }
         },
     )
@@ -1076,6 +1083,7 @@ private fun withScaleMode(current: ReaderDisplayPreferences, value: ReaderScaleM
     current.brightnessPercent(),
     current.transition(),
     current.orientationPolicy(),
+    current.readingDirection(),
 )
 
 private fun withCropBorders(current: ReaderDisplayPreferences, value: Boolean) = ReaderDisplayPreferences(
@@ -1089,6 +1097,7 @@ private fun withCropBorders(current: ReaderDisplayPreferences, value: Boolean) =
     current.brightnessPercent(),
     current.transition(),
     current.orientationPolicy(),
+    current.readingDirection(),
 )
 
 private fun withSplitPages(current: ReaderDisplayPreferences, value: Boolean) = ReaderDisplayPreferences(
@@ -1102,6 +1111,7 @@ private fun withSplitPages(current: ReaderDisplayPreferences, value: Boolean) = 
     current.brightnessPercent(),
     current.transition(),
     current.orientationPolicy(),
+    current.readingDirection(),
 )
 
 private fun withRotation(current: ReaderDisplayPreferences, value: ReaderRotation) = ReaderDisplayPreferences(
@@ -1115,6 +1125,7 @@ private fun withRotation(current: ReaderDisplayPreferences, value: ReaderRotatio
     current.brightnessPercent(),
     current.transition(),
     current.orientationPolicy(),
+    current.readingDirection(),
 )
 
 private fun withDualPage(current: ReaderDisplayPreferences, value: Boolean) = ReaderDisplayPreferences(
@@ -1128,6 +1139,7 @@ private fun withDualPage(current: ReaderDisplayPreferences, value: Boolean) = Re
     current.brightnessPercent(),
     current.transition(),
     current.orientationPolicy(),
+    current.readingDirection(),
 )
 
 private fun withWebtoonSpacing(current: ReaderDisplayPreferences, value: Int) = ReaderDisplayPreferences(
@@ -1141,6 +1153,7 @@ private fun withWebtoonSpacing(current: ReaderDisplayPreferences, value: Int) = 
     current.brightnessPercent(),
     current.transition(),
     current.orientationPolicy(),
+    current.readingDirection(),
 )
 
 private fun withColorFilter(current: ReaderDisplayPreferences, value: ReaderColorFilter) = ReaderDisplayPreferences(
@@ -1154,6 +1167,7 @@ private fun withColorFilter(current: ReaderDisplayPreferences, value: ReaderColo
     current.brightnessPercent(),
     current.transition(),
     current.orientationPolicy(),
+    current.readingDirection(),
 )
 
 private fun withBrightness(current: ReaderDisplayPreferences, value: Int) = ReaderDisplayPreferences(
@@ -1167,6 +1181,7 @@ private fun withBrightness(current: ReaderDisplayPreferences, value: Int) = Read
     value,
     current.transition(),
     current.orientationPolicy(),
+    current.readingDirection(),
 )
 
 private fun withTransition(
@@ -1183,6 +1198,7 @@ private fun withTransition(
     current.brightnessPercent(),
     value,
     current.orientationPolicy(),
+    current.readingDirection(),
 )
 
 private fun withOrientation(
@@ -1199,6 +1215,7 @@ private fun withOrientation(
     current.brightnessPercent(),
     current.transition(),
     value,
+    current.readingDirection(),
 )
 
 private fun nextScaleMode(value: ReaderScaleMode): ReaderScaleMode {

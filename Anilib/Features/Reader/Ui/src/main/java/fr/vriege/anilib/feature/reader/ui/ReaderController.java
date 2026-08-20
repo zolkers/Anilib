@@ -45,6 +45,7 @@ public final class ReaderController implements AutoCloseable {
         this.session = contentUnitId == null
                 ? reader.open(libraryItemId)
                 : reader.open(libraryItemId, contentUnitId);
+        restoreReadingDirection();
     }
 
     ReaderController(
@@ -62,6 +63,7 @@ public final class ReaderController implements AutoCloseable {
         this.display = Objects.requireNonNull(display, "display must not be null");
         this.readState = Objects.requireNonNull(readState, "readState must not be null");
         this.session = reader.open(title, contentUnitId);
+        restoreReadingDirection();
     }
 
     public ReaderSessionSnapshot snapshot() {
@@ -89,7 +91,15 @@ public final class ReaderController implements AutoCloseable {
     }
 
     public void setDirection(ReadingDirection direction) {
-        session.setDirection(direction);
+        ReadingDirection value = Objects.requireNonNull(direction, "direction must not be null");
+        LibraryItemId itemId = session.snapshot().libraryItemId();
+        ReaderDisplayPreferences preferences = display.snapshot(itemId).withReadingDirection(value);
+        if (display.hasOverride(itemId)) {
+            display.saveOverride(itemId, preferences);
+        } else {
+            display.save(preferences);
+        }
+        session.setDirection(value);
     }
 
     public List<SourceContentUnit> contentUnits() {
@@ -144,10 +154,13 @@ public final class ReaderController implements AutoCloseable {
     }
 
     public void setDisplay(ReaderDisplayPreferences preferences, boolean titleOverride) {
+        ReaderDisplayPreferences value = Objects.requireNonNull(
+                preferences,
+                "preferences must not be null").withReadingDirection(session.snapshot().direction());
         if (titleOverride && libraryItemId != null) {
-            display.saveOverride(session.snapshot().libraryItemId(), preferences);
+            display.saveOverride(session.snapshot().libraryItemId(), value);
         } else {
-            display.save(preferences);
+            display.save(value);
         }
     }
 
@@ -174,5 +187,9 @@ public final class ReaderController implements AutoCloseable {
             }
         }
         return false;
+    }
+
+    private void restoreReadingDirection() {
+        session.setDirection(display.snapshot(session.snapshot().libraryItemId()).readingDirection());
     }
 }

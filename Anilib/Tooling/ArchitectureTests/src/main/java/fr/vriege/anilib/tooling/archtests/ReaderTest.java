@@ -25,6 +25,8 @@ import fr.vriege.anilib.feature.reader.runtime.DefaultReaderService;
 import fr.vriege.anilib.feature.reader.runtime.FileReaderDisplayPreferenceStore;
 import fr.vriege.anilib.feature.reader.runtime.FileReaderInteractionPreferenceStore;
 import fr.vriege.anilib.feature.reader.runtime.FileReaderReadStateStore;
+import fr.vriege.anilib.feature.reader.ui.ReaderController;
+import fr.vriege.anilib.feature.reader.ui.ReaderUiCapabilities;
 import fr.vriege.anilib.feature.source.InstalledSourceExtension;
 import fr.vriege.anilib.feature.source.PagedSource;
 import fr.vriege.anilib.feature.source.Source;
@@ -109,7 +111,8 @@ final class ReaderTest {
                     ReaderColorFilter.SEPIA,
                     125,
                     ReaderPageTransition.SLIDE,
-                    ReaderOrientationPolicy.LANDSCAPE);
+                    ReaderOrientationPolicy.LANDSCAPE,
+                    ReadingDirection.RIGHT_TO_LEFT);
             FileReaderDisplayPreferenceStore store = new FileReaderDisplayPreferenceStore(file);
             store.save(customized);
             ReaderDisplayPreferences reopened = new FileReaderDisplayPreferenceStore(file).snapshot();
@@ -203,12 +206,20 @@ final class ReaderTest {
                         "reader progress must retain the chapter extent");
                 counter.check(saved.history().size() == 1,
                         "opening a reader session must append one history entry");
+                try (ReaderController controller = product
+                        .capability(ReaderUiCapabilities.PRESENTATION)
+                        .open(item.id())) {
+                    controller.setDirection(ReadingDirection.WEBTOON);
+                }
             }
 
             try (StartedAnilib product = StandardAnilib.start(dataDirectory);
-                    ReaderSession resumed = product.capability(ReaderCapabilities.SERVICE).open(itemId)) {
+                    ReaderSession resumed = product.capability(ReaderCapabilities.SERVICE).open(itemId);
+                    ReaderController controller = product.capability(ReaderUiCapabilities.PRESENTATION).open(itemId)) {
                 counter.check(resumed.snapshot().currentPageIndex() == 1,
                         "reader must resume the persisted page after a product restart");
+                counter.check(controller.snapshot().direction() == ReadingDirection.WEBTOON,
+                        "reader mode must survive Android and desktop restart");
             }
         } catch (IOException exception) {
             throw new AssertionError("Unable to prepare local reader test", exception);

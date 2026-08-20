@@ -8,6 +8,7 @@ import fr.vriege.anilib.feature.reader.ReaderOrientationPolicy;
 import fr.vriege.anilib.feature.reader.ReaderPageTransition;
 import fr.vriege.anilib.feature.reader.ReaderRotation;
 import fr.vriege.anilib.feature.reader.ReaderScaleMode;
+import fr.vriege.anilib.feature.reader.ReadingDirection;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -96,7 +97,10 @@ public final class FileReaderDisplayPreferenceStore implements ReaderDisplayPref
                             defaults.transition().name())),
                     ReaderOrientationPolicy.valueOf(values.getOrDefault(
                             prefix + "orientationPolicy",
-                            defaults.orientationPolicy().name())));
+                            defaults.orientationPolicy().name())),
+                    ReadingDirection.valueOf(values.getOrDefault(
+                            prefix + "readingDirection",
+                            defaults.readingDirection().name())));
         } catch (IllegalArgumentException exception) {
             throw new IllegalStateException("Invalid reader display preference value", exception);
         }
@@ -116,6 +120,7 @@ public final class FileReaderDisplayPreferenceStore implements ReaderDisplayPref
         values.put(prefix + "brightnessPercent", Integer.toString(preferences.brightnessPercent()));
         values.put(prefix + "transition", preferences.transition().name());
         values.put(prefix + "orientationPolicy", preferences.orientationPolicy().name());
+        values.put(prefix + "readingDirection", preferences.readingDirection().name());
     }
 
     private Map<String, String> readRows() {
