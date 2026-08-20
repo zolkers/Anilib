@@ -105,6 +105,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.vriege.anilib.feature.library.LibraryCategory
+import fr.vriege.anilib.feature.library.LibraryCategoryScope
 import fr.vriege.anilib.feature.library.LibraryProgress
 import fr.vriege.anilib.feature.library.LibraryTitleMetadata
 import fr.vriege.anilib.feature.library.LibraryDisplayDensity
@@ -825,6 +826,8 @@ private fun LibraryPageContent(
             }
         }
         .toList()
+    val selectedCards = overview.titles().filter { it.id() in selected }
+    val allSelectedFavorites = selectedCards.isNotEmpty() && selectedCards.all(LibraryCard::favorite)
     Scaffold(
         topBar = {
             TopAppBar(
@@ -913,12 +916,21 @@ private fun LibraryPageContent(
                     }
                     IconButton(
                         enabled = selected.isNotEmpty(),
-                        onClick = { update { presentation.setFavorite(selected, false) } },
+                        onClick = {
+                            update { presentation.setFavorite(selected, !allSelectedFavorites) }
+                        },
                     ) {
-                        Icon(Icons.Default.FavoriteBorder, contentDescription = "ui.remove.from.library")
+                        Icon(
+                            if (allSelectedFavorites) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            contentDescription = if (allSelectedFavorites) {
+                                "ui.remove.from.library"
+                            } else {
+                                "ui.add.to.library"
+                            },
+                        )
                     }
                     IconButton(
-                        enabled = selected.isNotEmpty() && scopedCategories.isNotEmpty(),
+                        enabled = selected.isNotEmpty(),
                         onClick = { categoryAction = true },
                     ) {
                         Icon(Icons.Outlined.Category, contentDescription = "ui.category")
@@ -1047,6 +1059,19 @@ private fun LibraryPageContent(
         BulkCategoryDialog(
             categories = scopedCategories,
             dismiss = { categoryAction = false },
+            create = { value ->
+                update {
+                    presentation.createCategory(
+                        value,
+                        if (kind == MediaKind.ANIME) {
+                            LibraryCategoryScope.ANIME
+                        } else {
+                            LibraryCategoryScope.MANGA
+                        },
+                    )
+                    presentation.addToCategory(selected, value)
+                }
+            },
             add = { value ->
                 update { presentation.addToCategory(selected, value) }
                 categoryAction = false
@@ -1101,14 +1126,33 @@ private fun Set<LibraryItemId>.toggle(id: LibraryItemId): Set<LibraryItemId> =
 private fun BulkCategoryDialog(
     categories: List<String>,
     dismiss: () -> Unit,
+    create: (String) -> Unit,
     add: (String) -> Unit,
     remove: (String) -> Unit,
 ) {
+    var newCategory by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = dismiss,
         title = { Text("ui.update.categories") },
         text = {
             Column {
+                OutlinedTextField(
+                    value = newCategory,
+                    onValueChange = { newCategory = it },
+                    label = { Text("ui.category.name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                TextButton(
+                    enabled = newCategory.isNotBlank(),
+                    onClick = {
+                        create(newCategory.trim())
+                        newCategory = ""
+                    },
+                    modifier = Modifier.align(Alignment.End),
+                ) {
+                    Text("ui.create.category")
+                }
                 categories.forEach { category ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
