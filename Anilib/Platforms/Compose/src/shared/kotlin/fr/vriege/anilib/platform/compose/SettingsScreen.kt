@@ -56,6 +56,7 @@ import com.multiplatform.webview.cookie.WebViewCookieManager
 import fr.vriege.anilib.feature.network.NetworkMaintenance
 import fr.vriege.anilib.feature.network.NetworkPolicy
 import fr.vriege.anilib.feature.settings.SettingsSnapshot
+import fr.vriege.anilib.feature.settings.ApplicationWindowMode
 import fr.vriege.anilib.feature.settings.DiagnosticResetArea
 import fr.vriege.anilib.feature.settings.DiagnosticResetPlan
 import fr.vriege.anilib.feature.settings.DiagnosticSnapshot
@@ -77,7 +78,7 @@ import kotlinx.coroutines.withContext
 internal fun SettingsScreen(
     presentation: SettingsPresentation,
     settings: SettingsSnapshot,
-    supportsPlayerWindowModes: Boolean,
+    supportsDesktopWindowModes: Boolean,
     maintenance: NetworkMaintenance,
     browserDataController: BrowserDataController,
     diagnosticExportPicker: BackupImportPicker,
@@ -151,7 +152,7 @@ internal fun SettingsScreen(
             destination = selected,
             presentation = presentation,
             settings = settings,
-            supportsPlayerWindowModes = supportsPlayerWindowModes,
+            supportsDesktopWindowModes = supportsDesktopWindowModes,
             result = result,
             openDownloads = openDownloads,
             openBackup = openBackup,
@@ -390,7 +391,7 @@ private fun SettingsDetail(
     destination: SettingsDestination,
     presentation: SettingsPresentation,
     settings: SettingsSnapshot,
-    supportsPlayerWindowModes: Boolean,
+    supportsDesktopWindowModes: Boolean,
     result: String?,
     openDownloads: () -> Unit,
     openBackup: () -> Unit,
@@ -402,6 +403,7 @@ private fun SettingsDetail(
     goBack: () -> Unit,
 ) {
     var choosingLanguage by remember { mutableStateOf(false) }
+    var choosingApplicationWindowMode by remember { mutableStateOf(false) }
     var choosingPlayerWindowMode by remember { mutableStateOf(false) }
     AnilibSubScreenScaffold(title = destination.title, goBack = goBack) { padding ->
         LazyColumn(modifier = Modifier.fillMaxSize().padding(padding)) {
@@ -455,6 +457,15 @@ private fun SettingsDetail(
                             presentation.setNavigationStyle(settings.navigationStyle().next())
                         }
                     }
+                    if (supportsDesktopWindowModes) {
+                        item { SettingsSection("ui.desktop.window") }
+                        item {
+                            SettingsRow(
+                                "ui.application.window.mode",
+                                applicationWindowModeLabel(settings.applicationWindowMode()),
+                            ) { choosingApplicationWindowMode = true }
+                        }
+                    }
                     item { SettingsHint("ui.appearance.changes.apply.immediately.on.android.and.desktop") }
                 }
                 SettingsDestination.PRIVACY -> {
@@ -497,7 +508,7 @@ private fun SettingsDetail(
                 }
                 SettingsDestination.PLAYER -> {
                     item { SettingsSection("ui.player.behavior") }
-                    if (supportsPlayerWindowModes) {
+                    if (supportsDesktopWindowModes) {
                         item {
                             SettingsRow(
                                 "ui.player.window.mode",
@@ -589,6 +600,16 @@ private fun SettingsDetail(
             close = { choosingLanguage = false },
         )
     }
+    if (choosingApplicationWindowMode) {
+        ApplicationWindowModeDialog(
+            selected = settings.applicationWindowMode(),
+            select = {
+                presentation.setApplicationWindowMode(it)
+                choosingApplicationWindowMode = false
+            },
+            close = { choosingApplicationWindowMode = false },
+        )
+    }
     if (choosingPlayerWindowMode) {
         PlayerWindowModeDialog(
             selected = settings.playerWindowMode(),
@@ -599,6 +620,41 @@ private fun SettingsDetail(
             close = { choosingPlayerWindowMode = false },
         )
     }
+}
+
+@Composable
+private fun ApplicationWindowModeDialog(
+    selected: ApplicationWindowMode,
+    select: (ApplicationWindowMode) -> Unit,
+    close: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = close,
+        title = { Text("ui.choose.application.window.mode") },
+        text = {
+            Column {
+                ApplicationWindowMode.entries.forEach { mode ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { select(mode) }
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(
+                            selected = selected == mode,
+                            onClick = { select(mode) },
+                        )
+                        Column(modifier = Modifier.padding(start = 8.dp)) {
+                            Text(applicationWindowModeLabel(mode), fontWeight = FontWeight.SemiBold)
+                            Text(applicationWindowModeDescription(mode), style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = close) { Text("ui.cancel") } },
+    )
 }
 
 @Composable
@@ -1042,6 +1098,18 @@ private fun playerWindowModeLabel(mode: PlayerWindowMode): String = when (mode) 
     PlayerWindowMode.WINDOWED -> "ui.player.window.mode.windowed"
     PlayerWindowMode.FULLSCREEN -> "ui.player.window.mode.fullscreen"
     PlayerWindowMode.BORDERLESS -> "ui.player.window.mode.borderless"
+}
+
+private fun applicationWindowModeLabel(mode: ApplicationWindowMode): String = when (mode) {
+    ApplicationWindowMode.WINDOWED -> "ui.application.window.mode.windowed"
+    ApplicationWindowMode.MAXIMIZED -> "ui.application.window.mode.maximized"
+    ApplicationWindowMode.BORDERLESS -> "ui.application.window.mode.borderless"
+}
+
+private fun applicationWindowModeDescription(mode: ApplicationWindowMode): String = when (mode) {
+    ApplicationWindowMode.WINDOWED -> "ui.application.window.mode.windowed.description"
+    ApplicationWindowMode.MAXIMIZED -> "ui.application.window.mode.maximized.description"
+    ApplicationWindowMode.BORDERLESS -> "ui.application.window.mode.borderless.description"
 }
 
 private fun playerWindowModeDescription(mode: PlayerWindowMode): String = when (mode) {

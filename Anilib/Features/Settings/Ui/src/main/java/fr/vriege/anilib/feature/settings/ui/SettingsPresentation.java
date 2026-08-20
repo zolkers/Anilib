@@ -3,6 +3,7 @@ package fr.vriege.anilib.feature.settings.ui;
 import fr.vriege.anilib.feature.settings.DiagnosticResetArea;
 import fr.vriege.anilib.feature.settings.DiagnosticResetPlan;
 import fr.vriege.anilib.feature.settings.DiagnosticSnapshot;
+import fr.vriege.anilib.feature.settings.ApplicationWindowMode;
 import fr.vriege.anilib.feature.settings.BrowserPolicy;
 import fr.vriege.anilib.feature.settings.SettingsSnapshot;
 import fr.vriege.anilib.feature.settings.AccentColor;
@@ -37,6 +38,8 @@ public interface SettingsPresentation {
     void setReducedMotion(boolean enabled);
 
     void setNavigationStyle(NavigationStyle navigationStyle);
+
+    void setApplicationWindowMode(ApplicationWindowMode applicationWindowMode);
 
     void setPlayerWindowMode(PlayerWindowMode playerWindowMode);
 

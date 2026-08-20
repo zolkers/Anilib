@@ -4,6 +4,7 @@ import fr.vriege.anilib.feature.settings.SettingsSnapshot;
 import fr.vriege.anilib.feature.settings.DiagnosticResetArea;
 import fr.vriege.anilib.feature.settings.BrowserPolicy;
 import fr.vriege.anilib.feature.settings.AccentColor;
+import fr.vriege.anilib.feature.settings.ApplicationWindowMode;
 import fr.vriege.anilib.feature.settings.LanguagePack;
 import fr.vriege.anilib.feature.settings.NavigationStyle;
 import fr.vriege.anilib.feature.settings.PlayerWindowMode;
@@ -58,6 +59,7 @@ final class SettingsTest {
             presentation.setTypographyScale(TypographyScale.LARGE);
             presentation.setReducedMotion(true);
             presentation.setNavigationStyle(NavigationStyle.NAVIGATION_RAIL);
+            presentation.setApplicationWindowMode(ApplicationWindowMode.MAXIMIZED);
             presentation.setPlayerWindowMode(PlayerWindowMode.FULLSCREEN);
             BrowserPolicy browserPolicy = new BrowserPolicy(
                     true, true, false, false, true, true, 125);
@@ -67,7 +69,7 @@ final class SettingsTest {
             presentation.setIncognitoMode(true);
             presentation.setDownloadOnlyOnWifi(false);
             presentation.setUpdateOnlyOnWifi(false);
-            counter.check(observations.get() == 15,
+            counter.check(observations.get() == 16,
                     "every settings change must publish one immutable snapshot");
             close(observation);
 
@@ -79,6 +81,7 @@ final class SettingsTest {
                     TypographyScale.LARGE,
                     true,
                     NavigationStyle.NAVIGATION_RAIL,
+                    ApplicationWindowMode.MAXIMIZED,
                     PlayerWindowMode.FULLSCREEN,
                     browserPolicy,
                     StartScreen.BROWSE,
@@ -92,7 +95,7 @@ final class SettingsTest {
                     "settings must survive a service restart");
 
             presentation.setThemeMode(ThemeMode.LIGHT);
-            counter.check(observations.get() == 15,
+            counter.check(observations.get() == 16,
                     "closed settings observations must stop receiving changes");
             diagnostics.recordLog("settings test log");
             diagnostics.recordCrash("settings test crash", "bounded details");

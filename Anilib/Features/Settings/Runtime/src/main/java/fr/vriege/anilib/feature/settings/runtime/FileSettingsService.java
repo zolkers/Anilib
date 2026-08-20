@@ -3,6 +3,7 @@ package fr.vriege.anilib.feature.settings.runtime;
 import fr.vriege.anilib.feature.settings.SettingsService;
 import fr.vriege.anilib.feature.settings.SettingsSnapshot;
 import fr.vriege.anilib.feature.settings.AccentColor;
+import fr.vriege.anilib.feature.settings.ApplicationWindowMode;
 import fr.vriege.anilib.feature.settings.BrowserPolicy;
 import fr.vriege.anilib.feature.settings.LanguagePack;
 import fr.vriege.anilib.feature.settings.NavigationStyle;
@@ -38,6 +39,7 @@ public final class FileSettingsService implements SettingsService {
     private static final String TYPOGRAPHY = "appearance.typography";
     private static final String REDUCED_MOTION = "accessibility.reduced-motion";
     private static final String NAVIGATION = "appearance.navigation";
+    private static final String APPLICATION_WINDOW_MODE = "appearance.window-mode";
     private static final String PLAYER_WINDOW_MODE = "player.window-mode";
     private static final String BROWSER_JAVA_SCRIPT = "browser.java-script";
     private static final String BROWSER_DOM_STORAGE = "browser.dom-storage";
@@ -110,6 +112,10 @@ public final class FileSettingsService implements SettingsService {
                 flag(values, REDUCED_MOTION, defaults.reducedMotion()),
                 enumValue(values.getProperty(NAVIGATION), defaults.navigationStyle(), NavigationStyle.class),
                 enumValue(
+                        values.getProperty(APPLICATION_WINDOW_MODE),
+                        defaults.applicationWindowMode(),
+                        ApplicationWindowMode.class),
+                enumValue(
                         values.getProperty(PLAYER_WINDOW_MODE),
                         defaults.playerWindowMode(),
                         PlayerWindowMode.class),
@@ -130,6 +136,7 @@ public final class FileSettingsService implements SettingsService {
         values.setProperty(TYPOGRAPHY, setting(settings.typographyScale()));
         values.setProperty(REDUCED_MOTION, Boolean.toString(settings.reducedMotion()));
         values.setProperty(NAVIGATION, setting(settings.navigationStyle()));
+        values.setProperty(APPLICATION_WINDOW_MODE, setting(settings.applicationWindowMode()));
         values.setProperty(PLAYER_WINDOW_MODE, setting(settings.playerWindowMode()));
         BrowserPolicy browser = settings.browserPolicy();
         values.setProperty(BROWSER_JAVA_SCRIPT, Boolean.toString(browser.javaScriptEnabled()));

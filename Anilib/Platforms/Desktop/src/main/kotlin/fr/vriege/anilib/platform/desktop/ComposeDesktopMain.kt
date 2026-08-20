@@ -2,6 +2,7 @@ package fr.vriege.anilib.platform.desktop
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.input.key.Key
@@ -24,6 +25,7 @@ import fr.vriege.anilib.feature.library.ui.LibraryUiCapabilities
 import fr.vriege.anilib.feature.network.NetworkCapabilities
 import fr.vriege.anilib.feature.reader.ui.ReaderUiCapabilities
 import fr.vriege.anilib.feature.settings.ui.SettingsUiCapabilities
+import fr.vriege.anilib.feature.settings.ApplicationWindowMode
 import fr.vriege.anilib.feature.settings.SettingsCapabilities
 import fr.vriege.anilib.feature.settings.PlayerWindowMode
 import fr.vriege.anilib.feature.player.ui.PlayerUiCapabilities
@@ -83,27 +85,42 @@ fun main(arguments: Array<String>) {
     val settingsService = started.capability(SettingsCapabilities.SERVICE)
     try {
         application {
-            val windowState = rememberWindowState()
+            val initialApplicationWindowMode = settingsService.snapshot().applicationWindowMode()
+            val windowState = rememberWindowState(placement = initialApplicationWindowMode.placement())
+            val applicationWindowMode = remember { mutableStateOf(initialApplicationWindowMode) }
             val playerFullscreen = remember { mutableStateOf(false) }
             val playerWindowMode = remember { mutableStateOf(PlayerWindowMode.BORDERLESS) }
             val placementBeforeFullscreen = remember { mutableStateOf(WindowPlacement.Floating) }
+            val applicationModeBeforeFullscreen = remember { mutableStateOf(initialApplicationWindowMode) }
             val setPlayerFullscreen: (Boolean) -> Unit = remember(windowState) {
                 { fullscreen ->
                     if (fullscreen != playerFullscreen.value) {
                         if (fullscreen) {
                             placementBeforeFullscreen.value = windowState.placement
+                            applicationModeBeforeFullscreen.value = applicationWindowMode.value
                             playerWindowMode.value = settingsService.snapshot().playerWindowMode()
                             windowState.placement = when (playerWindowMode.value) {
                                 PlayerWindowMode.WINDOWED -> windowState.placement
                                 PlayerWindowMode.FULLSCREEN -> WindowPlacement.Fullscreen
                                 PlayerWindowMode.BORDERLESS -> WindowPlacement.Maximized
                             }
-                        } else {
+                        } else if (applicationModeBeforeFullscreen.value == applicationWindowMode.value) {
                             windowState.placement = placementBeforeFullscreen.value
+                        } else {
+                            windowState.placement = applicationWindowMode.value.placement()
                         }
                         playerFullscreen.value = fullscreen
                     }
                 }
+            }
+            DisposableEffect(settingsService, windowState) {
+                val observation = settingsService.observe { settings ->
+                    applicationWindowMode.value = settings.applicationWindowMode()
+                    if (!playerFullscreen.value) {
+                        windowState.placement = settings.applicationWindowMode().placement()
+                    }
+                }
+                onDispose { observation.close() }
             }
             Window(
                 onCloseRequest = {
@@ -127,10 +144,24 @@ fun main(arguments: Array<String>) {
                 },
                 title = "Anilib",
                 state = windowState,
-                undecorated = playerFullscreen.value && playerWindowMode.value == PlayerWindowMode.BORDERLESS,
+                undecorated = if (playerFullscreen.value) {
+                    playerWindowMode.value == PlayerWindowMode.BORDERLESS
+                } else {
+                    applicationWindowMode.value == ApplicationWindowMode.BORDERLESS
+                },
                 onPreviewKeyEvent = { event ->
                     if (playerFullscreen.value && event.key == Key.Escape && event.type == KeyEventType.KeyDown) {
                         setPlayerFullscreen(false)
+                        true
+                    } else if (
+                        !playerFullscreen.value &&
+                        applicationWindowMode.value == ApplicationWindowMode.BORDERLESS &&
+                        event.key == Key.Escape &&
+                        event.type == KeyEventType.KeyDown
+                    ) {
+                        settingsService.replace(
+                            settingsService.snapshot().withApplicationWindowMode(ApplicationWindowMode.WINDOWED),
+                        )
                         true
                     } else {
                         false
@@ -154,6 +185,13 @@ fun main(arguments: Array<String>) {
     } finally {
         crashShield.close()
     }
+}
+
+private fun ApplicationWindowMode.placement(): WindowPlacement = when (this) {
+    ApplicationWindowMode.WINDOWED -> WindowPlacement.Floating
+    ApplicationWindowMode.MAXIMIZED,
+    ApplicationWindowMode.BORDERLESS,
+    -> WindowPlacement.Maximized
 }
 
 @Composable
