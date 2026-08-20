@@ -4,19 +4,27 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performMultiModalInput
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.printToString
+import androidx.compose.ui.test.pinch
 import androidx.compose.ui.test.v2.runComposeUiTest
 import androidx.compose.ui.unit.dp
 import fr.vriege.anilib.configuration.standard.StandardAnilib
@@ -139,6 +147,8 @@ class UiRouteScreenshotTest {
                 onNodeWithContentDescription("Read").performClick()
                 waitForContentDescription("Close reader")
                 captureStable("Reader with decoded local page")
+                assertReaderZoomInputs()
+                onNodeWithContentDescription("Show reader controls").performClick()
                 onNodeWithContentDescription("Reading mode").performClick()
                 onNodeWithText("Vertical").performClick()
                 waitForContentDescription("Page 1")
@@ -332,6 +342,34 @@ class UiRouteScreenshotTest {
             color.alpha > 0.8f && color.red + color.green + color.blue > 1.5f
         }
         assertTrue(filledSamples >= 2, "$route left a viewport-sized gap around an original-size page")
+    }
+
+    private fun ComposeUiTest.assertReaderZoomInputs() {
+        val canvas = onNodeWithTag("reader-canvas", useUnmergedTree = true)
+        canvas.assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "100%"))
+        canvas.performMultiModalInput {
+            key { keyDown(Key.CtrlLeft) }
+            mouse { updatePointerTo(center); scroll(-1f) }
+            key { keyUp(Key.CtrlLeft) }
+        }
+        canvas.assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "112%"))
+        canvas.performMultiModalInput {
+            key { keyDown(Key.CtrlLeft) }
+            mouse { scroll(1f) }
+            key { keyUp(Key.CtrlLeft) }
+        }
+        canvas.assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "100%"))
+        canvas.performMultiModalInput {
+            touch {
+                pinch(
+                    start0 = center + Offset(-24f, 0f),
+                    end0 = center + Offset(-96f, 0f),
+                    start1 = center + Offset(24f, 0f),
+                    end1 = center + Offset(96f, 0f),
+                )
+            }
+        }
+        canvas.assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "400%"))
     }
 
     @Composable

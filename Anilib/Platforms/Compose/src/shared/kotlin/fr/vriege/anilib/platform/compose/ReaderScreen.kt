@@ -63,6 +63,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.PointerInputScope
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -283,6 +286,9 @@ internal fun ReaderScreen(
     val readerModifier = Modifier
         .fillMaxSize()
         .background(Color.Black)
+        .testTag("reader-canvas")
+        .semantics { stateDescription = "${(zoomScale * 100f).roundToInt()}%" }
+        .readerPlatformZoom { transformZoom(Offset.Zero, it) }
         .pointerInput(controller, snapshot.contentUnit().id(), snapshot.currentPageIndex()) {
             detectReaderPinchGestures(::transformZoom)
         }
