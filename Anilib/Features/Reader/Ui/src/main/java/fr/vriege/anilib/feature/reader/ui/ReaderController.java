@@ -31,6 +31,7 @@ public final class ReaderController implements AutoCloseable {
     ReaderController(
             ReaderService reader,
             LibraryItemId libraryItemId,
+            SourceContentUnitId contentUnitId,
             ReaderInteractionPreferenceStore interactions,
             ReaderDisplayPreferenceStore display,
             ReaderReadStateStore readState) {
@@ -41,7 +42,9 @@ public final class ReaderController implements AutoCloseable {
         this.interactions = Objects.requireNonNull(interactions, "interactions must not be null");
         this.display = Objects.requireNonNull(display, "display must not be null");
         this.readState = Objects.requireNonNull(readState, "readState must not be null");
-        this.session = reader.open(libraryItemId);
+        this.session = contentUnitId == null
+                ? reader.open(libraryItemId)
+                : reader.open(libraryItemId, contentUnitId);
     }
 
     ReaderController(

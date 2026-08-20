@@ -47,6 +47,7 @@ internal fun ReaderContinuousPages(
     consumeScrollTarget: () -> Unit,
     pageSelected: (Int) -> Unit,
     toggleControls: () -> Unit,
+    toggleZoom: () -> Unit,
 ) {
     val firstPage = initialPage.coerceIn(0, (pageCount - 1).coerceAtLeast(0))
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = firstPage)
@@ -69,7 +70,10 @@ internal fun ReaderContinuousPages(
 
     LazyColumn(
         state = listState,
-        modifier = Modifier.fillMaxSize().combinedClickable(onClick = toggleControls),
+        modifier = Modifier.fillMaxSize().combinedClickable(
+            onClick = toggleControls,
+            onDoubleClick = toggleZoom,
+        ),
         verticalArrangement = Arrangement.spacedBy(spacing),
     ) {
         items(pageCount, key = { it }) { pageIndex ->

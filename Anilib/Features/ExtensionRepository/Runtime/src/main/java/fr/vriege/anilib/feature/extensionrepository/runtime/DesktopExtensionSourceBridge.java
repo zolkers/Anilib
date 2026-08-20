@@ -711,7 +711,7 @@ public final class DesktopExtensionSourceBridge {
             requireOwned(source, page.contentUnitId().itemId());
             return bytes("/api/v1/proxy", Map.of(
                     "sourceId", source.remoteId,
-                    "url", requiredWebUri(page.value(), "Manga page location").toASCIIString(),
+                    "url", page.value(),
                     "pageIndex", Integer.toString(page.index())));
         }
     }

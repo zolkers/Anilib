@@ -360,7 +360,8 @@ public final class ExtensionSourceOperations {
                 ExtensionOperationDispatcher.invokeAny(source, "getClient"), OkHttpClient.class);
         try (Response response = client.newCall(request).execute()) {
             if (!response.isSuccessful()) {
-                throw new RemoteRequestException("Source request failed with HTTP " + response.code());
+                throw new RemoteRequestException(
+                        "Source request failed with HTTP " + response.code() + " at " + request.url());
             }
             try {
                 return ExtensionOperationDispatcher.result(

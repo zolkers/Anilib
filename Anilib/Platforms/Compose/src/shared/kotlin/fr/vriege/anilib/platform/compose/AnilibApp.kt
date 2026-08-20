@@ -128,6 +128,7 @@ import fr.vriege.anilib.feature.settings.SettingsSnapshot
 import fr.vriege.anilib.feature.settings.AccentColor
 import fr.vriege.anilib.feature.settings.LanguagePack
 import fr.vriege.anilib.feature.settings.NavigationStyle
+import fr.vriege.anilib.feature.source.SourceContentUnitId
 import fr.vriege.anilib.feature.settings.StartScreen
 import fr.vriege.anilib.feature.settings.ThemeFamily
 import fr.vriege.anilib.feature.settings.ThemeMode
@@ -334,9 +335,13 @@ fun AnilibApp(
                     )
                 }
             } else {
-                val openReader: (LibraryItemId) -> Unit = { id ->
+                val openReader: (LibraryItemId, SourceContentUnitId?) -> Unit = { id, contentUnitId ->
                     scope.launch {
-                        withContext(Dispatchers.IO) { runCatching { reader.open(id) } }
+                        withContext(Dispatchers.IO) {
+                            runCatching {
+                                if (contentUnitId == null) reader.open(id) else reader.open(id, contentUnitId)
+                            }
+                        }
                             .onSuccess {
                                 readerError = null
                                 activeReader = it
@@ -530,7 +535,7 @@ private fun ExpandedShell(
     componentCount: Int,
     navigate: ((LibraryNavigator) -> Unit) -> Unit,
     openSection: (AppSection) -> Unit,
-    openReader: (LibraryItemId) -> Unit,
+    openReader: (LibraryItemId, SourceContentUnitId?) -> Unit,
     readerError: String?,
     openPlayer: (LibraryItemId, SourceEpisodeId?) -> Unit,
     enqueueDownload: (LibraryItemId) -> Unit,
@@ -614,7 +619,7 @@ private fun CompactShell(
     componentCount: Int,
     navigate: ((LibraryNavigator) -> Unit) -> Unit,
     openSection: (AppSection) -> Unit,
-    openReader: (LibraryItemId) -> Unit,
+    openReader: (LibraryItemId, SourceContentUnitId?) -> Unit,
     readerError: String?,
     openPlayer: (LibraryItemId, SourceEpisodeId?) -> Unit,
     enqueueDownload: (LibraryItemId) -> Unit,
@@ -739,7 +744,7 @@ private fun AppDestination(
     componentCount: Int,
     navigate: ((LibraryNavigator) -> Unit) -> Unit,
     openSection: (AppSection) -> Unit,
-    openReader: (LibraryItemId) -> Unit,
+    openReader: (LibraryItemId, SourceContentUnitId?) -> Unit,
     readerError: String?,
     openPlayer: (LibraryItemId, SourceEpisodeId?) -> Unit,
     enqueueDownload: (LibraryItemId) -> Unit,
@@ -1461,7 +1466,7 @@ private fun HistoryPage(
     presentation: LibraryPresentation,
     reader: ReaderPresentation,
     player: PlayerPresentation,
-    openReader: (LibraryItemId) -> Unit,
+    openReader: (LibraryItemId, SourceContentUnitId?) -> Unit,
     openPlayer: (LibraryItemId, SourceEpisodeId?) -> Unit,
     resumeError: String?,
     goBack: () -> Unit,
@@ -1617,7 +1622,7 @@ private fun HistoryPage(
                                             episodeIds[HistoryContentKey(row.libraryItemId(), row.contentId())],
                                         )
                                     } else {
-                                        openReader(row.libraryItemId())
+                                        openReader(row.libraryItemId(), null)
                                     }
                                 },
                                 remove = {
@@ -1739,7 +1744,7 @@ private fun DetailsDestination(
     tracking: TrackerPresentation,
     destination: LibraryNavigationState,
     navigate: ((LibraryNavigator) -> Unit) -> Unit,
-    openReader: (LibraryItemId) -> Unit,
+    openReader: (LibraryItemId, SourceContentUnitId?) -> Unit,
     readerError: String?,
     openPlayer: (LibraryItemId, SourceEpisodeId?) -> Unit,
     enqueueDownload: (LibraryItemId) -> Unit,
@@ -1823,7 +1828,7 @@ private fun DetailsDestination(
             canTrack = true,
             readerError = readerError,
             downloadError = downloadError,
-            read = { openReader(details.id()) },
+            read = { chapter -> openReader(details.id(), chapter?.id()) },
             watch = { openPlayer(details.id(), null) },
             watchEpisode = { episode -> openPlayer(details.id(), episode.episode().id()) },
             download = { enqueueDownload(details.id()) },
@@ -1879,7 +1884,7 @@ private fun DetailsPage(
     canTrack: Boolean,
     readerError: String?,
     downloadError: String?,
-    read: () -> Unit,
+    read: (SourceContentUnit?) -> Unit,
     watch: () -> Unit,
     watchEpisode: (EpisodeSnapshot) -> Unit,
     download: () -> Unit,
@@ -1922,7 +1927,7 @@ private fun DetailsPage(
         download = download,
         share = share,
         edit = { editing = true },
-        openPrimary = if (canWatch) watch else read,
+        openPrimary = if (canWatch) watch else ({ read(null) }),
         goBack = goBack,
     ) {
             if (chapters.isNotEmpty()) {
@@ -1931,7 +1936,7 @@ private fun DetailsPage(
                     MediaUnitRow(
                         title = chapter.title(),
                         summary = chapter.publishedAt().map(mediaDateTimeFormatter::format).orElse("Available"),
-                        open = read,
+                        open = { read(chapter) },
                         download = { downloadChapter(chapter) },
                     )
                 }

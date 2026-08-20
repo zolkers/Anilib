@@ -16,7 +16,10 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.Comparator;
+import java.util.ArrayList;
 import java.util.HexFormat;
+import java.util.List;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -40,7 +43,7 @@ public final class ExtensionCompatibilitySmoke {
                     InetAddress.getLoopbackAddress(), 0, data)) {
                 server.start();
                 String sources = get(server, DesktopExtensionHostProtocol.SOURCES_PATH);
-                String mangaId = sourceId(sources, "MangaDex", null);
+                String mangaId = sourceId(sources, "MangaDex", "en");
                 String animeId = sourceId(sources, "Anime-Sama", "fr");
                 verifyMangaWorkflow(server, mangaId);
                 verifyAnimeWorkflow(server, animeId);
@@ -118,21 +121,54 @@ public final class ExtensionCompatibilitySmoke {
     }
 
     private static void verifyMangaWorkflow(DesktopExtensionHostServer server, String sourceId) throws Exception {
-        String catalogue = get(server, DesktopExtensionHostProtocol.MANGA_PATH + sourceId + "/popular?page=1");
+        String catalogue = get(server, DesktopExtensionHostProtocol.MANGA_PATH
+                + sourceId + "/search?page=1&query=one%20piece");
         verifyCatalogue(catalogue, "mangas");
-        String titleUrl = first(catalogue, "mangas", "url");
-        String title = first(catalogue, "mangas", "title");
-        String model = "?url=" + encode(titleUrl) + "&title=" + encode(title);
-        String detailsPath = DesktopExtensionHostProtocol.MANGA_PATH + sourceId + "/details" + model;
-        requireObject(get(server, detailsPath), "manga");
-        String chaptersPath = DesktopExtensionHostProtocol.MANGA_PATH + sourceId + "/chapters" + model;
-        String chapters = requireArray(get(server, chaptersPath), "chapters");
-        String chapterUrl = first(chapters, "chapters", "url");
-        String pagesPath = DesktopExtensionHostProtocol.MANGA_PATH + sourceId + "/pages?url=" + encode(chapterUrl);
-        requireArray(get(server, pagesPath), "pages");
-        requireObject(get(server, detailsPath), "manga");
-        requireArray(get(server, chaptersPath), "chapters");
-        requireArray(get(server, pagesPath), "pages");
+        String readableDetailsPath = null;
+        String readableChaptersPath = null;
+        String readablePagesPath = null;
+        List<String> titleUrls = all(catalogue, "url");
+        List<String> titles = all(catalogue, "title");
+        for (int titleIndex = 0; titleIndex < Math.min(titleUrls.size(), 20); titleIndex++) {
+            String title = titleIndex < titles.size() ? titles.get(titleIndex) : "Compatibility title";
+            String model = "?url=" + encode(titleUrls.get(titleIndex)) + "&title=" + encode(title);
+            String detailsPath = DesktopExtensionHostProtocol.MANGA_PATH + sourceId + "/details" + model;
+            String chaptersPath = DesktopExtensionHostProtocol.MANGA_PATH + sourceId + "/chapters" + model;
+            Optional<String> chaptersCandidate = getIfSuccessful(server, chaptersPath)
+                    .filter(document -> document.contains("\"chapters\":[{"));
+            if (chaptersCandidate.isEmpty()) {
+                continue;
+            }
+            for (String chapterUrl : all(chaptersCandidate.get(), "url").stream().limit(50).toList()) {
+                String pagesPath = DesktopExtensionHostProtocol.MANGA_PATH + sourceId
+                        + "/pages?url=" + encode(chapterUrl);
+                Optional<String> pagesCandidate = getIfSuccessful(server, pagesPath)
+                        .filter(document -> document.contains("\"pages\":[{"));
+                if (pagesCandidate.isEmpty()) {
+                    continue;
+                }
+                String pages = pagesCandidate.get();
+                String pageUrl = optionalFirst(pages, "pages", "imageUrl")
+                        .filter(value -> !value.isBlank())
+                        .orElseGet(() -> first(pages, "pages", "url"));
+                if (verifyBinary(server, DesktopExtensionHostProtocol.PROXY_PATH + "?sourceId=" + sourceId
+                        + "&pageIndex=0&url=" + encode(pageUrl))) {
+                    readableDetailsPath = detailsPath;
+                    readableChaptersPath = chaptersPath;
+                    readablePagesPath = pagesPath;
+                    break;
+                }
+            }
+            if (readablePagesPath != null) {
+                break;
+            }
+        }
+        if (readablePagesPath == null) {
+            throw new IllegalStateException("MangaDex returned chapters but no readable page image");
+        }
+        requireObject(get(server, readableDetailsPath), "manga");
+        requireArray(get(server, readableChaptersPath), "chapters");
+        requireArray(get(server, readablePagesPath), "pages");
     }
 
     private static void verifyAnimeWorkflow(DesktopExtensionHostServer server, String sourceId) throws Exception {
@@ -172,14 +208,48 @@ public final class ExtensionCompatibilitySmoke {
     }
 
     private static String first(String document, String collection, String field) {
+        return optionalFirst(document, collection, field)
+                .orElseThrow(() -> new IllegalStateException(
+                        "Extension response has no " + field + " in " + collection));
+    }
+
+    private static Optional<String> optionalFirst(String document, String collection, String field) {
         Pattern pattern = Pattern.compile("\\\"" + Pattern.quote(collection)
                 + "\\\":\\[\\{.*?\\\"" + Pattern.quote(field) + "\\\":\\\"((?:\\\\.|[^\\\"])*)\\\"",
                 Pattern.DOTALL);
         Matcher matcher = pattern.matcher(document);
         if (!matcher.find()) {
-            throw new IllegalStateException("Extension response has no " + field + " in " + collection);
+            return Optional.empty();
         }
-        return unescape(matcher.group(1));
+        return Optional.of(unescape(matcher.group(1)));
+    }
+
+    private static List<String> all(String document, String field) {
+        Pattern pattern = Pattern.compile("\\\"" + Pattern.quote(field)
+                + "\\\":\\\"((?:\\\\.|[^\\\"])*)\\\"");
+        Matcher matcher = pattern.matcher(document);
+        List<String> values = new ArrayList<>();
+        while (matcher.find()) {
+            values.add(unescape(matcher.group(1)));
+        }
+        return List.copyOf(values);
+    }
+
+    private static Optional<String> getIfSuccessful(
+            DesktopExtensionHostServer server,
+            String path) throws Exception {
+        HttpResponse<String> response = HttpClient.newHttpClient().send(
+                HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + server.port() + path)).build(),
+                HttpResponse.BodyHandlers.ofString());
+        return response.statusCode() == 200 ? Optional.of(response.body()) : Optional.empty();
+    }
+
+    private static boolean verifyBinary(DesktopExtensionHostServer server, String path) throws Exception {
+        HttpResponse<byte[]> response = HttpClient.newHttpClient().send(
+                HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + server.port() + path)).build(),
+                HttpResponse.BodyHandlers.ofByteArray());
+        String contentType = response.headers().firstValue("content-type").orElse("");
+        return response.statusCode() == 200 && response.body().length >= 128 && contentType.startsWith("image/");
     }
 
     private static String unescape(String value) {

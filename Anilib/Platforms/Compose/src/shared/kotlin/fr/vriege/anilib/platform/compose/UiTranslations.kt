@@ -384,6 +384,7 @@ internal object UiTranslations {
             "Extension icon" to "Icône de l’extension",
             "Extension icon unavailable" to "Icône de l’extension indisponible",
             "Close reader" to "Fermer le lecteur",
+            "Show reader controls" to "Afficher les contrÃ´les du lecteur",
             "Reader menu" to "Menu du lecteur",
             "Refresh repositories" to "Actualiser les dépôts",
             "Delete backup" to "Supprimer la sauvegarde",

@@ -14,6 +14,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -61,6 +62,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -83,6 +85,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
+import kotlin.math.sqrt
 
 private const val READER_CONTROLS_HIDE_DELAY_MILLIS = 3_500L
 
@@ -97,7 +100,8 @@ internal fun ReaderScreen(
     val scope = rememberCrashSafeCoroutineScope()
     var revision by remember(controller) { mutableIntStateOf(0) }
     var controlsVisible by remember(controller) { mutableStateOf(true) }
-    var zoomed by remember(controller) { mutableStateOf(false) }
+    var zoomScale by remember(controller) { mutableFloatStateOf(1f) }
+    var zoomOffset by remember(controller) { mutableStateOf(Offset.Zero) }
     var settingsMenu by remember(controller) { mutableStateOf(false) }
     var chapterMenu by remember(controller) { mutableStateOf(false) }
     var readerMenu by remember(controller) { mutableStateOf(false) }
@@ -135,6 +139,8 @@ internal fun ReaderScreen(
     ) {
         decodedPage = null
         decodedAdjacentPage = null
+        zoomScale = 1f
+        zoomOffset = Offset.Zero
         if (continuous) return@CrashSafeLaunchedEffect
         val pageIndex = snapshot.currentPageIndex()
         val loadAdjacent = display.dualPage() && pageIndex + 1 < snapshot.pageCount()
@@ -208,7 +214,11 @@ internal fun ReaderScreen(
             ReaderInteractionAction.PREVIOUS_PAGE -> move(true)
             ReaderInteractionAction.NEXT_PAGE -> move(false)
             ReaderInteractionAction.TOGGLE_CONTROLS -> controlsVisible = !controlsVisible
-            ReaderInteractionAction.TOGGLE_ZOOM -> zoomed = !zoomed
+            ReaderInteractionAction.TOGGLE_ZOOM -> {
+                zoomScale = if (zoomScale > 1.01f) 1f else 2f
+                zoomOffset = Offset.Zero
+                controlsVisible = false
+            }
             ReaderInteractionAction.OPEN_MENU -> settingsMenu = true
             ReaderInteractionAction.NONE -> Unit
         }
@@ -257,20 +267,47 @@ internal fun ReaderScreen(
             .onFailure { actionMessage = it.message ?: "The download could not be queued." }
     }
 
+    fun transformZoom(pan: Offset, gestureZoom: Float) {
+        val nextScale = (zoomScale * gestureZoom).coerceIn(1f, 5f)
+        if (nextScale <= 1.01f) {
+            zoomScale = 1f
+            zoomOffset = Offset.Zero
+        } else {
+            zoomScale = nextScale
+            zoomOffset += pan
+            controlsVisible = false
+        }
+    }
+
     var drag by remember(controller) { mutableStateOf(Offset.Zero) }
-    val readerModifier = Modifier.fillMaxSize().background(Color.Black)
+    val readerModifier = Modifier
+        .fillMaxSize()
+        .background(Color.Black)
+        .pointerInput(controller, snapshot.contentUnit().id(), snapshot.currentPageIndex()) {
+            detectReaderPinchGestures(::transformZoom)
+        }
     Box(
-        modifier = if (continuous) {
+        modifier = if (continuous && zoomScale <= 1.01f) {
             readerModifier
         } else {
-            readerModifier.pointerInput(interactions, snapshot.direction()) {
+            readerModifier.pointerInput(interactions, snapshot.direction(), zoomScale) {
                 detectDragGestures(
                     onDragStart = { drag = Offset.Zero },
                     onDrag = { change, amount ->
                         change.consume()
-                        drag += amount
+                        if (zoomScale > 1.01f) {
+                            val maximumX = size.width * (zoomScale - 1f) / 2f
+                            val maximumY = size.height * (zoomScale - 1f) / 2f
+                            zoomOffset = Offset(
+                                (zoomOffset.x + amount.x).coerceIn(-maximumX, maximumX),
+                                (zoomOffset.y + amount.y).coerceIn(-maximumY, maximumY),
+                            )
+                        } else {
+                            drag += amount
+                        }
                     },
                     onDragEnd = {
+                        if (zoomScale > 1.01f) return@detectDragGestures
                         val horizontal = kotlin.math.abs(drag.x) > kotlin.math.abs(drag.y)
                         val action = if (horizontal && kotlin.math.abs(drag.x) >= 48f) {
                             if (drag.x < 0f) interactions.swipeLeft() else interactions.swipeRight()
@@ -286,50 +323,66 @@ internal fun ReaderScreen(
         },
     ) {
         val reducedMotion = LocalReducedMotion.current
-        if (continuous) {
-            key(snapshot.contentUnit().id()) {
-                ReaderContinuousPages(
-                    controller = controller,
-                    pageDecoder = pageDecoder,
-                    pageCount = snapshot.pageCount(),
-                    initialPage = snapshot.currentPageIndex(),
-                    direction = snapshot.direction(),
-                    display = display,
-                    revision = revision,
-                    scrollTarget = continuousScrollTarget,
-                    consumeScrollTarget = { continuousScrollTarget = null },
-                    pageSelected = { continuousPageIndex = it },
-                    toggleControls = { controlsVisible = !controlsVisible },
-                )
+        Box(modifier = Modifier.fillMaxSize().clipToBounds()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer(
+                        scaleX = zoomScale,
+                        scaleY = zoomScale,
+                        translationX = zoomOffset.x,
+                        translationY = zoomOffset.y,
+                    ),
+            ) {
+                if (continuous) {
+                    key(snapshot.contentUnit().id()) {
+                        ReaderContinuousPages(
+                            controller = controller,
+                            pageDecoder = pageDecoder,
+                            pageCount = snapshot.pageCount(),
+                            initialPage = snapshot.currentPageIndex(),
+                            direction = snapshot.direction(),
+                            display = display,
+                            revision = revision,
+                            scrollTarget = continuousScrollTarget,
+                            consumeScrollTarget = { continuousScrollTarget = null },
+                            pageSelected = { continuousPageIndex = it },
+                            toggleControls = { controlsVisible = !controlsVisible },
+                            toggleZoom = { execute(ReaderInteractionAction.TOGGLE_ZOOM) },
+                        )
+                    }
+                } else decodedPage?.getOrNull()?.let { image ->
+                    val frame = ReaderPageFrame(
+                        image,
+                        decodedAdjacentPage?.getOrNull(),
+                        snapshot.currentPageIndex(),
+                        splitSecondHalf,
+                    )
+                    AnimatedContent(
+                        targetState = frame,
+                        transitionSpec = {
+                            readerTransition(
+                                if (reducedMotion) ReaderPageTransition.NONE else display.transition(),
+                            )
+                        },
+                        label = "reader-page",
+                    ) { current ->
+                        ReaderPages(
+                            primary = current.primary,
+                            adjacent = current.adjacent,
+                            pageIndex = current.pageIndex,
+                            direction = snapshot.direction(),
+                            display = display,
+                            zoomed = false,
+                            splitSecondHalf = current.splitSecondHalf,
+                        )
+                    }
+                } ?: if (decodedPage == null) {
+                    ReaderPageLoading()
+                } else {
+                    ReaderPageError(decodedPage?.exceptionOrNull()?.message) { revision++ }
+                }
             }
-        } else decodedPage?.getOrNull()?.let { image ->
-            val frame = ReaderPageFrame(
-                image,
-                decodedAdjacentPage?.getOrNull(),
-                snapshot.currentPageIndex(),
-                splitSecondHalf,
-            )
-            AnimatedContent(
-                targetState = frame,
-                transitionSpec = {
-                    readerTransition(if (reducedMotion) ReaderPageTransition.NONE else display.transition())
-                },
-                label = "reader-page",
-            ) { current ->
-                ReaderPages(
-                    primary = current.primary,
-                    adjacent = current.adjacent,
-                    pageIndex = current.pageIndex,
-                    direction = snapshot.direction(),
-                    display = display,
-                    zoomed = zoomed,
-                    splitSecondHalf = current.splitSecondHalf,
-                )
-            }
-        } ?: if (decodedPage == null) {
-            ReaderPageLoading()
-        } else {
-            ReaderPageError(decodedPage?.exceptionOrNull()?.message) { revision++ }
         }
 
         if (!continuous) {
@@ -366,6 +419,11 @@ internal fun ReaderScreen(
                 dualPage = display.dualPage(),
                 splitPages = display.splitPages(),
                 modifier = Modifier.align(Alignment.BottomCenter),
+            )
+        } else {
+            ReaderControlsHandle(
+                showControls = { controlsVisible = true },
+                modifier = Modifier.align(Alignment.TopCenter),
             )
         }
         if (settingsMenu) {
@@ -464,6 +522,51 @@ internal fun ReaderScreen(
                 CircularProgressIndicator(color = Color.White)
             }
         }
+    }
+}
+
+private suspend fun PointerInputScope.detectReaderPinchGestures(
+    transform: (pan: Offset, zoom: Float) -> Unit,
+) {
+    awaitEachGesture {
+        var previousCentroid: Offset? = null
+        var previousDistance = 0f
+        var active: Boolean
+        do {
+            val event = awaitPointerEvent()
+            val pressed = event.changes.filter { it.pressed }
+            if (pressed.size >= 2) {
+                val first = pressed[0].position
+                val second = pressed[1].position
+                val centroid = Offset((first.x + second.x) / 2f, (first.y + second.y) / 2f)
+                val horizontal = first.x - second.x
+                val vertical = first.y - second.y
+                val distance = sqrt(horizontal * horizontal + vertical * vertical)
+                if (previousDistance > 0f && distance > 0f) {
+                    transform(centroid - (previousCentroid ?: centroid), distance / previousDistance)
+                }
+                previousCentroid = centroid
+                previousDistance = distance
+                pressed.forEach { it.consume() }
+            } else {
+                previousCentroid = null
+                previousDistance = 0f
+            }
+            active = event.changes.any { it.pressed }
+        } while (active)
+    }
+}
+
+@Composable
+private fun ReaderControlsHandle(showControls: () -> Unit, modifier: Modifier = Modifier) {
+    val description = UiTranslations.translate("Show reader controls", LocalLanguagePack.current)
+    IconButton(
+        onClick = showControls,
+        modifier = modifier
+            .padding(top = 8.dp)
+            .background(Color.Black.copy(alpha = 0.54f), MaterialTheme.shapes.large),
+    ) {
+        Icon(Icons.Default.MoreVert, contentDescription = description, tint = Color.White)
     }
 }
 

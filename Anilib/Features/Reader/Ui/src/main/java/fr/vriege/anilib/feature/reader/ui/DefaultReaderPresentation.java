@@ -46,7 +46,12 @@ public final class DefaultReaderPresentation implements ReaderPresentation {
 
     @Override
     public ReaderController open(LibraryItemId libraryItemId) {
-        return new ReaderController(reader, libraryItemId, interactions, display, readState);
+        return new ReaderController(reader, libraryItemId, null, interactions, display, readState);
+    }
+
+    @Override
+    public ReaderController open(LibraryItemId libraryItemId, SourceContentUnitId contentUnitId) {
+        return new ReaderController(reader, libraryItemId, contentUnitId, interactions, display, readState);
     }
 
     @Override

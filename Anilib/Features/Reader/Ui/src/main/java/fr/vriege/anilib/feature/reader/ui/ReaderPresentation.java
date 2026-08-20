@@ -16,5 +16,7 @@ public interface ReaderPresentation {
 
     ReaderController open(LibraryItemId libraryItemId);
 
+    ReaderController open(LibraryItemId libraryItemId, SourceContentUnitId contentUnitId);
+
     ReaderController open(String title, SourceContentUnitId contentUnitId);
 }

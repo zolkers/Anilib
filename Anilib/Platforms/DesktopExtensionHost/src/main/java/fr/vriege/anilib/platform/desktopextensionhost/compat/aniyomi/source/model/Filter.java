@@ -36,7 +36,7 @@ public abstract class Filter<T> {
         public Separator() { this(""); }
     }
 
-    public abstract static class Select<V> extends Filter<Integer> {
+    public static class Select<V> extends Filter<Integer> {
         private final V[] values;
         public Select(String name, V[] values, int state) {
             super(name, state);
@@ -53,21 +53,21 @@ public abstract class Filter<T> {
         public final V[] getValues() { return values.clone(); }
     }
 
-    public abstract static class Text extends Filter<String> {
+    public static class Text extends Filter<String> {
         public Text(String name, String state) { super(name, state); }
         public Text(String name, String state, int mask, kotlin.jvm.internal.DefaultConstructorMarker marker) {
             this(name, (mask & 2) == 0 ? state : "");
         }
     }
 
-    public abstract static class CheckBox extends Filter<Boolean> {
+    public static class CheckBox extends Filter<Boolean> {
         public CheckBox(String name, boolean state) { super(name, state); }
         public CheckBox(String name, boolean state, int mask, kotlin.jvm.internal.DefaultConstructorMarker marker) {
             this(name, (mask & 2) == 0 && state);
         }
     }
 
-    public abstract static class TriState extends Filter<Integer> {
+    public static class TriState extends Filter<Integer> {
         public static final int STATE_IGNORE = 0;
         public static final int STATE_INCLUDE = 1;
         public static final int STATE_EXCLUDE = 2;
@@ -81,11 +81,11 @@ public abstract class Filter<T> {
         public final boolean isExcluded() { return getState() == STATE_EXCLUDE; }
     }
 
-    public abstract static class Group<V> extends Filter<List<? extends V>> {
+    public static class Group<V> extends Filter<List<? extends V>> {
         public Group(String name, List<? extends V> state) { super(name, List.copyOf(state)); }
     }
 
-    public abstract static class Sort extends Filter<Sort.Selection> {
+    public static class Sort extends Filter<Sort.Selection> {
         private final String[] values;
         public Sort(String name, String[] values, Selection state) {
             super(name, state);

@@ -278,8 +278,7 @@ public final class AniyomiMangaSourceAdapter {
             requireOwned(resource.contentUnitId().itemId());
             Object abiPage = Optional.ofNullable(pageByResource.get(resource))
                     .orElseThrow(() -> new IllegalArgumentException("Page is not loaded in this APK source"));
-            URI location = pageLocation(abiPage);
-            return download(location);
+            return download(abiPage);
         }
 
         private SourcePage page(Object abiPage) {
@@ -344,7 +343,8 @@ public final class AniyomiMangaSourceAdapter {
         }
 
         private URI pageLocation(Object page) {
-            String location = initialPageLocation(page);
+            String location = AniyomiAnimeSourceAdapter.nullableText(
+                    AniyomiAnimeSourceAdapter.invokeOptional(page, "getImageUrl").orElse(null));
             if (location.isBlank()) {
                 Object resolved;
                 if (AniyomiAnimeSourceAdapter.hasCompatibleSuspendMethod(delegate, "getImageUrl", page)) {
@@ -354,21 +354,32 @@ public final class AniyomiMangaSourceAdapter {
                             AniyomiAnimeSourceAdapter.invoke(delegate, "fetchImageUrl", page));
                 }
                 location = AniyomiAnimeSourceAdapter.nullableText(resolved);
+                if (!location.isBlank() && AniyomiAnimeSourceAdapter.hasMethod(page, "setImageUrl", 1)) {
+                    AniyomiAnimeSourceAdapter.invoke(page, "setImageUrl", location);
+                }
             }
             return AniyomiAnimeSourceAdapter.absoluteUri(location)
                     .orElseThrow(() -> new IllegalStateException("APK manga page location must be absolute"));
         }
 
-        private byte[] download(URI location) {
+        private byte[] download(Object page) {
             Object response = null;
             try {
                 Object client = AniyomiAnimeSourceAdapter.invoke(delegate, "getClient");
-                ClassLoader classLoader = delegate.getClass().getClassLoader();
-                Class<?> builderType = Class.forName("okhttp3.Request$Builder", true, classLoader);
-                Constructor<?> constructor = builderType.getConstructor();
-                Object builder = constructor.newInstance();
-                AniyomiAnimeSourceAdapter.invoke(builder, "url", location.toString());
-                Object request = AniyomiAnimeSourceAdapter.invoke(builder, "build");
+                URI location = pageLocation(page);
+                Object request;
+                if (AniyomiAnimeSourceAdapter.hasMethod(delegate, "imageRequest", 1)) {
+                    request = AniyomiAnimeSourceAdapter.invoke(delegate, "imageRequest", page);
+                } else {
+                    ClassLoader classLoader = delegate.getClass().getClassLoader();
+                    Class<?> builderType = Class.forName("okhttp3.Request$Builder", true, classLoader);
+                    Constructor<?> constructor = builderType.getConstructor();
+                    Object builder = constructor.newInstance();
+                    AniyomiAnimeSourceAdapter.invoke(builder, "url", location.toString());
+                    AniyomiAnimeSourceAdapter.invokeOptional(delegate, "getHeaders")
+                            .ifPresent(headers -> AniyomiAnimeSourceAdapter.invoke(builder, "headers", headers));
+                    request = AniyomiAnimeSourceAdapter.invoke(builder, "build");
+                }
                 Object call = AniyomiAnimeSourceAdapter.invoke(client, "newCall", request);
                 response = AniyomiAnimeSourceAdapter.invoke(call, "execute");
                 Object currentResponse = response;
