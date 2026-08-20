@@ -10,6 +10,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isAltPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.graphics.ImageBitmap
@@ -50,6 +51,7 @@ import fr.vriege.anilib.platform.compose.ComposePlayerBackend
 import fr.vriege.anilib.platform.compose.DesktopBrowserRuntime
 import fr.vriege.anilib.platform.compose.ShareController
 import java.awt.GraphicsEnvironment
+import java.util.concurrent.atomic.AtomicBoolean
 import org.jetbrains.skia.Image
 
 fun main(arguments: Array<String>) {
@@ -91,10 +93,32 @@ fun main(arguments: Array<String>) {
             val initialApplicationWindowMode = settingsService.snapshot().applicationWindowMode()
             val windowState = rememberWindowState(placement = initialApplicationWindowMode.placement())
             val applicationWindowMode = remember { mutableStateOf(initialApplicationWindowMode) }
+            val applicationFullscreen = remember { mutableStateOf(false) }
+            val applicationPlacementBeforeFullscreen = remember { mutableStateOf(WindowPlacement.Floating) }
+            val applicationModeBeforeApplicationFullscreen = remember { mutableStateOf(initialApplicationWindowMode) }
             val playerFullscreen = remember { mutableStateOf(false) }
+            val playerActive = remember { mutableStateOf(false) }
             val playerWindowMode = remember { mutableStateOf(PlayerWindowMode.BORDERLESS) }
             val placementBeforeFullscreen = remember { mutableStateOf(WindowPlacement.Floating) }
             val applicationModeBeforeFullscreen = remember { mutableStateOf(initialApplicationWindowMode) }
+            val setApplicationFullscreen: (Boolean) -> Unit = remember(windowState) {
+                { fullscreen ->
+                    if (fullscreen != applicationFullscreen.value) {
+                        if (fullscreen) {
+                            applicationPlacementBeforeFullscreen.value = windowState.placement
+                            applicationModeBeforeApplicationFullscreen.value = applicationWindowMode.value
+                            windowState.placement = WindowPlacement.Fullscreen
+                        } else if (
+                            applicationModeBeforeApplicationFullscreen.value == applicationWindowMode.value
+                        ) {
+                            windowState.placement = applicationPlacementBeforeFullscreen.value
+                        } else {
+                            windowState.placement = applicationWindowMode.value.placement()
+                        }
+                        applicationFullscreen.value = fullscreen
+                    }
+                }
+            }
             val setPlayerFullscreen: (Boolean) -> Unit = remember(windowState) {
                 { fullscreen ->
                     if (fullscreen != playerFullscreen.value) {
@@ -119,36 +143,16 @@ fun main(arguments: Array<String>) {
             DisposableEffect(settingsService, windowState) {
                 val observation = settingsService.observe { settings ->
                     applicationWindowMode.value = settings.applicationWindowMode()
-                    if (!playerFullscreen.value) {
+                    if (!playerFullscreen.value && !applicationFullscreen.value) {
                         windowState.placement = settings.applicationWindowMode().placement()
                     }
                 }
                 onDispose { observation.close() }
             }
-            val windowUndecorated = if (playerFullscreen.value) {
-                playerWindowMode.value == PlayerWindowMode.BORDERLESS
-            } else {
-                applicationWindowMode.value == ApplicationWindowMode.BORDERLESS
-            }
-            val content = remember {
-                movableContentOf {
-                    DesktopAnilibContent(
-                        started = started,
-                        browserRuntimeStatus = browserRuntimeStatus,
-                        browserDataController = DesktopBrowserDataController(dataDirectory),
-                        browserPlatformController = DesktopBrowserPlatformController(),
-                        backupImportPicker = DesktopBackupImportPicker(),
-                        applicationUpdatePlatformController = DesktopApplicationUpdateController(dataDirectory),
-                        shareController = DesktopShareController(),
-                        extensionPlatform = extensionPlatform,
-                        playerFullscreen = playerFullscreen.value,
-                        setPlayerFullscreen = setPlayerFullscreen,
-                    )
-                }
-            }
-            key(windowUndecorated) {
-                Window(
-                    onCloseRequest = {
+            val closing = remember { AtomicBoolean() }
+            val closeApplication: () -> Unit = remember {
+                {
+                    if (closing.compareAndSet(false, true)) {
                         try {
                             DesktopBrowserRuntime.dispose()
                         } finally {
@@ -166,16 +170,71 @@ fun main(arguments: Array<String>) {
                                 }
                             }
                         }
-                    },
+                    }
+                }
+            }
+            val windowUndecorated = applicationFullscreen.value || if (playerFullscreen.value) {
+                playerWindowMode.value == PlayerWindowMode.BORDERLESS
+            } else {
+                applicationWindowMode.value == ApplicationWindowMode.BORDERLESS
+            }
+            val content = remember {
+                movableContentOf {
+                    DesktopAnilibContent(
+                        started = started,
+                        browserRuntimeStatus = browserRuntimeStatus,
+                        browserDataController = DesktopBrowserDataController(dataDirectory),
+                        browserPlatformController = DesktopBrowserPlatformController(),
+                        backupImportPicker = DesktopBackupImportPicker(),
+                        applicationUpdatePlatformController = DesktopApplicationUpdateController(dataDirectory),
+                        shareController = DesktopShareController(),
+                        extensionPlatform = extensionPlatform,
+                        playerFullscreen = playerFullscreen.value,
+                        setPlayerFullscreen = setPlayerFullscreen,
+                        setPlayerActive = { active -> playerActive.value = active },
+                    )
+                }
+            }
+            key(windowUndecorated) {
+                Window(
+                    onCloseRequest = closeApplication,
                     title = "Anilib",
                     state = windowState,
                     undecorated = windowUndecorated,
                     onPreviewKeyEvent = { event ->
-                        if (playerFullscreen.value && event.key == Key.Escape && event.type == KeyEventType.KeyDown) {
+                        if (
+                            event.type == KeyEventType.KeyDown &&
+                            event.key == Key.F4 &&
+                            event.isAltPressed
+                        ) {
+                            closeApplication()
+                            true
+                        } else if (event.type == KeyEventType.KeyDown && event.key == Key.F11) {
+                            if (applicationFullscreen.value) {
+                                setApplicationFullscreen(false)
+                            } else if (playerFullscreen.value || playerActive.value) {
+                                setPlayerFullscreen(!playerFullscreen.value)
+                            } else {
+                                setApplicationFullscreen(true)
+                            }
+                            true
+                        } else if (
+                            playerFullscreen.value &&
+                            event.key == Key.Escape &&
+                            event.type == KeyEventType.KeyDown
+                        ) {
                             setPlayerFullscreen(false)
                             true
                         } else if (
+                            applicationFullscreen.value &&
+                            event.key == Key.Escape &&
+                            event.type == KeyEventType.KeyDown
+                        ) {
+                            setApplicationFullscreen(false)
+                            true
+                        } else if (
                             !playerFullscreen.value &&
+                            !applicationFullscreen.value &&
                             applicationWindowMode.value == ApplicationWindowMode.BORDERLESS &&
                             event.key == Key.Escape &&
                             event.type == KeyEventType.KeyDown
@@ -222,6 +281,7 @@ internal fun DesktopAnilibContent(
     extensionPlatform: ApkExtensionPlatform = ApkExtensionPlatforms.unavailable(),
     playerFullscreen: Boolean = false,
     setPlayerFullscreen: (Boolean) -> Unit = {},
+    setPlayerActive: (Boolean) -> Unit = {},
 ) {
     AnilibApp(
         presentation = started.capability(LibraryUiCapabilities.PRESENTATION),
@@ -251,7 +311,7 @@ internal fun DesktopAnilibContent(
         requestPlayerPictureInPicture = {},
         playerFullscreen = playerFullscreen,
         setPlayerFullscreen = setPlayerFullscreen,
-        setPlayerActive = {},
+        setPlayerActive = setPlayerActive,
         setPlayerBackgroundAudio = {},
         enableAndroidPlayerControls = false,
         enableDesktopPlayerControls = true,
