@@ -2,10 +2,18 @@ package fr.vriege.anilib.platform.desktop
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.application
+import androidx.compose.ui.window.rememberWindowState
 import fr.vriege.anilib.configuration.standard.StandardAnilib
 import fr.vriege.anilib.feature.covercache.bundle.CoverCachePlugin
 import fr.vriege.anilib.feature.discovery.ui.DiscoveryUiCapabilities
@@ -73,6 +81,22 @@ fun main(arguments: Array<String>) {
     )
     try {
         application {
+            val windowState = rememberWindowState()
+            val playerFullscreen = remember { mutableStateOf(false) }
+            val placementBeforeFullscreen = remember { mutableStateOf(WindowPlacement.Floating) }
+            val setPlayerFullscreen: (Boolean) -> Unit = remember(windowState) {
+                { fullscreen ->
+                    if (fullscreen != playerFullscreen.value) {
+                        if (fullscreen) {
+                            placementBeforeFullscreen.value = windowState.placement
+                            windowState.placement = WindowPlacement.Fullscreen
+                        } else {
+                            windowState.placement = placementBeforeFullscreen.value
+                        }
+                        playerFullscreen.value = fullscreen
+                    }
+                }
+            }
             Window(
                 onCloseRequest = {
                     try {
@@ -94,6 +118,15 @@ fun main(arguments: Array<String>) {
                     }
                 },
                 title = "Anilib",
+                state = windowState,
+                onPreviewKeyEvent = { event ->
+                    if (playerFullscreen.value && event.key == Key.Escape && event.type == KeyEventType.KeyDown) {
+                        setPlayerFullscreen(false)
+                        true
+                    } else {
+                        false
+                    }
+                },
             ) {
                 DesktopAnilibContent(
                     started = started,
@@ -104,6 +137,8 @@ fun main(arguments: Array<String>) {
                     applicationUpdatePlatformController = DesktopApplicationUpdateController(dataDirectory),
                     shareController = DesktopShareController(),
                     extensionPlatform = extensionPlatform,
+                    playerFullscreen = playerFullscreen.value,
+                    setPlayerFullscreen = setPlayerFullscreen,
                 )
             }
         }
@@ -122,6 +157,8 @@ internal fun DesktopAnilibContent(
     applicationUpdatePlatformController: ApplicationUpdatePlatformController,
     shareController: ShareController,
     extensionPlatform: ApkExtensionPlatform = ApkExtensionPlatforms.unavailable(),
+    playerFullscreen: Boolean = false,
+    setPlayerFullscreen: (Boolean) -> Unit = {},
 ) {
     AnilibApp(
         presentation = started.capability(LibraryUiCapabilities.PRESENTATION),
@@ -149,6 +186,8 @@ internal fun DesktopAnilibContent(
         applyReaderOrientationPolicy = {},
         applyPlayerOrientationPolicy = {},
         requestPlayerPictureInPicture = {},
+        playerFullscreen = playerFullscreen,
+        setPlayerFullscreen = setPlayerFullscreen,
         setPlayerActive = {},
         setPlayerBackgroundAudio = {},
         enableAndroidPlayerControls = false,

@@ -9,7 +9,11 @@ import android.app.PictureInPictureParams
 import android.graphics.BitmapFactory
 import android.util.Log
 import android.util.Rational
+import android.view.View
+import android.view.WindowInsets
+import android.view.WindowInsetsController
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
@@ -135,6 +139,16 @@ class MainActivity : ComponentActivity() {
         }
         val componentCount = started.components().size
         val shareController = remember(started) { AndroidShareController(this) }
+        val fullscreenState = remember { mutableStateOf(false) }
+        val setPlayerFullscreen: (Boolean) -> Unit = remember {
+            { fullscreen ->
+                fullscreenState.value = fullscreen
+                applyPlayerFullscreen(fullscreen)
+            }
+        }
+        BackHandler(enabled = fullscreenState.value) {
+            setPlayerFullscreen(false)
+        }
         AnilibApp(
             presentation = presentation,
             discovery = discovery,
@@ -161,6 +175,8 @@ class MainActivity : ComponentActivity() {
             applyReaderOrientationPolicy = ::applyReaderOrientationPolicy,
             applyPlayerOrientationPolicy = ::applyPlayerOrientationPolicy,
             requestPlayerPictureInPicture = ::enterPlayerPictureInPicture,
+            playerFullscreen = fullscreenState.value,
+            setPlayerFullscreen = setPlayerFullscreen,
             setPlayerActive = ::setPlayerActive,
             setPlayerBackgroundAudio = ::setPlayerBackgroundAudio,
             enableAndroidPlayerControls = true,
@@ -181,6 +197,7 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         startupAttempt++
         try {
+            applyPlayerFullscreen(false)
             if (isFinishing) setPlayerBackgroundAudio(false)
             product?.close()
             product = null
@@ -211,6 +228,29 @@ class MainActivity : ComponentActivity() {
             PlayerOrientationPolicy.PORTRAIT -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
             PlayerOrientationPolicy.LANDSCAPE -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
             PlayerOrientationPolicy.SENSOR -> ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun applyPlayerFullscreen(fullscreen: Boolean) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.insetsController?.apply {
+                systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                if (fullscreen) hide(WindowInsets.Type.systemBars()) else show(WindowInsets.Type.systemBars())
+            }
+            return
+        }
+        window.decorView.systemUiVisibility = if (fullscreen) {
+            View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
+                View.SYSTEM_UI_FLAG_FULLSCREEN or
+                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
+                View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+        } else {
+            View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
+                View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
         }
     }
 

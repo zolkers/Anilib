@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
@@ -69,6 +70,8 @@ private const val CONTROLS_HIDE_DELAY_MILLIS = 3_000L
 internal fun PlayerVideoSurface(
     controller: PlayerController,
     playback: PlayerPlayback,
+    fullscreen: Boolean,
+    setFullscreen: (Boolean) -> Unit,
     applyOrientationPolicy: (PlayerOrientationPolicy) -> Unit,
     requestPictureInPicture: () -> Unit,
     setPlayerActive: (Boolean) -> Unit,
@@ -188,9 +191,7 @@ internal fun PlayerVideoSurface(
     }
 
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .aspectRatio(16f / 9f)
+        modifier = (if (fullscreen) Modifier.fillMaxSize() else Modifier.fillMaxWidth().aspectRatio(16f / 9f))
             .background(Color.Black)
             .pointerInput(locked) {
                 detectTapGestures(
@@ -431,9 +432,16 @@ internal fun PlayerVideoSurface(
                         }
                         IconButton(onClick = {
                             revealControls()
-                            player.toggleFullscreen()
+                            setFullscreen(!fullscreen)
                         }) {
-                            Icon(Icons.Default.Fullscreen, "Fullscreen", tint = Color.White)
+                            Icon(
+                                if (fullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
+                                UiTranslations.translate(
+                                    if (fullscreen) "ui.exit.fullscreen" else "ui.fullscreen",
+                                    LocalLanguagePack.current,
+                                ),
+                                tint = Color.White,
+                            )
                         }
                     }
                 }

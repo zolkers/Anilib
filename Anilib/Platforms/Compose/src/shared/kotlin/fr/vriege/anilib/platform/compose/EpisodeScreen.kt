@@ -37,7 +37,9 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
@@ -58,6 +60,8 @@ import java.util.Optional
 @Composable
 internal fun PlayerSelectionScreen(
     controller: PlayerController,
+    fullscreen: Boolean,
+    setFullscreen: (Boolean) -> Unit,
     applyOrientationPolicy: (PlayerOrientationPolicy) -> Unit,
     requestPictureInPicture: () -> Unit,
     setPlayerActive: (Boolean) -> Unit,
@@ -91,6 +95,35 @@ internal fun PlayerSelectionScreen(
             }
             .onFailure { commandError = it.message ?: "The player command failed." }
     }
+    val currentSetFullscreen by rememberUpdatedState(setFullscreen)
+    DisposableEffect(controller) {
+        onDispose { currentSetFullscreen(false) }
+    }
+    val playerSurface = remember(controller) {
+        movableContentOf<Boolean> { expanded ->
+            PlayerVideoSurface(
+                controller,
+                controller.playback(),
+                expanded,
+                currentSetFullscreen,
+                applyOrientationPolicy,
+                requestPictureInPicture,
+                setPlayerActive,
+                setBackgroundAudio,
+                enableAndroidControls,
+                enableDesktopControls,
+                progressChanged = {
+                    livePlayback.value = controller.snapshot().playback()
+                },
+            )
+        }
+    }
+    if (fullscreen) {
+        Box(Modifier.fillMaxSize().background(Color.Black)) {
+            playerSurface(true)
+        }
+        return
+    }
 
     Scaffold(
         topBar = {
@@ -109,19 +142,7 @@ internal fun PlayerSelectionScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
-                PlayerVideoSurface(
-                    controller,
-                    controller.playback(),
-                    applyOrientationPolicy,
-                    requestPictureInPicture,
-                    setPlayerActive,
-                    setBackgroundAudio,
-                    enableAndroidControls,
-                    enableDesktopControls,
-                    progressChanged = {
-                        livePlayback.value = controller.snapshot().playback()
-                    },
-                )
+                playerSurface(false)
             }
             item {
                 Text(snapshot.title(), fontWeight = FontWeight.Bold)

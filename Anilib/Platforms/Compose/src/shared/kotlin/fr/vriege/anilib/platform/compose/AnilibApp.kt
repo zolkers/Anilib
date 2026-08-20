@@ -219,6 +219,8 @@ fun AnilibApp(
     applyReaderOrientationPolicy: (ReaderOrientationPolicy) -> Unit,
     applyPlayerOrientationPolicy: (PlayerOrientationPolicy) -> Unit,
     requestPlayerPictureInPicture: () -> Unit,
+    playerFullscreen: Boolean,
+    setPlayerFullscreen: (Boolean) -> Unit,
     setPlayerActive: (Boolean) -> Unit,
     setPlayerBackgroundAudio: (Boolean) -> Unit,
     enableAndroidPlayerControls: Boolean,
@@ -312,6 +314,8 @@ fun AnilibApp(
             } else if (playerController != null) {
                 PlayerSelectionScreen(
                     playerController,
+                    playerFullscreen,
+                    setPlayerFullscreen,
                     applyPlayerOrientationPolicy,
                     requestPlayerPictureInPicture,
                     setPlayerActive,
