@@ -10,11 +10,14 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public final class ExtensionRuntimeCatalog implements AutoCloseable {
     private final ExtensionRegistry registry;
     private final ExtensionAbiVerifier abiVerifier;
     private final List<Snapshot> generations = new ArrayList<>();
+    private final ReentrantReadWriteLock lifecycleLock = new ReentrantReadWriteLock(true);
     private Snapshot active;
     private String activeSignature = "";
 
@@ -23,19 +26,39 @@ public final class ExtensionRuntimeCatalog implements AutoCloseable {
         this.abiVerifier = new ExtensionAbiVerifier();
     }
 
-    public synchronized Snapshot discover() {
-        List<InstalledExtension> installed = registry.installed();
-        String signature = signature(installed);
-        if (active == null || !activeSignature.equals(signature)) {
-            active = discover(installed, true);
-            activeSignature = signature;
-            generations.add(active);
+    public Snapshot discover() {
+        Lock readLock = lifecycleLock.readLock();
+        readLock.lock();
+        try {
+            synchronized (this) {
+                List<InstalledExtension> installed = registry.installed();
+                String signature = signature(installed);
+                if (active == null || !activeSignature.equals(signature)) {
+                    active = discover(installed, true);
+                    activeSignature = signature;
+                    generations.add(active);
+                }
+                return active.borrow(readLock::unlock);
+            }
+        } catch (RuntimeException | Error failure) {
+            readLock.unlock();
+            throw failure;
         }
-        return active.borrow();
     }
 
     public Snapshot discover(List<InstalledExtension> extensions) {
-        return discover(extensions, false);
+        Lock readLock = lifecycleLock.readLock();
+        readLock.lock();
+        try {
+            synchronized (this) {
+                Snapshot generation = discover(extensions, false);
+                generations.add(generation);
+                return generation.borrow(readLock::unlock);
+            }
+        } catch (RuntimeException | Error failure) {
+            readLock.unlock();
+            throw failure;
+        }
     }
 
     private Snapshot discover(List<InstalledExtension> extensions, boolean validateCompatibility) {
@@ -66,8 +89,24 @@ public final class ExtensionRuntimeCatalog implements AutoCloseable {
                 .toList());
     }
 
+    public void reset() {
+        Lock writeLock = lifecycleLock.writeLock();
+        writeLock.lock();
+        try {
+            synchronized (this) {
+                closeGenerations();
+            }
+        } finally {
+            writeLock.unlock();
+        }
+    }
+
     @Override
-    public synchronized void close() {
+    public void close() {
+        reset();
+    }
+
+    private void closeGenerations() {
         UncheckedIOException failure = null;
         for (Snapshot generation : generations) {
             try {
@@ -200,14 +239,25 @@ public final class ExtensionRuntimeCatalog implements AutoCloseable {
         private final List<LoadedSource> sources;
         private final Map<String, String> failures;
         private final List<ExtensionClassLoader> loaders;
+        private final Runnable releaser;
+        private boolean closed;
 
         private Snapshot(
                 List<LoadedSource> sources,
                 Map<String, String> failures,
                 List<ExtensionClassLoader> loaders) {
+            this(sources, failures, loaders, () -> { });
+        }
+
+        private Snapshot(
+                List<LoadedSource> sources,
+                Map<String, String> failures,
+                List<ExtensionClassLoader> loaders,
+                Runnable releaser) {
             this.sources = List.copyOf(sources);
             this.failures = Map.copyOf(failures);
             this.loaders = List.copyOf(loaders);
+            this.releaser = Objects.requireNonNull(releaser, "releaser");
         }
 
         public List<LoadedSource> sources() {
@@ -218,23 +268,31 @@ public final class ExtensionRuntimeCatalog implements AutoCloseable {
             return failures;
         }
 
-        private Snapshot borrow() {
-            return new Snapshot(sources, failures, List.of());
+        private Snapshot borrow(Runnable releaser) {
+            return new Snapshot(sources, failures, List.of(), releaser);
         }
 
         @Override
-        public void close() {
+        public synchronized void close() {
+            if (closed) {
+                return;
+            }
+            closed = true;
             IOException failure = null;
-            for (ExtensionClassLoader loader : loaders) {
-                try {
-                    loader.close();
-                } catch (IOException exception) {
-                    if (failure == null) {
-                        failure = exception;
-                    } else {
-                        failure.addSuppressed(exception);
+            try {
+                for (ExtensionClassLoader loader : loaders) {
+                    try {
+                        loader.close();
+                    } catch (IOException exception) {
+                        if (failure == null) {
+                            failure = exception;
+                        } else {
+                            failure.addSuppressed(exception);
+                        }
                     }
                 }
+            } finally {
+                releaser.run();
             }
             if (failure != null) {
                 throw new UncheckedIOException("Unable to close extension classloaders", failure);

@@ -44,6 +44,12 @@ public final class ExtensionCompatibilitySmoke {
                 String animeId = sourceId(sources, "Anime-Sama", "fr");
                 verifyMangaWorkflow(server, mangaId);
                 verifyAnimeWorkflow(server, animeId);
+                verifyUninstall(server, mangaPin.packageName());
+                verifyUninstall(server, animePin.packageName());
+                String installed = get(server, DesktopExtensionHostProtocol.INSTALLED_EXTENSIONS_PATH);
+                if (!installed.contains("\"extensions\":[]")) {
+                    throw new IllegalStateException("Uninstalled extensions remain in the inventory: " + installed);
+                }
             }
         } finally {
             try (var paths = Files.walk(data)) {
@@ -74,6 +80,23 @@ public final class ExtensionCompatibilitySmoke {
             throw new IllegalStateException("Extension endpoint failed: " + path + ' ' + response.body());
         }
         return response.body();
+    }
+
+    private static void verifyUninstall(DesktopExtensionHostServer server, String packageName) throws Exception {
+        HttpResponse<String> response = HttpClient.newHttpClient().send(
+                HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + server.port()
+                                + DesktopExtensionHostProtocol.UNINSTALL_EXTENSION_PATH))
+                        .header("content-type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString("{\"pkg\":\"" + packageName + "\"}"))
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() != 200 || !response.body().contains("\"ok\":true")) {
+            throw new IllegalStateException("Extension uninstall failed for " + packageName + ": " + response.body());
+        }
+        String sources = get(server, DesktopExtensionHostProtocol.SOURCES_PATH);
+        if (sources.contains("\"pkg\":\"" + packageName + "\"")) {
+            throw new IllegalStateException("Uninstalled extension still exposes sources: " + packageName);
+        }
     }
 
     private static String sourceId(String document, String name, String language) {

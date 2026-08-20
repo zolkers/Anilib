@@ -18,6 +18,10 @@ import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
 
@@ -32,7 +36,7 @@ final class ExtensionRuntimeCatalogSmoke {
     private ExtensionRuntimeCatalogSmoke() {
     }
 
-    static void verify() throws IOException {
+    static void verify() throws Exception {
         Path directory = Files.createTempDirectory("anilib-extension-runtime-");
         try {
             Path archive = directory.resolve("extension.jar");
@@ -50,8 +54,8 @@ final class ExtensionRuntimeCatalogSmoke {
                     Optional.empty());
             InstalledExtension installed = new InstalledExtension(
                     metadata, apk, archive);
-            ExtensionRuntimeCatalog catalog = new ExtensionRuntimeCatalog(new ExtensionRegistry(directory));
-            try (ExtensionRuntimeCatalog.Snapshot snapshot = catalog.discover(List.of(installed))) {
+            try (ExtensionRuntimeCatalog catalog = new ExtensionRuntimeCatalog(new ExtensionRegistry(directory))) {
+                ExtensionRuntimeCatalog.Snapshot snapshot = catalog.discover(List.of(installed));
                 if (!snapshot.failures().isEmpty() || snapshot.sources().size() != 1) {
                     throw new IllegalStateException("Dynamic extension discovery failed: " + snapshot.failures());
                 }
@@ -61,13 +65,42 @@ final class ExtensionRuntimeCatalogSmoke {
                     throw new IllegalStateException("Dynamic source descriptor is invalid: " + source);
                 }
                 verifyApkResource(source);
+                verifyLifecycleReset(catalog, snapshot);
             }
+            Files.delete(archive);
+            Files.delete(apk);
         } finally {
             try (var paths = Files.walk(directory)) {
                 for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) {
                     Files.deleteIfExists(path);
                 }
             }
+        }
+    }
+
+    private static void verifyLifecycleReset(
+            ExtensionRuntimeCatalog catalog,
+            ExtensionRuntimeCatalog.Snapshot lease) throws Exception {
+        var executor = Executors.newVirtualThreadPerTaskExecutor();
+        try {
+            CountDownLatch started = new CountDownLatch(1);
+            var reset = executor.submit(() -> {
+                started.countDown();
+                catalog.reset();
+            });
+            if (!started.await(5, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("Runtime catalogue reset did not start");
+            }
+            try {
+                reset.get(100, TimeUnit.MILLISECONDS);
+                throw new IllegalStateException("Runtime catalogue reset ignored an active source operation");
+            } catch (TimeoutException expected) {
+                lease.close();
+            }
+            reset.get(5, TimeUnit.SECONDS);
+        } finally {
+            lease.close();
+            executor.close();
         }
     }
 

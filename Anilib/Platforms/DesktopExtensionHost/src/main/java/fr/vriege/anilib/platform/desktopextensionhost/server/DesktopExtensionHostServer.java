@@ -153,6 +153,7 @@ public final class DesktopExtensionHostServer implements AutoCloseable {
                     ExtensionHostHttpExchange.body(exchange), "apk"));
             Path downloaded = downloadClient.download(uri, dataDirectory.resolve("downloads"));
             try {
+                runtimeCatalog.reset();
                 InstalledExtension installed = extensionRegistry.install(downloaded);
                 ExtensionHostHttpExchange.json(exchange, 200, "{\"ok\":true,\"name\":"
                         + ExtensionHostHttpExchange.jsonString(installed.metadata().displayName())
@@ -168,6 +169,7 @@ public final class DesktopExtensionHostServer implements AutoCloseable {
             }
             String packageName = ExtensionHostHttpExchange.stringField(
                     ExtensionHostHttpExchange.body(exchange), "pkg");
+            runtimeCatalog.reset();
             boolean removed = extensionRegistry.uninstall(packageName);
             ExtensionHostHttpExchange.json(exchange, removed ? 200 : 404,
                     removed ? "{\"ok\":true}" : "{\"ok\":false,\"error\":\"not_installed\"}");
