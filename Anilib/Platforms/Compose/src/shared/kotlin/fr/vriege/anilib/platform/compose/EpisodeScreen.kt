@@ -33,6 +33,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -80,10 +81,12 @@ internal fun PlayerSelectionScreen(
         )
         return
     }
+    val livePlayback = remember(controller) { mutableStateOf(snapshot.playback()) }
     val command: (() -> Unit) -> Unit = { action ->
         runCatching(action)
             .onSuccess {
                 commandError = null
+                livePlayback.value = controller.snapshot().playback()
                 revision++
             }
             .onFailure { commandError = it.message ?: "The player command failed." }
@@ -115,15 +118,14 @@ internal fun PlayerSelectionScreen(
                     setBackgroundAudio,
                     enableAndroidControls,
                     enableDesktopControls,
-                    progressChanged = { revision++ },
+                    progressChanged = {
+                        livePlayback.value = controller.snapshot().playback()
+                    },
                 )
             }
             item {
                 Text(snapshot.title(), fontWeight = FontWeight.Bold)
-                Text(
-                    playbackLabel(snapshot.playback()),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                LivePlaybackLabel(livePlayback)
                 commandError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 TextButton(onClick = { preferenceDialog = true }) {
                     Text(
@@ -180,12 +182,7 @@ internal fun PlayerSelectionScreen(
                 }
             }
             item {
-                TextButton(
-                    onClick = { command(controller::markCompleted) },
-                    enabled = !snapshot.playback().completed(),
-                ) {
-                    Text(if (snapshot.playback().completed()) "Watched" else "Mark as watched")
-                }
+                WatchedAction(livePlayback) { command(controller::markCompleted) }
                 Spacer(Modifier.height(12.dp))
             }
         }
@@ -204,6 +201,22 @@ internal fun PlayerSelectionScreen(
             },
             close = { preferenceDialog = false },
         )
+    }
+}
+
+@Composable
+private fun LivePlaybackLabel(playback: State<PlaybackState>) {
+    Text(
+        playbackLabel(playback.value),
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+@Composable
+private fun WatchedAction(playback: State<PlaybackState>, markCompleted: () -> Unit) {
+    val state = playback.value
+    TextButton(onClick = markCompleted, enabled = !state.completed()) {
+        Text(if (state.completed()) "Watched" else "Mark as watched")
     }
 }
 

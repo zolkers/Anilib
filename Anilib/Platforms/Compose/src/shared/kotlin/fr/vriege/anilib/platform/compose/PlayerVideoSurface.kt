@@ -56,9 +56,12 @@ import fr.vriege.anilib.feature.player.ui.PlayerController
 import io.github.kdroidfilter.composemediaplayer.VideoPlayerSurface
 import io.github.kdroidfilter.composemediaplayer.rememberVideoPlayerState
 import kotlin.math.abs
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
-private const val PROGRESS_INTERVAL_MILLIS = 2_000L
+private const val PROGRESS_INTERVAL_MILLIS = 5_000L
 private const val CONTROLS_HIDE_DELAY_MILLIS = 3_000L
 
 @Composable
@@ -79,6 +82,7 @@ internal fun PlayerVideoSurface(
         return
     }
     val player = rememberVideoPlayerState()
+    val persistenceScope = rememberCrashSafeCoroutineScope()
     val preferences = controller.preferences()
     var controlsVisible by remember(bridge) { mutableStateOf(true) }
     var controlsActivity by remember(bridge) { mutableIntStateOf(0) }
@@ -107,7 +111,7 @@ internal fun PlayerVideoSurface(
     DisposableEffect(bridge, player) {
         bridge.attach(player)
         onDispose {
-            persistProgress(controller, bridge)
+            persistProgressNow(controller, bridge)
             bridge.detach(player)
         }
     }
@@ -306,7 +310,9 @@ internal fun PlayerVideoSurface(
                         },
                         onValueChangeFinished = {
                             player.seekFinished()
-                            if (persistProgress(controller, bridge)) progressChanged()
+                            persistenceScope.launch {
+                                if (persistProgress(controller, bridge)) progressChanged()
+                            }
                         },
                         valueRange = 0f..1000f,
                     )
@@ -573,13 +579,28 @@ private fun UnavailablePlayerSurface() {
     }
 }
 
-private fun persistProgress(controller: PlayerController, playback: ComposePlayerPlayback): Boolean =
-    runCatching {
-        val state = playback.snapshot()
-        if (state.durationMillis() > 0) {
-            controller.updatePlayback(state.positionMillis(), state.durationMillis())
-            true
-        } else {
-            false
-        }
-    }.getOrDefault(false)
+private suspend fun persistProgress(
+    controller: PlayerController,
+    playback: ComposePlayerPlayback,
+): Boolean {
+    val state = runCatching { playback.snapshot() }.getOrNull() ?: return false
+    if (state.durationMillis() <= 0) return false
+    return withContext(Dispatchers.IO) {
+        saveProgress(controller, state.positionMillis(), state.durationMillis())
+    }
+}
+
+private fun persistProgressNow(controller: PlayerController, playback: ComposePlayerPlayback) {
+    val state = runCatching { playback.snapshot() }.getOrNull() ?: return
+    if (state.durationMillis() > 0) {
+        saveProgress(controller, state.positionMillis(), state.durationMillis())
+    }
+}
+
+private fun saveProgress(
+    controller: PlayerController,
+    positionMillis: Long,
+    durationMillis: Long,
+): Boolean = runCatching {
+    controller.updatePlayback(positionMillis, durationMillis)
+}.isSuccess
