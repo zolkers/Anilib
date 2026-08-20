@@ -326,6 +326,7 @@ internal fun DiscoveryScreen(
                 ExtensionDiscoveryList(
                     extensionRepositories,
                     apkExtensionPlatform,
+                    presentation,
                     if (section.kind == SourceContentKind.ANIME) {
                         ExtensionContentKind.ANIME
                     } else {
@@ -342,6 +343,7 @@ internal fun DiscoveryScreen(
                             BrowseSection.MANGA_SOURCES
                         }
                     },
+                    onSourcePreferenceChanged = { sourceBrowseRevision++ },
                 )
             } else if (globalSearch && globalQuery.isNotBlank() && section.sourceTab()) {
                 GlobalSearchContent(presentation, section.kind!!, globalQuery)

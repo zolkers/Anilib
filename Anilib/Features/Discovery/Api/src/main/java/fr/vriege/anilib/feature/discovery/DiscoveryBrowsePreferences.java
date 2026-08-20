@@ -13,7 +13,8 @@ import java.util.stream.Collectors;
 public record DiscoveryBrowsePreferences(
         Map<SourceContentKind, Set<String>> enabledLanguages,
         Set<SourceId> pinnedSources,
-        Map<SourceId, DiscoveryCatalogueDisplayMode> catalogueDisplayModes) {
+        Map<SourceId, DiscoveryCatalogueDisplayMode> catalogueDisplayModes,
+        Set<SourceId> disabledSources) {
     public DiscoveryBrowsePreferences {
         Map<SourceContentKind, Set<String>> normalized = new EnumMap<>(SourceContentKind.class);
         Preconditions.requireNonNull(enabledLanguages, "enabledLanguages").forEach((kind, languages) ->
@@ -26,16 +27,24 @@ public record DiscoveryBrowsePreferences(
         pinnedSources = Set.copyOf(Preconditions.requireNonNull(pinnedSources, "pinnedSources"));
         catalogueDisplayModes = Map.copyOf(
                 Preconditions.requireNonNull(catalogueDisplayModes, "catalogueDisplayModes"));
+        disabledSources = Set.copyOf(Preconditions.requireNonNull(disabledSources, "disabledSources"));
     }
 
     public static DiscoveryBrowsePreferences defaults() {
-        return new DiscoveryBrowsePreferences(Map.of(), Set.of(), Map.of());
+        return new DiscoveryBrowsePreferences(Map.of(), Set.of(), Map.of(), Set.of());
     }
 
     public DiscoveryBrowsePreferences(
             Map<SourceContentKind, Set<String>> enabledLanguages,
             Set<SourceId> pinnedSources) {
-        this(enabledLanguages, pinnedSources, Map.of());
+        this(enabledLanguages, pinnedSources, Map.of(), Set.of());
+    }
+
+    public DiscoveryBrowsePreferences(
+            Map<SourceContentKind, Set<String>> enabledLanguages,
+            Set<SourceId> pinnedSources,
+            Map<SourceId, DiscoveryCatalogueDisplayMode> catalogueDisplayModes) {
+        this(enabledLanguages, pinnedSources, catalogueDisplayModes, Set.of());
     }
 
     public Set<String> enabledLanguages(SourceContentKind contentKind) {

@@ -50,6 +50,7 @@ import fr.vriege.anilib.feature.extensionrepository.ExtensionContentKind
 import fr.vriege.anilib.feature.extensionrepository.ExtensionPlatformAvailability
 import fr.vriege.anilib.feature.extensionrepository.ExtensionInstallationState
 import fr.vriege.anilib.feature.extensionrepository.ExtensionPackageMetadata
+import fr.vriege.anilib.feature.extensionrepository.ExtensionSourceMetadata
 import fr.vriege.anilib.feature.extensionrepository.InstalledExtensionPackage
 import fr.vriege.anilib.feature.extensionrepository.ui.ExtensionRepositoryPresentation
 import fr.vriege.anilib.feature.extensionrepository.ui.ExtensionRepositoryRow
@@ -59,6 +60,9 @@ import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionPlatform
 import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionRuntimeReport
 import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionRuntimeState
 import fr.vriege.anilib.feature.extensionrepository.ui.InstalledApkExtension
+import fr.vriege.anilib.feature.discovery.ui.DiscoveryPresentation
+import fr.vriege.anilib.feature.source.SourceDescriptor
+import fr.vriege.anilib.feature.source.SourceId
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CoroutineScope
@@ -188,10 +192,12 @@ internal fun ExtensionRepositoriesScreen(
 internal fun ExtensionDiscoveryList(
     presentation: ExtensionRepositoryPresentation,
     apkExtensionPlatform: ApkExtensionPlatform,
+    discovery: DiscoveryPresentation,
     kind: ExtensionContentKind,
     query: String,
     manageRepositories: () -> Unit,
     onSourcesChanged: () -> Unit,
+    onSourcePreferenceChanged: () -> Unit,
 ) {
     var view by remember { mutableStateOf(presentation.snapshot()) }
     var installedApkPackages by remember(apkExtensionPlatform) {
@@ -205,6 +211,8 @@ internal fun ExtensionDiscoveryList(
     var message by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var pendingRemoval by remember { mutableStateOf<ExtensionRemovalRequest?>(null) }
+    var selectedExtension by remember { mutableStateOf<ExtensionPackageMetadata?>(null) }
+    var sourceStateRevision by remember { mutableStateOf(0) }
     val scope = rememberCrashSafeCoroutineScope()
 
     DisposableEffect(presentation) {
@@ -231,6 +239,20 @@ internal fun ExtensionDiscoveryList(
             }
         }.thenBy(String.CASE_INSENSITIVE_ORDER) { it.displayName() },
     )
+    selectedExtension?.let { extension ->
+        ExtensionSourcesDetailScreen(
+            extension = extension,
+            discovery = discovery,
+            revision = sourceStateRevision,
+            goBack = { selectedExtension = null },
+            sourceStateChanged = {
+                sourceStateRevision++
+                onSourcePreferenceChanged()
+            },
+            reportFailure = { error = it },
+        )
+        return
+    }
     if (view.repositories().isEmpty()) {
         Column(
             modifier = Modifier.fillMaxSize().padding(28.dp),
@@ -263,7 +285,7 @@ internal fun ExtensionDiscoveryList(
             val apkInstalled = extension.packageName() in installedApkPackages
             val blockedByAdultPolicy = extension.adult() && !view.adultContentEnabled()
             Card(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().clickable { selectedExtension = extension },
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
             ) {
                 Row(
@@ -408,6 +430,117 @@ internal fun ExtensionDiscoveryList(
         UiNoticeDialog(UiNoticeKind.INFO, value, dismiss = { message = null })
     }
 }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ExtensionSourcesDetailScreen(
+    extension: ExtensionPackageMetadata,
+    discovery: DiscoveryPresentation,
+    revision: Int,
+    goBack: () -> Unit,
+    sourceStateChanged: () -> Unit,
+    reportFailure: (String) -> Unit,
+) {
+    val sourceRows = remember(extension, discovery, revision) {
+        extension.sources().map { metadata ->
+            metadata to installedSource(discovery, metadata)
+        }
+    }
+    val multiLanguage = extension.sources().map { it.languageTag() }.distinct().size > 1
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(extension.displayName()) },
+                navigationIcon = {
+                    IconButton(onClick = goBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    ExtensionIcon(extension.icon().orElse(null), extension.displayName())
+                    Spacer(Modifier.width(14.dp))
+                    Column {
+                        Text(extension.displayName(), fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "${extensionLanguageName(extension.languageTag())} · v${extension.versionName()}",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+            item { SectionTitle("extension.sources") }
+            items(sourceRows, key = { it.first.sourceId() }) { (metadata, source) ->
+                val enabled = source?.id()?.let(discovery::sourceEnabled) ?: false
+                val label = if (multiLanguage && extension.sources()
+                        .map { it.displayName() }
+                        .distinct()
+                        .size == 1
+                ) {
+                    extensionLanguageName(metadata.languageTag())
+                } else {
+                    metadata.displayName()
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(label, fontWeight = FontWeight.Medium)
+                        Text(
+                            if (source == null) {
+                                extensionLanguageName(metadata.languageTag())
+                            } else {
+                                "${source.displayName()} · ${source.id()}"
+                            },
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (source == null) {
+                            Text(
+                                "extension.source.available_after_installation",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    Switch(
+                        checked = enabled,
+                        enabled = source != null,
+                        onCheckedChange = { checked ->
+                            val descriptor = source ?: return@Switch
+                            runCatching { discovery.setSourceEnabled(descriptor.id(), checked) }
+                                .onSuccess { sourceStateChanged() }
+                                .onFailure {
+                                    reportFailure(it.message ?: "extension.source.state_failed")
+                                }
+                        },
+                    )
+                }
+            }
+            item { Spacer(Modifier.height(20.dp)) }
+        }
+    }
+}
+
+private fun installedSource(
+    discovery: DiscoveryPresentation,
+    metadata: ExtensionSourceMetadata,
+): SourceDescriptor? = metadata.runtimeSourceIds().asSequence()
+    .mapNotNull { identity ->
+        runCatching { discovery.source(SourceId.of(identity)).orElse(null) }.getOrNull()
+    }
+    .firstOrNull()
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

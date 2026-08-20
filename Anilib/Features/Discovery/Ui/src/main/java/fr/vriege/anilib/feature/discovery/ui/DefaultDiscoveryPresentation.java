@@ -53,6 +53,7 @@ public final class DefaultDiscoveryPresentation implements DiscoveryPresentation
         Map<String, List<SourceDescriptor>> grouped = new LinkedHashMap<>();
         service.sources(contentKind).stream()
                 .filter(source -> enabledLanguages.contains(source.languageTag()))
+                .filter(source -> !preferences.disabledSources().contains(source.id()))
                 .forEach(source ->
                 grouped.computeIfAbsent(source.languageTag(), ignored -> new ArrayList<>()).add(source));
         return grouped.entrySet().stream()
@@ -95,6 +96,12 @@ public final class DefaultDiscoveryPresentation implements DiscoveryPresentation
     }
 
     @Override
+    public boolean sourceEnabled(SourceId sourceId) {
+        SourceId id = Objects.requireNonNull(sourceId, "sourceId must not be null");
+        return !browsePreferences.snapshot().disabledSources().contains(id);
+    }
+
+    @Override
     public void setSourceLanguageEnabled(
             SourceContentKind contentKind,
             String languageTag,
@@ -121,7 +128,8 @@ public final class DefaultDiscoveryPresentation implements DiscoveryPresentation
         browsePreferences.save(new DiscoveryBrowsePreferences(
                 languages,
                 current.pinnedSources(),
-                current.catalogueDisplayModes()));
+                current.catalogueDisplayModes(),
+                current.disabledSources()));
     }
 
     @Override
@@ -137,7 +145,28 @@ public final class DefaultDiscoveryPresentation implements DiscoveryPresentation
         browsePreferences.save(new DiscoveryBrowsePreferences(
                 current.enabledLanguages(),
                 sources,
-                current.catalogueDisplayModes()));
+                current.catalogueDisplayModes(),
+                current.disabledSources()));
+    }
+
+    @Override
+    public void setSourceEnabled(SourceId sourceId, boolean enabled) {
+        SourceId id = Objects.requireNonNull(sourceId, "sourceId must not be null");
+        if (service.source(id).isEmpty()) {
+            throw new IllegalArgumentException("Unknown source: " + id);
+        }
+        DiscoveryBrowsePreferences current = browsePreferences.snapshot();
+        Set<SourceId> disabled = new LinkedHashSet<>(current.disabledSources());
+        if (enabled) {
+            disabled.remove(id);
+        } else {
+            disabled.add(id);
+        }
+        browsePreferences.save(new DiscoveryBrowsePreferences(
+                current.enabledLanguages(),
+                current.pinnedSources(),
+                current.catalogueDisplayModes(),
+                disabled));
     }
 
     @Override
@@ -165,7 +194,8 @@ public final class DefaultDiscoveryPresentation implements DiscoveryPresentation
         browsePreferences.save(new DiscoveryBrowsePreferences(
                 current.enabledLanguages(),
                 current.pinnedSources(),
-                modes));
+                modes,
+                current.disabledSources()));
     }
 
     @Override
@@ -220,7 +250,15 @@ public final class DefaultDiscoveryPresentation implements DiscoveryPresentation
 
     @Override
     public Map<SourceId, SourcePage> globalSearch(SourceContentKind contentKind, String query, int pageSize) {
-        return service.globalSearch(contentKind, query, pageSize);
+        DiscoveryBrowsePreferences preferences = browsePreferences.snapshot();
+        Set<String> enabledLanguages = effectiveLanguages(contentKind, preferences);
+        Map<SourceId, SourcePage> visible = new LinkedHashMap<>();
+        service.globalSearch(contentKind, query, pageSize).forEach((sourceId, page) ->
+                service.source(sourceId)
+                        .filter(source -> enabledLanguages.contains(source.languageTag()))
+                        .filter(source -> !preferences.disabledSources().contains(source.id()))
+                        .ifPresent(source -> visible.put(sourceId, page)));
+        return Map.copyOf(visible);
     }
 
     @Override

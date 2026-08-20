@@ -39,6 +39,7 @@ public final class FileDiscoveryBrowsePreferenceStore implements DiscoveryBrowse
         Map<SourceContentKind, Set<String>> languages = new EnumMap<>(SourceContentKind.class);
         Set<SourceId> pinned = new LinkedHashSet<>();
         Map<SourceId, DiscoveryCatalogueDisplayMode> displayModes = new LinkedHashMap<>();
+        Set<SourceId> disabled = new LinkedHashSet<>();
         int values = 0;
         try {
             for (String line : Files.readAllLines(file, StandardCharsets.UTF_8)) {
@@ -63,6 +64,10 @@ public final class FileDiscoveryBrowsePreferenceStore implements DiscoveryBrowse
                     if (previous != null) {
                         throw new IllegalStateException("Duplicate catalogue display preference");
                     }
+                } else if (columns.length == 2 && columns[0].equals("disabled")) {
+                    if (!disabled.add(SourceId.of(decode(columns[1])))) {
+                        throw new IllegalStateException("Duplicate disabled discovery source");
+                    }
                 } else {
                     throw new IllegalStateException("Invalid discovery browse preference row");
                 }
@@ -71,7 +76,7 @@ public final class FileDiscoveryBrowsePreferenceStore implements DiscoveryBrowse
                     throw new IllegalStateException("Too many discovery browse preferences");
                 }
             }
-            return new DiscoveryBrowsePreferences(languages, pinned, displayModes);
+            return new DiscoveryBrowsePreferences(languages, pinned, displayModes, disabled);
         } catch (IllegalArgumentException exception) {
             throw new IllegalStateException("Invalid discovery browse preference value", exception);
         } catch (IOException exception) {
@@ -84,7 +89,8 @@ public final class FileDiscoveryBrowsePreferenceStore implements DiscoveryBrowse
         DiscoveryBrowsePreferences value = Preconditions.requireNonNull(preferences, "preferences");
         int count = value.pinnedSources().size()
                 + value.enabledLanguages().values().stream().mapToInt(Set::size).sum()
-                + value.catalogueDisplayModes().size();
+                + value.catalogueDisplayModes().size()
+                + value.disabledSources().size();
         if (count > MAX_VALUES) {
             throw new IllegalArgumentException("Too many discovery browse preferences");
         }
@@ -100,7 +106,14 @@ public final class FileDiscoveryBrowsePreferenceStore implements DiscoveryBrowse
         Stream<String> displayRows = value.catalogueDisplayModes().entrySet().stream()
                 .sorted(Map.Entry.comparingByKey())
                 .map(entry -> "display\t" + encode(entry.getKey().toString()) + "\t" + entry.getValue().name());
-        write(Stream.concat(Stream.concat(languageRows, pinnedRows), displayRows).toList());
+        Stream<String> disabledRows = value.disabledSources().stream()
+                .map(SourceId::toString)
+                .sorted()
+                .map(source -> "disabled\t" + encode(source));
+        Stream<String> visiblePreferences = Stream.concat(
+                Stream.concat(languageRows, pinnedRows),
+                displayRows);
+        write(Stream.concat(visiblePreferences, disabledRows).toList());
     }
 
     private void write(List<String> lines) {

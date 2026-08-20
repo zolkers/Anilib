@@ -235,10 +235,16 @@ final class DiscoveryTest {
         try (StartedAnilib product = StandardAnilib.start(directory, List.of(remotePlugin))) {
             DiscoveryPresentation presentation = product.capability(DiscoveryUiCapabilities.PRESENTATION);
             presentation.setSourcePinned(REMOTE_SOURCE, true);
+            presentation.setSourceEnabled(REMOTE_SOURCE, false);
             presentation.setSourceLanguageEnabled(SourceContentKind.MANGA, "en", false);
             presentation.setCatalogueDisplayMode(REMOTE_SOURCE, DiscoveryCatalogueDisplayMode.LIST);
             counter.check(presentation.pinnedSources().equals(Set.of(REMOTE_SOURCE)),
                     "pinned sources must be reflected by the shared presentation immediately");
+            counter.check(!presentation.sourceEnabled(REMOTE_SOURCE),
+                    "an individual extension source must be disabled without removing its package");
+            counter.check(!presentation.globalSearch(SourceContentKind.MANGA, "alpha", 20)
+                            .containsKey(REMOTE_SOURCE),
+                    "disabled extension sources must be excluded from global search");
             counter.check(presentation.sourceSections(SourceContentKind.MANGA).stream()
                             .flatMap(section -> section.sources().stream())
                             .noneMatch(source -> source.id().equals(REMOTE_SOURCE)),
@@ -254,6 +260,8 @@ final class DiscoveryTest {
                     "pinned sources must survive Android and desktop restart");
             counter.check(!presentation.enabledSourceLanguages(SourceContentKind.MANGA).contains("en"),
                     "source language choices must survive Android and desktop restart");
+            counter.check(!presentation.sourceEnabled(REMOTE_SOURCE),
+                    "individual extension source choices must survive Android and desktop restart");
             counter.check(presentation.catalogueDisplayMode(REMOTE_SOURCE)
                             == DiscoveryCatalogueDisplayMode.LIST,
                     "catalogue display choices must survive Android and desktop restart");

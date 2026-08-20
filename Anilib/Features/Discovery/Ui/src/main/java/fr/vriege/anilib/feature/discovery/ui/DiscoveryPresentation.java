@@ -34,9 +34,13 @@ public interface DiscoveryPresentation {
 
     java.util.Set<SourceId> pinnedSources();
 
+    boolean sourceEnabled(SourceId sourceId);
+
     void setSourceLanguageEnabled(SourceContentKind contentKind, String languageTag, boolean enabled);
 
     void setSourcePinned(SourceId sourceId, boolean pinned);
+
+    void setSourceEnabled(SourceId sourceId, boolean enabled);
 
     DiscoveryCatalogueDisplayMode catalogueDisplayMode(SourceId sourceId);
 
