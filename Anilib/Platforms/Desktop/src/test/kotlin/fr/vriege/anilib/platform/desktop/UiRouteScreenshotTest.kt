@@ -22,6 +22,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performMultiModalInput
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.printToString
 import androidx.compose.ui.test.pinch
@@ -153,6 +154,7 @@ class UiRouteScreenshotTest {
                 onNodeWithText("Vertical").performClick()
                 waitForContentDescription("Page 1")
                 assertContinuousPageFillsWidth("Vertical reader")
+                assertContinuousReaderScrollsBackToFirstPage()
                 onNodeWithContentDescription("Reading mode").performClick()
                 onNodeWithText("Webtoon").performClick()
                 waitForContentDescription("Page 1")
@@ -344,6 +346,22 @@ class UiRouteScreenshotTest {
         assertTrue(filledSamples >= 2, "$route left a viewport-sized gap around an original-size page")
     }
 
+    private fun ComposeUiTest.assertContinuousReaderScrollsBackToFirstPage() {
+        val pages = onNodeWithTag("reader-continuous-pages", useUnmergedTree = true)
+        pages.performScrollToIndex(7)
+        pages.performScrollToIndex(0)
+        waitForUnmergedContentDescription("Page 1")
+        assertContinuousPageFillsWidth("Vertical reader after reverse scroll")
+    }
+
+    private fun ComposeUiTest.waitForUnmergedContentDescription(label: String) {
+        waitUntil(timeoutMillis = 5_000) {
+            runCatching {
+                onNodeWithContentDescription(label, useUnmergedTree = true).fetchSemanticsNode()
+            }.isSuccess
+        }
+    }
+
     private fun ComposeUiTest.assertReaderZoomInputs() {
         val canvas = onNodeWithTag("reader-canvas", useUnmergedTree = true)
         canvas.assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "100%"))
@@ -402,7 +420,7 @@ class UiRouteScreenshotTest {
         }
 
     private fun prepareLocalContent(directory: Path) {
-        val bitmap = BufferedImage(8, 8, BufferedImage.TYPE_INT_RGB)
+        val bitmap = BufferedImage(8, 16, BufferedImage.TYPE_INT_RGB)
         for (x in 0 until bitmap.width) {
             for (y in 0 until bitmap.height) bitmap.setRGB(x, y, 0xFFFFFF)
         }
@@ -412,8 +430,9 @@ class UiRouteScreenshotTest {
         val legacyManga = Files.createDirectories(
             directory.resolve("local-content").resolve("Acceptance manga"),
         )
-        Files.write(legacyManga.resolve("001.png"), image)
-        Files.write(legacyManga.resolve("002.png"), image)
+        repeat(8) { index ->
+            Files.write(legacyManga.resolve("%03d.png".format(index + 1)), image)
+        }
 
         val catalogueManga = Files.createDirectories(
             directory.resolve("local-content").resolve("local")

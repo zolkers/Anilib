@@ -17,6 +17,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -25,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import fr.vriege.anilib.feature.reader.ReaderDisplayPreferences
 import fr.vriege.anilib.feature.reader.ReadingDirection
@@ -51,6 +53,7 @@ internal fun ReaderContinuousPages(
 ) {
     val firstPage = initialPage.coerceIn(0, (pageCount - 1).coerceAtLeast(0))
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = firstPage)
+    val pageAspectRatios = remember(controller, pageCount) { mutableStateMapOf<Int, Float>() }
     val spacing = if (direction == ReadingDirection.WEBTOON) display.webtoonSpacingDp().dp else 15.dp
 
     CrashSafeLaunchedEffect(listState, controller) {
@@ -70,7 +73,7 @@ internal fun ReaderContinuousPages(
 
     LazyColumn(
         state = listState,
-        modifier = Modifier.fillMaxSize().combinedClickable(
+        modifier = Modifier.fillMaxSize().testTag("reader-continuous-pages").combinedClickable(
             onClick = toggleControls,
             onDoubleClick = toggleZoom,
         ),
@@ -84,6 +87,8 @@ internal fun ReaderContinuousPages(
                 direction = direction,
                 display = display,
                 revision = revision,
+                knownAspectRatio = pageAspectRatios[pageIndex],
+                rememberAspectRatio = { pageAspectRatios[pageIndex] = it },
             )
         }
     }
@@ -97,24 +102,28 @@ private fun ReaderContinuousPage(
     direction: ReadingDirection,
     display: ReaderDisplayPreferences,
     revision: Int,
+    knownAspectRatio: Float?,
+    rememberAspectRatio: (Float) -> Unit,
 ) {
     var retry by remember(controller, pageIndex) { mutableIntStateOf(0) }
     var decoded by remember(controller, pageIndex, revision, retry) {
         mutableStateOf<Result<ImageBitmap>?>(null)
     }
     CrashSafeLaunchedEffect(controller, pageIndex, revision, retry) {
-        decoded = withContext(Dispatchers.IO) {
+        val result = withContext(Dispatchers.IO) {
             runCatching {
                 requireNotNull(pageDecoder(controller.page(pageIndex))) {
                     "Unsupported page image format"
                 }
             }
         }
+        result.getOrNull()?.let { rememberAspectRatio(it.width.toFloat() / it.height) }
+        decoded = result
     }
 
     when (val result = decoded) {
         null -> Box(
-            modifier = Modifier.fillMaxWidth().height(520.dp),
+            modifier = stablePageSize(knownAspectRatio, 520),
             contentAlignment = Alignment.Center,
         ) {
             CircularProgressIndicator(color = Color.White)
@@ -133,7 +142,7 @@ private fun ReaderContinuousPage(
             },
             onFailure = { failure ->
                 Column(
-                    modifier = Modifier.fillMaxWidth().height(240.dp).padding(24.dp),
+                    modifier = stablePageSize(knownAspectRatio, 240).padding(24.dp),
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
@@ -147,3 +156,10 @@ private fun ReaderContinuousPage(
         )
     }
 }
+
+private fun stablePageSize(knownAspectRatio: Float?, fallbackHeightDp: Int): Modifier =
+    if (knownAspectRatio == null) {
+        Modifier.fillMaxWidth().height(fallbackHeightDp.dp)
+    } else {
+        Modifier.fillMaxWidth().aspectRatio(knownAspectRatio)
+    }
