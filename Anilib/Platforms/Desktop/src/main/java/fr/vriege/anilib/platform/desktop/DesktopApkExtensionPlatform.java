@@ -7,6 +7,7 @@ import fr.vriege.anilib.feature.extensionrepository.runtime.ExtensionRepositoryL
 import fr.vriege.anilib.feature.extensionrepository.runtime.FileExtensionRepositoryStore;
 import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionPlatform;
 import fr.vriege.anilib.foundation.component.ComponentId;
+import fr.vriege.anilib.framework.concurrent.runtime.ManagedExecutors;
 import fr.vriege.anilib.framework.http.AnilibHttpClient;
 import fr.vriege.anilib.framework.http.HttpTransport;
 import fr.vriege.anilib.kernel.AnilibPlugin;
@@ -24,6 +25,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
 
 final class DesktopApkExtensionPlatform implements ApkExtensionPlatform, AutoCloseable {
@@ -36,6 +38,7 @@ final class DesktopApkExtensionPlatform implements ApkExtensionPlatform, AutoClo
     private final Set<String> installedPackageNames = new LinkedHashSet<>();
     private volatile StartedAnilib started;
     private volatile String diagnostic;
+    private final ExecutorService operations = ManagedExecutors.fixed("anilib-desktop-apk", 2);
 
     private DesktopApkExtensionPlatform(
             Path dataDirectory,
@@ -139,7 +142,7 @@ final class DesktopApkExtensionPlatform implements ApkExtensionPlatform, AutoClo
             }
             return extensionPackage.displayName() + " installed. " + activated
                     + " source(s) added immediately to Browse.";
-        });
+        }, operations);
     }
 
     @Override
@@ -154,7 +157,7 @@ final class DesktopApkExtensionPlatform implements ApkExtensionPlatform, AutoClo
             String result = bridge.uninstall(packageName);
             deactivate(packageName);
             return result + " Its sources were removed from Browse.";
-        });
+        }, operations);
     }
 
     private synchronized int activateNewSources() {
@@ -205,6 +208,7 @@ final class DesktopApkExtensionPlatform implements ApkExtensionPlatform, AutoClo
         installedPackageNames.clear();
         installedPackageNames.addAll(restarted.installedPackageNames);
         diagnostic = restarted.diagnostic;
+        ManagedExecutors.shutdown(restarted.operations);
     }
 
     private static DesktopApkExtensionPlatform running(Path dataDirectory, HttpTransport transport) {
@@ -245,6 +249,7 @@ final class DesktopApkExtensionPlatform implements ApkExtensionPlatform, AutoClo
 
     @Override
     public synchronized void close() {
+        ManagedExecutors.shutdown(operations);
         EmbeddedDesktopExtensionHost running = host;
         host = null;
         bridge = null;

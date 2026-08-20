@@ -1,5 +1,6 @@
 package fr.vriege.anilib.feature.extensionrepository.runtime;
 
+import fr.vriege.anilib.framework.concurrent.runtime.ManagedExecutors;
 import fr.vriege.anilib.feature.extensionrepository.ExtensionArtifactFormat;
 import fr.vriege.anilib.feature.extensionrepository.ExtensionArtifactMetadata;
 import fr.vriege.anilib.feature.extensionrepository.ExtensionInstallationService;
@@ -19,7 +20,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
@@ -53,11 +53,7 @@ public final class DefaultExtensionUpdateService implements ExtensionUpdateServi
         this.policyStore = Preconditions.requireNonNull(policyStore, "policyStore");
         this.adultContentAllowed = Preconditions.requireNonNull(adultContentAllowed, "adultContentAllowed");
         automaticUpdatesEnabled = policyStore.load();
-        executor = Executors.newSingleThreadScheduledExecutor(runnable -> {
-            Thread thread = new Thread(runnable, "anilib-extension-updates");
-            thread.setDaemon(true);
-            return thread;
-        });
+        executor = ManagedExecutors.scheduled("anilib-extension-updates");
         executor.scheduleWithFixedDelay(
                 this::runAutomaticUpdateSafely,
                 INITIAL_DELAY.toSeconds(),

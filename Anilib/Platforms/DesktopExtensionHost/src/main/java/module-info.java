@@ -1,4 +1,5 @@
 module fr.vriege.anilib.platform.desktopextensionhost {
+    requires fr.vriege.anilib.framework.concurrent.runtime;
     requires jdk.httpserver;
     requires java.net.http;
     requires java.xml;

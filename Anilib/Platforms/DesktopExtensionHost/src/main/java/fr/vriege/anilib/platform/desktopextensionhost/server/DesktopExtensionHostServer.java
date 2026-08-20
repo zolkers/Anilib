@@ -2,6 +2,7 @@ package fr.vriege.anilib.platform.desktopextensionhost.server;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import fr.vriege.anilib.framework.concurrent.runtime.ManagedExecutors;
 import fr.vriege.anilib.platform.desktopextensionhost.extension.ExtensionDownloadClient;
 import fr.vriege.anilib.platform.desktopextensionhost.extension.ExtensionKind;
 import fr.vriege.anilib.platform.desktopextensionhost.extension.ExtensionOperationException;
@@ -34,7 +35,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -85,7 +85,10 @@ public final class DesktopExtensionHostServer implements AutoCloseable {
         Path data = prepareDataDirectory(dataDirectory);
         try {
             HttpServer server = HttpServer.create(new InetSocketAddress(bindAddress, port), 0);
-            ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
+            ExecutorService executor = ManagedExecutors.bounded(
+                    "anilib-extension-http",
+                    Math.max(4, Math.min(32, Runtime.getRuntime().availableProcessors() * 2)),
+                    128);
             ExtensionRegistry registry = new ExtensionRegistry(data);
             registry.prepareInstalledArchives();
             ExtensionRuntimeCatalog catalog = new ExtensionRuntimeCatalog(registry);
@@ -493,7 +496,9 @@ public final class DesktopExtensionHostServer implements AutoCloseable {
         try {
             action.run();
         } catch (ExtensionOperationException exception) {
-            logFailure(correlationId, exchange, exception);
+            if (exception.code() != ExtensionOperationException.Code.OPERATION_SUPERSEDED) {
+                logFailure(correlationId, exchange, exception);
+            }
             ExtensionHostHttpExchange.json(exchange, exception.code().statusCode(), errorJson(
                     exception.code().protocolValue(), exception.getMessage(), correlationId));
         } catch (IllegalArgumentException exception) {
@@ -575,7 +580,8 @@ public final class DesktopExtensionHostServer implements AutoCloseable {
     @Override
     public void close() {
         server.stop(0);
-        executor.close();
+        sourceOperations.close();
+        ManagedExecutors.shutdown(executor);
         runtimeCatalog.close();
     }
 }

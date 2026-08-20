@@ -21,6 +21,7 @@ public final class AnilibJavaRuleRegistry {
                 new SecurityBoundaryRule(),
                 new LocalizationRule(),
                 new ExtensionIsolationRule(),
+                new ThreadOwnershipRule(),
                 new KotlinSourceRule(),
                 new SourceFormatRule());
     }

@@ -331,6 +331,9 @@ public final class DesktopExtensionSourceBridge {
                 case "remote_http_failure" -> "The source website could not complete the request";
                 case "parse_failure" -> "The extension could not read the source response";
                 case "abi_failure" -> "This extension is not compatible with the desktop host";
+                case "host_busy" -> "The desktop extension host is busy; retry shortly";
+                case "operation_superseded" -> "This request was replaced by a newer search";
+                case "operation_timeout" -> "The source took too long to respond";
                 case "invalid_request" -> "The desktop extension host rejected the request";
                 default -> optionalText(error, "message").orElse(fallback);
             };

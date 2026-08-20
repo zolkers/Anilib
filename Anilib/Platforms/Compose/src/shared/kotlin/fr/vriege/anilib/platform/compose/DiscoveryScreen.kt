@@ -102,6 +102,7 @@ import fr.vriege.anilib.framework.http.HttpCookieJar
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.foundation.layout.PaddingValues
@@ -634,6 +635,9 @@ private fun SourceCatalogueScreen(
         preferenceRevision,
         requestRevision,
     ) {
+        if (query.isNotBlank()) {
+            delay(SOURCE_SEARCH_DEBOUNCE_MILLIS)
+        }
         result = null
         result = withContext(Dispatchers.IO) {
             runCatching {
@@ -1136,6 +1140,7 @@ private fun GlobalSearchContent(
         mutableStateOf<Result<Map<SourceId, SourcePage>>?>(null)
     }
     CrashSafeLaunchedEffect(kind, query, revision) {
+        delay(SOURCE_SEARCH_DEBOUNCE_MILLIS)
         result = null
         result = withContext(Dispatchers.IO) {
             runCatching { presentation.globalSearch(kind, query, 10) }
@@ -1176,6 +1181,8 @@ private fun GlobalSearchContent(
         }
     }
 }
+
+private const val SOURCE_SEARCH_DEBOUNCE_MILLIS = 400L
 
 @Composable
 private fun ExtensionList(

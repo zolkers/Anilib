@@ -1,5 +1,6 @@
 package fr.vriege.anilib.feature.reader.runtime;
 
+import fr.vriege.anilib.framework.concurrent.runtime.ManagedExecutors;
 import fr.vriege.anilib.feature.library.LibraryCatalog;
 import fr.vriege.anilib.feature.library.LibraryHistoryEntry;
 import fr.vriege.anilib.feature.library.LibraryItem;
@@ -29,7 +30,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.function.BooleanSupplier;
 import java.util.Comparator;
 import java.util.UUID;
@@ -60,7 +60,7 @@ public final class DefaultReaderService implements ReaderService, ReaderContentR
                 library,
                 policy,
                 Clock.systemUTC(),
-                Executors.newFixedThreadPool(2),
+                ManagedExecutors.fixed("anilib-reader", 2),
                 persistenceAllowed);
     }
 

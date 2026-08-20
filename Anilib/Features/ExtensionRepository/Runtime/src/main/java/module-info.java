@@ -1,5 +1,6 @@
 module fr.vriege.anilib.feature.extensionrepository.runtime {
     requires fr.vriege.anilib.foundation;
+    requires fr.vriege.anilib.framework.concurrent.runtime;
     requires transitive fr.vriege.anilib.kernel.api;
     requires transitive fr.vriege.anilib.framework.http.api;
     requires transitive fr.vriege.anilib.feature.source.api;

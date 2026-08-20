@@ -1,5 +1,6 @@
 package fr.vriege.anilib.feature.extensionrepository.ui;
 
+import fr.vriege.anilib.framework.concurrent.runtime.ManagedExecutors;
 import fr.vriege.anilib.feature.extensionrepository.ExtensionBrowsePreferenceStore;
 import fr.vriege.anilib.feature.extensionrepository.ExtensionBrowsePreferences;
 import fr.vriege.anilib.feature.extensionrepository.ExtensionInstallationService;
@@ -21,7 +22,6 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -31,11 +31,7 @@ public final class DefaultExtensionRepositoryPresentation
     private final ExtensionRepositoryService service;
     private final ExtensionInstallationService installation;
     private final ExtensionUpdateService updates;
-    private final ExecutorService executor = Executors.newSingleThreadExecutor(runnable -> {
-        Thread thread = new Thread(runnable, "anilib-extension-repositories");
-        thread.setDaemon(true);
-        return thread;
-    });
+    private final ExecutorService executor = ManagedExecutors.single("anilib-extension-repositories");
     private final List<Runnable> listeners = new CopyOnWriteArrayList<>();
     private final AutoCloseable updateObservation;
     private final AutoCloseable settingsObservation;

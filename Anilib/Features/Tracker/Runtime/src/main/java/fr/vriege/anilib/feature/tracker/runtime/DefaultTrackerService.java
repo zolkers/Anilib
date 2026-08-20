@@ -1,5 +1,6 @@
 package fr.vriege.anilib.feature.tracker.runtime;
 
+import fr.vriege.anilib.framework.concurrent.runtime.ManagedExecutors;
 import fr.vriege.anilib.feature.library.LibraryCatalog;
 import fr.vriege.anilib.feature.library.LibraryItem;
 import fr.vriege.anilib.feature.library.LibraryItemId;
@@ -38,7 +39,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
@@ -51,11 +51,7 @@ public final class DefaultTrackerService implements TrackerService, AutoCloseabl
     private final CopyOnWriteArrayList<Runnable> listeners = new CopyOnWriteArrayList<>();
     private final Map<BindingKey, TrackerSyncConflict> conflicts = new LinkedHashMap<>();
     private final Set<BindingKey> dirtyEntries = new HashSet<>();
-    private final ExecutorService synchronizer = Executors.newSingleThreadExecutor(task -> {
-        Thread thread = new Thread(task, "anilib-tracker-sync");
-        thread.setDaemon(true);
-        return thread;
-    });
+    private final ExecutorService synchronizer = ManagedExecutors.single("anilib-tracker-sync");
     private final AtomicBoolean synchronizationQueued = new AtomicBoolean();
     private final AutoCloseable libraryObservation;
     private volatile boolean closed;

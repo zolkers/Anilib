@@ -1,5 +1,6 @@
 package fr.vriege.anilib.framework.http.runtime;
 
+import fr.vriege.anilib.framework.concurrent.runtime.ManagedExecutors;
 import fr.vriege.anilib.framework.http.HttpException;
 
 import java.io.ByteArrayOutputStream;
@@ -25,7 +26,6 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -81,14 +81,8 @@ public final class MediaHeaderProxy implements AutoCloseable {
             throw new HttpException("Unable to start the loopback media relay", exception);
         }
         token = randomToken();
-        workers = Executors.newCachedThreadPool(task -> {
-            Thread thread = new Thread(task, "anilib-media-relay-worker");
-            thread.setDaemon(true);
-            return thread;
-        });
-        acceptor = new Thread(this::acceptConnections, "anilib-media-relay-acceptor");
-        acceptor.setDaemon(true);
-        acceptor.start();
+        workers = ManagedExecutors.bounded("anilib-media-relay-worker", 8, 64);
+        acceptor = ManagedExecutors.start("anilib-media-relay-acceptor", this::acceptConnections);
     }
 
     public URI route(URI target, Map<String, String> headers) {
@@ -490,7 +484,7 @@ public final class MediaHeaderProxy implements AutoCloseable {
             } catch (IOException ignored) {
                 // Closing an already-failed loopback socket is best effort.
             }
-            workers.shutdownNow();
+            ManagedExecutors.shutdown(workers);
             targets.clear();
             routes.clear();
         }

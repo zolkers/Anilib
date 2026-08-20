@@ -19,6 +19,7 @@ import fr.vriege.anilib.feature.extensionrepository.ui.InstalledApkExtension
 import fr.vriege.anilib.framework.http.AnilibHttpClient
 import fr.vriege.anilib.framework.http.HttpCachePolicy
 import fr.vriege.anilib.framework.http.HttpRequest
+import fr.vriege.anilib.framework.concurrent.runtime.ManagedExecutors
 import fr.vriege.anilib.kernel.PluginRegistration
 import fr.vriege.anilib.kernel.StartedAnilib
 import java.net.URI
@@ -85,7 +86,7 @@ internal class AndroidApkExtensionPlatform(
                 )
             }
         }
-        return CompletableFuture.supplyAsync {
+        return ManagedExecutors.supply("anilib-android-apk-download") {
             val artifact = extensionPackage.artifacts()
                 .firstOrNull { it.format() == ExtensionArtifactFormat.ANIYOMI_APK }
                 ?: throw IllegalArgumentException("Extension has no Aniyomi APK artifact")

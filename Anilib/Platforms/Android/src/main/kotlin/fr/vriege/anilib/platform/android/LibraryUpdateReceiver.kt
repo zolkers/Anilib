@@ -12,15 +12,15 @@ import fr.vriege.anilib.feature.updates.UpdateCapabilities
 import fr.vriege.anilib.feature.player.PlayerBackends
 import fr.vriege.anilib.feature.updates.UpdateInterval
 import fr.vriege.anilib.framework.http.runtime.UrlConnectionHttpTransport
+import fr.vriege.anilib.framework.concurrent.runtime.ManagedExecutors
 import java.time.Instant
-import java.util.concurrent.CompletableFuture
 
 class LibraryUpdateReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         schedule(context)
         if (intent.action == Intent.ACTION_BOOT_COMPLETED) return
         val pendingResult = goAsync()
-        CompletableFuture.runAsync {
+        ManagedExecutors.run("anilib-android-library-update") {
             runCatching { refreshIfDue(context.applicationContext) }
             pendingResult.finish()
         }

@@ -1,0 +1,15 @@
+tasks.register('concurrencyRuntimeSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verifies latest-wins cancellation and timeout behavior for managed task pipelines.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'fr.vriege.anilib.framework.concurrent.runtime.ConcurrencyRuntimeSmoke'
+}
+
+tasks.named('test') {
+    failOnNoDiscoveredTests = false
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('concurrencyRuntimeSmoke')
+}

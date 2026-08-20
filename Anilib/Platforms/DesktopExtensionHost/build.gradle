@@ -68,6 +68,7 @@ def rxjavaModuleJar = tasks.register('rxjavaModuleJar', Jar) {
 }
 
 dependencies {
+    implementation project(':Anilib:Framework:Concurrency:Runtime')
     implementation 'de.femtopedia.dex2jar:dex-translator:2.4.38'
     implementation 'net.dongliu:apk-parser:2.6.10'
     implementation 'org.ow2.asm:asm:9.10.1'

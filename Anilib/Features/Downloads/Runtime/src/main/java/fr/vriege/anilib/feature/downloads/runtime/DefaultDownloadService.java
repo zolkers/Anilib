@@ -1,5 +1,6 @@
 package fr.vriege.anilib.feature.downloads.runtime;
 
+import fr.vriege.anilib.framework.concurrent.runtime.ManagedExecutors;
 import fr.vriege.anilib.feature.downloads.AutomaticDownloadCategoryRule;
 import fr.vriege.anilib.feature.downloads.AutomaticDownloadPolicy;
 import fr.vriege.anilib.feature.downloads.AutomaticDownloadResult;
@@ -49,7 +50,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
 import java.util.Locale;
@@ -109,7 +109,7 @@ public final class DefaultDownloadService
                 root,
                 policy,
                 Clock.systemUTC(),
-                Executors.newFixedThreadPool(policy.concurrentJobs()),
+                ManagedExecutors.fixed("anilib-download", policy.concurrentJobs()),
                 largeTransfersAllowed);
     }
 

@@ -1,5 +1,6 @@
 package fr.vriege.anilib.feature.updates.runtime;
 
+import fr.vriege.anilib.framework.concurrent.runtime.ManagedExecutors;
 import fr.vriege.anilib.feature.library.LibraryCatalog;
 import fr.vriege.anilib.feature.library.LibraryCategory;
 import fr.vriege.anilib.feature.library.LibraryCategoryUpdatePolicy;
@@ -50,7 +51,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -176,12 +176,9 @@ public final class DefaultLibraryUpdateService implements LibraryUpdateService, 
                 libraryConfiguration,
                 "libraryConfiguration must not be null");
         store = new LibraryUpdateStore(stateFile);
-        coordinator = Executors.newSingleThreadExecutor(task -> daemon(task, "anilib-library-update"));
-        workers = Executors.newFixedThreadPool(
-                SOURCE_LANES,
-                task -> daemon(task, "anilib-library-update-source"));
-        scheduler = Executors.newSingleThreadScheduledExecutor(
-                task -> daemon(task, "anilib-library-update-scheduler"));
+        coordinator = ManagedExecutors.single("anilib-library-update");
+        workers = ManagedExecutors.fixed("anilib-library-update-source", SOURCE_LANES);
+        scheduler = ManagedExecutors.scheduled("anilib-library-update-scheduler");
         scheduleNext();
     }
 
@@ -688,12 +685,6 @@ public final class DefaultLibraryUpdateService implements LibraryUpdateService, 
         workers.shutdownNow();
         notifier.close();
         listeners.clear();
-    }
-
-    private static Thread daemon(Runnable task, String name) {
-        Thread thread = new Thread(task, name);
-        thread.setDaemon(true);
-        return thread;
     }
 
     private record ContentRecord(String id, String title, Optional<Instant> publishedAt) {

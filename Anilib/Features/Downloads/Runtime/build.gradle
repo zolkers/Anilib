@@ -1,4 +1,5 @@
 dependencies {
+    implementation project(':Anilib:Framework:Concurrency:Runtime')
     api project(':Anilib:Features:Downloads:Api')
     implementation project(':Anilib:Features:Library:Api')
     api project(':Anilib:Features:Reader:Api')

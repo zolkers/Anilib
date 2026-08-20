@@ -51,6 +51,9 @@ public final class ExtensionOperationException extends RuntimeException {
             case REMOTE_HTTP_FAILURE -> "The source website could not complete the request";
             case PARSE_FAILURE -> "The extension could not read the source response";
             case ABI_FAILURE -> "The extension is not compatible with the desktop host";
+            case HOST_BUSY -> "The desktop extension host is busy";
+            case OPERATION_SUPERSEDED -> "The extension operation was replaced by a newer request";
+            case OPERATION_TIMEOUT -> "The extension operation timed out";
             case INTERNAL_HOST_FAILURE -> "The desktop extension host could not complete the request";
         };
     }
@@ -68,6 +71,9 @@ public final class ExtensionOperationException extends RuntimeException {
         REMOTE_HTTP_FAILURE("remote_http_failure", 502),
         PARSE_FAILURE("parse_failure", 502),
         ABI_FAILURE("abi_failure", 422),
+        HOST_BUSY("host_busy", 503),
+        OPERATION_SUPERSEDED("operation_superseded", 409),
+        OPERATION_TIMEOUT("operation_timeout", 504),
         INTERNAL_HOST_FAILURE("internal_host_failure", 500);
 
         private final String protocolValue;

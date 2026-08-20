@@ -39,6 +39,7 @@ import fr.vriege.anilib.feature.backup.ui.BackupUiCapabilities
 import fr.vriege.anilib.feature.tracker.ui.TrackerUiCapabilities
 import fr.vriege.anilib.feature.updates.ui.UpdateUiCapabilities
 import fr.vriege.anilib.feature.applicationupdate.ui.ApplicationUpdateUiCapabilities
+import fr.vriege.anilib.framework.concurrent.runtime.ManagedExecutors
 import fr.vriege.anilib.framework.http.runtime.UrlConnectionHttpTransport
 import fr.vriege.anilib.platform.compose.AnilibApp
 import fr.vriege.anilib.platform.compose.AnilibStartupScreen
@@ -87,7 +88,7 @@ class MainActivity : ComponentActivity() {
     private fun startProduct() {
         val attempt = ++startupAttempt
         startupState.value = AndroidStartupState.Loading
-        Thread({
+        ManagedExecutors.start(STARTUP_THREAD_NAME) {
             val result = runCatching {
                 val apkActivation = AndroidAniyomiSourceRuntime(this).prepare()
                 val started = StandardAnilib.start(
@@ -115,7 +116,7 @@ class MainActivity : ComponentActivity() {
                     startupState.value = AndroidStartupState.Failed(startupFailureMessage(failure))
                 }
             }
-        }, STARTUP_THREAD_NAME).start()
+        }
     }
 
     @Composable

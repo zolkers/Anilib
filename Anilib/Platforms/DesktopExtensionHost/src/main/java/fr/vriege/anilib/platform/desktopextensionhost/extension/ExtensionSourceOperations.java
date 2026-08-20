@@ -1,5 +1,7 @@
 package fr.vriege.anilib.platform.desktopextensionhost.extension;
 
+import fr.vriege.anilib.framework.concurrent.runtime.LatestTaskPipeline;
+import fr.vriege.anilib.framework.concurrent.runtime.TaskPipelineException;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.AnimesPage;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.Hoster;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.SAnime;
@@ -12,6 +14,7 @@ import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.source.mode
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -20,18 +23,29 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.TreeSet;
 import java.util.regex.Pattern;
+import java.util.concurrent.atomic.AtomicLong;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 import java.io.InputStream;
 
-public final class ExtensionSourceOperations {
+public final class ExtensionSourceOperations implements AutoCloseable {
     private static final int MAX_PROXY_BYTES = 64 * 1024 * 1024;
     private static final int MAX_RETAINED_MODELS = 4_096;
     private static final Pattern WEB_HOST = Pattern.compile("https?://([^/\\\\\"']+)", Pattern.CASE_INSENSITIVE);
     private static final System.Logger LOGGER = System.getLogger(ExtensionSourceOperations.class.getName());
+    private static final Duration OPERATION_TIMEOUT = Duration.ofSeconds(25);
+    private static final int OPERATION_PARALLELISM = Math.max(
+            2,
+            Math.min(8, Runtime.getRuntime().availableProcessors()));
 
     private final ExtensionRuntimeCatalog catalog;
+    private final LatestTaskPipeline<OperationKey> operationPipeline = new LatestTaskPipeline<>(
+            "anilib-extension-operation",
+            OPERATION_PARALLELISM,
+            64,
+            OPERATION_TIMEOUT);
+    private final AtomicLong operationSequence = new AtomicLong();
     private final Map<ModelKey, SManga> mangaByUrl = retainedModels();
     private final Map<ModelKey, SAnime> animeByUrl = retainedModels();
     private final Map<ModelKey, SChapter> chapterByUrl = retainedModels();
@@ -442,6 +456,24 @@ public final class ExtensionSourceOperations {
             String operation,
             String url,
             SourceOperation<T> action) {
+        OperationKey key = operationKey(sourceId, operation, url);
+        try {
+            return operation.endsWith(".search")
+                    ? operationPipeline.execute(key, () -> executeDirect(sourceId, kind, operation, url, action))
+                    : operationPipeline.executeIndependent(
+                            key,
+                            () -> executeDirect(sourceId, kind, operation, url, action));
+        } catch (TaskPipelineException failure) {
+            throw pipelineFailure(sourceId, kind.name(), operation, url, failure);
+        }
+    }
+
+    private <T> T executeDirect(
+            long sourceId,
+            ExtensionKind kind,
+            String operation,
+            String url,
+            SourceOperation<T> action) {
         try (ExtensionRuntimeCatalog.Snapshot snapshot = catalog.discover()) {
             LoadedSource loaded = snapshot.sources().stream()
                     .filter(source -> source.id() == sourceId && source.kind() == kind)
@@ -452,6 +484,17 @@ public final class ExtensionSourceOperations {
     }
 
     private <T> T executeAny(long sourceId, String operation, String url, SourceOperation<T> action) {
+        OperationKey key = operationKey(sourceId, operation, url);
+        try {
+            return operationPipeline.executeIndependent(
+                    key,
+                    () -> executeAnyDirect(sourceId, operation, url, action));
+        } catch (TaskPipelineException failure) {
+            throw pipelineFailure(sourceId, "external-source", operation, url, failure);
+        }
+    }
+
+    private <T> T executeAnyDirect(long sourceId, String operation, String url, SourceOperation<T> action) {
         try (ExtensionRuntimeCatalog.Snapshot snapshot = catalog.discover()) {
             LoadedSource loaded = snapshot.sources().stream()
                     .filter(source -> source.id() == sourceId)
@@ -459,6 +502,25 @@ public final class ExtensionSourceOperations {
                     .orElseThrow(() -> new IllegalArgumentException("Source is not installed"));
             return invoke(loaded, operation, url, action);
         }
+    }
+
+    private OperationKey operationKey(long sourceId, String operation, String url) {
+        long sequence = operation.endsWith(".search") ? 0L : operationSequence.incrementAndGet();
+        return new OperationKey(sourceId, operation, Objects.requireNonNullElse(url, ""), sequence);
+    }
+
+    private static ExtensionOperationException pipelineFailure(
+            long sourceId,
+            String packageName,
+            String operation,
+            String url,
+            TaskPipelineException failure) {
+        ExtensionOperationException.Code code = switch (failure.reason()) {
+            case SUPERSEDED -> ExtensionOperationException.Code.OPERATION_SUPERSEDED;
+            case TIMED_OUT -> ExtensionOperationException.Code.OPERATION_TIMEOUT;
+            case BUSY, CLOSED, INTERRUPTED -> ExtensionOperationException.Code.HOST_BUSY;
+        };
+        return new ExtensionOperationException(code, operation, packageName, sourceId, url, failure);
     }
 
     private static <T> T invoke(
@@ -577,5 +639,13 @@ public final class ExtensionSourceOperations {
         public byte[] body() {
             return body.clone();
         }
+    }
+
+    private record OperationKey(long sourceId, String operation, String url, long sequence) {
+    }
+
+    @Override
+    public void close() {
+        operationPipeline.close();
     }
 }

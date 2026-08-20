@@ -1,5 +1,6 @@
 package fr.vriege.anilib.feature.backup.runtime;
 
+import fr.vriege.anilib.framework.concurrent.runtime.ManagedExecutors;
 import fr.vriege.anilib.feature.backup.BackupException;
 import fr.vriege.anilib.feature.backup.BackupContentOption;
 import fr.vriege.anilib.feature.backup.BackupFileSnapshot;
@@ -36,7 +37,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import fr.vriege.anilib.feature.backup.BackupSchedule;
@@ -108,11 +108,7 @@ public final class DefaultBackupService implements BackupService, AutoCloseable 
                 defaultBackupDirectory.resolveSibling("backup-policy.properties"),
                 defaults);
         validatePolicy(policyStore.load().policy());
-        scheduler = Executors.newSingleThreadScheduledExecutor(runnable -> {
-            Thread thread = new Thread(runnable, "anilib-backup-scheduler");
-            thread.setDaemon(true);
-            return thread;
-        });
+        scheduler = ManagedExecutors.scheduled("anilib-backup-scheduler");
         scheduler.scheduleWithFixedDelay(this::runAutomaticSafely, 0L, 1L, TimeUnit.HOURS);
     }
 

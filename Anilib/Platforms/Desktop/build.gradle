@@ -14,6 +14,7 @@ repositories {
 
 dependencies {
     implementation project(':Anilib:Foundation')
+    implementation project(':Anilib:Framework:Concurrency:Runtime')
     implementation project(':Anilib:Framework:Http:Api')
     implementation project(':Anilib:Framework:Http:JdkRuntime')
     implementation project(':Anilib:Configurations:Standard')

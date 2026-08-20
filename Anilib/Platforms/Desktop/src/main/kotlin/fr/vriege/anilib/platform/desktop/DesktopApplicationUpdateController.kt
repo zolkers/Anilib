@@ -2,6 +2,7 @@ package fr.vriege.anilib.platform.desktop
 
 import fr.vriege.anilib.feature.applicationupdate.ApplicationArtifact
 import fr.vriege.anilib.feature.applicationupdate.ApplicationUpdateVerification
+import fr.vriege.anilib.framework.concurrent.runtime.ManagedExecutors
 import fr.vriege.anilib.platform.compose.ApplicationUpdatePlatformController
 import java.awt.Desktop
 import java.net.HttpURLConnection
@@ -17,7 +18,7 @@ class DesktopApplicationUpdateController(dataDirectory: Path) : ApplicationUpdat
 
     override suspend fun download(artifact: ApplicationArtifact, progress: (Long) -> Unit): Path =
         kotlin.coroutines.suspendCoroutine { continuation ->
-            Thread({
+            ManagedExecutors.start("anilib-update-download") {
                 continuation.resumeWith(runCatching {
             Files.createDirectories(updateDirectory)
             val target = updateDirectory.resolve(artifact.fileName()).normalize()
@@ -41,7 +42,7 @@ class DesktopApplicationUpdateController(dataDirectory: Path) : ApplicationUpdat
                 Files.deleteIfExists(temporary)
             }
                 })
-            }, "anilib-update-download").start()
+            }
         }
 
     override fun install(verification: ApplicationUpdateVerification) {

@@ -7,6 +7,7 @@ import android.net.Uri
 import android.provider.Settings
 import fr.vriege.anilib.feature.applicationupdate.ApplicationArtifact
 import fr.vriege.anilib.feature.applicationupdate.ApplicationUpdateVerification
+import fr.vriege.anilib.framework.concurrent.runtime.ManagedExecutors
 import fr.vriege.anilib.platform.compose.ApplicationUpdatePlatformController
 import java.net.HttpURLConnection
 import java.net.URI
@@ -22,7 +23,7 @@ class AndroidApplicationUpdateController(private val activity: MainActivity) :
 
     override suspend fun download(artifact: ApplicationArtifact, progress: (Long) -> Unit): Path =
         kotlin.coroutines.suspendCoroutine { continuation ->
-            Thread({
+            ManagedExecutors.start("anilib-update-download") {
                 continuation.resumeWith(runCatching {
             Files.createDirectories(updateDirectory)
             val target = updateDirectory.resolve(artifact.fileName()).normalize()
@@ -46,7 +47,7 @@ class AndroidApplicationUpdateController(private val activity: MainActivity) :
                 Files.deleteIfExists(temporary)
             }
                 })
-            }, "anilib-update-download").start()
+            }
         }
 
     override fun install(verification: ApplicationUpdateVerification) {

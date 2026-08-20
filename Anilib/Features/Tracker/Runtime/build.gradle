@@ -1,5 +1,6 @@
 dependencies {
     implementation project(':Anilib:Framework:Backup:Api')
+    implementation project(':Anilib:Framework:Concurrency:Runtime')
     implementation project(':Anilib:Features:Library:Api')
     implementation project(':Anilib:Features:Tracker:Api')
 }
