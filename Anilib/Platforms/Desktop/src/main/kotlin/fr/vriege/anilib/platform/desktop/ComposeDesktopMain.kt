@@ -89,7 +89,7 @@ fun main(arguments: Array<String>) {
                     if (fullscreen != playerFullscreen.value) {
                         if (fullscreen) {
                             placementBeforeFullscreen.value = windowState.placement
-                            windowState.placement = WindowPlacement.Fullscreen
+                            windowState.placement = WindowPlacement.Maximized
                         } else {
                             windowState.placement = placementBeforeFullscreen.value
                         }
@@ -119,6 +119,7 @@ fun main(arguments: Array<String>) {
                 },
                 title = "Anilib",
                 state = windowState,
+                undecorated = playerFullscreen.value,
                 onPreviewKeyEvent = { event ->
                     if (playerFullscreen.value && event.key == Key.Escape && event.type == KeyEventType.KeyDown) {
                         setPlayerFullscreen(false)
