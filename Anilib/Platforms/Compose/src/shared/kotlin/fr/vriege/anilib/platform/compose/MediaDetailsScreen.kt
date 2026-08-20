@@ -219,7 +219,7 @@ private fun MediaDetailsActions(
     ) {
         MediaDetailAction(
             if (favorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-            if (favorite) "In Library" else "Favorite",
+            if (favorite) "ui.in.library" else "ui.add.to.library",
             true,
             toggleFavorite,
         )

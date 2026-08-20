@@ -912,15 +912,9 @@ private fun LibraryPageContent(
                     }
                     IconButton(
                         enabled = selected.isNotEmpty(),
-                        onClick = { update { presentation.setFavorite(selected, true) } },
-                    ) {
-                        Icon(Icons.Default.Favorite, contentDescription = "ui.favorite")
-                    }
-                    IconButton(
-                        enabled = selected.isNotEmpty(),
                         onClick = { update { presentation.setFavorite(selected, false) } },
                     ) {
-                        Icon(Icons.Default.FavoriteBorder, contentDescription = "ui.unfavorite")
+                        Icon(Icons.Default.FavoriteBorder, contentDescription = "ui.remove.from.library")
                     }
                     IconButton(
                         enabled = selected.isNotEmpty() && scopedCategories.isNotEmpty(),
@@ -1617,7 +1611,11 @@ private fun HistoryCard(
         IconButton(onClick = toggleFavorite) {
             Icon(
                 if (card?.favorite() == true) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                contentDescription = "ui.toggle.favorite",
+                contentDescription = if (card?.favorite() == true) {
+                    "ui.remove.from.library"
+                } else {
+                    "ui.add.to.library"
+                },
             )
         }
         IconButton(onClick = remove) {
