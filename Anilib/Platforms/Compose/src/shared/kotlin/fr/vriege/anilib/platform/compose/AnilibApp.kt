@@ -796,7 +796,6 @@ private fun LibraryPageContent(
                 ?.takeIf { it in scopedCategories },
         )
     }
-    var favoritesOnly by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var selectionMode by remember { mutableStateOf(false) }
     var selected by remember { mutableStateOf(setOf<LibraryItemId>()) }
@@ -816,7 +815,7 @@ private fun LibraryPageContent(
         .asSequence()
         .filter { query.isBlank() || it.title().contains(query, ignoreCase = true) }
         .filter { it.kind() == kind }
-        .filter { !favoritesOnly || it.favorite() }
+        .filter { it.favorite() }
         .filter {
             when (category) {
                 null -> true
@@ -956,16 +955,6 @@ private fun LibraryPageContent(
                         Icon(Icons.Default.Delete, contentDescription = "ui.delete")
                     }
                 }
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                FilterChip(
-                    selected = favoritesOnly,
-                    onClick = { favoritesOnly = !favoritesOnly },
-                    label = { Text("ui.favorites") },
-                )
             }
             if (scopedCategories.isNotEmpty()) {
                 Row(
