@@ -184,6 +184,12 @@ class UiRouteScreenshotTest {
                         onNodeWithText("Local library").performClick()
                         waitForText("Acceptance catalogue manga")
                         captureStable("Local source catalogue")
+                        onNodeWithText("Acceptance catalogue manga").performClick()
+                        waitForContentDescription("Read")
+                        captureStable("Source title canonical details")
+                        goBack()
+                        waitForText("Acceptance catalogue manga")
+                        captureStable("Local source catalogue restored after details")
                         goBack()
                     }
                 }

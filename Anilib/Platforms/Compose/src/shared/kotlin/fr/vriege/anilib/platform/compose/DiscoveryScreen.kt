@@ -123,13 +123,16 @@ internal fun DiscoveryScreen(
     apkExtensionPlatform: ApkExtensionPlatform,
     browserCookies: HttpCookieJar,
     browserRuntimeStatus: BrowserRuntimeStatus,
-    openDetails: (LibraryItemId, MediaKind) -> Unit,
+    initialSource: SourceDescriptor?,
+    initialListing: SourceListing,
+    openDetails: (LibraryItemId, MediaKind, SourceDescriptor, SourceListing) -> Unit,
+    returnTargetConsumed: () -> Unit,
     navigationVisibilityChanged: (Boolean) -> Unit,
     manageExtensions: () -> Unit,
 ) {
     var section by remember { mutableStateOf(BrowseSection.ANIME_SOURCES) }
-    var selectedSource by remember { mutableStateOf<SourceDescriptor?>(null) }
-    var listing by remember { mutableStateOf(SourceListing.POPULAR) }
+    var selectedSource by remember { mutableStateOf(initialSource) }
+    var listing by remember { mutableStateOf(initialListing) }
     var globalSearch by remember { mutableStateOf(false) }
     var globalQuery by remember { mutableStateOf("") }
     var sourceBrowseRevision by remember { mutableIntStateOf(0) }
@@ -140,6 +143,10 @@ internal fun DiscoveryScreen(
     var updatingSources by remember { mutableStateOf<Set<SourceId>>(emptySet()) }
     val mainDestination = selectedSource == null && browserPage == null
     val scope = rememberCrashSafeCoroutineScope()
+    DisposableEffect(initialSource, initialListing) {
+        if (initialSource != null) returnTargetConsumed()
+        onDispose { }
+    }
     DisposableEffect(mainDestination, navigationVisibilityChanged) {
         navigationVisibilityChanged(mainDestination)
         onDispose { }
@@ -589,7 +596,7 @@ private fun SourceCatalogueScreen(
     presentation: DiscoveryPresentation,
     library: LibraryPresentation,
     openWebPage: (SourceWebPage) -> Unit,
-    openDetails: (LibraryItemId, MediaKind) -> Unit,
+    openDetails: (LibraryItemId, MediaKind, SourceDescriptor, SourceListing) -> Unit,
     navigateUp: () -> Unit,
 ) {
     val scope = rememberCrashSafeCoroutineScope()
@@ -809,6 +816,8 @@ private fun SourceCatalogueScreen(
                                     } else {
                                         MediaKind.MANGA
                                     },
+                                    source,
+                                    selectedListing,
                                 )
                             }.onFailure {
                                 notice = it.message ?: "The title could not be opened"

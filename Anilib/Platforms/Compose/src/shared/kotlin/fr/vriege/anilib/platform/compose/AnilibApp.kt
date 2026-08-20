@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
@@ -134,8 +135,10 @@ import fr.vriege.anilib.feature.settings.ui.SettingsPresentation
 import fr.vriege.anilib.feature.source.SourceContentKind
 import fr.vriege.anilib.feature.source.SourceCatalogueItem
 import fr.vriege.anilib.feature.source.SourceContentUnit
+import fr.vriege.anilib.feature.source.SourceDescriptor
 import fr.vriege.anilib.feature.source.SourceEpisodeId
 import fr.vriege.anilib.feature.source.SourceId
+import fr.vriege.anilib.feature.source.SourceListing
 import fr.vriege.anilib.feature.reader.ui.ReaderController
 import fr.vriege.anilib.feature.reader.ui.ReaderPresentation
 import fr.vriege.anilib.feature.reader.ReaderOrientationPolicy
@@ -166,6 +169,11 @@ private data class DetailPlatform(
     val httpClient: AnilibHttpClient,
     val shareController: ShareController,
     val pageDecoder: (ByteArray) -> ImageBitmap?,
+)
+
+private data class BrowseReturnTarget(
+    val source: SourceDescriptor,
+    val listing: SourceListing,
 )
 
 private data class HistoryContentKey(
@@ -742,6 +750,7 @@ private fun AppDestination(
     closeMore: () -> Unit,
     browseDestinationChanged: (Boolean) -> Unit,
 ) {
+    var browseReturnTarget by remember { mutableStateOf<BrowseReturnTarget?>(null) }
     when (section) {
         AppSection.ANIME,
         AppSection.MANGA,
@@ -764,6 +773,12 @@ private fun AppDestination(
                 enqueueDownload,
                 downloadError,
                 openTracking,
+                goBackOverride = browseReturnTarget?.let {
+                    {
+                        navigate(LibraryNavigator::openLibrary)
+                        openSection(AppSection.BROWSE)
+                    }
+                },
             )
             else -> LibraryPageContent(
                 presentation,
@@ -781,10 +796,14 @@ private fun AppDestination(
             apkExtensionPlatform,
             browserCookies,
             browserRuntimeStatus,
-            openDetails = { id, kind ->
+            initialSource = browseReturnTarget?.source,
+            initialListing = browseReturnTarget?.listing ?: SourceListing.POPULAR,
+            openDetails = { id, kind, source, listing ->
+                browseReturnTarget = BrowseReturnTarget(source, listing)
                 navigate { it.openDetails(id) }
                 openSection(if (kind == MediaKind.ANIME) AppSection.ANIME else AppSection.MANGA)
             },
+            returnTargetConsumed = { browseReturnTarget = null },
             navigationVisibilityChanged = browseDestinationChanged,
             manageExtensions = {
                 openSection(AppSection.MORE)
@@ -1726,8 +1745,10 @@ private fun DetailsDestination(
     enqueueDownload: (LibraryItemId) -> Unit,
     downloadError: String?,
     openTracking: (LibraryItemId) -> Unit,
+    goBackOverride: (() -> Unit)?,
 ) {
     val id = destination.selectedTitle().orElse(null)
+    var relatedBackStack by remember { mutableStateOf<List<LibraryItemId>>(emptyList()) }
     var revision by remember(id) { mutableStateOf(0) }
     var browserPage by remember(id) {
         mutableStateOf<fr.vriege.anilib.feature.source.SourceWebPage?>(null)
@@ -1736,6 +1757,15 @@ private fun DetailsDestination(
     var episodes by remember(id) { mutableStateOf(listOf<EpisodeSnapshot>()) }
     var unitError by remember(id) { mutableStateOf<String?>(null) }
     val details = remember(id, revision) { id?.let { presentation.details(it).orElse(null) } }
+    val navigateBack: () -> Unit = {
+        val previous = relatedBackStack.lastOrNull()
+        if (previous != null) {
+            relatedBackStack = relatedBackStack.dropLast(1)
+            navigate { it.openDetails(previous) }
+        } else {
+            (goBackOverride ?: { navigate(LibraryNavigator::back) })()
+        }
+    }
     if (browserPage != null) {
         BrowserScreen(
             browserPage!!,
@@ -1746,7 +1776,7 @@ private fun DetailsDestination(
         return
     }
     if (details == null) {
-        MissingDetails { navigate(LibraryNavigator::openLibrary) }
+        MissingDetails(navigateBack)
     } else {
         CrashSafeLaunchedEffect(details.id(), revision) {
             unitError = null
@@ -1824,8 +1854,11 @@ private fun DetailsDestination(
                     titlePage?.location()?.toString() ?: details.title(),
                 )
             },
-            openRelated = { relatedId -> navigate { it.openDetails(relatedId) } },
-            goBack = { navigate(LibraryNavigator::back) },
+            openRelated = { relatedId ->
+                relatedBackStack = relatedBackStack + details.id()
+                navigate { it.openDetails(relatedId) }
+            },
+            goBack = navigateBack,
         )
     }
 }
@@ -1924,9 +1957,8 @@ private fun DetailsPage(
                 }
             }
             if (related.isNotEmpty()) {
-                item { MediaContentHeading("Related titles") }
-                items(related, key = { it.id().value() }) { card ->
-                    LibraryTitleCard(card, null, false, false, {}, { openRelated(card.id()) })
+                item {
+                    RelatedTitlesSection(related) { card -> openRelated(card.id()) }
                 }
             }
     }
@@ -1939,6 +1971,97 @@ private fun DetailsPage(
                 editing = false
             },
         )
+    }
+}
+
+@Composable
+private fun RelatedTitlesSection(
+    titles: List<LibraryCard>,
+    open: (LibraryCard) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .widthIn(max = 900.dp)
+            .fillMaxWidth()
+            .padding(top = 20.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "Related titles",
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                titles.size.toString(),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelLarge,
+            )
+        }
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(end = 8.dp),
+        ) {
+            items(titles, key = { it.id().value() }) { card ->
+                RelatedTitleCard(card) { open(card) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RelatedTitleCard(card: LibraryCard, open: () -> Unit) {
+    Card(
+        modifier = Modifier.width(148.dp).clickable(onClick = open),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+    ) {
+        Column {
+            Box {
+                RemoteArtwork(
+                    card.artwork().orElse(null),
+                    card.title(),
+                    modifier = Modifier.fillMaxWidth().aspectRatio(0.68f),
+                )
+                if (card.favorite()) {
+                    Surface(
+                        modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
+                        shape = RoundedCornerShape(999.dp),
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
+                    ) {
+                        Icon(
+                            Icons.Default.Favorite,
+                            contentDescription = "In Library",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(6.dp).size(16.dp),
+                        )
+                    }
+                }
+            }
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(10.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    card.title(),
+                    minLines = 2,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    formatEnum(card.kind()),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.labelMedium,
+                )
+            }
+        }
     }
 }
 
