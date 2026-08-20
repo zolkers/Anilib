@@ -40,6 +40,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 public final class DefaultTrackerService implements TrackerService, AutoCloseable {
     private final TrackerRegistry registry;
@@ -347,7 +348,7 @@ public final class DefaultTrackerService implements TrackerService, AutoCloseabl
             entries.replaceAll(retained);
             synchronized (this) {
                 Set<BindingKey> retainedKeys = retained.stream().map(BindingKey::of).collect(
-                        java.util.stream.Collectors.toSet());
+                        Collectors.toSet());
                 dirtyEntries.retainAll(retainedKeys);
                 conflicts.keySet().retainAll(retainedKeys);
                 persistPending();

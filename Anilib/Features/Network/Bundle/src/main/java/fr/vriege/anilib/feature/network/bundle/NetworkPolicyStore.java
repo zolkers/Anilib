@@ -13,6 +13,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Optional;
 import java.util.Properties;
+import java.time.Duration;
 
 final class NetworkPolicyStore {
     private final Path file;
@@ -36,7 +37,7 @@ final class NetworkPolicyStore {
                     values.getProperty("user-agent", defaults.userAgent()),
                     uri(values.getProperty("proxy")),
                     uri(values.getProperty("dns-over-https")),
-                    java.time.Duration.ofSeconds(number(values, "timeout-seconds", 30)),
+                    Duration.ofSeconds(number(values, "timeout-seconds", 30)),
                     flag(values, "response-cache", true));
         } catch (IOException | IllegalArgumentException exception) {
             throw new IllegalStateException("Unable to load the network policy", exception);

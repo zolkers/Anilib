@@ -49,6 +49,10 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.net.URLDecoder;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedHashSet;
 
 public final class DesktopExtensionSourceBridge {
     private static final SourceApiVersion REQUIRED_API = new SourceApiVersion(1, 8);
@@ -92,7 +96,7 @@ public final class DesktopExtensionSourceBridge {
 
     public Set<String> installedPackageNames() {
         Map<String, Object> document = object(get("/api/v1/extensions/installed", Map.of()));
-        Set<String> packages = new java.util.LinkedHashSet<>();
+        Set<String> packages = new LinkedHashSet<>();
         for (Object value : array(document, "extensions")) {
             packages.add(text(object(value), "pkg"));
         }
@@ -380,7 +384,7 @@ public final class DesktopExtensionSourceBridge {
                     .map(String::strip).filter(item -> !item.isEmpty()).toList();
         }
         if (value instanceof String text) {
-            return java.util.Arrays.stream(text.split(","))
+            return Arrays.stream(text.split(","))
                     .map(String::strip).filter(item -> !item.isEmpty()).toList();
         }
         return List.of();
@@ -566,8 +570,8 @@ public final class DesktopExtensionSourceBridge {
             String[] parts = pair.split("=", 2);
             if (parts.length == 2) {
                 result.put(
-                        java.net.URLDecoder.decode(parts[0], StandardCharsets.UTF_8),
-                        java.net.URLDecoder.decode(parts[1], StandardCharsets.UTF_8));
+                        URLDecoder.decode(parts[0], StandardCharsets.UTF_8),
+                        URLDecoder.decode(parts[1], StandardCharsets.UTF_8));
             }
         }
         return Map.copyOf(result);
@@ -591,7 +595,7 @@ public final class DesktopExtensionSourceBridge {
     }
 
     private static <K, V> Map<K, V> retainedModels() {
-        return java.util.Collections.synchronizedMap(new LinkedHashMap<>(64, 0.75f, true) {
+        return Collections.synchronizedMap(new LinkedHashMap<>(64, 0.75f, true) {
             @Override
             protected boolean removeEldestEntry(Map.Entry<K, V> eldest) {
                 return size() > MAX_RETAINED_MODELS;

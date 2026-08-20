@@ -22,6 +22,7 @@ import fr.vriege.anilib.feature.source.SourceEpisode;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 public interface DiscoveryPresentation {
     List<DiscoverySourceSection> sourceSections(SourceContentKind contentKind);
@@ -30,9 +31,9 @@ public interface DiscoveryPresentation {
 
     List<String> availableSourceLanguages(SourceContentKind contentKind);
 
-    java.util.Set<String> enabledSourceLanguages(SourceContentKind contentKind);
+    Set<String> enabledSourceLanguages(SourceContentKind contentKind);
 
-    java.util.Set<SourceId> pinnedSources();
+    Set<SourceId> pinnedSources();
 
     boolean sourceEnabled(SourceId sourceId);
 

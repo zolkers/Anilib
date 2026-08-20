@@ -52,6 +52,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
+import androidx.compose.foundation.shape.RoundedCornerShape
 
 internal val mediaDateTimeFormatter: DateTimeFormatter = DateTimeFormatter
     .ofLocalizedDateTime(FormatStyle.MEDIUM)
@@ -175,7 +176,7 @@ private fun MediaDetailsHero(
         ) {
             artwork(
                 Modifier.width(coverWidth).height(coverHeight)
-                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp)),
+                    .clip(RoundedCornerShape(8.dp)),
             )
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(model.title, style = MaterialTheme.typography.headlineSmall)

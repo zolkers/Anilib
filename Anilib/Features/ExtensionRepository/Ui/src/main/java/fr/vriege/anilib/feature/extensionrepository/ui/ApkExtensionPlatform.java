@@ -5,6 +5,7 @@ import fr.vriege.anilib.feature.extensionrepository.ExtensionPackageMetadata;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 public interface ApkExtensionPlatform {
     boolean available();
@@ -42,7 +43,7 @@ public interface ApkExtensionPlatform {
     default Set<String> installedPackageNames() {
         return discoverInstalled().stream()
                 .map(InstalledApkExtension::packageName)
-                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+                .collect(Collectors.toUnmodifiableSet());
     }
 
     default Set<String> activePackageNames() {

@@ -169,8 +169,9 @@ revision and run the same fixtures on packaged Android and desktop hosts.
 - [x] reproducible MSI, DEB, DMG, and APK packaging; production Android,
   Authenticode, and Apple signing; notarization; checksums; provenance
   attestations; atomic GitHub Releases; and a shared stable update check
-- [x] API-only Javadoc/KDoc-free implementation rule, conventional commits, UI audit, and
-  full Android/desktop verification gate
+- [x] API-only Javadoc/KDoc-free implementation rule, import-first type usage,
+  conventional commits, UI and technical-debt audits, and full
+  Android/desktop verification gate
 - [x] audit all declared modules, keep every active implementation/Bundle, and
   reject future Java/Kotlin module shells through the `empty-module` quality rule
 - [x] unify APK-only, Bundle-only, and dual-artifact source entries under one

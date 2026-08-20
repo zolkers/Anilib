@@ -41,6 +41,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.foundation.layout.Box
+import com.multiplatform.webview.cookie.CookieManager
 
 internal val LocalBrowserPolicy = staticCompositionLocalOf { BrowserPolicy.defaults() }
 
@@ -251,9 +253,9 @@ internal fun BrowserInitializing(close: () -> Unit) {
             )
         },
     ) { padding ->
-        androidx.compose.foundation.layout.Box(
+        Box(
             modifier = Modifier.fillMaxSize().padding(padding),
-            contentAlignment = androidx.compose.ui.Alignment.Center,
+            contentAlignment = Alignment.Center,
         ) {
             CircularProgressIndicator()
         }
@@ -275,9 +277,9 @@ internal fun BrowserUnavailable(message: String, close: () -> Unit) {
             )
         },
     ) { padding ->
-        androidx.compose.foundation.layout.Box(
+        Box(
             modifier = Modifier.fillMaxSize().padding(padding),
-            contentAlignment = androidx.compose.ui.Alignment.Center,
+            contentAlignment = Alignment.Center,
         ) {
             Text(message)
         }
@@ -304,7 +306,7 @@ private fun currentWebUri(value: String?, fallback: URI): URI {
 
 private suspend fun challengeCookiesPresent(
     locations: List<URI>,
-    manager: com.multiplatform.webview.cookie.CookieManager,
+    manager: CookieManager,
     expectedNames: Set<String>,
 ): Boolean {
     val cookieNames = locations.distinct()
@@ -317,7 +319,7 @@ private suspend fun challengeCookiesPresent(
 private suspend fun seedCookies(
     uri: URI,
     headers: Map<String, String>,
-    manager: com.multiplatform.webview.cookie.CookieManager,
+    manager: CookieManager,
 ) {
     headers.entries
         .filter { it.key.equals("Cookie", ignoreCase = true) }
@@ -343,7 +345,7 @@ private suspend fun seedCookies(
 
 private suspend fun syncCookies(
     uri: URI,
-    manager: com.multiplatform.webview.cookie.CookieManager,
+    manager: CookieManager,
     cookieJar: HttpCookieJar,
 ) {
     if (!uri.scheme.equals("http", ignoreCase = true)

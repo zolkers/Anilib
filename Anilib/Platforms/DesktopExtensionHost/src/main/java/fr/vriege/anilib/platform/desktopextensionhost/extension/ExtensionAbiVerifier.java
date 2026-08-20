@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
+import org.objectweb.asm.Label;
 
 /* Validates every relocated host ABI symbol before an extension is activated. */
 public final class ExtensionAbiVerifier {
@@ -183,9 +184,9 @@ public final class ExtensionAbiVerifier {
 
             @Override
             public void visitTryCatchBlock(
-                    org.objectweb.asm.Label start,
-                    org.objectweb.asm.Label end,
-                    org.objectweb.asm.Label handler,
+                    Label start,
+                    Label end,
+                    Label handler,
                     String type) {
                 checkClass(type, missing);
             }

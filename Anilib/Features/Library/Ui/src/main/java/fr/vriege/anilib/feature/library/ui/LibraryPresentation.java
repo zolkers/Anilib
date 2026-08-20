@@ -11,6 +11,7 @@ import fr.vriege.anilib.feature.library.LibraryTitleMetadata;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.Set;
+import java.util.List;
 
 public interface LibraryPresentation {
     LibraryOverview library();
@@ -55,5 +56,5 @@ public interface LibraryPresentation {
 
     void editTitle(LibraryItemId id, String title, LibraryTitleMetadata metadata);
 
-    java.util.List<LibraryCard> relatedTitles(LibraryItemId id);
+    List<LibraryCard> relatedTitles(LibraryItemId id);
 }

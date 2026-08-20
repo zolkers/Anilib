@@ -2,6 +2,7 @@ package fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.source.mod
 
 import java.util.Map;
 import kotlinx.serialization.json.JsonObject;
+import java.util.Objects;
 
 public final class SMangaImpl implements SManga {
     private static final long serialVersionUID = 1L;
@@ -45,7 +46,7 @@ public final class SMangaImpl implements SManga {
     @Override public void setMemo(JsonObject value) { memo = required(value); }
 
     private static <T> T required(T value) {
-        return java.util.Objects.requireNonNull(value, "value");
+        return Objects.requireNonNull(value, "value");
     }
 
     private static String require(String value, String property) {

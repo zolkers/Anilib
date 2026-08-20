@@ -25,6 +25,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.nio.charset.StandardCharsets;
 
 public final class GitHubApplicationUpdateService implements ApplicationUpdateService {
     private static final int MAX_RELEASE_BYTES = 1024 * 1024;
@@ -82,7 +83,7 @@ public final class GitHubApplicationUpdateService implements ApplicationUpdateSe
                     : betaEndpoint;
             String releaseJson = new String(
                     fetch(endpoint, MAX_RELEASE_BYTES),
-                    java.nio.charset.StandardCharsets.UTF_8);
+                    StandardCharsets.UTF_8);
             String tag = match(TAG, releaseJson, "tag_name");
             URI page = URI.create(match(PAGE, releaseJson, "html_url"));
             String changelog = optionalMatch(BODY, releaseJson).map(GitHubApplicationUpdateService::unescape)
@@ -92,7 +93,7 @@ public final class GitHubApplicationUpdateService implements ApplicationUpdateSe
             byte[] manifest = fetch(manifestUri, MAX_MANIFEST_BYTES);
             String signature = new String(
                     fetch(signatureUri, 1024),
-                    java.nio.charset.StandardCharsets.US_ASCII);
+                    StandardCharsets.US_ASCII);
             ApplicationRelease release = ApplicationReleaseManifest.verify(
                     manifest,
                     signature,
@@ -163,8 +164,8 @@ public final class GitHubApplicationUpdateService implements ApplicationUpdateSe
             }
             String digest = digest(artifact);
             if (!MessageDigest.isEqual(
-                    digest.getBytes(java.nio.charset.StandardCharsets.US_ASCII),
-                    expected.sha256().getBytes(java.nio.charset.StandardCharsets.US_ASCII))) {
+                    digest.getBytes(StandardCharsets.US_ASCII),
+                    expected.sha256().getBytes(StandardCharsets.US_ASCII))) {
                 throw new IllegalArgumentException("Downloaded installer checksum does not match the signed manifest");
             }
             return new ApplicationUpdateVerification(artifact, digest, release.sourceCommit(), Instant.now());

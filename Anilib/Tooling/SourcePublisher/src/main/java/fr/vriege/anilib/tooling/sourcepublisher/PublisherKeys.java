@@ -7,13 +7,16 @@ import java.security.KeyPairGenerator;
 import java.security.PrivateKey;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.Base64;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 final class PublisherKeys {
     private PublisherKeys() {
     }
 
-    static void generate(java.nio.file.Path privateFile, java.nio.file.Path publicFile) {
-        if (java.nio.file.Files.exists(privateFile) || java.nio.file.Files.exists(publicFile)) {
+    static void generate(Path privateFile, Path publicFile) {
+        if (Files.exists(privateFile) || Files.exists(publicFile)) {
             throw new IllegalArgumentException("Publisher key output already exists");
         }
         try {
@@ -25,8 +28,8 @@ final class PublisherKeys {
         }
     }
 
-    static PrivateKey privateKey(java.nio.file.Path path) {
-        String encoded = new String(PublisherFiles.read(path, "private key"), java.nio.charset.StandardCharsets.UTF_8)
+    static PrivateKey privateKey(Path path) {
+        String encoded = new String(PublisherFiles.read(path, "private key"), StandardCharsets.UTF_8)
                 .strip();
         try {
             byte[] bytes = Base64.getDecoder().decode(encoded);

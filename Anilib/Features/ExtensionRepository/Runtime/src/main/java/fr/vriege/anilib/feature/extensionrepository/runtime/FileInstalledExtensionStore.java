@@ -19,6 +19,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 public final class FileInstalledExtensionStore {
     private static final int LEGACY_FIELD_COUNT = 8;
@@ -80,8 +81,8 @@ public final class FileInstalledExtensionStore {
                     ExtensionInstallationState.valueOf(fields[5]),
                     fields[6],
                     fields.length == FIELD_COUNT && !fields[7].isEmpty()
-                            ? java.util.Optional.of(decodeText(fields[7]))
-                            : java.util.Optional.empty(),
+                            ? Optional.of(decodeText(fields[7]))
+                            : Optional.empty(),
                     Instant.parse(fields[fields.length - 1]));
         } catch (IllegalArgumentException exception) {
             throw new IllegalStateException("Invalid installed-extension entry", exception);

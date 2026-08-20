@@ -14,6 +14,7 @@ import java.util.Comparator;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.jar.JarOutputStream;
+import java.net.URL;
 
 final class ExtensionRelocationSmoke {
     private static final String ORIGINAL = "eu/kanade/tachiyomi/source/Source";
@@ -46,7 +47,7 @@ final class ExtensionRelocationSmoke {
                     throw new IllegalStateException("Prepared extension marker is missing");
                 }
             }
-            try (URLClassLoader loader = new URLClassLoader(new java.net.URL[]{output.toUri().toURL()})) {
+            try (URLClassLoader loader = new URLClassLoader(new URL[]{output.toUri().toURL()})) {
                 Class<?> enumType = Class.forName("sample.BrokenEnum", true, loader);
                 if (enumType.getField("ITEM").get(null) == null) {
                     throw new IllegalStateException("Converted enum constant was not repaired");

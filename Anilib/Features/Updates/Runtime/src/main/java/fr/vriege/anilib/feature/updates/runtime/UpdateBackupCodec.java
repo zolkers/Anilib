@@ -15,6 +15,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import fr.vriege.anilib.framework.backup.BackupCodecException;
+import java.time.Instant;
 
 public final class UpdateBackupCodec implements BackupSectionCodec {
     private static final BackupSectionId SECTION_ID = BackupSectionId.of("library-updates");
@@ -63,7 +65,7 @@ public final class UpdateBackupCodec implements BackupSectionCodec {
 
     private static LibraryUpdateStore.State decode(int version, byte[] payload) {
         if (version != CURRENT_VERSION) {
-            throw new fr.vriege.anilib.framework.backup.BackupCodecException(
+            throw new BackupCodecException(
                     "Unsupported library updates backup version: " + version);
         }
         return LibraryUpdateStore.decodeState(payload);
@@ -79,7 +81,7 @@ public final class UpdateBackupCodec implements BackupSectionCodec {
         Map<EventKey, LibraryUpdateEvent> events = new LinkedHashMap<>();
         current.events().forEach(event -> events.put(EventKey.of(event), event));
         imported.events().forEach(event -> events.merge(EventKey.of(event), event, UpdateBackupCodec::mergeEvent));
-        Optional<java.time.Instant> lastRunAt = newest(current.lastRunAt(), imported.lastRunAt());
+        Optional<Instant> lastRunAt = newest(current.lastRunAt(), imported.lastRunAt());
         return new LibraryUpdateStore.State(
                 imported.policy(),
                 baselines,
@@ -104,9 +106,9 @@ public final class UpdateBackupCodec implements BackupSectionCodec {
                 false);
     }
 
-    private static Optional<java.time.Instant> newest(
-            Optional<java.time.Instant> first,
-            Optional<java.time.Instant> second) {
+    private static Optional<Instant> newest(
+            Optional<Instant> first,
+            Optional<Instant> second) {
         if (first.isEmpty()) {
             return second;
         }

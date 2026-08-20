@@ -48,6 +48,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Comparator;
+import java.util.function.Supplier;
 
 public final class DefaultDiscoveryService implements DiscoveryService {
     private final SourceRegistry registry;
@@ -74,7 +76,7 @@ public final class DefaultDiscoveryService implements DiscoveryService {
                 .filter(CatalogueSource.class::isInstance)
                 .map(source -> source.descriptor())
                 .filter(descriptor -> descriptor.contentKinds().contains(contentKind))
-                .sorted(java.util.Comparator.comparing(SourceDescriptor::languageTag)
+                .sorted(Comparator.comparing(SourceDescriptor::languageTag)
                         .thenComparing(SourceDescriptor::displayName, String.CASE_INSENSITIVE_ORDER)
                         .thenComparing(SourceDescriptor::id))
                 .toList();
@@ -91,7 +93,7 @@ public final class DefaultDiscoveryService implements DiscoveryService {
         Objects.requireNonNull(contentKind, "contentKind must not be null");
         return registry.extensions().stream()
                 .filter(extension -> extension.source().contentKinds().contains(contentKind))
-                .sorted(java.util.Comparator
+                .sorted(Comparator
                         .comparing((InstalledSourceExtension extension) -> extension.source().languageTag())
                         .thenComparing(
                                 extension -> extension.manifest().component().displayName(),
@@ -411,7 +413,7 @@ public final class DefaultDiscoveryService implements DiscoveryService {
                 .map(WebSource.class::cast);
     }
 
-    private static <T> Optional<T> browserPage(java.util.function.Supplier<T> supplier) {
+    private static <T> Optional<T> browserPage(Supplier<T> supplier) {
         try {
             return Optional.ofNullable(supplier.get());
         } catch (IllegalArgumentException | IllegalStateException ignored) {

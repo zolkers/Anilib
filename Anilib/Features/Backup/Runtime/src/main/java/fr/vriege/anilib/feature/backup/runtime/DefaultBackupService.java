@@ -39,6 +39,8 @@ import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import fr.vriege.anilib.feature.backup.BackupSchedule;
+import java.util.stream.Stream;
 
 public final class DefaultBackupService implements BackupService, AutoCloseable {
     private static final DateTimeFormatter FILE_TIME =
@@ -98,7 +100,7 @@ public final class DefaultBackupService implements BackupService, AutoCloseable 
         }
         this.codecs = Collections.unmodifiableMap(new LinkedHashMap<>(indexed));
         BackupPolicy defaults = new BackupPolicy(
-                fr.vriege.anilib.feature.backup.BackupSchedule.MANUAL,
+                BackupSchedule.MANUAL,
                 5,
                 indexed.keySet(),
                 defaultBackupDirectory);
@@ -127,7 +129,7 @@ public final class DefaultBackupService implements BackupService, AutoCloseable 
             return List.of();
         }
         validateExistingDirectory();
-        try (java.util.stream.Stream<Path> entries = Files.list(directory)) {
+        try (Stream<Path> entries = Files.list(directory)) {
             return entries
                     .filter(this::isManagedBackup)
                     .map(path -> {
@@ -209,7 +211,7 @@ public final class DefaultBackupService implements BackupService, AutoCloseable 
     public synchronized Optional<BackupFileSnapshot> runAutomaticBackupIfDue() {
         ensureOpen();
         BackupPolicyStore.State state = policyStore.load();
-        if (state.policy().schedule() == fr.vriege.anilib.feature.backup.BackupSchedule.MANUAL) {
+        if (state.policy().schedule() == BackupSchedule.MANUAL) {
             return Optional.empty();
         }
         Instant dueAt = state.lastAutomatic()

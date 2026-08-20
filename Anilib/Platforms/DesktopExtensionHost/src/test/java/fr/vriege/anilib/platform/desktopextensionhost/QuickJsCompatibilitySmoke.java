@@ -1,6 +1,7 @@
 package fr.vriege.anilib.platform.desktopextensionhost;
 
 import fr.vriege.anilib.platform.desktopextensionhost.compat.quickjs.QuickJs;
+import java.io.Closeable;
 
 final class QuickJsCompatibilitySmoke {
     private static final String EPISODE_PROJECTION =
@@ -13,7 +14,7 @@ final class QuickJsCompatibilitySmoke {
 
     static void verify() {
         try (QuickJs quickJs = QuickJs.create()) {
-            java.io.Closeable closeable = quickJs;
+            Closeable closeable = quickJs;
             if (closeable != quickJs) {
                 throw new IllegalStateException("QuickJs must retain its java.io.Closeable ABI");
             }

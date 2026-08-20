@@ -39,6 +39,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.zip.GZIPInputStream;
+import java.util.stream.Collectors;
 
 final class AniyomiBackupImporter {
     private static final long MAX_FILE_BYTES = 256L * 1024L * 1024L;
@@ -489,7 +490,7 @@ final class AniyomiBackupImporter {
             Set<String> categories = new LinkedHashSet<>();
             categoryOrders.stream().map(categoryNames::get).filter(Objects::nonNull).forEach(categories::add);
             Map<String, ParsedContent> contentByUrl = content.stream().collect(
-                    java.util.stream.Collectors.toMap(
+                    Collectors.toMap(
                             ParsedContent::url,
                             Function.identity(),
                             (first, second) -> second,

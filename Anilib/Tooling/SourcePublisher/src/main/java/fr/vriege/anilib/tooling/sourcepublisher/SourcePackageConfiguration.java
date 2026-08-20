@@ -14,6 +14,7 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.regex.Pattern;
+import java.util.Objects;
 
 record SourcePackageConfiguration(
         Path configurationFile,
@@ -33,7 +34,7 @@ record SourcePackageConfiguration(
             "[A-Za-z_$][A-Za-z0-9_$]*(?:\\.[A-Za-z_$][A-Za-z0-9_$]*)+");
 
     SourcePackageConfiguration {
-        apk = java.util.Objects.requireNonNull(apk, "apk must not be null");
+        apk = Objects.requireNonNull(apk, "apk must not be null");
         sources = List.copyOf(sources);
     }
 

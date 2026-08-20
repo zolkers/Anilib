@@ -45,6 +45,9 @@ import java.util.List;
 import java.nio.file.Path;
 import java.nio.file.Files;
 import java.io.IOException;
+import fr.vriege.anilib.kernel.PluginInstallationContext;
+import java.util.Comparator;
+import java.util.stream.Stream;
 
 public final class ArchitectureTestMain {
     private static int assertions;
@@ -71,6 +74,7 @@ public final class ArchitectureTestMain {
         assertions += ApplicationReleaseRuleTest.run();
         assertions += SecurityBoundaryRuleTest.run();
         assertions += LocalizationRuleTest.run();
+        assertions += DirectTypeQualifierRuleTest.run();
         assertions += LocalizationTest.run();
         assertions += ExtensionRepositoryTest.run();
         assertions += ExtensionPortabilityTest.run();
@@ -178,8 +182,8 @@ public final class ArchitectureTestMain {
     }
 
     private static void deleteDirectory(Path directory) {
-        try (java.util.stream.Stream<Path> entries = Files.walk(directory)) {
-            for (Path entry : entries.sorted(java.util.Comparator.reverseOrder()).toList()) {
+        try (Stream<Path> entries = Files.walk(directory)) {
+            for (Path entry : entries.sorted(Comparator.reverseOrder()).toList()) {
                 Files.deleteIfExists(entry);
             }
         } catch (IOException exception) {
@@ -282,7 +286,7 @@ public final class ArchitectureTestMain {
             }
 
             @Override
-            public void install(fr.vriege.anilib.kernel.PluginInstallationContext context) throws Exception {
+            public void install(PluginInstallationContext context) throws Exception {
                 installer.install(context);
             }
 
@@ -311,6 +315,6 @@ public final class ArchitectureTestMain {
 
     @FunctionalInterface
     private interface Installer {
-        void install(fr.vriege.anilib.kernel.PluginInstallationContext context) throws Exception;
+        void install(PluginInstallationContext context) throws Exception;
     }
 }

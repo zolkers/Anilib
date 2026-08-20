@@ -17,6 +17,7 @@ import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
+import fr.vriege.anilib.foundation.component.ComponentId;
 
 record PortableSourceBundleDescriptor(
         String packageName,
@@ -49,7 +50,7 @@ record PortableSourceBundleDescriptor(
             String prefix = "source." + index + ".";
             SourceId sourceId = SourceId.of(required(properties, prefix + "id"));
             String component = required(properties, prefix + "component");
-            fr.vriege.anilib.foundation.component.ComponentId.of(component);
+            ComponentId.of(component);
             String displayName = required(properties, prefix + "name");
             String factory = binaryName(required(properties, prefix + "factory"), prefix + "factory");
             Set<SourceNetworkOrigin> origins = origins(properties.getProperty(prefix + "origins", ""));

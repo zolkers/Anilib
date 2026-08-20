@@ -32,6 +32,8 @@ import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.jar.JarOutputStream;
+import java.util.Arrays;
+import java.util.Locale;
 
 public final class ExtensionBytecodeRelocator {
     private static final int MAX_ENTRIES = 25_000;
@@ -77,7 +79,7 @@ public final class ExtensionBytecodeRelocator {
             }
             ClassNode node = classes.get(new ClassReader(bytes).getClassName());
             Transformation transformation = transform(node, hierarchy);
-            if (!java.util.Arrays.equals(bytes, transformation.bytes())) {
+            if (!Arrays.equals(bytes, transformation.bytes())) {
                 relocatedClasses++;
             }
             collectUnresolved(transformation.bytes(), unresolved);
@@ -203,7 +205,7 @@ public final class ExtensionBytecodeRelocator {
                 ClassReader reader = new ClassReader(entry.getValue());
                 String name = remapper.mapType(reader.getClassName());
                 String parent = reader.getSuperName() == null ? null : remapper.mapType(reader.getSuperName());
-                List<String> interfaces = java.util.Arrays.stream(reader.getInterfaces())
+                List<String> interfaces = Arrays.stream(reader.getInterfaces())
                         .map(remapper::mapType)
                         .toList();
                 result.put(name, new ClassInfo(parent, interfaces, (reader.getAccess() & Opcodes.ACC_INTERFACE) != 0));
@@ -527,7 +529,7 @@ public final class ExtensionBytecodeRelocator {
     }
 
     private static boolean signature(String name) {
-        String upper = name.toUpperCase(java.util.Locale.ROOT);
+        String upper = name.toUpperCase(Locale.ROOT);
         return upper.startsWith("META-INF/")
                 && (upper.endsWith(".SF") || upper.endsWith(".RSA") || upper.endsWith(".DSA"));
     }

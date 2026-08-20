@@ -4,6 +4,7 @@ import fr.vriege.anilib.foundation.component.ComponentDescriptor;
 import fr.vriege.anilib.foundation.validation.Preconditions;
 
 import java.util.Set;
+import java.util.LinkedHashSet;
 
 /**
  * The immutable, side-effect-free declaration of an {@link AnilibPlugin}.
@@ -75,9 +76,9 @@ public record PluginManifest(
      */
     public static final class Builder {
         private final ComponentDescriptor descriptor;
-        private final java.util.Set<CapabilityKey<?>> required = new java.util.LinkedHashSet<>();
-        private final java.util.Set<CapabilityKey<?>> provided = new java.util.LinkedHashSet<>();
-        private final java.util.Set<ContributionPoint<?>> contributions = new java.util.LinkedHashSet<>();
+        private final Set<CapabilityKey<?>> required = new LinkedHashSet<>();
+        private final Set<CapabilityKey<?>> provided = new LinkedHashSet<>();
+        private final Set<ContributionPoint<?>> contributions = new LinkedHashSet<>();
 
         private Builder(ComponentDescriptor descriptor) {
             this.descriptor = Preconditions.requireNonNull(descriptor, "descriptor");

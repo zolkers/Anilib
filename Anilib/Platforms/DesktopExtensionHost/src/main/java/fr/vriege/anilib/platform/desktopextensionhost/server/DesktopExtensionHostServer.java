@@ -38,6 +38,8 @@ import java.util.concurrent.Executors;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.net.URISyntaxException;
+import java.util.ArrayList;
 
 public final class DesktopExtensionHostServer implements AutoCloseable {
     private static final System.Logger LOGGER = System.getLogger(DesktopExtensionHostServer.class.getName());
@@ -402,7 +404,7 @@ public final class DesktopExtensionHostServer implements AutoCloseable {
 
     private static String headers(Video video) {
         if (video.getHeaders() == null) return "{}";
-        List<String> values = new java.util.ArrayList<>();
+        List<String> values = new ArrayList<>();
         for (int index = 0; index < video.getHeaders().size(); index++) {
             values.add(json(video.getHeaders().name(index)) + ':' + json(video.getHeaders().value(index)));
         }
@@ -453,8 +455,8 @@ public final class DesktopExtensionHostServer implements AutoCloseable {
     }
 
     private static String sourcesJson(ExtensionRuntimeCatalog.Snapshot snapshot) {
-        List<String> manga = new java.util.ArrayList<>();
-        List<String> anime = new java.util.ArrayList<>();
+        List<String> manga = new ArrayList<>();
+        List<String> anime = new ArrayList<>();
         for (LoadedSource source : snapshot.sources()) {
             String value = "{\"id\":" + ExtensionHostHttpExchange.jsonString(Long.toUnsignedString(source.id()))
                     + ",\"name\":" + ExtensionHostHttpExchange.jsonString(source.name())
@@ -545,7 +547,7 @@ public final class DesktopExtensionHostServer implements AutoCloseable {
             URI uri = URI.create(value);
             if (!uri.isAbsolute()) return uri.getPath() == null ? "" : uri.getPath();
             return new URI(uri.getScheme(), null, uri.getHost(), uri.getPort(), uri.getPath(), null, null).toString();
-        } catch (java.net.URISyntaxException | IllegalArgumentException ignored) {
+        } catch (URISyntaxException | IllegalArgumentException ignored) {
             return "<invalid-url>";
         }
     }

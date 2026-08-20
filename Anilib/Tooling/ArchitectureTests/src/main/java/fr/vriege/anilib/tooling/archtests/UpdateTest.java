@@ -53,6 +53,11 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.AtomicInteger;
+import fr.vriege.anilib.feature.updates.LibraryUpdateException;
+import java.util.Comparator;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.stream.Stream;
 
 final class UpdateTest {
     private static final SourceId SOURCE_ID = SourceId.of("test.updates");
@@ -264,8 +269,8 @@ final class UpdateTest {
             try {
                 application.capability(UpdateCapabilities.SERVICE).runNow().join();
                 throw new AssertionError("library update must reject a disallowed network connection");
-            } catch (java.util.concurrent.CompletionException expected) {
-                counter.check(expected.getCause() instanceof fr.vriege.anilib.feature.updates.LibraryUpdateException,
+            } catch (CompletionException expected) {
+                counter.check(expected.getCause() instanceof LibraryUpdateException,
                         "library update network policy must report a feature-owned failure");
             }
         } finally {
@@ -356,8 +361,8 @@ final class UpdateTest {
         if (!Files.exists(directory)) {
             return;
         }
-        try (java.util.stream.Stream<Path> entries = Files.walk(directory)) {
-            for (Path entry : entries.sorted(java.util.Comparator.reverseOrder()).toList()) {
+        try (Stream<Path> entries = Files.walk(directory)) {
+            for (Path entry : entries.sorted(Comparator.reverseOrder()).toList()) {
                 Files.deleteIfExists(entry);
             }
         } catch (IOException exception) {
@@ -367,7 +372,7 @@ final class UpdateTest {
 
     private static final class RecordingNotifier implements LibraryUpdateNotifier {
         private final List<LibraryUpdateNotification> notifications =
-                new java.util.concurrent.CopyOnWriteArrayList<>();
+                new CopyOnWriteArrayList<>();
 
         @Override
         public boolean available() {

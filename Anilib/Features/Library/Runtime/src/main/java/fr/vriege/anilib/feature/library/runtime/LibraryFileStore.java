@@ -34,6 +34,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Objects;
 import java.util.Set;
+import java.io.InputStream;
+import java.net.URI;
 
 final class LibraryFileStore {
     static final int MAGIC = 0x414E494C;
@@ -69,7 +71,7 @@ final class LibraryFileStore {
         return bytes.toByteArray();
     }
 
-    private static LoadResult read(java.io.InputStream source) throws IOException {
+    private static LoadResult read(InputStream source) throws IOException {
         try (DataInputStream input = new DataInputStream(source)) {
             if (input.readInt() != MAGIC) {
                 throw new IOException("Invalid Anilib library file signature");
@@ -267,8 +269,8 @@ final class LibraryFileStore {
             List<LibraryHistoryEntry> history = readHistory(input);
             LibraryTitleMetadata legacyMetadata = readMetadata(input);
             Optional<LibraryOrigin> origin = readOrigin(input);
-            Optional<java.net.URI> artwork = input.readBoolean()
-                    ? Optional.of(java.net.URI.create(input.readUTF()))
+            Optional<URI> artwork = input.readBoolean()
+                    ? Optional.of(URI.create(input.readUTF()))
                     : Optional.empty();
             List<String> genres = readStrings(input, MAX_PEOPLE_PER_ITEM, "genre");
             LibraryTitleMetadata metadata = new LibraryTitleMetadata(

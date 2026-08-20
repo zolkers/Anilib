@@ -19,6 +19,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 public final class DefaultExtensionRepositoryService implements ExtensionRepositoryService {
     private static final int MAX_REDIRECTS = 5;
@@ -91,13 +92,13 @@ public final class DefaultExtensionRepositoryService implements ExtensionReposit
         ExtensionRepositorySnapshot snapshot;
         try {
             List<ExtensionPackageMetadata> packages = fetchRepository(repository);
-            snapshot = new ExtensionRepositorySnapshot(repository, fetchedAt, packages, java.util.Optional.empty());
+            snapshot = new ExtensionRepositorySnapshot(repository, fetchedAt, packages, Optional.empty());
         } catch (RuntimeException exception) {
             snapshot = new ExtensionRepositorySnapshot(
                     repository,
                     fetchedAt,
                     List.of(),
-                    java.util.Optional.of(failureMessage(exception)));
+                    Optional.of(failureMessage(exception)));
         }
         snapshots.put(repository, snapshot);
         return snapshot;

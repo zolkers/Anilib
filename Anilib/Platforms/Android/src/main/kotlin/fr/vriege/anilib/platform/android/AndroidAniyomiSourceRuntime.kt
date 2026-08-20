@@ -14,6 +14,7 @@ import fr.vriege.anilib.feature.extensionrepository.ui.InstalledApkExtension
 import fr.vriege.anilib.feature.source.SourceId
 import fr.vriege.anilib.kernel.AnilibPlugin
 import java.lang.reflect.InvocationTargetException
+import java.lang.reflect.Method
 
 internal data class AndroidApkSourceActivation(
     val bundles: List<AnilibPlugin>,
@@ -158,7 +159,7 @@ internal class AndroidAniyomiSourceRuntime(
         return sources.filterNotNull()
     }
 
-    private fun invokeFactory(method: java.lang.reflect.Method, instance: Any): List<*> = try {
+    private fun invokeFactory(method: Method, instance: Any): List<*> = try {
         method.invoke(instance) as? List<*>
             ?: throw IllegalStateException("Aniyomi source factory must return a List")
     } catch (failure: InvocationTargetException) {

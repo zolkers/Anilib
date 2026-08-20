@@ -10,8 +10,17 @@ public final class AnilibJavaMain {
     }
 
     public static void main(String[] arguments) {
-        Path root = arguments.length == 0 ? Path.of("") : Path.of(arguments[0]);
+        Path root = List.of(arguments).stream()
+                .filter(argument -> !argument.startsWith("--"))
+                .findFirst()
+                .map(Path::of)
+                .orElseGet(() -> Path.of(""));
         RepositorySnapshot repository = new RepositoryScanner().scan(root);
+        if (List.of(arguments).contains("--fix-direct-type-qualifiers")) {
+            int changedSources = new DirectTypeQualifierFormatter().format(repository);
+            System.out.println("AnilibJava: imported direct type qualifiers in " + changedSources + " source(s).");
+            repository = new RepositoryScanner().scan(root);
+        }
         List<Diagnostic> diagnostics = new ArrayList<>();
         for (AnilibJavaRule rule : AnilibJavaRuleRegistry.standard()) {
             diagnostics.addAll(rule.analyze(repository));

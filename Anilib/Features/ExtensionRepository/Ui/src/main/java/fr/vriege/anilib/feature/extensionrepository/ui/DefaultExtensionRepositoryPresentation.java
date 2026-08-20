@@ -22,6 +22,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.Locale;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 public final class DefaultExtensionRepositoryPresentation
         implements ExtensionRepositoryPresentation, AutoCloseable {
@@ -73,17 +76,17 @@ public final class DefaultExtensionRepositoryPresentation
                         .thenComparing(ExtensionPackageMetadata::packageName))
                 .toList();
         Map<URI, ExtensionRepositorySnapshot> snapshots = service.snapshots().stream()
-                .collect(java.util.stream.Collectors.toMap(
+                .collect(Collectors.toMap(
                         ExtensionRepositorySnapshot::indexUri,
                         value -> value));
         List<ExtensionRepositoryRow> rows = new ArrayList<>();
         for (URI repository : service.repositories()) {
             ExtensionRepositorySnapshot snapshot = snapshots.get(repository);
             rows.add(snapshot == null
-                    ? new ExtensionRepositoryRow(repository, java.util.Optional.empty(), 0, java.util.Optional.empty())
+                    ? new ExtensionRepositoryRow(repository, Optional.empty(), 0, Optional.empty())
                     : new ExtensionRepositoryRow(
                             repository,
-                            java.util.Optional.of(snapshot.fetchedAt()),
+                            Optional.of(snapshot.fetchedAt()),
                             (int) snapshot.packages().stream()
                                     .filter(extension -> enabledLanguages.contains(extension.languageTag()))
                                     .count(),
@@ -251,7 +254,7 @@ public final class DefaultExtensionRepositoryPresentation
     private static String normalizeLanguage(String languageTag) {
         return Preconditions.requireNonBlank(languageTag, "languageTag")
                 .replace('_', '-')
-                .toLowerCase(java.util.Locale.ROOT);
+                .toLowerCase(Locale.ROOT);
     }
 
     private void notifyListeners() {

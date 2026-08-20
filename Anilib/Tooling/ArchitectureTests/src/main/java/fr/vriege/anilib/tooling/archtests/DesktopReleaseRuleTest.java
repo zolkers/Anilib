@@ -8,6 +8,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Comparator;
+import java.util.stream.Stream;
 
 final class DesktopReleaseRuleTest {
     private DesktopReleaseRuleTest() {
@@ -83,8 +85,8 @@ final class DesktopReleaseRuleTest {
         if (!Files.exists(directory)) {
             return;
         }
-        try (java.util.stream.Stream<Path> entries = Files.walk(directory)) {
-            for (Path entry : entries.sorted(java.util.Comparator.reverseOrder()).toList()) {
+        try (Stream<Path> entries = Files.walk(directory)) {
+            for (Path entry : entries.sorted(Comparator.reverseOrder()).toList()) {
                 Files.deleteIfExists(entry);
             }
         } catch (IOException exception) {

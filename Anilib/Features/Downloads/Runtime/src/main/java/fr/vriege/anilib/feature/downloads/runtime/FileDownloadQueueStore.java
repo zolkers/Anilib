@@ -23,6 +23,7 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 final class FileDownloadQueueStore {
     private static final String HEADER_V1 = "ANILIB_DOWNLOADS\t1\t";
@@ -80,9 +81,9 @@ final class FileDownloadQueueStore {
 
     private String encode(DownloadRecord record) {
         String pageValues = record.pages.stream().map(page -> text(page.value())).collect(
-                java.util.stream.Collectors.joining(","));
+                Collectors.joining(","));
         String pageSizes = record.pages.stream().map(page -> Long.toString(page.estimatedBytes())).collect(
-                java.util.stream.Collectors.joining(","));
+                Collectors.joining(","));
         return String.join("\t",
                 "JOB",
                 record.id.toString(),

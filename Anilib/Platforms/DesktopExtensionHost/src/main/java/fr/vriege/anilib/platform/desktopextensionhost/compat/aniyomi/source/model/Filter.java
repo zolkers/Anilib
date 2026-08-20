@@ -2,6 +2,7 @@ package fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.source.mod
 
 import java.util.List;
 import java.util.Objects;
+import kotlin.jvm.internal.DefaultConstructorMarker;
 
 public abstract class Filter<T> {
     private final String name;
@@ -30,7 +31,7 @@ public abstract class Filter<T> {
 
     public static class Separator extends Filter<Object> {
         public Separator(String name) { super(name, 0); }
-        public Separator(String name, int mask, kotlin.jvm.internal.DefaultConstructorMarker marker) {
+        public Separator(String name, int mask, DefaultConstructorMarker marker) {
             this((mask & 1) == 0 ? name : "");
         }
         public Separator() { this(""); }
@@ -47,7 +48,7 @@ public abstract class Filter<T> {
                 V[] values,
                 int state,
                 int mask,
-                kotlin.jvm.internal.DefaultConstructorMarker marker) {
+                DefaultConstructorMarker marker) {
             this(name, values, (mask & 4) == 0 ? state : 0);
         }
         public final V[] getValues() { return values.clone(); }
@@ -55,14 +56,14 @@ public abstract class Filter<T> {
 
     public static class Text extends Filter<String> {
         public Text(String name, String state) { super(name, state); }
-        public Text(String name, String state, int mask, kotlin.jvm.internal.DefaultConstructorMarker marker) {
+        public Text(String name, String state, int mask, DefaultConstructorMarker marker) {
             this(name, (mask & 2) == 0 ? state : "");
         }
     }
 
     public static class CheckBox extends Filter<Boolean> {
         public CheckBox(String name, boolean state) { super(name, state); }
-        public CheckBox(String name, boolean state, int mask, kotlin.jvm.internal.DefaultConstructorMarker marker) {
+        public CheckBox(String name, boolean state, int mask, DefaultConstructorMarker marker) {
             this(name, (mask & 2) == 0 && state);
         }
     }
@@ -73,7 +74,7 @@ public abstract class Filter<T> {
         public static final int STATE_EXCLUDE = 2;
 
         public TriState(String name, int state) { super(name, state); }
-        public TriState(String name, int state, int mask, kotlin.jvm.internal.DefaultConstructorMarker marker) {
+        public TriState(String name, int state, int mask, DefaultConstructorMarker marker) {
             this(name, (mask & 2) == 0 ? state : STATE_IGNORE);
         }
         public final boolean isIgnored() { return getState() == STATE_IGNORE; }
@@ -96,7 +97,7 @@ public abstract class Filter<T> {
                 String[] values,
                 Selection state,
                 int mask,
-                kotlin.jvm.internal.DefaultConstructorMarker marker) {
+                DefaultConstructorMarker marker) {
             this(name, values, (mask & 4) == 0 ? state : null);
         }
         public final String[] getValues() { return values.clone(); }

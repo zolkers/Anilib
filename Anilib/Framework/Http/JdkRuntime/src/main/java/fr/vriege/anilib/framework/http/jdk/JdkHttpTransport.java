@@ -11,16 +11,17 @@ import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpResponse.BodyHandlers;
 import java.util.List;
 import java.util.Map;
+import java.net.http.HttpClient;
 
 public final class JdkHttpTransport implements HttpTransport {
     private static final int MAX_RESPONSE_BYTES = 16 * 1024 * 1024;
 
-    private final java.net.http.HttpClient transport;
+    private final HttpClient transport;
 
     public JdkHttpTransport() {
-        transport = java.net.http.HttpClient.newBuilder()
-                .followRedirects(java.net.http.HttpClient.Redirect.NEVER)
-                .version(java.net.http.HttpClient.Version.HTTP_2)
+        transport = HttpClient.newBuilder()
+                .followRedirects(HttpClient.Redirect.NEVER)
+                .version(HttpClient.Version.HTTP_2)
                 .build();
     }
 

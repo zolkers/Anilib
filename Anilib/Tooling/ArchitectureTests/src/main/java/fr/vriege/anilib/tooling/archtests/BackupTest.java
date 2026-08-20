@@ -50,6 +50,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.zip.GZIPOutputStream;
+import java.util.Comparator;
+import java.util.stream.Stream;
 
 final class BackupTest {
     private static final Instant BACKUP_TIME = Instant.parse("2026-08-18T09:30:00Z");
@@ -499,8 +501,8 @@ final class BackupTest {
         if (!Files.exists(directory)) {
             return;
         }
-        try (java.util.stream.Stream<Path> entries = Files.walk(directory)) {
-            for (Path entry : entries.sorted(java.util.Comparator.reverseOrder()).toList()) {
+        try (Stream<Path> entries = Files.walk(directory)) {
+            for (Path entry : entries.sorted(Comparator.reverseOrder()).toList()) {
                 Files.deleteIfExists(entry);
             }
         } catch (IOException exception) {

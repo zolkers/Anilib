@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Objects;
+import java.nio.file.AtomicMoveNotSupportedException;
 
 public final class FileApplicationUpdateChannelStore {
     private final Path file;
@@ -40,7 +41,7 @@ public final class FileApplicationUpdateChannelStore {
                         file,
                         StandardCopyOption.ATOMIC_MOVE,
                         StandardCopyOption.REPLACE_EXISTING);
-            } catch (java.nio.file.AtomicMoveNotSupportedException exception) {
+            } catch (AtomicMoveNotSupportedException exception) {
                 Files.move(temporary, file, StandardCopyOption.REPLACE_EXISTING);
             }
         } catch (IOException exception) {

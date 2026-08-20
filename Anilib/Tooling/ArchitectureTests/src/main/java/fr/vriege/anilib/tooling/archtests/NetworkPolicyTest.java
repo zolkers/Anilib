@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Stream;
 
 final class NetworkPolicyTest {
     private NetworkPolicyTest() {
@@ -86,7 +87,7 @@ final class NetworkPolicyTest {
     }
 
     private static void deleteDirectory(Path directory) {
-        try (java.util.stream.Stream<Path> entries = Files.walk(directory)) {
+        try (Stream<Path> entries = Files.walk(directory)) {
             for (Path entry : entries.sorted(Comparator.reverseOrder()).toList()) {
                 Files.deleteIfExists(entry);
             }

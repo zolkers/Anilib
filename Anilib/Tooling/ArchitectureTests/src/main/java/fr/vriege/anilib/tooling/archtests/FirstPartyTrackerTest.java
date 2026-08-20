@@ -31,6 +31,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalDouble;
+import java.util.Comparator;
+import java.util.stream.Stream;
 
 final class FirstPartyTrackerTest {
     private FirstPartyTrackerTest() {
@@ -195,8 +197,8 @@ final class FirstPartyTrackerTest {
     }
 
     private static void deleteDirectory(Path directory) {
-        try (java.util.stream.Stream<Path> entries = Files.walk(directory)) {
-            for (Path entry : entries.sorted(java.util.Comparator.reverseOrder()).toList()) {
+        try (Stream<Path> entries = Files.walk(directory)) {
+            for (Path entry : entries.sorted(Comparator.reverseOrder()).toList()) {
                 Files.deleteIfExists(entry);
             }
         } catch (IOException exception) {

@@ -63,6 +63,7 @@ import java.util.Optional
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import androidx.compose.ui.test.ComposeUiTest
 
 @OptIn(ExperimentalTestApi::class)
 class UiRouteScreenshotTest {
@@ -234,23 +235,23 @@ class UiRouteScreenshotTest {
         }
     }
 
-    private fun androidx.compose.ui.test.ComposeUiTest.visitPrimary(label: String) {
+    private fun ComposeUiTest.visitPrimary(label: String) {
         onNodeWithText(label).performClick()
         captureStable(label)
     }
 
-    private fun androidx.compose.ui.test.ComposeUiTest.visitMore(label: String, snapshot: String) {
+    private fun ComposeUiTest.visitMore(label: String, snapshot: String) {
         scrollToText(label)
         onNodeWithText(label).performClick()
         captureStable(snapshot)
         goBack()
     }
 
-    private fun androidx.compose.ui.test.ComposeUiTest.scrollToText(label: String) {
+    private fun ComposeUiTest.scrollToText(label: String) {
         onAllNodes(hasScrollAction()).onFirst().performScrollToNode(hasText(label) and hasClickAction())
     }
 
-    private fun androidx.compose.ui.test.ComposeUiTest.goBack() {
+    private fun ComposeUiTest.goBack() {
         val icon = onNodeWithContentDescription("Back")
         if (runCatching { icon.fetchSemanticsNode() }.isSuccess) {
             icon.performClick()
@@ -259,19 +260,19 @@ class UiRouteScreenshotTest {
         }
     }
 
-    private fun androidx.compose.ui.test.ComposeUiTest.waitForText(label: String) {
+    private fun ComposeUiTest.waitForText(label: String) {
         waitUntil(timeoutMillis = 5_000) {
             onAllNodes(hasText(label)).fetchSemanticsNodes().isNotEmpty()
         }
     }
 
-    private fun androidx.compose.ui.test.ComposeUiTest.waitForContentDescription(label: String) {
+    private fun ComposeUiTest.waitForContentDescription(label: String) {
         waitUntil(timeoutMillis = 5_000) {
             runCatching { onNodeWithContentDescription(label).fetchSemanticsNode() }.isSuccess
         }
     }
 
-    private fun androidx.compose.ui.test.ComposeUiTest.captureStable(route: String) {
+    private fun ComposeUiTest.captureStable(route: String) {
         waitForIdle()
         waitUntil(timeoutMillis = 5_000) {
             onAllNodes(hasText("Calculating statistics…")).fetchSemanticsNodes().isEmpty()

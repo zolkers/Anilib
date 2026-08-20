@@ -32,6 +32,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BooleanSupplier;
+import java.util.UUID;
 
 public final class DefaultPlayerService implements PlayerService, AutoCloseable {
     private static final int MAXIMUM_EPISODES = 100_000;
@@ -189,7 +190,7 @@ public final class DefaultPlayerService implements PlayerService, AutoCloseable 
                 .findFirst()
                 .orElseThrow(() -> new PlayerException("Episode is no longer available"));
         List<SourceVideoStream> streams = validatedStreams(source, selectedEpisodeId);
-        LibraryItemId transientId = new LibraryItemId("transient-player-" + java.util.UUID.randomUUID());
+        LibraryItemId transientId = new LibraryItemId("transient-player-" + UUID.randomUUID());
         PlaybackState playback = new PlaybackState(
                 transientId, selectedEpisodeId, 0L, PlaybackState.UNKNOWN_DURATION, false, clock.instant());
         PlayerSessionSnapshot snapshot = new PlayerSessionSnapshot(

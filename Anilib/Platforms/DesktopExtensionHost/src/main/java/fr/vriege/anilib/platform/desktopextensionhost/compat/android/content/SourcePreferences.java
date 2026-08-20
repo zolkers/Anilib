@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 public final class SourcePreferences implements SharedPreferences, SharedPreferences.Editor {
     private static final Map<Long, SourcePreferences> SOURCES = new ConcurrentHashMap<>();
@@ -63,6 +64,6 @@ public final class SourcePreferences implements SharedPreferences, SharedPrefere
                 || valuesSet.stream().anyMatch(element -> !(element instanceof String))) {
             return fallback;
         }
-        return valuesSet.stream().map(String.class::cast).collect(java.util.stream.Collectors.toUnmodifiableSet());
+        return valuesSet.stream().map(String.class::cast).collect(Collectors.toUnmodifiableSet());
     }
 }

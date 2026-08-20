@@ -33,6 +33,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import fr.vriege.anilib.kernel.PluginInstallationContext;
 
 final class SourceExtensionSdkTest {
     private SourceExtensionSdkTest() {
@@ -268,7 +269,7 @@ final class SourceExtensionSdkTest {
             }
 
             @Override
-            public void install(fr.vriege.anilib.kernel.PluginInstallationContext context) {
+            public void install(PluginInstallationContext context) {
                 context.publish(NetworkCapabilities.HTTP_CLIENT, client);
             }
         };

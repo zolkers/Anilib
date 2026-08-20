@@ -34,6 +34,9 @@ import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import fr.vriege.anilib.kernel.PluginStartupException;
+import java.util.Comparator;
+import java.util.stream.Stream;
 
 final class TrackerTest {
     private TrackerTest() {
@@ -115,7 +118,7 @@ final class TrackerTest {
                     List.of(extension(unsupported)))) {
                 incompatible.components();
                 throw new AssertionError("Expected incompatible tracker API rejection");
-            } catch (fr.vriege.anilib.kernel.PluginStartupException expected) {
+            } catch (PluginStartupException expected) {
                 counter.check(hasCause(expected, TrackerException.class),
                         "tracker registry must reject incompatible extension API versions");
             }
@@ -142,8 +145,8 @@ final class TrackerTest {
     }
 
     private static void deleteDirectory(Path directory) {
-        try (java.util.stream.Stream<Path> entries = Files.walk(directory)) {
-            for (Path entry : entries.sorted(java.util.Comparator.reverseOrder()).toList()) {
+        try (Stream<Path> entries = Files.walk(directory)) {
+            for (Path entry : entries.sorted(Comparator.reverseOrder()).toList()) {
                 Files.deleteIfExists(entry);
             }
         } catch (IOException exception) {

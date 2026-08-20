@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
+import java.nio.charset.StandardCharsets;
 
 public final class FileHttpResponseCache implements HttpResponseCache {
     private static final int MAGIC = 0x41484331;
@@ -184,7 +185,7 @@ public final class FileHttpResponseCache implements HttpResponseCache {
     private static String digest(String key) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            return HEX.formatHex(digest.digest(key.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+            return HEX.formatHex(digest.digest(key.getBytes(StandardCharsets.UTF_8)));
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException("JDK does not provide SHA-256", exception);
         }

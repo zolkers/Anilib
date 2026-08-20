@@ -23,6 +23,7 @@ import java.util.regex.Pattern;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
+import java.io.InputStream;
 
 public final class ExtensionSourceOperations {
     private static final int MAX_PROXY_BYTES = 64 * 1024 * 1024;
@@ -267,7 +268,7 @@ public final class ExtensionSourceOperations {
                 if (length > MAX_PROXY_BYTES) {
                     throw new IllegalStateException("Source resource exceeds the proxy size limit");
                 }
-                try (java.io.InputStream input = body.byteStream()) {
+                try (InputStream input = body.byteStream()) {
                     byte[] bytes = input.readNBytes(MAX_PROXY_BYTES + 1);
                     if (bytes.length > MAX_PROXY_BYTES) {
                         throw new IllegalStateException("Source resource exceeds the proxy size limit");

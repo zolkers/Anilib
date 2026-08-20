@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 final class DesktopApkExtensionPlatform implements ApkExtensionPlatform, AutoCloseable {
     private final Path dataDirectory;
@@ -163,7 +164,7 @@ final class DesktopApkExtensionPlatform implements ApkExtensionPlatform, AutoClo
         }
         Set<ComponentId> active = product.components().stream()
                 .map(component -> component.id())
-                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+                .collect(Collectors.toCollection(LinkedHashSet::new));
         int count = 0;
         for (AnilibPlugin bundle : bridge.sourceBundles()) {
             if (active.add(bundle.manifest().descriptor().id())) {

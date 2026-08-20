@@ -52,6 +52,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
+import java.util.Locale;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public final class DefaultDownloadService
         implements DownloadService, ReaderContentProvider, AutoCloseable {
@@ -334,7 +337,7 @@ public final class DefaultDownloadService
         DownloadRecord selected = record(id);
         List<DownloadRecord> ordered = records.values().stream()
                 .sorted(Comparator.comparingLong(record -> record.queueOrder))
-                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+                .collect(Collectors.toCollection(ArrayList::new));
         ordered.remove(selected);
         ordered.add(Math.max(0, Math.min(queuePosition, ordered.size())), selected);
         for (int index = 0; index < ordered.size(); index++) {
@@ -445,8 +448,8 @@ public final class DefaultDownloadService
                 }
             }
             Set<String> known = records.keySet().stream().map(DownloadId::toString).collect(
-                    java.util.stream.Collectors.toSet());
-            try (java.util.stream.Stream<Path> entries = Files.list(contentRoot)) {
+                    Collectors.toSet());
+            try (Stream<Path> entries = Files.list(contentRoot)) {
                 for (Path entry : entries.filter(Files::isDirectory).toList()) {
                     if (!known.contains(entry.getFileName().toString()) && isDownloadDirectory(entry)) {
                         deleteDirectory(entry, false);
@@ -999,7 +1002,7 @@ public final class DefaultDownloadService
         if (!Files.exists(directory)) {
             return;
         }
-        try (java.util.stream.Stream<Path> paths = Files.walk(directory)) {
+        try (Stream<Path> paths = Files.walk(directory)) {
             for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) {
                 if (accountStorage && Files.isRegularFile(path)
                         && path.getFileName().toString().endsWith(".page")) {
@@ -1180,7 +1183,7 @@ public final class DefaultDownloadService
     }
 
     private static String pageFileName(int index) {
-        return String.format(java.util.Locale.ROOT, "%08d.page", index);
+        return String.format(Locale.ROOT, "%08d.page", index);
     }
 
     private int automaticLimit(LibraryItem item) {

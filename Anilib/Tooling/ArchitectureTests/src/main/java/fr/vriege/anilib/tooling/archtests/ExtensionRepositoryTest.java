@@ -81,6 +81,10 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
+import fr.vriege.anilib.feature.source.SourceId;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.stream.Stream;
 
 final class ExtensionRepositoryTest {
     private static final URI INDEX = URI.create("https://repo.example/extensions/index.min.json");
@@ -124,18 +128,18 @@ final class ExtensionRepositoryTest {
         bridge.saveRepositories(List.of(INDEX));
         Set<String> installedPackages = bridge.installedPackageNames();
         List<AnilibPlugin> bundles = bridge.sourceBundles();
-        List<AnilibPlugin> plugins = new java.util.ArrayList<>();
+        List<AnilibPlugin> plugins = new ArrayList<>();
         plugins.add(new SourceSdkPlugin());
         plugins.addAll(bundles);
         try (StartedAnilib started = new DefaultPluginEngine().start(plugins)) {
             SourceRegistry registry = started.capability(SourceCapabilities.REGISTRY);
             counter.check(registry.sources().size() == 2
-                            && registry.find(fr.vriege.anilib.feature.source.SourceId.of("aniyomi.42")).isPresent()
-                            && registry.find(fr.vriege.anilib.feature.source.SourceId.of("aniyomi.43")).isPresent(),
+                            && registry.find(SourceId.of("aniyomi.42")).isPresent()
+                            && registry.find(SourceId.of("aniyomi.43")).isPresent(),
                     "the desktop engine must publish manga and anime APK sources as explicit Source Bundles");
 
             CatalogueSource mangaCatalogue = (CatalogueSource) registry.find(
-                    fr.vriege.anilib.feature.source.SourceId.of("aniyomi.42")).orElseThrow();
+                    SourceId.of("aniyomi.42")).orElseThrow();
             SourcePage mangaPage = mangaCatalogue.popular(new SourceBrowseRequest(1, 20, List.of(), Map.of()));
             SourceTitleDetails mangaDetails = ((DetailedSource) mangaCatalogue)
                     .details(mangaPage.items().getFirst());
@@ -149,7 +153,7 @@ final class ExtensionRepositoryTest {
                     "the desktop manga bridge must map catalogue, chapters, pages, and proxied bytes");
 
             CatalogueSource animeCatalogue = (CatalogueSource) registry.find(
-                    fr.vriege.anilib.feature.source.SourceId.of("aniyomi.43")).orElseThrow();
+                    SourceId.of("aniyomi.43")).orElseThrow();
             SourcePage animePage = animeCatalogue.search(new SourceSearchRequest(
                     "bridge",
                     new SourceBrowseRequest(1, 20, List.of(), Map.of())));
@@ -365,7 +369,7 @@ final class ExtensionRepositoryTest {
                     "https://raw.githubusercontent.com/keiyoushi/extensions/repo/index.min.json");
             URI protobufIndex = URI.create(
                     "https://raw.githubusercontent.com/keiyoushi/extensions/repo/index.pb");
-            List<URI> requests = new java.util.ArrayList<>();
+            List<URI> requests = new ArrayList<>();
             AnilibHttpClient client = request -> {
                 requests.add(request.uri());
                 if (request.uri().equals(jsonIndex)) {
@@ -1060,8 +1064,8 @@ final class ExtensionRepositoryTest {
         if (!Files.exists(directory)) {
             return;
         }
-        try (java.util.stream.Stream<Path> entries = Files.walk(directory)) {
-            for (Path entry : entries.sorted(java.util.Comparator.reverseOrder()).toList()) {
+        try (Stream<Path> entries = Files.walk(directory)) {
+            for (Path entry : entries.sorted(Comparator.reverseOrder()).toList()) {
                 Files.deleteIfExists(entry);
             }
         } catch (IOException exception) {
@@ -1195,7 +1199,7 @@ final class ExtensionRepositoryTest {
 
     private static final class GitHubIndexClient implements AnilibHttpClient {
         private final byte[] index;
-        private final List<URI> requests = new java.util.ArrayList<>();
+        private final List<URI> requests = new ArrayList<>();
 
         private GitHubIndexClient(String index) {
             this.index = index.getBytes(StandardCharsets.UTF_8);

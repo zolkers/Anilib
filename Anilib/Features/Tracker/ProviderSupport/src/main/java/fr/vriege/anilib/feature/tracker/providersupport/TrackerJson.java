@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Locale;
 
 public final class TrackerJson {
     private static final int MAXIMUM_DEPTH = 64;
@@ -204,7 +205,7 @@ public final class TrackerJson {
                 case '\t' -> output.append("\\t");
                 default -> {
                     if (character < 0x20) {
-                        output.append(String.format(java.util.Locale.ROOT, "\\u%04x", (int) character));
+                        output.append(String.format(Locale.ROOT, "\\u%04x", (int) character));
                     } else {
                         output.append(character);
                     }

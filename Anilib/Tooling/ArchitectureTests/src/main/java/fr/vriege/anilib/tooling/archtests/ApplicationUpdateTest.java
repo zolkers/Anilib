@@ -22,6 +22,7 @@ import java.util.Base64;
 import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.Map;
+import java.util.Comparator;
 
 final class ApplicationUpdateTest {
     private static final URI ENDPOINT =
@@ -195,7 +196,7 @@ final class ApplicationUpdateTest {
 
     private static void delete(Path directory) {
         try (var paths = Files.walk(directory)) {
-            for (Path path : paths.sorted(java.util.Comparator.reverseOrder()).toList()) {
+            for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) {
                 Files.deleteIfExists(path);
             }
         } catch (IOException exception) {

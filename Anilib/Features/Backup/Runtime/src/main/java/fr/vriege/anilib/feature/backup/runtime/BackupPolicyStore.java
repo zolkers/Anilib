@@ -18,6 +18,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.Arrays;
+import java.util.List;
 
 final class BackupPolicyStore {
     private final Path file;
@@ -40,7 +42,7 @@ final class BackupPolicyStore {
                     throw new IllegalStateException("Invalid backup policy row");
                 }
             }
-            Set<BackupSectionId> sections = java.util.Arrays.stream(required(values, "sections").split(","))
+            Set<BackupSectionId> sections = Arrays.stream(required(values, "sections").split(","))
                     .filter(value -> !value.isBlank())
                     .map(BackupSectionId::of)
                     .collect(Collectors.toUnmodifiableSet());
@@ -62,7 +64,7 @@ final class BackupPolicyStore {
 
     synchronized void save(State state) {
         BackupPolicy policy = state.policy();
-        java.util.List<String> rows = java.util.List.of(
+        List<String> rows = List.of(
                 "destination=" + encode(policy.destination().toString()),
                 "lastAutomatic=" + state.lastAutomatic().map(Instant::toString).orElse(""),
                 "retention=" + policy.retentionCount(),

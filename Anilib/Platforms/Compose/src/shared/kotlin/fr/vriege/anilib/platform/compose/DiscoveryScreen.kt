@@ -104,6 +104,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.foundation.layout.PaddingValues
 
 private enum class BrowseSection(val label: String, val kind: SourceContentKind?) {
     ANIME_SOURCES("Anime sources", SourceContentKind.ANIME),
@@ -856,7 +857,7 @@ private fun ColumnScope.CatalogueContent(
         LazyVerticalGrid(
             columns = GridCells.Adaptive(160.dp),
             modifier = Modifier.weight(1f),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp),
+            contentPadding = PaddingValues(12.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {

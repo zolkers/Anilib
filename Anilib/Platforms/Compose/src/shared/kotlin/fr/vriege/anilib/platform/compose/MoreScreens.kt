@@ -52,6 +52,7 @@ import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.foundation.layout.PaddingValues
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -691,7 +692,7 @@ internal fun AboutScreen(
 private fun MoreScaffold(
     title: String,
     goBack: () -> Unit,
-    content: @Composable (androidx.compose.foundation.layout.PaddingValues) -> Unit,
+    content: @Composable (PaddingValues) -> Unit,
 ) {
     Scaffold(
         topBar = {

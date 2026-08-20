@@ -77,6 +77,8 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.VerticalDivider
@@ -135,11 +137,13 @@ import fr.vriege.anilib.feature.settings.ThemeMode
 import fr.vriege.anilib.feature.settings.ui.SettingsPresentation
 import fr.vriege.anilib.feature.source.SourceContentKind
 import fr.vriege.anilib.feature.source.SourceCatalogueItem
+import fr.vriege.anilib.feature.source.SourceCatalogueItemId
 import fr.vriege.anilib.feature.source.SourceContentUnit
 import fr.vriege.anilib.feature.source.SourceDescriptor
 import fr.vriege.anilib.feature.source.SourceEpisodeId
 import fr.vriege.anilib.feature.source.SourceId
 import fr.vriege.anilib.feature.source.SourceListing
+import fr.vriege.anilib.feature.source.SourceWebPage
 import fr.vriege.anilib.feature.reader.ui.ReaderController
 import fr.vriege.anilib.feature.reader.ui.ReaderPresentation
 import fr.vriege.anilib.feature.reader.ReaderOrientationPolicy
@@ -161,6 +165,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
+import java.util.Optional
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -1065,7 +1070,7 @@ private fun LibraryPageContent(
                         selected = category == null,
                         onClick = {
                             category = null
-                            update { presentation.setDefaultCategory(java.util.Optional.empty()) }
+                            update { presentation.setDefaultCategory(Optional.empty()) }
                         },
                         label = { Text("All categories") },
                     )
@@ -1073,7 +1078,7 @@ private fun LibraryPageContent(
                         selected = category == "",
                         onClick = {
                             category = ""
-                            update { presentation.setDefaultCategory(java.util.Optional.empty()) }
+                            update { presentation.setDefaultCategory(Optional.empty()) }
                         },
                         label = { Text("Default") },
                     )
@@ -1082,7 +1087,7 @@ private fun LibraryPageContent(
                             selected = category == value,
                             onClick = {
                                 category = value
-                                update { presentation.setDefaultCategory(java.util.Optional.of(value)) }
+                                update { presentation.setDefaultCategory(Optional.of(value)) }
                             },
                             label = { Text(value) },
                         )
@@ -1149,7 +1154,7 @@ private fun LibraryPageContent(
             title = { Text("Delete ${selected.size} titles?") },
             text = { Text("This removes the selected titles from your library.") },
             confirmButton = {
-                androidx.compose.material3.TextButton(onClick = {
+                TextButton(onClick = {
                     update { presentation.deleteTitles(selected) }
                     selected = emptySet()
                     selectionMode = false
@@ -1157,7 +1162,7 @@ private fun LibraryPageContent(
                 }) { Text("Delete") }
             },
             dismissButton = {
-                androidx.compose.material3.TextButton(onClick = { confirmingDelete = false }) {
+                TextButton(onClick = { confirmingDelete = false }) {
                     Text("Cancel")
                 }
             },
@@ -1199,10 +1204,10 @@ private fun BulkCategoryDialog(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(category, modifier = Modifier.weight(1f))
-                        androidx.compose.material3.TextButton(onClick = { add(category) }) {
+                        TextButton(onClick = { add(category) }) {
                             Text("Add")
                         }
-                        androidx.compose.material3.TextButton(onClick = { remove(category) }) {
+                        TextButton(onClick = { remove(category) }) {
                             Text("Remove")
                         }
                     }
@@ -1211,7 +1216,7 @@ private fun BulkCategoryDialog(
         },
         confirmButton = {},
         dismissButton = {
-            androidx.compose.material3.TextButton(onClick = dismiss) { Text("Close") }
+            TextButton(onClick = dismiss) { Text("Close") }
         },
     )
 }
@@ -1289,17 +1294,17 @@ private fun BulkMigrationDialog(
                 } else if (targetSource == null) {
                     Text("Choose a target source")
                     sources.take(12).forEach { source ->
-                        androidx.compose.material3.TextButton(onClick = { selectSource(source.id()) }) {
+                        TextButton(onClick = { selectSource(source.id()) }) {
                             Text("${source.displayName()} · ${source.languageTag()}")
                         }
                     }
                 } else {
-                    androidx.compose.material3.TextButton(onClick = {
+                    TextButton(onClick = {
                         targetSource = null
                         candidates = emptyList()
                     }) { Text("Change source") }
                     candidates.take(12).forEach { candidate ->
-                        androidx.compose.material3.TextButton(onClick = { migrate(candidate) }) {
+                        TextButton(onClick = { migrate(candidate) }) {
                             Text(candidate.title())
                         }
                     }
@@ -1308,7 +1313,7 @@ private fun BulkMigrationDialog(
         },
         confirmButton = {},
         dismissButton = {
-            androidx.compose.material3.TextButton(onClick = dismiss) { Text("Cancel") }
+            TextButton(onClick = dismiss) { Text("Cancel") }
         },
     )
 }
@@ -1500,7 +1505,7 @@ private fun HistoryPage(
                         val position = episode.playback()
                             .map { it.positionMillis() }
                             .orElse(fallbackPosition)
-                        labels[key] = "${episode.episode().title()} · ${formatHistoryDuration(position)}"
+                        labels[key] = "${episode.episode().title()} · ${formatMediaPosition(position)}"
                         resolvedEpisodeIds[key] = episode.episode().id()
                     }
                 } else {
@@ -1681,7 +1686,7 @@ private fun HistoryCard(
             )
             Text(
                 text = contentLabel ?: if (row.kind() == MediaKind.ANIME) {
-                    "Episode · ${formatHistoryDuration(row.position())}"
+                    "Episode · ${formatMediaPosition(row.position())}"
                 } else {
                     "Chapter"
                 },
@@ -1705,18 +1710,6 @@ private fun HistoryCard(
         IconButton(onClick = remove) {
             Icon(Icons.Default.Delete, contentDescription = "Remove history entry")
         }
-    }
-}
-
-private fun formatHistoryDuration(positionMillis: Long): String {
-    val totalSeconds = positionMillis.coerceAtLeast(0L) / 1000L
-    val hours = totalSeconds / 3600L
-    val minutes = totalSeconds % 3600L / 60L
-    val seconds = totalSeconds % 60L
-    return if (hours > 0L) {
-        "%d:%02d:%02d".format(Locale.ROOT, hours, minutes, seconds)
-    } else {
-        "%02d:%02d".format(Locale.ROOT, minutes, seconds)
     }
 }
 
@@ -1756,7 +1749,7 @@ private fun DetailsDestination(
     var relatedBackStack by remember { mutableStateOf<List<LibraryItemId>>(emptyList()) }
     var revision by remember(id) { mutableStateOf(0) }
     var browserPage by remember(id) {
-        mutableStateOf<fr.vriege.anilib.feature.source.SourceWebPage?>(null)
+        mutableStateOf<SourceWebPage?>(null)
     }
     var chapters by remember(id) { mutableStateOf(listOf<SourceContentUnit>()) }
     var episodes by remember(id) { mutableStateOf(listOf<EpisodeSnapshot>()) }
@@ -1798,16 +1791,16 @@ private fun DetailsDestination(
         val titlePage = details.origin().flatMap { origin ->
             runCatching {
                 discovery.titleWebPage(
-                    fr.vriege.anilib.feature.source.SourceCatalogueItemId(
+                    SourceCatalogueItemId(
                         SourceId.of(origin.sourceId()),
                         origin.sourceItemKey(),
                     ),
                 )
-            }.getOrDefault(java.util.Optional.empty())
+            }.getOrDefault(Optional.empty())
         }.orElse(null)
         val sourcePage = details.origin().flatMap { origin ->
             runCatching { discovery.sourceWebPage(SourceId.of(origin.sourceId())) }
-                .getOrDefault(java.util.Optional.empty())
+                .getOrDefault(Optional.empty())
         }.orElse(null)
         val sourceName = details.origin().map { origin ->
             runCatching {
@@ -1949,7 +1942,7 @@ private fun DetailsPage(
                         episode.episode().uploadedAt().map(mediaDateTimeFormatter::format).orElse(null),
                         episode.episode().scanlator().orElse(null),
                         playback?.let {
-                            if (it.completed()) "Watched" else "${it.positionMillis() / 60_000} min watched"
+                            if (it.completed()) "Watched" else "Progress: ${formatMediaPosition(it.positionMillis())}"
                         },
                     ).ifEmpty { listOf("Available") }.joinToString(" · ")
                     MediaUnitRow(
@@ -2144,14 +2137,14 @@ private fun EditLibraryTitleDialog(
                 OutlinedTextField(artists, { artists = it }, label = { Text("Artists") })
                 OutlinedTextField(genres, { genres = it }, label = { Text("Genres") })
                 OutlinedTextField(artwork, { artwork = it }, label = { Text("Artwork URL") })
-                androidx.compose.material3.TextButton(onClick = { status = status.next() }) {
+                TextButton(onClick = { status = status.next() }) {
                     Text("Status: ${formatEnum(status)}")
                 }
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }
         },
         confirmButton = {
-            androidx.compose.material3.TextButton(
+            TextButton(
                 enabled = title.isNotBlank(),
                 onClick = {
                     runCatching {
@@ -2161,8 +2154,8 @@ private fun EditLibraryTitleDialog(
                             commaSeparated(artists),
                             status,
                             artwork.trim().takeIf(String::isNotEmpty)
-                                ?.let { java.util.Optional.of(URI.create(it)) }
-                                ?: java.util.Optional.empty(),
+                                ?.let { Optional.of(URI.create(it)) }
+                                ?: Optional.empty(),
                             commaSeparated(genres),
                         )
                         save(title.trim(), metadata)
@@ -2173,7 +2166,7 @@ private fun EditLibraryTitleDialog(
             ) { Text("Save") }
         },
         dismissButton = {
-            androidx.compose.material3.TextButton(onClick = dismiss) { Text("Cancel") }
+            TextButton(onClick = dismiss) { Text("Cancel") }
         },
     )
 }
@@ -2364,7 +2357,7 @@ private fun MoreSwitchRow(
             Spacer(Modifier.height(3.dp))
             Text(summary, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        androidx.compose.material3.Switch(checked = checked, onCheckedChange = onCheckedChange)
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 

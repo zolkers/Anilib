@@ -51,6 +51,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.Collection;
+import java.util.stream.Stream;
 
 final class ReaderTest {
     private static final byte[] FIRST_PAGE = {1, 2, 3};
@@ -290,7 +292,7 @@ final class ReaderTest {
         if (root == null) {
             return;
         }
-        try (java.util.stream.Stream<Path> paths = Files.walk(root)) {
+        try (Stream<Path> paths = Files.walk(root)) {
             for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) {
                 Files.deleteIfExists(path);
             }
@@ -382,7 +384,7 @@ final class ReaderTest {
         }
 
         @Override
-        public synchronized void replaceAll(java.util.Collection<LibraryItem> replacement) {
+        public synchronized void replaceAll(Collection<LibraryItem> replacement) {
             items.clear();
             replacement.forEach(item -> items.put(item.id(), item));
         }

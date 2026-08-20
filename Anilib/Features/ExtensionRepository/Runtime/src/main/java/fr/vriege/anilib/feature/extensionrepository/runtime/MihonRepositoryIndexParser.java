@@ -17,6 +17,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.Arrays;
 
 final class MihonRepositoryIndexParser {
     private static final int MAX_PACKAGES = 10_000;
@@ -287,7 +288,7 @@ final class MihonRepositoryIndexParser {
                 throw new IllegalArgumentException("Truncated Protobuf length-delimited field");
             }
             int length = (int) declaredLength;
-            byte[] value = java.util.Arrays.copyOfRange(content, position, position + length);
+            byte[] value = Arrays.copyOfRange(content, position, position + length);
             position += length;
             return value;
         }

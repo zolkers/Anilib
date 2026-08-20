@@ -15,6 +15,7 @@ import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public final class FileReaderReadStateStore implements ReaderReadStateStore {
     private final Path file;
@@ -29,7 +30,7 @@ public final class FileReaderReadStateStore implements ReaderReadStateStore {
         return entries().stream()
                 .filter(entry -> entry.libraryItemId().equals(libraryItemId.value()))
                 .map(Entry::contentId)
-                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+                .collect(Collectors.toUnmodifiableSet());
     }
 
     @Override

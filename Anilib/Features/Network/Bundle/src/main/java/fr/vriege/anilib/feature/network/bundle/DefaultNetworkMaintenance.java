@@ -15,6 +15,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.List;
+import java.util.Objects;
 
 final class DefaultNetworkMaintenance implements NetworkMaintenance {
     private static final int MAX_DIAGNOSTICS = 50;
@@ -122,7 +123,7 @@ final class DefaultNetworkMaintenance implements NetworkMaintenance {
     }
 
     private static String boundedMessage(RuntimeException failure) {
-        String message = java.util.Objects.toString(failure.getMessage(), failure.getClass().getSimpleName());
+        String message = Objects.toString(failure.getMessage(), failure.getClass().getSimpleName());
         return message.length() <= 512 ? message : message.substring(0, 512);
     }
 }

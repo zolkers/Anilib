@@ -15,6 +15,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
 import java.util.jar.JarFile;
+import java.util.Locale;
 
 public final class ExtensionRegistry {
     private final Path directory;
@@ -149,7 +150,7 @@ public final class ExtensionRegistry {
     }
 
     private static boolean apkFile(Path path) {
-        return path.getFileName().toString().toLowerCase(java.util.Locale.ROOT).endsWith(".apk");
+        return path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".apk");
     }
 
     private static boolean preparedArchive(Path archive) {

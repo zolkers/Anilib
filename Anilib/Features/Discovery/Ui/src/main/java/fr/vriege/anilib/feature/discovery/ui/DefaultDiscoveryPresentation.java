@@ -364,6 +364,6 @@ public final class DefaultDiscoveryPresentation implements DiscoveryPresentation
     private static String normalizeLanguage(String languageTag) {
         return Objects.requireNonNull(languageTag, "languageTag must not be null")
                 .replace('_', '-')
-                .toLowerCase(java.util.Locale.ROOT);
+                .toLowerCase(Locale.ROOT);
     }
 }

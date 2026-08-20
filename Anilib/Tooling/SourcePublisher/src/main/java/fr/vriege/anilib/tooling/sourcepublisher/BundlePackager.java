@@ -9,6 +9,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
+import java.util.stream.Stream;
 
 final class BundlePackager {
     private static final String DESCRIPTOR = "META-INF/anilib-extension.properties";
@@ -23,7 +24,7 @@ final class BundlePackager {
         }
         byte[] descriptor = PublisherFiles.read(descriptorFile, "descriptor");
         List<Path> entries;
-        try (java.util.stream.Stream<Path> paths = Files.walk(classes)) {
+        try (Stream<Path> paths = Files.walk(classes)) {
             entries = paths.filter(path -> !path.equals(classes))
                     .sorted(Comparator.comparing(path -> archiveName(classes, path)))
                     .toList();

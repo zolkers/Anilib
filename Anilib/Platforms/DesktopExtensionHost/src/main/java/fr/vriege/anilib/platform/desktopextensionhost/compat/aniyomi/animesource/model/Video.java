@@ -3,6 +3,7 @@ package fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesourc
 import fr.vriege.anilib.platform.desktopextensionhost.compat.android.net.Uri;
 import java.util.List;
 import okhttp3.Headers;
+import kotlin.jvm.internal.DefaultConstructorMarker;
 
 public class Video {
     private String videoUrl;
@@ -51,7 +52,7 @@ public class Video {
 
     public Video(String url, String quality, String videoUrl, Headers headers,
                  List<Track> subtitleTracks, List<Track> audioTracks, int mask,
-                 kotlin.jvm.internal.DefaultConstructorMarker marker) {
+                 DefaultConstructorMarker marker) {
         this(url, quality, videoUrl,
                 (mask & 8) == 0 ? headers : new Headers.Builder().build(),
                 (mask & 16) == 0 ? subtitleTracks : List.of(),
@@ -63,7 +64,7 @@ public class Video {
     }
 
     public Video(String url, String quality, String videoUrl, Uri uri, Headers headers, int mask,
-                 kotlin.jvm.internal.DefaultConstructorMarker marker) {
+                 DefaultConstructorMarker marker) {
         this(url, quality, videoUrl, uri,
                 (mask & 16) == 0 ? headers : new Headers.Builder().build());
     }

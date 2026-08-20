@@ -4,6 +4,7 @@ import fr.vriege.anilib.platform.desktopextensionhost.compat.android.net.Uri;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.network.ProgressListener;
 
 import java.util.Objects;
+import kotlin.jvm.internal.DefaultConstructorMarker;
 
 public class Page implements ProgressListener {
     private final int index;
@@ -26,7 +27,7 @@ public class Page implements ProgressListener {
             String imageUrl,
             Uri uri,
             int mask,
-            kotlin.jvm.internal.DefaultConstructorMarker marker) {
+            DefaultConstructorMarker marker) {
         this(index, (mask & 2) == 0 ? url : "", (mask & 4) == 0 ? imageUrl : null,
                 (mask & 8) == 0 ? uri : null);
     }

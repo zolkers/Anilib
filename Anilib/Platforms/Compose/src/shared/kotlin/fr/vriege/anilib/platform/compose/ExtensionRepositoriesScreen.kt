@@ -68,6 +68,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.foundation.layout.ColumnScope
+import java.util.concurrent.CompletableFuture
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -581,7 +583,7 @@ private fun ExtensionRepositoryCatalogueScreen(
         onDispose { observation.close() }
     }
 
-    fun complete(label: String, operation: () -> java.util.concurrent.CompletableFuture<ExtensionRepositoryView>) {
+    fun complete(label: String, operation: () -> CompletableFuture<ExtensionRepositoryView>) {
         loading = true
         operationLabel = label
         error = null
@@ -1469,7 +1471,7 @@ private fun ExtensionDetailScreen(
 }
 
 @Composable
-private fun ExtensionDetailCard(content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
+private fun ExtensionDetailCard(content: @Composable ColumnScope.() -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),

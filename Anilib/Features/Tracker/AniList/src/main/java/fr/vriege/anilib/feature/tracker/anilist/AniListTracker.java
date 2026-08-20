@@ -35,6 +35,7 @@ import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.Set;
 import java.util.UUID;
+import fr.vriege.anilib.feature.library.LibraryItemId;
 
 public final class AniListTracker implements Tracker {
     private static final URI ENDPOINT = URI.create("https://graphql.anilist.co/");
@@ -274,7 +275,7 @@ public final class AniListTracker implements Tracker {
     }
 
     private static TrackerEntry entry(
-            fr.vriege.anilib.feature.library.LibraryItemId libraryItemId,
+            LibraryItemId libraryItemId,
             Map<String, Object> value) {
         Map<String, Object> media = TrackerJson.memberObject(value, "media");
         MediaKind kind = "ANIME".equals(TrackerJson.memberString(media, "type"))

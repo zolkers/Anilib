@@ -29,6 +29,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.Comparator;
+import java.util.Objects;
 
 final class HttpFrameworkTest {
     private HttpFrameworkTest() {
@@ -304,9 +308,9 @@ final class HttpFrameworkTest {
             connection.setReadTimeout(5_000);
             headers.forEach(connection::setRequestProperty);
             int status = connection.getResponseCode();
-            String contentType = java.util.Objects.toString(connection.getContentType(), "");
+            String contentType = Objects.toString(connection.getContentType(), "");
             String body;
-            try (java.io.InputStream input = connection.getInputStream()) {
+            try (InputStream input = connection.getInputStream()) {
                 body = new String(input.readAllBytes(), StandardCharsets.UTF_8);
             } finally {
                 connection.disconnect();
@@ -320,7 +324,7 @@ final class HttpFrameworkTest {
     private static void respond(HttpExchange exchange, String value) throws IOException {
         byte[] response = value.getBytes(StandardCharsets.UTF_8);
         exchange.sendResponseHeaders(200, response.length);
-        try (java.io.OutputStream output = exchange.getResponseBody()) {
+        try (OutputStream output = exchange.getResponseBody()) {
             output.write(response);
         }
     }
@@ -335,7 +339,7 @@ final class HttpFrameworkTest {
 
     private static void deleteTree(Path directory) {
         try (Stream<Path> paths = Files.walk(directory)) {
-            for (Path path : paths.sorted(java.util.Comparator.reverseOrder()).toList()) {
+            for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) {
                 Files.deleteIfExists(path);
             }
         } catch (IOException exception) {

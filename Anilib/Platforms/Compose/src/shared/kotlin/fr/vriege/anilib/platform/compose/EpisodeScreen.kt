@@ -401,18 +401,6 @@ private fun PlayerSessionError(message: String, goBack: () -> Unit) {
 
 private fun playbackLabel(state: PlaybackState): String = when {
     state.completed() -> "Watched"
-    state.positionMillis() > 0 -> "Resume at ${formatDuration(state.positionMillis())}"
+    state.positionMillis() > 0 -> "Resume at ${formatMediaPosition(state.positionMillis())}"
     else -> "Not started"
-}
-
-private fun formatDuration(milliseconds: Long): String {
-    val totalSeconds = milliseconds / 1000L
-    val hours = totalSeconds / 3600L
-    val minutes = totalSeconds % 3600L / 60L
-    val seconds = totalSeconds % 60L
-    return if (hours > 0) {
-        "%d:%02d:%02d".format(hours, minutes, seconds)
-    } else {
-        "%d:%02d".format(minutes, seconds)
-    }
 }

@@ -22,6 +22,11 @@ import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import fr.vriege.anilib.feature.extensionrepository.ExtensionArtifactFormat;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
+import java.util.stream.Stream;
 
 final class SourcePublisherTest {
     private SourcePublisherTest() {
@@ -62,7 +67,7 @@ final class SourcePublisherTest {
                     "official source template must use the Anilib package namespace");
             check(metadata.artifacts().size() == 2
                             && metadata.artifacts().getFirst().format()
-                            == fr.vriege.anilib.feature.extensionrepository.ExtensionArtifactFormat.ANIYOMI_APK,
+                            == ExtensionArtifactFormat.ANIYOMI_APK,
                     "publisher must merge the Android fallback and portable Bundle into one package entry");
 
             byte[] bundleBytes = Files.readAllBytes(bundle);
@@ -105,10 +110,10 @@ final class SourcePublisherTest {
 
     private static String packageHash(String packageName) {
         try {
-            byte[] digest = java.security.MessageDigest.getInstance("SHA-256")
+            byte[] digest = MessageDigest.getInstance("SHA-256")
                     .digest(packageName.getBytes(StandardCharsets.UTF_8));
-            return java.util.HexFormat.of().formatHex(digest, 0, 16);
-        } catch (java.security.NoSuchAlgorithmException exception) {
+            return HexFormat.of().formatHex(digest, 0, 16);
+        } catch (NoSuchAlgorithmException exception) {
             throw new AssertionError("JDK must provide SHA-256", exception);
         }
     }
@@ -150,7 +155,7 @@ final class SourcePublisherTest {
         if (!Files.exists(directory)) {
             return;
         }
-        try (java.util.stream.Stream<Path> entries = Files.walk(directory)) {
+        try (Stream<Path> entries = Files.walk(directory)) {
             for (Path entry : entries.sorted(Comparator.reverseOrder()).toList()) {
                 Files.deleteIfExists(entry);
             }

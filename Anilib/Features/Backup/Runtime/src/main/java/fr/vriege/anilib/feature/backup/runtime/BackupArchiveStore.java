@@ -23,6 +23,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.io.OutputStream;
+import java.util.Arrays;
 
 final class BackupArchiveStore {
     static final String EXTENSION = ".anibak";
@@ -45,8 +47,8 @@ final class BackupArchiveStore {
             }
             byte[] archiveBytes = Files.readAllBytes(normalized);
             int bodyLength = archiveBytes.length - CHECKSUM_BYTES;
-            byte[] expected = java.util.Arrays.copyOfRange(archiveBytes, bodyLength, archiveBytes.length);
-            byte[] body = java.util.Arrays.copyOf(archiveBytes, bodyLength);
+            byte[] expected = Arrays.copyOfRange(archiveBytes, bodyLength, archiveBytes.length);
+            byte[] body = Arrays.copyOf(archiveBytes, bodyLength);
             if (!MessageDigest.isEqual(expected, digest(body))) {
                 throw new BackupException("Backup archive checksum does not match");
             }
@@ -66,7 +68,7 @@ final class BackupArchiveStore {
                 destination,
                 StandardOpenOption.WRITE,
                 StandardOpenOption.TRUNCATE_EXISTING);
-             java.io.OutputStream output = Channels.newOutputStream(channel)) {
+             OutputStream output = Channels.newOutputStream(channel)) {
             output.write(body);
             output.write(checksum);
             output.flush();

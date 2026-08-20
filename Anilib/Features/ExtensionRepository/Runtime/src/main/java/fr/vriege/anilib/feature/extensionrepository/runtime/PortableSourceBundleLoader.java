@@ -29,6 +29,7 @@ import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Set;
+import java.nio.charset.StandardCharsets;
 
 public final class PortableSourceBundleLoader {
     private static final long MAX_ARTIFACT_BYTES = 16L * 1_024L * 1_024L;
@@ -82,8 +83,8 @@ public final class PortableSourceBundleLoader {
         Path artifact = PortableExtensionArtifacts.path(installationDirectory, extension);
         byte[] bytes = readArtifact(artifact);
         if (!MessageDigest.isEqual(
-                extension.sha256().getBytes(java.nio.charset.StandardCharsets.US_ASCII),
-                checksum(bytes).getBytes(java.nio.charset.StandardCharsets.US_ASCII))) {
+                extension.sha256().getBytes(StandardCharsets.US_ASCII),
+                checksum(bytes).getBytes(StandardCharsets.US_ASCII))) {
             throw new SecurityException("Installed portable Bundle checksum no longer matches");
         }
         PortableSourceBundleDescriptor descriptor = PortableSourceBundleDescriptor.read(bytes);

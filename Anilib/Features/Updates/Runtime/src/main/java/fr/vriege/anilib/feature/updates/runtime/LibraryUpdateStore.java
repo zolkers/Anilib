@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 final class LibraryUpdateStore {
     private static final int MAGIC = 0x55504454;
@@ -284,7 +285,7 @@ final class LibraryUpdateStore {
     private static Set<LibraryItemId> readItemIds(DataInputStream input) throws IOException {
         return readStrings(input, MAXIMUM_BASELINES).stream()
                 .map(LibraryItemId::new)
-                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+                .collect(Collectors.toUnmodifiableSet());
     }
 
     private static void writeString(DataOutputStream output, String value) throws IOException {

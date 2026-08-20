@@ -58,6 +58,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
+import java.util.Collections;
+import java.util.stream.Collectors;
 
 public final class DefaultLibraryUpdateService implements LibraryUpdateService, AutoCloseable {
     private static final int SOURCE_LANES = 5;
@@ -250,7 +252,7 @@ public final class DefaultLibraryUpdateService implements LibraryUpdateService, 
     public synchronized void markAllRead() {
         setEventsRead(snapshot().events().stream()
                 .map(LibraryUpdateEvent::id)
-                .collect(java.util.stream.Collectors.toUnmodifiableSet()), true);
+                .collect(Collectors.toUnmodifiableSet()), true);
     }
 
     @Override
@@ -298,11 +300,11 @@ public final class DefaultLibraryUpdateService implements LibraryUpdateService, 
         }
         Set<LibraryItemId> retainedIds = library.snapshot().stream()
                 .map(LibraryItem::id)
-                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+                .collect(Collectors.toUnmodifiableSet());
         LibraryUpdateStore.State current = store.snapshot();
         Map<LibraryItemId, Set<String>> baselines = current.baselines().entrySet().stream()
                 .filter(entry -> retainedIds.contains(entry.getKey()))
-                .collect(java.util.stream.Collectors.toUnmodifiableMap(
+                .collect(Collectors.toUnmodifiableMap(
                         Map.Entry::getKey,
                         Map.Entry::getValue));
         List<LibraryUpdateEvent> events = current.events().stream()
@@ -310,10 +312,10 @@ public final class DefaultLibraryUpdateService implements LibraryUpdateService, 
                 .toList();
         Set<LibraryItemId> includedTitles = current.policy().includedTitles().stream()
                 .filter(retainedIds::contains)
-                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+                .collect(Collectors.toUnmodifiableSet());
         Set<LibraryItemId> excludedTitles = current.policy().excludedTitles().stream()
                 .filter(retainedIds::contains)
-                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+                .collect(Collectors.toUnmodifiableSet());
         LibraryUpdatePolicy cleanedPolicy = new LibraryUpdatePolicy(
                 current.policy().interval(),
                 current.policy().favoritesOnly(),
@@ -354,7 +356,7 @@ public final class DefaultLibraryUpdateService implements LibraryUpdateService, 
             List<LibraryItem> libraryItems = library.snapshot();
             Set<LibraryItemId> existingIds = libraryItems.stream()
                     .map(LibraryItem::id)
-                    .collect(java.util.stream.Collectors.toUnmodifiableSet());
+                    .collect(Collectors.toUnmodifiableSet());
             Map<LibraryItemId, Set<String>> baselines = new ConcurrentHashMap<>(before.baselines());
             baselines.keySet().retainAll(existingIds);
             List<LibraryItem> eligible = libraryItems.stream()
@@ -370,10 +372,10 @@ public final class DefaultLibraryUpdateService implements LibraryUpdateService, 
             CopyOnWriteArrayList<LibraryUpdateEvent> newEvents = new CopyOnWriteArrayList<>();
             CopyOnWriteArrayList<LibraryUpdateFailure> runFailures = new CopyOnWriteArrayList<>();
             Map<String, List<LibraryItem>> bySource = eligible.stream().collect(
-                    java.util.stream.Collectors.groupingBy(
+                    Collectors.groupingBy(
                             item -> item.origin().orElseThrow().sourceId(),
                             LinkedHashMap::new,
-                            java.util.stream.Collectors.toList()));
+                            Collectors.toList()));
             List<CompletableFuture<Void>> lanes = bySource.values().stream()
                     .map(items -> CompletableFuture.runAsync(
                             () -> processSource(items, baselines, newEvents, runFailures, active, completed),
@@ -450,7 +452,7 @@ public final class DefaultLibraryUpdateService implements LibraryUpdateService, 
                 List<ContentRecord> content = fetch(item);
                 Set<String> currentIds = content.stream()
                         .map(ContentRecord::id)
-                        .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+                        .collect(Collectors.toCollection(LinkedHashSet::new));
                 Set<String> previous = baselines.put(item.id(), Set.copyOf(currentIds));
                 if (previous != null) {
                     Instant discoveredAt = clock.instant();
@@ -535,7 +537,7 @@ public final class DefaultLibraryUpdateService implements LibraryUpdateService, 
         }
         Map<String, LibraryCategoryUpdatePolicy> categoryPolicies = configuration.categories()
                 .stream()
-                .collect(java.util.stream.Collectors.toMap(
+                .collect(Collectors.toMap(
                         LibraryCategory::name,
                         LibraryCategory::updatePolicy));
         boolean explicitlyIncluded = item.categories().stream()
@@ -551,10 +553,10 @@ public final class DefaultLibraryUpdateService implements LibraryUpdateService, 
             return Optional.empty();
         }
         if (!policy.includedCategories().isEmpty()
-                && java.util.Collections.disjoint(item.categories(), policy.includedCategories())) {
+                && Collections.disjoint(item.categories(), policy.includedCategories())) {
             return Optional.of(LibraryUpdateSkipReason.CATEGORY_NOT_INCLUDED);
         }
-        return java.util.Collections.disjoint(item.categories(), policy.excludedCategories())
+        return Collections.disjoint(item.categories(), policy.excludedCategories())
                 ? Optional.empty()
                 : Optional.of(LibraryUpdateSkipReason.CATEGORY_EXCLUDED);
     }
@@ -594,7 +596,7 @@ public final class DefaultLibraryUpdateService implements LibraryUpdateService, 
                 .map(LibraryUpdateEvent::libraryTitle)
                 .distinct()
                 .limit(3)
-                .collect(java.util.stream.Collectors.joining(", "));
+                .collect(Collectors.joining(", "));
     }
 
     private static String failureSummary(Collection<LibraryUpdateFailure> failures) {
@@ -602,7 +604,7 @@ public final class DefaultLibraryUpdateService implements LibraryUpdateService, 
                 .map(LibraryUpdateFailure::title)
                 .distinct()
                 .limit(3)
-                .collect(java.util.stream.Collectors.joining(", "));
+                .collect(Collectors.joining(", "));
     }
 
     private synchronized void scheduleNext() {

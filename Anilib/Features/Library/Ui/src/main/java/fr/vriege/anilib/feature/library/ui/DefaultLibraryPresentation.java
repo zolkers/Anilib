@@ -25,6 +25,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.Collections;
+import java.util.function.UnaryOperator;
+import java.util.stream.Collectors;
 
 public final class DefaultLibraryPresentation implements LibraryPresentation {
     private static final Comparator<String> TEXT_ORDER =
@@ -297,7 +300,7 @@ public final class DefaultLibraryPresentation implements LibraryPresentation {
 
     private void replaceSelected(
             Set<LibraryItemId> ids,
-            java.util.function.UnaryOperator<LibraryItem> operation) {
+            UnaryOperator<LibraryItem> operation) {
         Objects.requireNonNull(operation, "operation must not be null");
         Set<LibraryItemId> selected = validatedSelection(ids);
         catalog.replaceAll(catalog.snapshot().stream()
@@ -313,7 +316,7 @@ public final class DefaultLibraryPresentation implements LibraryPresentation {
         }
         Set<LibraryItemId> available = catalog.snapshot().stream()
                 .map(LibraryItem::id)
-                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+                .collect(Collectors.toUnmodifiableSet());
         if (!available.containsAll(selected)) {
             throw new IllegalArgumentException("ids contain an unknown library title");
         }
@@ -525,10 +528,10 @@ public final class DefaultLibraryPresentation implements LibraryPresentation {
                 && candidate.origin().isPresent()
                 && selected.origin().orElseThrow().sourceId()
                 .equals(candidate.origin().orElseThrow().sourceId());
-        boolean sharedCategory = !java.util.Collections.disjoint(
+        boolean sharedCategory = !Collections.disjoint(
                 selected.categories(),
                 candidate.categories());
-        boolean sharedGenre = !java.util.Collections.disjoint(
+        boolean sharedGenre = !Collections.disjoint(
                 selected.metadata().genres(),
                 candidate.metadata().genres());
         return selected.kind() == candidate.kind()

@@ -55,6 +55,9 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Predicate;
+import java.util.Collection;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 final class DownloadTest {
     private static final byte[] FIRST_PAGE = {11, 12, 13};
@@ -101,7 +104,7 @@ final class DownloadTest {
                 List<DownloadJobSnapshot> jobs = downloads.snapshot().jobs();
                 counter.check(jobs.size() == 2
                                 && jobs.stream().map(job -> job.contentUnit().id().value()).collect(
-                                        java.util.stream.Collectors.toSet()).equals(Set.of("b", "c")),
+                                        Collectors.toSet()).equals(Set.of("b", "c")),
                         "automatic category rules must queue only the configured latest chapter limit");
                 for (DownloadJobSnapshot job : jobs) {
                     await(downloads, job.id(), value -> value.status() == DownloadStatus.COMPLETED);
@@ -430,7 +433,7 @@ final class DownloadTest {
         if (root == null || !Files.exists(root)) {
             return;
         }
-        try (java.util.stream.Stream<Path> paths = Files.walk(root)) {
+        try (Stream<Path> paths = Files.walk(root)) {
             for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) {
                 Files.deleteIfExists(path);
             }
@@ -658,7 +661,7 @@ final class DownloadTest {
         }
 
         @Override
-        public synchronized void replaceAll(java.util.Collection<LibraryItem> replacement) {
+        public synchronized void replaceAll(Collection<LibraryItem> replacement) {
             items.clear();
             replacement.forEach(item -> items.put(item.id(), item));
         }

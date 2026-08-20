@@ -10,6 +10,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Properties;
 import java.util.stream.Stream;
+import java.io.Reader;
 
 public final class RepositoryScanner {
     public RepositoryScanner() {
@@ -64,7 +65,7 @@ public final class RepositoryScanner {
                 continue;
             }
             Properties properties = new Properties();
-            try (java.io.Reader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
+            try (Reader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
                 properties.load(reader);
             }
             List<String> dependencies = split(properties.getProperty("dependencies", ""));

@@ -14,6 +14,7 @@ import fr.vriege.anilib.feature.source.SourcePreferenceDefinition
 import fr.vriege.anilib.feature.source.SourcePreferenceType
 import java.lang.reflect.InvocationTargetException
 import java.util.function.Consumer
+import java.lang.reflect.Method
 
 internal class AndroidAniyomiPreferenceBridge(
     context: Context,
@@ -65,7 +66,7 @@ internal class AndroidAniyomiPreferenceBridge(
         return applicationContext.getSharedPreferences("source_$sourceId", Context.MODE_PRIVATE)
     }
 
-    private fun invokeSetup(method: java.lang.reflect.Method, source: Any, screen: Any) {
+    private fun invokeSetup(method: Method, source: Any, screen: Any) {
         try {
             method.invoke(source, screen)
         } catch (failure: InvocationTargetException) {

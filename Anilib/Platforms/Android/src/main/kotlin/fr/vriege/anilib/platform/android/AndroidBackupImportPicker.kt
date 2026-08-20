@@ -7,6 +7,7 @@ import fr.vriege.anilib.platform.compose.BackupImportPicker
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
+import android.net.Uri
 
 internal class AndroidBackupImportPicker(private val activity: ComponentActivity) : BackupImportPicker {
     private val importDirectory = activity.cacheDir.toPath().resolve("backup-imports").normalize()
@@ -109,7 +110,7 @@ internal class AndroidBackupImportPicker(private val activity: ComponentActivity
         }
     }
 
-    private fun materialize(uri: android.net.Uri): Path {
+    private fun materialize(uri: Uri): Path {
         Files.createDirectories(importDirectory)
         val target = Files.createTempFile(importDirectory, "backup-import-", ".bin")
         try {

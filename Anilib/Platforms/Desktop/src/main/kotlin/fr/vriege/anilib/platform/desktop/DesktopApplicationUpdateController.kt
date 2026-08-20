@@ -10,6 +10,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import javax.net.ssl.HttpsURLConnection
+import java.nio.file.AtomicMoveNotSupportedException
 
 class DesktopApplicationUpdateController(dataDirectory: Path) : ApplicationUpdatePlatformController {
     private val updateDirectory = dataDirectory.toAbsolutePath().normalize().resolve("application-updates")
@@ -32,7 +33,7 @@ class DesktopApplicationUpdateController(dataDirectory: Path) : ApplicationUpdat
                         StandardCopyOption.ATOMIC_MOVE,
                         StandardCopyOption.REPLACE_EXISTING,
                     )
-                } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
+                } catch (_: AtomicMoveNotSupportedException) {
                     Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING)
                 }
                     target

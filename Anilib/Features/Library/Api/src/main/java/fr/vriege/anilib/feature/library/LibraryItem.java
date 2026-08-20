@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public record LibraryItem(
         LibraryItemId id,
@@ -91,7 +92,7 @@ public record LibraryItem(
         LibraryHistoryEntry selectedEntry = Preconditions.requireNonNull(entry, "entry");
         List<LibraryHistoryEntry> nextHistory = history.stream()
                 .filter(existing -> !existing.contentId().equals(selectedEntry.contentId()))
-                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+                .collect(Collectors.toCollection(ArrayList::new));
         nextHistory.add(selectedEntry);
         return copy(categories, favorite, progress, nextHistory, metadata);
     }

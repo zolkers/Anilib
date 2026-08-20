@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Supplier;
+import java.io.OutputStream;
 
 public final class UrlConnectionHttpTransport implements HttpTransport {
     private static final int MAX_RESPONSE_BYTES = 16 * 1024 * 1024;
@@ -41,7 +42,7 @@ public final class UrlConnectionHttpTransport implements HttpTransport {
             if (requestBody.length > 0) {
                 connection.setDoOutput(true);
                 connection.setFixedLengthStreamingMode(requestBody.length);
-                try (java.io.OutputStream output = connection.getOutputStream()) {
+                try (OutputStream output = connection.getOutputStream()) {
                     output.write(requestBody);
                 }
             }

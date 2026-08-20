@@ -31,6 +31,9 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.BooleanSupplier;
+import java.util.Comparator;
+import java.util.UUID;
+import java.util.function.Function;
 
 public final class DefaultReaderService implements ReaderService, ReaderContentRegistrar, AutoCloseable {
     private final SourceRegistry sources;
@@ -146,7 +149,7 @@ public final class DefaultReaderService implements ReaderService, ReaderContentR
                 .orElseThrow(() -> new ReaderException("Requested content unit was not found for this title"));
         List<SourcePageResource> pages = validatedPages(source, unit);
         ReaderPagePipeline pipeline = new ReaderPagePipeline(source::readPage, pages, policy, pageExecutor);
-        LibraryItemId transientId = new LibraryItemId("transient-reader-" + java.util.UUID.randomUUID());
+        LibraryItemId transientId = new LibraryItemId("transient-reader-" + UUID.randomUUID());
         DefaultReaderSession[] holder = new DefaultReaderSession[1];
         DefaultReaderSession session = new DefaultReaderSession(
                 library,
@@ -183,7 +186,7 @@ public final class DefaultReaderService implements ReaderService, ReaderContentR
                 : provider.find(sourceItemId, preferredContentId);
         SourceContentUnit unit;
         List<SourcePageResource> pages;
-        java.util.function.Function<SourcePageResource, byte[]> pageReader;
+        Function<SourcePageResource, byte[]> pageReader;
         if (alternate.isPresent()) {
             ReaderContent content = alternate.orElseThrow();
             unit = content.contentUnit();
@@ -289,7 +292,7 @@ public final class DefaultReaderService implements ReaderService, ReaderContentR
         if (pages.isEmpty()) {
             throw new ReaderException("The selected content unit contains no pages");
         }
-        pages.sort(java.util.Comparator.comparingInt(SourcePageResource::index));
+        pages.sort(Comparator.comparingInt(SourcePageResource::index));
         for (int index = 0; index < pages.size(); index++) {
             SourcePageResource page = pages.get(index);
             if (!page.contentUnitId().equals(unit.id()) || page.index() != index) {

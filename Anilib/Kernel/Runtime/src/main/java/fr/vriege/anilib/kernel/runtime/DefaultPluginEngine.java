@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 
 public final class DefaultPluginEngine implements PluginEngine {
     public DefaultPluginEngine() {
@@ -205,7 +206,7 @@ public final class DefaultPluginEngine implements PluginEngine {
 
         private InstalledPlugin complete() {
             ensureOpen();
-            Set<CapabilityKey<?>> missing = new java.util.TreeSet<>(manifest.providedCapabilities());
+            Set<CapabilityKey<?>> missing = new TreeSet<>(manifest.providedCapabilities());
             missing.removeAll(published.keySet());
             if (!missing.isEmpty()) {
                 throw new IllegalStateException("Plugin did not publish declared capabilities: " + missing);

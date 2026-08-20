@@ -27,6 +27,9 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Stream;
+import fr.vriege.anilib.feature.library.LibrarySort;
+import java.net.URI;
+import java.util.Optional;
 
 final class LibraryPersistenceTest {
     private static final int MAGIC = 0x414E494C;
@@ -58,15 +61,15 @@ final class LibraryPersistenceTest {
             LibraryDisplayPreferences preferences = new LibraryDisplayPreferences(
                     LibraryDisplayMode.LIST,
                     LibraryDisplayDensity.COMPACT,
-                    fr.vriege.anilib.feature.library.LibrarySort.ADDED_NEWEST,
-                    java.util.Optional.of("Seasonal"));
+                    LibrarySort.ADDED_NEWEST,
+                    Optional.of("Seasonal"));
             LibraryConfigurationSnapshot snapshot = new LibraryConfigurationSnapshot(
                     preferences,
                     List.of(new LibraryCategory(
                             "Seasonal",
                             LibraryDisplayMode.GRID,
                             LibraryDisplayDensity.RELAXED,
-                            fr.vriege.anilib.feature.library.LibrarySort.TITLE_DESCENDING,
+                            LibrarySort.TITLE_DESCENDING,
                             LibraryCategoryUpdatePolicy.EXCLUDE)));
             configuration.save(snapshot);
             counter.check(new FileLibraryConfiguration(file).snapshot().equals(snapshot),
@@ -107,7 +110,7 @@ final class LibraryPersistenceTest {
                             List.of("Test Author"),
                             List.of("Test Artist"),
                             PublicationStatus.ONGOING,
-                            java.util.Optional.of(java.net.URI.create("https://images.example/cover.jpg")),
+                            Optional.of(URI.create("https://images.example/cover.jpg")),
                             List.of("Action", "Drama")))
                     .withOrigin(new LibraryOrigin("test.source", "remote-title-7"));
             counter.check(item.favorite(), "favourite state must be expressible");

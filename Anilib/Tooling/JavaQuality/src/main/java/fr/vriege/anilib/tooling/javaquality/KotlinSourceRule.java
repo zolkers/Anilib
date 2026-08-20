@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.io.File;
 
 public final class KotlinSourceRule implements AnilibJavaRule {
     private static final int MAX_LINE_LENGTH = 120;
@@ -78,7 +79,7 @@ public final class KotlinSourceRule implements AnilibJavaRule {
         for (int index = 0; index < packageSegments; index++) {
             sourceRoot = sourceRoot.getParent();
         }
-        Path expected = sourceRoot.resolve(packageName.replace('.', java.io.File.separatorChar))
+        Path expected = sourceRoot.resolve(packageName.replace('.', File.separatorChar))
                 .resolve(source.absolutePath().getFileName())
                 .normalize();
         if (!expected.equals(source.absolutePath())) {

@@ -3,6 +3,7 @@ package fr.vriege.anilib.tooling.javaquality;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.io.File;
 
 public final class PackageLayoutRule implements AnilibJavaRule {
     private static final String ROOT_PACKAGE = "fr.vriege.anilib";
@@ -33,7 +34,7 @@ public final class PackageLayoutRule implements AnilibJavaRule {
             for (int index = 0; index < packageSegments; index++) {
                 sourceRoot = sourceRoot.getParent();
             }
-            Path expected = sourceRoot.resolve(packageName.replace('.', java.io.File.separatorChar))
+            Path expected = sourceRoot.resolve(packageName.replace('.', File.separatorChar))
                     .resolve(source.absolutePath().getFileName())
                     .normalize();
             if (!expected.equals(source.absolutePath())) {

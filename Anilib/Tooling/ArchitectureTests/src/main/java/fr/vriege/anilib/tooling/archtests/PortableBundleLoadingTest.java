@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
+import java.util.stream.Stream;
 
 final class PortableBundleLoadingTest {
     private static final String PACKAGE = "eu.example.extension";
@@ -160,7 +161,7 @@ final class PortableBundleLoadingTest {
 
     private static byte[] jar(Path classes, Path destination) throws IOException {
         try (JarOutputStream archive = new JarOutputStream(Files.newOutputStream(destination));
-             java.util.stream.Stream<Path> files = Files.walk(classes)) {
+             Stream<Path> files = Files.walk(classes)) {
             for (Path file : files.filter(Files::isRegularFile).sorted().toList()) {
                 String name = classes.relativize(file).toString().replace('\\', '/');
                 archive.putNextEntry(new JarEntry(name));
@@ -246,7 +247,7 @@ final class PortableBundleLoadingTest {
         if (!Files.exists(directory)) {
             return;
         }
-        try (java.util.stream.Stream<Path> entries = Files.walk(directory)) {
+        try (Stream<Path> entries = Files.walk(directory)) {
             for (Path entry : entries.sorted(Comparator.reverseOrder()).toList()) {
                 Files.deleteIfExists(entry);
             }

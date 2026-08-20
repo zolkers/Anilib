@@ -49,6 +49,9 @@ import java.util.function.Predicate;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
+import java.net.URI;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 public final class FileSystemLocalContentSource
         implements LocalContentSource, CatalogueSource, PagedSource, StreamingSource, RefreshableSource {
@@ -346,13 +349,13 @@ public final class FileSystemLocalContentSource
                 "Local file",
                 episode.video().toUri(),
                 SourceStreamFormat.PROGRESSIVE,
-                java.util.Map.of(),
+                Map.of(),
                 episode.subtitles()));
     }
 
     private SourcePage cataloguePage(SourceBrowseRequest request, String query, boolean latest) {
         Objects.requireNonNull(request, "request must not be null");
-        java.util.Map<String, String> filters = new java.util.LinkedHashMap<>();
+        Map<String, String> filters = new LinkedHashMap<>();
         request.filters().forEach(value -> filters.put(value.filterId(), value.value()));
         String normalizedQuery = query.strip().toLowerCase(Locale.ROOT);
         String titleFilter = filters.getOrDefault("title", "").strip().toLowerCase(Locale.ROOT);
@@ -389,7 +392,7 @@ public final class FileSystemLocalContentSource
         Optional<LocalSeriesMetadata> metadata = metadata(publication.id());
         String description = metadata.map(FileSystemLocalContentSource::description)
                 .orElseGet(() -> legacyDescription(publication.id().type()));
-        Optional<java.net.URI> thumbnail = snapshot.series().stream()
+        Optional<URI> thumbnail = snapshot.series().stream()
                 .filter(value -> value.publication().id().equals(publication.id()))
                 .flatMap(value -> value.cover().stream())
                 .findFirst();

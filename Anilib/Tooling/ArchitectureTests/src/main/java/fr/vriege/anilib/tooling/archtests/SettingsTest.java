@@ -22,6 +22,9 @@ import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.Set;
+import fr.vriege.anilib.feature.settings.UnusedDataCleanupResult;
+import java.util.Map;
+import java.util.stream.Stream;
 
 final class SettingsTest {
     private SettingsTest() {
@@ -40,7 +43,7 @@ final class SettingsTest {
 
             SettingsPresentation presentation = new DefaultSettingsPresentation(
                     service,
-                    fr.vriege.anilib.feature.settings.UnusedDataCleanupResult::empty,
+                    UnusedDataCleanupResult::empty,
                     diagnostics);
             AtomicInteger observations = new AtomicInteger();
             AutoCloseable observation = presentation.observe(ignored -> observations.incrementAndGet());
@@ -117,7 +120,7 @@ final class SettingsTest {
         counter.check(maintenance.clean().totalRemoved() == 3,
                 "unused-data maintenance must aggregate every registered feature cleaner");
         close(first);
-        counter.check(maintenance.clean().removedByOwner().equals(java.util.Map.of("downloads", 1)),
+        counter.check(maintenance.clean().removedByOwner().equals(Map.of("downloads", 1)),
                 "closing a feature registration must remove its unused-data cleaner");
     }
 
@@ -138,7 +141,7 @@ final class SettingsTest {
     }
 
     private static void deleteDirectory(Path directory) {
-        try (java.util.stream.Stream<Path> entries = Files.walk(directory)) {
+        try (Stream<Path> entries = Files.walk(directory)) {
             for (Path entry : entries.sorted(Comparator.reverseOrder()).toList()) {
                 Files.deleteIfExists(entry);
             }

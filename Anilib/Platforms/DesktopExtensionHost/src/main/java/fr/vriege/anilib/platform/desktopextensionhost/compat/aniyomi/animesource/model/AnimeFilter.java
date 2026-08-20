@@ -2,6 +2,7 @@ package fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesourc
 
 import java.util.List;
 import java.util.Objects;
+import kotlin.jvm.internal.DefaultConstructorMarker;
 
 public abstract class AnimeFilter<T> {
     private final String name;
@@ -30,7 +31,7 @@ public abstract class AnimeFilter<T> {
 
     public static class Separator extends AnimeFilter<Object> {
         public Separator(String name) { super(name, 0); }
-        public Separator(String name, int mask, kotlin.jvm.internal.DefaultConstructorMarker marker) {
+        public Separator(String name, int mask, DefaultConstructorMarker marker) {
             this((mask & 1) == 0 ? name : "");
         }
         public Separator() { this(""); }
@@ -43,7 +44,7 @@ public abstract class AnimeFilter<T> {
             this.values = Objects.requireNonNull(values, "values").clone();
         }
         public Select(String name, V[] values, int state, int mask,
-                      kotlin.jvm.internal.DefaultConstructorMarker marker) {
+                      DefaultConstructorMarker marker) {
             this(name, values, (mask & 4) == 0 ? state : 0);
         }
         public final V[] getValues() { return values.clone(); }
@@ -51,14 +52,14 @@ public abstract class AnimeFilter<T> {
 
     public abstract static class Text extends AnimeFilter<String> {
         public Text(String name, String state) { super(name, state); }
-        public Text(String name, String state, int mask, kotlin.jvm.internal.DefaultConstructorMarker marker) {
+        public Text(String name, String state, int mask, DefaultConstructorMarker marker) {
             this(name, (mask & 2) == 0 ? state : "");
         }
     }
 
     public abstract static class CheckBox extends AnimeFilter<Boolean> {
         public CheckBox(String name, boolean state) { super(name, state); }
-        public CheckBox(String name, boolean state, int mask, kotlin.jvm.internal.DefaultConstructorMarker marker) {
+        public CheckBox(String name, boolean state, int mask, DefaultConstructorMarker marker) {
             this(name, (mask & 2) == 0 && state);
         }
     }
@@ -69,7 +70,7 @@ public abstract class AnimeFilter<T> {
         public static final int STATE_EXCLUDE = 2;
 
         public TriState(String name, int state) { super(name, state); }
-        public TriState(String name, int state, int mask, kotlin.jvm.internal.DefaultConstructorMarker marker) {
+        public TriState(String name, int state, int mask, DefaultConstructorMarker marker) {
             this(name, (mask & 2) == 0 ? state : STATE_IGNORE);
         }
         public final boolean isIgnored() { return getState() == STATE_IGNORE; }
@@ -88,7 +89,7 @@ public abstract class AnimeFilter<T> {
             this.values = Objects.requireNonNull(values, "values").clone();
         }
         public Sort(String name, String[] values, Selection state, int mask,
-                    kotlin.jvm.internal.DefaultConstructorMarker marker) {
+                    DefaultConstructorMarker marker) {
             this(name, values, (mask & 4) == 0 ? state : null);
         }
         public final String[] getValues() { return values.clone(); }

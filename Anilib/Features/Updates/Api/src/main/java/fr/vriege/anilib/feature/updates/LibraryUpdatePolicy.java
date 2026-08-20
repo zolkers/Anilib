@@ -4,6 +4,7 @@ import fr.vriege.anilib.feature.library.LibraryItemId;
 
 import java.util.Objects;
 import java.util.Set;
+import java.util.Collections;
 
 public record LibraryUpdatePolicy(
         UpdateInterval interval,
@@ -20,7 +21,7 @@ public record LibraryUpdatePolicy(
         excludedCategories = validatedCategories(excludedCategories, "excludedCategories");
         includedTitles = Set.copyOf(Objects.requireNonNull(includedTitles, "includedTitles must not be null"));
         excludedTitles = Set.copyOf(Objects.requireNonNull(excludedTitles, "excludedTitles must not be null"));
-        if (!java.util.Collections.disjoint(includedTitles, excludedTitles)) {
+        if (!Collections.disjoint(includedTitles, excludedTitles)) {
             throw new IllegalArgumentException("includedTitles and excludedTitles must not overlap");
         }
     }

@@ -54,6 +54,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
+import fr.vriege.anilib.feature.library.LibraryItemId
 
 private val updateDateFormatter = DateTimeFormatter
     .ofLocalizedDateTime(FormatStyle.MEDIUM)
@@ -414,8 +415,8 @@ private fun copyPolicy(
     favoritesOnly: Boolean = policy.favoritesOnly(),
     skipCompleted: Boolean = policy.skipCompleted(),
     skipNotStarted: Boolean = policy.skipNotStarted(),
-    includedTitles: Set<fr.vriege.anilib.feature.library.LibraryItemId> = policy.includedTitles(),
-    excludedTitles: Set<fr.vriege.anilib.feature.library.LibraryItemId> = policy.excludedTitles(),
+    includedTitles: Set<LibraryItemId> = policy.includedTitles(),
+    excludedTitles: Set<LibraryItemId> = policy.excludedTitles(),
 ): LibraryUpdatePolicy = LibraryUpdatePolicy(
     interval,
     favoritesOnly,

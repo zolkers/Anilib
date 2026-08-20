@@ -6,6 +6,7 @@ and scans every owned module, including Tooling itself.
 The standard registry currently enforces:
 
 - the `fr.vriege.anilib` package root and source-directory correspondence;
+- imports instead of direct package-qualified type references, except for real simple-name collisions;
 - JDK/Anilib-only imports and no wildcard imports;
 - complete module manifests, known direct dependencies, and inward layer flow;
 - explicit manifest dependencies for cross-module Java imports;
@@ -23,3 +24,10 @@ Run it directly or through the full gate:
 
 New rules implement `AnilibJavaRule`, return deterministic diagnostics, and are
 registered in `AnilibJavaRuleRegistry.standard()`.
+
+The one-shot formatter migrates existing direct type qualifiers before running
+the checks:
+
+```powershell
+.\gradlew.bat :Anilib:Tooling:JavaQuality:run --args="--fix-direct-type-qualifiers"
+```

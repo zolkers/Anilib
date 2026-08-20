@@ -3,6 +3,7 @@ package fr.vriege.anilib.feature.library;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Objects;
 
 public interface LibraryCatalog {
     List<LibraryItem> snapshot();
@@ -16,7 +17,7 @@ public interface LibraryCatalog {
     boolean remove(LibraryItemId id);
 
     default AutoCloseable observe(Runnable listener) {
-        java.util.Objects.requireNonNull(listener, "listener must not be null");
+        Objects.requireNonNull(listener, "listener must not be null");
         return () -> {
         };
     }

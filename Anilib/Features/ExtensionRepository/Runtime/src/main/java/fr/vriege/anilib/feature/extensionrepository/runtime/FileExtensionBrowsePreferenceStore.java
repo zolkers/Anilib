@@ -15,6 +15,7 @@ import java.util.Base64;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Stream;
 
 public final class FileExtensionBrowsePreferenceStore implements ExtensionBrowsePreferenceStore {
     private static final int MAX_VALUES = 10_000;
@@ -65,7 +66,7 @@ public final class FileExtensionBrowsePreferenceStore implements ExtensionBrowse
         if (value.enabledLanguages().size() + value.pinnedPackages().size() > MAX_VALUES) {
             throw new IllegalArgumentException("Too many extension browse preferences");
         }
-        List<String> lines = java.util.stream.Stream.concat(
+        List<String> lines = Stream.concat(
                         value.enabledLanguages().stream().sorted().map(item -> "language\t" + encode(item)),
                         value.pinnedPackages().stream().sorted().map(item -> "pinned\t" + encode(item)))
                 .toList();

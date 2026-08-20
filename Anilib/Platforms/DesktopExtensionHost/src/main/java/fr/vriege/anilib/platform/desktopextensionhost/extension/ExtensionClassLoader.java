@@ -7,12 +7,13 @@ import java.nio.file.Path;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.LinkedHashSet;
+import java.net.MalformedURLException;
 
 final class ExtensionClassLoader extends URLClassLoader {
     private static final String COMPATIBILITY_PACKAGE =
             "fr.vriege.anilib.platform.desktopextensionhost.compat.";
 
-    ExtensionClassLoader(Path archive, Path apk) throws java.net.MalformedURLException {
+    ExtensionClassLoader(Path archive, Path apk) throws MalformedURLException {
         super(new URL[]{archive.toUri().toURL(), apk.toUri().toURL()}, ExtensionClassLoader.class.getClassLoader());
     }
 

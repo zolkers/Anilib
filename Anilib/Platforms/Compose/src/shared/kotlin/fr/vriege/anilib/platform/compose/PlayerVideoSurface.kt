@@ -60,6 +60,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.Optional
 
 private const val PROGRESS_INTERVAL_MILLIS = 5_000L
 private const val CONTROLS_HIDE_DELAY_MILLIS = 3_000L
@@ -524,10 +525,10 @@ private fun DelayControl(label: String, delayMillis: Long, update: (Long) -> Uni
     }
 }
 
-private fun nextAspectRatio(current: java.util.Optional<String>): java.util.Optional<String> {
+private fun nextAspectRatio(current: Optional<String>): Optional<String> {
     val values = listOf(null, "16:9", "4:3", "2.35:1", "1:1")
     val next = values[(values.indexOf(current.orElse(null)) + 1) % values.size]
-    return java.util.Optional.ofNullable(next)
+    return Optional.ofNullable(next)
 }
 
 private enum class PlayerCustomAction(val label: String) {

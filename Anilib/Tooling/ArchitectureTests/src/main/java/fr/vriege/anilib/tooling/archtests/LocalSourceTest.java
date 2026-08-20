@@ -24,6 +24,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
+import java.util.Arrays;
+import java.util.stream.Stream;
 
 final class LocalSourceTest {
     private static final byte[] FIRST_IMAGE = {1, 2, 3};
@@ -100,7 +102,7 @@ final class LocalSourceTest {
         counter.check(archivePages.stream().map(SourcePageResource::value).toList()
                         .equals(List.of("002.jpg", "010.png")),
                 "CBZ pages must be naturally indexed inside a structured manga chapter");
-        counter.check(java.util.Arrays.equals(source.readPage(archivePages.getFirst()), FIRST_IMAGE),
+        counter.check(Arrays.equals(source.readPage(archivePages.getFirst()), FIRST_IMAGE),
                 "structured manga chapter bytes must be readable");
     }
 
@@ -232,7 +234,7 @@ final class LocalSourceTest {
             try {
                 source.pages(chapter.id());
                 throw new AssertionError("Expected archive entry limit rejection");
-            } catch (fr.vriege.anilib.feature.localsource.LocalSourceException expected) {
+            } catch (LocalSourceException expected) {
                 counter.value++;
             }
         } catch (IOException exception) {
@@ -249,7 +251,7 @@ final class LocalSourceTest {
     }
 
     private static void deleteTree(Path root) throws IOException {
-        try (java.util.stream.Stream<Path> paths = Files.walk(root)) {
+        try (Stream<Path> paths = Files.walk(root)) {
             for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) {
                 Files.deleteIfExists(path);
             }

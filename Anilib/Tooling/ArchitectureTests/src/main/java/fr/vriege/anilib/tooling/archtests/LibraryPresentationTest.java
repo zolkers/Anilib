@@ -25,6 +25,8 @@ import fr.vriege.anilib.feature.library.ui.LibraryPresentation;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
+import java.net.URI;
+import java.util.Optional;
 
 final class LibraryPresentationTest {
     private LibraryPresentationTest() {
@@ -52,7 +54,7 @@ final class LibraryPresentationTest {
         counter.check(overview.displayPreferences().mode() == LibraryDisplayMode.GRID,
                 "library display mode must have a stable default");
 
-        presentation.setDefaultCategory(java.util.Optional.of("Anime"));
+        presentation.setDefaultCategory(Optional.of("Anime"));
         presentation.setDisplayMode(LibraryDisplayMode.LIST);
         presentation.setDisplayDensity(LibraryDisplayDensity.COMPACT);
         presentation.setCategoryUpdatePolicy("Anime", LibraryCategoryUpdatePolicy.EXCLUDE);
@@ -160,7 +162,7 @@ final class LibraryPresentationTest {
                 List.of("Editor"),
                 List.of(),
                 PublicationStatus.COMPLETED,
-                java.util.Optional.empty(),
+                Optional.empty(),
                 List.of("Drama"));
         presentation.editTitle(zuluId, "Edited Zulu", edited);
         counter.check(presentation.details(zuluId).orElseThrow().title().equals("Edited Zulu")
@@ -199,7 +201,7 @@ final class LibraryPresentationTest {
                         List.of("Author One"),
                         List.of("Artist One"),
                         PublicationStatus.ONGOING,
-                        java.util.Optional.of(java.net.URI.create(
+                        Optional.of(URI.create(
                                 "https://images.example/zulu.jpg")),
                         List.of("Action")));
         LibraryItem alpha = new LibraryItem(
@@ -244,7 +246,7 @@ final class LibraryPresentationTest {
     }
 
     private static LibraryNavigationState state(LibraryPage page) {
-        return new LibraryNavigationState(page, java.util.Optional.empty());
+        return new LibraryNavigationState(page, Optional.empty());
     }
 
     private static final class Counter {

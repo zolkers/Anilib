@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.Locale;
 
 public final class ExtensionCompatibilitySmoke {
     private ExtensionCompatibilitySmoke() {
@@ -272,7 +273,7 @@ public final class ExtensionCompatibilitySmoke {
             Path path = Path.of(arguments[offset]).toAbsolutePath().normalize();
             String packageName = required(arguments[offset + 1], "packageName");
             String versionName = required(arguments[offset + 2], "versionName");
-            String sha256 = required(arguments[offset + 3], "sha256").toLowerCase(java.util.Locale.ROOT);
+            String sha256 = required(arguments[offset + 3], "sha256").toLowerCase(Locale.ROOT);
             String revision = required(arguments[offset + 4], "repositoryRevision");
             if (!sha256.matches("[0-9a-f]{64}")) {
                 throw new IllegalArgumentException("Fixture SHA-256 must contain 64 hexadecimal characters");

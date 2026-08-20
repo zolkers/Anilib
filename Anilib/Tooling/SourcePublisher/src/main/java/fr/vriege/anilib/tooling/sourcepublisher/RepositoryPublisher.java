@@ -21,6 +21,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
+import java.util.Objects;
 
 final class RepositoryPublisher {
     private static final String DESCRIPTOR = "META-INF/anilib-extension.properties";
@@ -151,7 +152,7 @@ final class RepositoryPublisher {
             String signature,
             Optional<String> apkSha256) {
         PublishedPackage {
-            apkSha256 = java.util.Objects.requireNonNull(apkSha256, "apkSha256 must not be null");
+            apkSha256 = Objects.requireNonNull(apkSha256, "apkSha256 must not be null");
         }
     }
 }
