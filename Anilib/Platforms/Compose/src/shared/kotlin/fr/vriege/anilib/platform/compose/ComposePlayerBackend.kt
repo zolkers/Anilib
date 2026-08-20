@@ -171,11 +171,13 @@ internal class ComposePlayerPlayback(
         applySubtitle(player)
     }
 
-    fun resumeWhenReady() = synchronized(this) {
+    fun resumeWhenReady(): Boolean = synchronized(this) {
         ensureOpen()
-        if (media.startPositionMillis() > 0) {
-            seek(state, media.startPositionMillis())
-        }
+        if (media.startPositionMillis() <= 0) return true
+        val player = state ?: return false
+        if (player.duration <= 0.0) return false
+        seek(player, media.startPositionMillis())
+        true
     }
 
     fun detach(player: VideoPlayerState) = synchronized(this) {

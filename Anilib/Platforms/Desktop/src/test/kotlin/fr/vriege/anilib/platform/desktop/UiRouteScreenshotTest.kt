@@ -99,10 +99,12 @@ class UiRouteScreenshotTest {
                 val library = started.capability(LibraryCapabilities.CATALOG)
                 library.save(
                     LibraryItem.create("Acceptance manga", MediaKind.MANGA)
+                        .withFavorite(true)
                         .withOrigin(LibraryOrigin("anilib.local", "DIRECTORY:Acceptance manga")),
                 )
                 library.save(
                     LibraryItem.create("Acceptance anime", MediaKind.ANIME)
+                        .withFavorite(true)
                         .withOrigin(
                             LibraryOrigin("anilib.local", "ANIME_SERIES:localanime/Acceptance anime"),
                         ),

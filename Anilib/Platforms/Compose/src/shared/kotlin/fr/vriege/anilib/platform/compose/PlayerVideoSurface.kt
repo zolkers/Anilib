@@ -71,6 +71,7 @@ internal fun PlayerVideoSurface(
     setBackgroundAudio: (Boolean) -> Unit,
     enableAndroidControls: Boolean,
     enableDesktopControls: Boolean,
+    progressChanged: () -> Unit,
 ) {
     val bridge = playback as? ComposePlayerPlayback
     if (bridge == null) {
@@ -112,12 +113,12 @@ internal fun PlayerVideoSurface(
     }
     CrashSafeLaunchedEffect(bridge, player) {
         while (!player.hasMedia && player.error == null) delay(50L)
-        bridge.resumeWhenReady()
+        while (!bridge.resumeWhenReady() && player.error == null) delay(50L)
     }
     CrashSafeLaunchedEffect(bridge, player.isPlaying) {
         while (player.isPlaying) {
             delay(PROGRESS_INTERVAL_MILLIS)
-            persistProgress(controller, bridge)
+            if (persistProgress(controller, bridge)) progressChanged()
         }
     }
     CrashSafeLaunchedEffect(
@@ -305,7 +306,7 @@ internal fun PlayerVideoSurface(
                         },
                         onValueChangeFinished = {
                             player.seekFinished()
-                            persistProgress(controller, bridge)
+                            if (persistProgress(controller, bridge)) progressChanged()
                         },
                         valueRange = 0f..1000f,
                     )
@@ -572,11 +573,13 @@ private fun UnavailablePlayerSurface() {
     }
 }
 
-private fun persistProgress(controller: PlayerController, playback: ComposePlayerPlayback) {
+private fun persistProgress(controller: PlayerController, playback: ComposePlayerPlayback): Boolean =
     runCatching {
         val state = playback.snapshot()
         if (state.durationMillis() > 0) {
             controller.updatePlayback(state.positionMillis(), state.durationMillis())
+            true
+        } else {
+            false
         }
-    }
-}
+    }.getOrDefault(false)

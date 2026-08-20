@@ -121,8 +121,17 @@ public final class DefaultPlayerService implements PlayerService, AutoCloseable 
     public synchronized List<EpisodeSnapshot> episodes(SourceCatalogueItemId itemId) {
         ensureOpen();
         StreamingSource source = streamingSource(itemId);
+        Optional<LibraryItemId> libraryItemId = library.snapshot().stream()
+                .filter(item -> item.origin()
+                        .filter(origin -> origin.equals(new LibraryOrigin(
+                                itemId.sourceId().toString(), itemId.value())))
+                        .isPresent())
+                .map(LibraryItem::id)
+                .findFirst();
         return validatedEpisodes(source, itemId).stream()
-                .map(episode -> new EpisodeSnapshot(episode, Optional.empty()))
+                .map(episode -> new EpisodeSnapshot(
+                        episode,
+                        libraryItemId.flatMap(id -> states.find(id, episode.id()))))
                 .toList();
     }
 
@@ -235,11 +244,16 @@ public final class DefaultPlayerService implements PlayerService, AutoCloseable 
                 .orElseThrow(() -> new PlayerException("Library item was removed during playback"));
         states.save(replacement);
         try {
-            library.save(itemBefore.withProgress(new LibraryProgress(
-                    replacement.episodeId().value(),
-                    replacement.positionMillis(),
-                    replacement.durationMillis(),
-                    replacement.updatedAt())));
+            library.save(itemBefore
+                    .withProgress(new LibraryProgress(
+                            replacement.episodeId().value(),
+                            replacement.positionMillis(),
+                            replacement.durationMillis(),
+                            replacement.updatedAt()))
+                    .recordHistory(new LibraryHistoryEntry(
+                            replacement.episodeId().value(),
+                            replacement.updatedAt(),
+                            replacement.positionMillis())));
         } catch (RuntimeException failure) {
             try {
                 states.restore(replacement.libraryItemId(), replacement.episodeId(), storedBefore);

@@ -777,16 +777,15 @@ private fun AppDestination(
         AppSection.BROWSE -> DiscoveryScreen(
             discovery,
             presentation,
-            reader,
-            player,
-            downloads,
             extensionRepositories,
             apkExtensionPlatform,
             browserCookies,
             browserRuntimeStatus,
-            detailPlatform.shareController,
-            openTracking,
-            browseDestinationChanged,
+            openDetails = { id, kind ->
+                navigate { it.openDetails(id) }
+                openSection(if (kind == MediaKind.ANIME) AppSection.ANIME else AppSection.MANGA)
+            },
+            navigationVisibilityChanged = browseDestinationChanged,
             manageExtensions = {
                 openSection(AppSection.MORE)
                 openMore(MoreDestination.EXTENSION_REPOSITORIES)
@@ -867,7 +866,7 @@ private fun LibraryPageContent(
     var category by remember(presentation) {
         mutableStateOf(overview.displayPreferences().defaultCategory().orElse(null))
     }
-    var favoritesOnly by remember { mutableStateOf(false) }
+    var favoritesOnly by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var selectionMode by remember { mutableStateOf(false) }
     var selected by remember { mutableStateOf(setOf<LibraryItemId>()) }
@@ -1067,7 +1066,7 @@ private fun LibraryPageContent(
                 }
             }
             Spacer(Modifier.height(8.dp))
-            if (overview.titles().none { it.kind() == kind }) {
+            if (overview.titles().none { it.kind() == kind && it.favorite() }) {
                 EmptyPage("Add shortcuts from Explore to keep your ${kind.name.lowercase()} here.")
             } else if (titles.isEmpty()) {
                 EmptyPage("No titles match the active library filters.")

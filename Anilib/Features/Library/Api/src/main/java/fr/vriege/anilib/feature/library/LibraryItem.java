@@ -88,8 +88,11 @@ public record LibraryItem(
     }
 
     public LibraryItem recordHistory(LibraryHistoryEntry entry) {
-        List<LibraryHistoryEntry> nextHistory = new ArrayList<>(history);
-        nextHistory.add(Preconditions.requireNonNull(entry, "entry"));
+        LibraryHistoryEntry selectedEntry = Preconditions.requireNonNull(entry, "entry");
+        List<LibraryHistoryEntry> nextHistory = history.stream()
+                .filter(existing -> !existing.contentId().equals(selectedEntry.contentId()))
+                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+        nextHistory.add(selectedEntry);
         return copy(categories, favorite, progress, nextHistory, metadata);
     }
 

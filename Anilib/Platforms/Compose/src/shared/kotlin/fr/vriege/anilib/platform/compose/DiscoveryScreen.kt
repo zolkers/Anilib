@@ -99,9 +99,6 @@ import fr.vriege.anilib.feature.source.SourcePreferenceType
 import fr.vriege.anilib.feature.source.SourceId
 import fr.vriege.anilib.feature.source.SourceWebPage
 import fr.vriege.anilib.framework.http.HttpCookieJar
-import fr.vriege.anilib.feature.player.ui.PlayerPresentation
-import fr.vriege.anilib.feature.reader.ui.ReaderPresentation
-import fr.vriege.anilib.feature.downloads.ui.DownloadPresentation
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.Dispatchers
@@ -122,15 +119,11 @@ private enum class BrowseSection(val label: String, val kind: SourceContentKind?
 internal fun DiscoveryScreen(
     presentation: DiscoveryPresentation,
     library: LibraryPresentation,
-    reader: ReaderPresentation,
-    player: PlayerPresentation,
-    downloads: DownloadPresentation,
     extensionRepositories: ExtensionRepositoryPresentation,
     apkExtensionPlatform: ApkExtensionPlatform,
     browserCookies: HttpCookieJar,
     browserRuntimeStatus: BrowserRuntimeStatus,
-    shareController: ShareController,
-    openTracking: (LibraryItemId) -> Unit,
+    openDetails: (LibraryItemId, MediaKind) -> Unit,
     navigationVisibilityChanged: (Boolean) -> Unit,
     manageExtensions: () -> Unit,
 ) {
@@ -209,13 +202,9 @@ internal fun DiscoveryScreen(
             source = source,
             listing = listing,
             presentation = presentation,
-            reader = reader,
-            player = player,
             library = library,
-            downloads = downloads,
-            shareController = shareController,
-            openTracking = openTracking,
             openWebPage = { browserPage = it },
+            openDetails = openDetails,
             navigateUp = { selectedSource = null },
         )
         return
@@ -598,17 +587,12 @@ private fun SourceCatalogueScreen(
     source: SourceDescriptor,
     listing: SourceListing,
     presentation: DiscoveryPresentation,
-    reader: ReaderPresentation,
-    player: PlayerPresentation,
     library: LibraryPresentation,
-    downloads: DownloadPresentation,
-    shareController: ShareController,
-    openTracking: (LibraryItemId) -> Unit,
     openWebPage: (SourceWebPage) -> Unit,
+    openDetails: (LibraryItemId, MediaKind) -> Unit,
     navigateUp: () -> Unit,
 ) {
     val scope = rememberCrashSafeCoroutineScope()
-    var selectedItem by remember(source.id()) { mutableStateOf<SourceCatalogueItem?>(null) }
     var selectedListing by remember(source.id(), listing) { mutableStateOf(listing) }
     var query by remember(source.id()) { mutableStateOf("") }
     var searchActive by remember(source.id()) { mutableStateOf(false) }
@@ -653,24 +637,6 @@ private fun SourceCatalogueScreen(
                 }
             }
         }
-    }
-
-    selectedItem?.let { item ->
-        SourceTitleScreen(
-            item = item,
-            presentation = presentation,
-            reader = reader,
-            player = player,
-            sourceName = source.displayName(),
-            sourceWebPage = sourceWebPage,
-            library = library,
-            downloads = downloads,
-            shareController = shareController,
-            openTracking = openTracking,
-            openWebPage = openWebPage,
-            navigateUp = { selectedItem = null },
-        )
-        return
     }
 
     Scaffold(
@@ -830,9 +796,28 @@ private fun SourceCatalogueScreen(
                 CatalogueContent(
                     page = sourcePage,
                     grid = grid,
-                    open = { selectedItem = it },
+                    open = { item ->
+                        scope.launch {
+                            withContext(Dispatchers.IO) {
+                                runCatching { presentation.addToLibrary(item) }
+                            }.onSuccess { id ->
+                                notice = null
+                                openDetails(
+                                    id,
+                                    if (item.contentKind() == SourceContentKind.ANIME) {
+                                        MediaKind.ANIME
+                                    } else {
+                                        MediaKind.MANGA
+                                    },
+                                )
+                            }.onFailure {
+                                notice = it.message ?: "The title could not be opened"
+                            }
+                        }
+                    },
                     add = { item ->
-                        presentation.addToLibrary(item)
+                        val id = presentation.addToLibrary(item)
+                        library.setFavorite(setOf(id), true)
                         notice = "${item.title()} added to Library"
                     },
                     webPage = { item -> presentation.titleWebPage(item.id()).orElse(null) },

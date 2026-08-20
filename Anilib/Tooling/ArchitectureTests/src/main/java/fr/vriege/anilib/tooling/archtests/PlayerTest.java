@@ -179,6 +179,12 @@ final class PlayerTest {
                     .orElseThrow();
             counter.check(episode.playback().orElseThrow().completed(),
                     "watched state must remain visible in the episode list");
+            EpisodeSnapshot sourceEpisode = presentation.episodes(SOURCE_ITEM_ID).stream()
+                    .filter(snapshot -> snapshot.episode().id().equals(FIRST_EPISODE.id()))
+                    .findFirst()
+                    .orElseThrow();
+            counter.check(sourceEpisode.playback().orElseThrow().completed(),
+                    "source episode lists must expose playback from their matching Library title");
         } finally {
             deleteDirectory(directory);
         }
@@ -326,7 +332,9 @@ final class PlayerTest {
                 counter.check(saved.progress().orElseThrow().position() == 60_000L,
                         "playback updates must mirror resume position into Library");
                 counter.check(saved.history().size() == 1,
-                        "opening an episode must append one Library history entry");
+                        "opening an episode must create one Library history entry");
+                counter.check(saved.history().getFirst().position() == 60_000L,
+                        "playback updates must mirror the latest position into Library history");
             }
 
             try (StartedAnilib restarted = StandardAnilib.start(
@@ -348,6 +356,13 @@ final class PlayerTest {
                 session.close();
                 expectPlayerFailure(session::snapshot, counter,
                         "closed Player sessions must reject further access");
+                LibraryItem saved = restarted.capability(LibraryCapabilities.CATALOG)
+                        .find(libraryItemId)
+                        .orElseThrow();
+                counter.check(saved.history().size() == 1,
+                        "reopening an episode must update its history row instead of duplicating it");
+                counter.check(saved.history().getFirst().position() == 120_000L,
+                        "completed playback must update the history resume position");
             }
             counter.check(Files.isRegularFile(directory.resolve("playback-state.anilib")),
                     "Player must persist resume state in its owned file");

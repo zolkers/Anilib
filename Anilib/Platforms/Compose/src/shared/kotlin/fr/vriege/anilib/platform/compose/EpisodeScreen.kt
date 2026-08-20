@@ -115,6 +115,7 @@ internal fun PlayerSelectionScreen(
                     setBackgroundAudio,
                     enableAndroidControls,
                     enableDesktopControls,
+                    progressChanged = { revision++ },
                 )
             }
             item {
