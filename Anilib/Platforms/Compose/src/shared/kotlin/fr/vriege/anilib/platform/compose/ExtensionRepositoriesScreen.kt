@@ -16,6 +16,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.PushPin
@@ -42,6 +45,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -67,6 +72,7 @@ import fr.vriege.anilib.feature.settings.LanguagePack
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.foundation.layout.ColumnScope
@@ -374,7 +380,10 @@ internal fun ExtensionDiscoveryList(
                                 }
                             },
                         ) {
-                            Text(if (loadingPackage == extension.packageName()) "Installing…" else "extension.install")
+                            Text(
+                                if (loadingPackage == extension.packageName()) "Installing…"
+                                else "extension.install",
+                            )
                         }
                     } else {
                         TextButton(
@@ -1257,7 +1266,7 @@ private fun ConfirmRepositoryRemovalDialog(
                 Text(repository, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         },
-        confirmButton = { Button(onClick = confirm) { Text("ui.remove") } },
+        confirmButton = { Button(onClick = confirm) { Text("repository.remove") } },
         dismissButton = { TextButton(onClick = dismiss) { Text("ui.cancel") } },
     )
 }
@@ -1629,14 +1638,19 @@ private fun TrustedKeyCard(keyId: String, forget: () -> Unit) {
 }
 
 @Composable
+@Suppress("DEPRECATION")
 private fun RepositoryCard(repository: ExtensionRepositoryRow, remove: () -> Unit) {
+    val address = repository.indexUri().toString()
+    val clipboard = LocalClipboardManager.current
+    val scope = rememberCrashSafeCoroutineScope()
+    var copied by remember(address) { mutableStateOf(false) }
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
             Text(
-                repository.indexUri().toString(),
+                address,
                 fontWeight = FontWeight.Medium,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
@@ -1649,16 +1663,44 @@ private fun RepositoryCard(repository: ExtensionRepositoryRow, remove: () -> Uni
                     "Not refreshed yet"
                 }
             }
-            Text(
-                status,
-                color = if (repository.failure().isPresent) {
-                    MaterialTheme.colorScheme.error
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-            )
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = remove) { Text("ui.remove") }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    status,
+                    color = if (repository.failure().isPresent) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    modifier = Modifier.weight(1f),
+                )
+                IconButton(onClick = {
+                    clipboard.setText(AnnotatedString(address))
+                    copied = true
+                    scope.launch {
+                        delay(1_500L)
+                        copied = false
+                    }
+                }) {
+                    Icon(
+                        if (copied) Icons.Default.Check else Icons.Default.ContentCopy,
+                        contentDescription = UiTranslations.translate(
+                            if (copied) "repository.copied" else "repository.copy",
+                            LocalLanguagePack.current,
+                        ),
+                    )
+                }
+                IconButton(onClick = remove) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = UiTranslations.translate(
+                            "repository.remove",
+                            LocalLanguagePack.current,
+                        ),
+                    )
+                }
             }
         }
     }
