@@ -3,6 +3,9 @@ package fr.vriege.anilib.platform.desktop
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
+import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.input.key.Key
@@ -122,64 +125,77 @@ fun main(arguments: Array<String>) {
                 }
                 onDispose { observation.close() }
             }
-            Window(
-                onCloseRequest = {
-                    try {
-                        DesktopBrowserRuntime.dispose()
-                    } finally {
+            val windowUndecorated = if (playerFullscreen.value) {
+                playerWindowMode.value == PlayerWindowMode.BORDERLESS
+            } else {
+                applicationWindowMode.value == ApplicationWindowMode.BORDERLESS
+            }
+            val content = remember {
+                movableContentOf {
+                    DesktopAnilibContent(
+                        started = started,
+                        browserRuntimeStatus = browserRuntimeStatus,
+                        browserDataController = DesktopBrowserDataController(dataDirectory),
+                        browserPlatformController = DesktopBrowserPlatformController(),
+                        backupImportPicker = DesktopBackupImportPicker(),
+                        applicationUpdatePlatformController = DesktopApplicationUpdateController(dataDirectory),
+                        shareController = DesktopShareController(),
+                        extensionPlatform = extensionPlatform,
+                        playerFullscreen = playerFullscreen.value,
+                        setPlayerFullscreen = setPlayerFullscreen,
+                    )
+                }
+            }
+            key(windowUndecorated) {
+                Window(
+                    onCloseRequest = {
                         try {
-                            crashShield.close()
+                            DesktopBrowserRuntime.dispose()
                         } finally {
                             try {
-                                started.close()
+                                crashShield.close()
                             } finally {
                                 try {
-                                    extensionPlatform.close()
+                                    started.close()
                                 } finally {
-                                    exitApplication()
+                                    try {
+                                        extensionPlatform.close()
+                                    } finally {
+                                        exitApplication()
+                                    }
                                 }
                             }
                         }
+                    },
+                    title = "Anilib",
+                    state = windowState,
+                    undecorated = windowUndecorated,
+                    onPreviewKeyEvent = { event ->
+                        if (playerFullscreen.value && event.key == Key.Escape && event.type == KeyEventType.KeyDown) {
+                            setPlayerFullscreen(false)
+                            true
+                        } else if (
+                            !playerFullscreen.value &&
+                            applicationWindowMode.value == ApplicationWindowMode.BORDERLESS &&
+                            event.key == Key.Escape &&
+                            event.type == KeyEventType.KeyDown
+                        ) {
+                            settingsService.replace(
+                                settingsService.snapshot().withApplicationWindowMode(ApplicationWindowMode.WINDOWED),
+                            )
+                            true
+                        } else {
+                            false
+                        }
+                    },
+                ) {
+                    LaunchedEffect(window) {
+                        window.isVisible = true
+                        window.toFront()
+                        window.requestFocus()
                     }
-                },
-                title = "Anilib",
-                state = windowState,
-                undecorated = if (playerFullscreen.value) {
-                    playerWindowMode.value == PlayerWindowMode.BORDERLESS
-                } else {
-                    applicationWindowMode.value == ApplicationWindowMode.BORDERLESS
-                },
-                onPreviewKeyEvent = { event ->
-                    if (playerFullscreen.value && event.key == Key.Escape && event.type == KeyEventType.KeyDown) {
-                        setPlayerFullscreen(false)
-                        true
-                    } else if (
-                        !playerFullscreen.value &&
-                        applicationWindowMode.value == ApplicationWindowMode.BORDERLESS &&
-                        event.key == Key.Escape &&
-                        event.type == KeyEventType.KeyDown
-                    ) {
-                        settingsService.replace(
-                            settingsService.snapshot().withApplicationWindowMode(ApplicationWindowMode.WINDOWED),
-                        )
-                        true
-                    } else {
-                        false
-                    }
-                },
-            ) {
-                DesktopAnilibContent(
-                    started = started,
-                    browserRuntimeStatus = browserRuntimeStatus,
-                    browserDataController = DesktopBrowserDataController(dataDirectory),
-                    browserPlatformController = DesktopBrowserPlatformController(),
-                    backupImportPicker = DesktopBackupImportPicker(),
-                    applicationUpdatePlatformController = DesktopApplicationUpdateController(dataDirectory),
-                    shareController = DesktopShareController(),
-                    extensionPlatform = extensionPlatform,
-                    playerFullscreen = playerFullscreen.value,
-                    setPlayerFullscreen = setPlayerFullscreen,
-                )
+                    content()
+                }
             }
         }
     } finally {
