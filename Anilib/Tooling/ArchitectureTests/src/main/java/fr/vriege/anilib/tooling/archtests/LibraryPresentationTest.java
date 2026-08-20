@@ -3,6 +3,7 @@ package fr.vriege.anilib.tooling.archtests;
 import fr.vriege.anilib.feature.library.LibraryHistoryEntry;
 import fr.vriege.anilib.feature.library.LibraryCategoryUpdatePolicy;
 import fr.vriege.anilib.feature.library.LibraryCategory;
+import fr.vriege.anilib.feature.library.LibraryCategoryScope;
 import fr.vriege.anilib.feature.library.LibraryDisplayDensity;
 import fr.vriege.anilib.feature.library.LibraryDisplayMode;
 import fr.vriege.anilib.feature.library.LibrarySort;
@@ -71,6 +72,7 @@ final class LibraryPresentationTest {
 
         presentation.createCategory(new LibraryCategory(
                 "Archive",
+                LibraryCategoryScope.SHARED,
                 LibraryDisplayMode.LIST,
                 LibraryDisplayDensity.RELAXED,
                 LibrarySort.ADDED_OLDEST,
@@ -85,6 +87,7 @@ final class LibraryPresentationTest {
         presentation.moveCategory("Archive", 0);
         presentation.replaceCategory("Anime", new LibraryCategory(
                 "Animation",
+                LibraryCategoryScope.ANIME,
                 LibraryDisplayMode.GRID,
                 LibraryDisplayDensity.COMFORTABLE,
                 LibrarySort.TITLE_DESCENDING,
@@ -116,9 +119,15 @@ final class LibraryPresentationTest {
                         .categories().contains("Archive"),
                 "bulk category and favourite actions must update every selected title");
         presentation.removeFromCategory(bulkSelection, "Archive");
+        presentation.setCategoryTitles("Archive", Set.of(new LibraryItemId("alpha")));
+        counter.check(catalog.find(new LibraryItemId("alpha")).orElseThrow()
+                        .categories().contains("Archive")
+                        && !catalog.find(new LibraryItemId("beta")).orElseThrow()
+                        .categories().contains("Archive"),
+                "category title management must replace the exact assignment set");
         presentation.deleteTitles(Set.of(new LibraryItemId("beta")));
         counter.check(catalog.find(new LibraryItemId("beta")).isEmpty()
-                        && !catalog.find(new LibraryItemId("alpha")).orElseThrow()
+                        && catalog.find(new LibraryItemId("alpha")).orElseThrow()
                         .categories().contains("Archive"),
                 "bulk category removal and deletion must be atomic catalog mutations");
 

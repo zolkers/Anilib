@@ -1,18 +1,23 @@
 package fr.vriege.anilib.platform.compose
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -23,18 +28,22 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import fr.vriege.anilib.feature.library.MediaKind
 import fr.vriege.anilib.feature.library.PublicationStatus
 import fr.vriege.anilib.feature.library.LibraryCategory
+import fr.vriege.anilib.feature.library.LibraryCategoryScope
 import fr.vriege.anilib.feature.library.LibraryCategoryUpdatePolicy
 import fr.vriege.anilib.feature.library.LibraryDisplayDensity
 import fr.vriege.anilib.feature.library.LibraryDisplayMode
+import fr.vriege.anilib.feature.library.LibraryItemId
 import fr.vriege.anilib.feature.library.LibrarySort
 import fr.vriege.anilib.feature.discovery.ui.DiscoveryPresentation
 import fr.vriege.anilib.feature.library.ui.LibraryPresentation
+import fr.vriege.anilib.feature.library.ui.LibraryCard
 import fr.vriege.anilib.feature.player.ui.PlayerPresentation
 import fr.vriege.anilib.feature.source.SourceId
 import fr.vriege.anilib.feature.tracker.ui.TrackerPresentation
@@ -54,18 +63,23 @@ internal fun CategoriesScreen(presentation: LibraryPresentation, goBack: () -> U
     var revision by remember(presentation) { mutableStateOf(0) }
     val overview = remember(presentation, revision) { presentation.library() }
     var creating by remember { mutableStateOf(false) }
+    var selectedScope by remember { mutableStateOf(LibraryCategoryScope.ANIME) }
+    var managingCategory by remember { mutableStateOf<LibraryCategory?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     fun update(action: () -> Unit): Boolean = try {
-            action()
-            error = null
-            revision++
-            true
-        } catch (failure: RuntimeException) {
-            error = failure.message ?: "Unable to update categories."
-            false
-        }
+        action()
+        error = null
+        revision++
+        true
+    } catch (failure: RuntimeException) {
+        error = failure.message ?: "Unable to update categories."
+        false
+    }
     MoreScaffold("ui.categories", goBack) { padding ->
-        val uncategorized = overview.titles().count { it.categories().isEmpty() }
+        val scopedTitles = overview.titles().filter { selectedScope.supports(it.kind()) }
+        val uncategorized = scopedTitles.count { it.categories().isEmpty() }
+        val visibleCategories = overview.categoryConfigurations()
+            .filter { it.scope() == selectedScope || it.scope() == LibraryCategoryScope.SHARED }
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 24.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -87,30 +101,50 @@ internal fun CategoriesScreen(presentation: LibraryPresentation, goBack: () -> U
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }
             item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = selectedScope == LibraryCategoryScope.ANIME,
+                        onClick = { selectedScope = LibraryCategoryScope.ANIME },
+                        label = { Text("ui.anime") },
+                    )
+                    FilterChip(
+                        selected = selectedScope == LibraryCategoryScope.MANGA,
+                        onClick = { selectedScope = LibraryCategoryScope.MANGA },
+                        label = { Text("ui.manga") },
+                    )
+                }
+            }
+            item {
                 SummaryCard(
                     "ui.default",
                     UiTranslations.format("dynamic.titles.count", LocalLanguagePack.current, uncategorized),
                 )
             }
-            overview.categoryConfigurations().forEachIndexed { index, category ->
-                val count = overview.titles().count { category.name() in it.categories() }
+            visibleCategories.forEachIndexed { index, category ->
+                val count = scopedTitles.count { category.name() in it.categories() }
+                val previousTarget = visibleCategories.getOrNull(index - 1)
+                    ?.let(overview.categoryConfigurations()::indexOf)
+                val nextTarget = visibleCategories.getOrNull(index + 1)
+                    ?.let(overview.categoryConfigurations()::indexOf)
                 item(key = category.name()) {
                     CategoryCard(
                         category,
                         count,
-                        index,
-                        overview.categoryConfigurations().lastIndex,
                         replace = { next ->
                             update { presentation.replaceCategory(category.name(), next) }
                         },
-                        move = { target ->
-                            update { presentation.moveCategory(category.name(), target) }
+                        moveUp = previousTarget?.let { target ->
+                            { update { presentation.moveCategory(category.name(), target) } }
                         },
+                        moveDown = nextTarget?.let { target ->
+                            { update { presentation.moveCategory(category.name(), target) } }
+                        },
+                        manageTitles = { managingCategory = category },
                         delete = { update { presentation.deleteCategory(category.name()) } },
                     )
                 }
             }
-            if (overview.categories().isEmpty() && uncategorized == 0) {
+            if (visibleCategories.isEmpty() && uncategorized == 0) {
                 item { EmptyPage("ui.categories.appear.after.adding.titles") }
             }
         }
@@ -118,10 +152,11 @@ internal fun CategoriesScreen(presentation: LibraryPresentation, goBack: () -> U
     if (creating) {
         val preferences = overview.displayPreferences()
         CategoryEditorDialog(
-            title = "Create category",
-            confirmLabel = "Create",
+            title = "ui.create.category",
+            confirmLabel = "ui.create",
             initial = LibraryCategory(
                 "New category",
+                selectedScope,
                 preferences.mode(),
                 preferences.density(),
                 preferences.sort(),
@@ -134,16 +169,28 @@ internal fun CategoriesScreen(presentation: LibraryPresentation, goBack: () -> U
             },
         )
     }
+    managingCategory?.let { category ->
+        CategoryTitlesDialog(
+            category = category,
+            titles = overview.titles().filter { category.scope().supports(it.kind()) },
+            dismiss = { managingCategory = null },
+            save = { selected ->
+                if (update { presentation.setCategoryTitles(category.name(), selected) }) {
+                    managingCategory = null
+                }
+            },
+        )
+    }
 }
 
 @Composable
 private fun CategoryCard(
     category: LibraryCategory,
     count: Int,
-    index: Int,
-    lastIndex: Int,
     replace: (LibraryCategory) -> Boolean,
-    move: (Int) -> Unit,
+    moveUp: (() -> Unit)?,
+    moveDown: (() -> Unit)?,
+    manageTitles: () -> Unit,
     delete: () -> Unit,
 ) {
     var editing by remember(category.name()) { mutableStateOf(false) }
@@ -153,6 +200,10 @@ private fun CategoryCard(
             Row(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(category.name(), fontWeight = FontWeight.Medium)
+                    Text(
+                        category.scope().scopeLabel(),
+                        color = MaterialTheme.colorScheme.primary,
+                    )
                     Text(
                         UiTranslations.format("dynamic.titles.count", LocalLanguagePack.current, count),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -177,10 +228,11 @@ private fun CategoryCard(
                         )
                     }
                 }
-                TextButton(enabled = index > 0, onClick = { move(index - 1) }) { Text("ui.up") }
-                TextButton(enabled = index < lastIndex, onClick = { move(index + 1) }) { Text("ui.down") }
+                TextButton(enabled = moveUp != null, onClick = { moveUp?.invoke() }) { Text("ui.up") }
+                TextButton(enabled = moveDown != null, onClick = { moveDown?.invoke() }) { Text("ui.down") }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = manageTitles) { Text("ui.manage.titles") }
                 TextButton(onClick = { editing = true }) { Text("ui.edit") }
                 TextButton(onClick = { confirmingDelete = true }) { Text("ui.delete") }
             }
@@ -188,8 +240,8 @@ private fun CategoryCard(
     }
     if (editing) {
         CategoryEditorDialog(
-            title = "Edit category",
-            confirmLabel = "Save",
+            title = "ui.edit.category",
+            confirmLabel = "ui.save",
             initial = category,
             dismiss = { editing = false },
             confirm = {
@@ -233,6 +285,7 @@ private fun CategoryEditorDialog(
     var density by remember(initial) { mutableStateOf(initial.density()) }
     var sort by remember(initial) { mutableStateOf(initial.sort()) }
     var updatePolicy by remember(initial) { mutableStateOf(initial.updatePolicy()) }
+    var scope by remember(initial) { mutableStateOf(initial.scope()) }
     AlertDialog(
         onDismissRequest = dismiss,
         title = { Text(title) },
@@ -245,16 +298,23 @@ private fun CategoryEditorDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                CategoryOption("Display mode", displayMode.displayLabel()) {
+                CategoryOption("ui.library.type", scope.scopeLabel()) {
+                    scope = if (scope == LibraryCategoryScope.ANIME) {
+                        LibraryCategoryScope.MANGA
+                    } else {
+                        LibraryCategoryScope.ANIME
+                    }
+                }
+                CategoryOption("ui.display.mode", displayMode.displayLabel()) {
                     displayMode = nextValue(displayMode, DISPLAY_MODES)
                 }
-                CategoryOption("Density", density.densityLabel()) {
+                CategoryOption("ui.density", density.densityLabel()) {
                     density = nextValue(density, DISPLAY_DENSITIES)
                 }
-                CategoryOption("Sort", sort.sortLabel()) {
+                CategoryOption("ui.sort", sort.sortLabel()) {
                     sort = nextValue(sort, SORTS)
                 }
-                CategoryOption("Library updates", updatePolicy.updateLabel()) {
+                CategoryOption("ui.library.updates", updatePolicy.updateLabel()) {
                     updatePolicy = nextValue(updatePolicy, UPDATE_POLICIES)
                 }
             }
@@ -263,13 +323,76 @@ private fun CategoryEditorDialog(
             TextButton(
                 enabled = name.isNotBlank(),
                 onClick = {
-                    confirm(LibraryCategory(name.trim(), displayMode, density, sort, updatePolicy))
+                    confirm(LibraryCategory(name.trim(), scope, displayMode, density, sort, updatePolicy))
                 },
             ) { Text(confirmLabel) }
         },
         dismissButton = { TextButton(onClick = dismiss) { Text("ui.cancel") } },
     )
 }
+
+@Composable
+private fun CategoryTitlesDialog(
+    category: LibraryCategory,
+    titles: List<LibraryCard>,
+    dismiss: () -> Unit,
+    save: (Set<LibraryItemId>) -> Unit,
+) {
+    var selected by remember(category.name(), titles) {
+        mutableStateOf<Set<LibraryItemId>>(
+            titles.filter { category.name() in it.categories() }.mapTo(linkedSetOf()) { it.id() },
+        )
+    }
+    AlertDialog(
+        onDismissRequest = dismiss,
+        title = {
+            Text(UiTranslations.format("dynamic.manage.category.titles", LocalLanguagePack.current, category.name()))
+        },
+        text = {
+            if (titles.isEmpty()) {
+                Text("ui.no.titles.in.this.library")
+            } else {
+                LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp)) {
+                    items(titles, key = { it.id().value() }) { title ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { selected = selected.toggle(title.id()) }
+                                .padding(vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Checkbox(
+                                checked = title.id() in selected,
+                                onCheckedChange = { selected = selected.toggle(title.id()) },
+                            )
+                            Column(modifier = Modifier.weight(1f).padding(start = 8.dp)) {
+                                Text(title.title(), fontWeight = FontWeight.Medium)
+                                Text(
+                                    title.kind().kindLabel(),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = { save(selected) }) { Text("ui.save") } },
+        dismissButton = { TextButton(onClick = dismiss) { Text("ui.cancel") } },
+    )
+}
+
+private fun Set<LibraryItemId>.toggle(id: LibraryItemId): Set<LibraryItemId> =
+    if (id in this) this - id else this + id
+
+private fun LibraryCategoryScope.scopeLabel(): String = when (this) {
+    LibraryCategoryScope.ANIME -> "ui.anime"
+    LibraryCategoryScope.MANGA -> "ui.manga"
+    LibraryCategoryScope.SHARED -> "ui.anime.and.manga"
+}
+
+private fun MediaKind.kindLabel(): String =
+    if (this == MediaKind.ANIME) "ui.anime" else "ui.manga"
 
 @Composable
 private fun CategoryOption(label: String, value: String, selectNext: () -> Unit) {
@@ -306,24 +429,26 @@ private fun <T> nextValue(current: T, values: List<T>): T {
 }
 
 private fun LibraryDisplayMode.displayLabel(): String =
-    if (this == LibraryDisplayMode.GRID) "Grid" else "List"
+    if (this == LibraryDisplayMode.GRID) "ui.grid" else "ui.list"
 
-private fun LibraryDisplayDensity.densityLabel(): String = name.titleLabel()
+private fun LibraryDisplayDensity.densityLabel(): String = when (this) {
+    LibraryDisplayDensity.COMPACT -> "ui.compact"
+    LibraryDisplayDensity.COMFORTABLE -> "ui.comfortable"
+    LibraryDisplayDensity.RELAXED -> "ui.relaxed"
+}
 
 private fun LibrarySort.sortLabel(): String {
-    if (this == LibrarySort.TITLE_ASCENDING) return "Title A–Z"
-    if (this == LibrarySort.TITLE_DESCENDING) return "Title Z–A"
-    if (this == LibrarySort.ADDED_NEWEST) return "Recently added"
-    return "Oldest added"
+    if (this == LibrarySort.TITLE_ASCENDING) return "ui.title.az"
+    if (this == LibrarySort.TITLE_DESCENDING) return "ui.title.za"
+    if (this == LibrarySort.ADDED_NEWEST) return "ui.recently.added"
+    return "ui.oldest.added"
 }
 
 private fun LibraryCategoryUpdatePolicy.updateLabel(): String {
-    if (this == LibraryCategoryUpdatePolicy.DEFAULT) return "Use global policy"
-    if (this == LibraryCategoryUpdatePolicy.INCLUDE) return "Always include"
-    return "Exclude"
+    if (this == LibraryCategoryUpdatePolicy.DEFAULT) return "ui.use.global.policy"
+    if (this == LibraryCategoryUpdatePolicy.INCLUDE) return "ui.always.include"
+    return "ui.exclude"
 }
-
-private fun String.titleLabel(): String = lowercase().replaceFirstChar(Char::uppercase)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

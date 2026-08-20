@@ -5,6 +5,7 @@ import fr.vriege.anilib.feature.backup.BackupCapabilities;
 import fr.vriege.anilib.feature.library.LibraryCapabilities;
 import fr.vriege.anilib.feature.library.LibraryCategory;
 import fr.vriege.anilib.feature.library.LibraryCategoryUpdatePolicy;
+import fr.vriege.anilib.feature.library.LibraryCategoryScope;
 import fr.vriege.anilib.feature.library.LibraryConfigurationSnapshot;
 import fr.vriege.anilib.feature.library.LibraryDisplayDensity;
 import fr.vriege.anilib.feature.library.LibraryDisplayMode;
@@ -189,6 +190,7 @@ final class UpdateTest {
                     preferences,
                     List.of(new LibraryCategory(
                             "Seasonal",
+                            LibraryCategoryScope.ANIME,
                             LibraryDisplayMode.GRID,
                             LibraryDisplayDensity.COMFORTABLE,
                             LibrarySort.TITLE_ASCENDING,
@@ -206,6 +208,7 @@ final class UpdateTest {
                     preferences,
                     List.of(new LibraryCategory(
                             "Seasonal",
+                            LibraryCategoryScope.ANIME,
                             LibraryDisplayMode.GRID,
                             LibraryDisplayDensity.COMFORTABLE,
                             LibrarySort.TITLE_ASCENDING,

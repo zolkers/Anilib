@@ -1,16 +1,18 @@
 package fr.vriege.anilib.tooling.archtests;
 
-import fr.vriege.anilib.feature.library.LibraryItem;
 import fr.vriege.anilib.feature.library.LibraryCategory;
+import fr.vriege.anilib.feature.library.LibraryCategoryScope;
 import fr.vriege.anilib.feature.library.LibraryCategoryUpdatePolicy;
 import fr.vriege.anilib.feature.library.LibraryConfigurationSnapshot;
 import fr.vriege.anilib.feature.library.LibraryDisplayDensity;
 import fr.vriege.anilib.feature.library.LibraryDisplayMode;
 import fr.vriege.anilib.feature.library.LibraryDisplayPreferences;
+import fr.vriege.anilib.feature.library.LibraryHistoryEntry;
+import fr.vriege.anilib.feature.library.LibraryItem;
 import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.library.LibraryOrigin;
-import fr.vriege.anilib.feature.library.LibraryHistoryEntry;
 import fr.vriege.anilib.feature.library.LibraryProgress;
+import fr.vriege.anilib.feature.library.LibrarySort;
 import fr.vriege.anilib.feature.library.LibraryTitleMetadata;
 import fr.vriege.anilib.feature.library.MediaKind;
 import fr.vriege.anilib.feature.library.PublicationStatus;
@@ -21,19 +23,20 @@ import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
-import fr.vriege.anilib.feature.library.LibrarySort;
-import java.net.URI;
-import java.util.Optional;
 
 final class LibraryPersistenceTest {
     private static final int MAGIC = 0x414E494C;
     private static final int CURRENT_VERSION = 4;
+    private static final int CONFIGURATION_MAGIC = 0x414E4C43;
+    private static final int CURRENT_CONFIGURATION_VERSION = 2;
 
     private LibraryPersistenceTest() {
     }
@@ -43,6 +46,7 @@ final class LibraryPersistenceTest {
         try {
             roundTripsCurrentFormat(counter);
             roundTripsLibraryConfiguration(counter);
+            migratesVersionOneLibraryConfiguration(counter);
             migratesVersionZero(counter);
             migratesVersionOne(counter);
             migratesVersionTwo(counter);
@@ -67,6 +71,7 @@ final class LibraryPersistenceTest {
                     preferences,
                     List.of(new LibraryCategory(
                             "Seasonal",
+                            LibraryCategoryScope.ANIME,
                             LibraryDisplayMode.GRID,
                             LibraryDisplayDensity.RELAXED,
                             LibrarySort.TITLE_DESCENDING,
@@ -134,6 +139,23 @@ final class LibraryPersistenceTest {
             counter.check(reloaded.remove(item.id()), "durable catalog must remove existing items");
             counter.check(new FileLibraryCatalog(file).snapshot().isEmpty(),
                     "removal must survive a catalog restart");
+        } finally {
+            deleteDirectory(directory);
+        }
+    }
+
+    private static void migratesVersionOneLibraryConfiguration(Counter counter) throws IOException {
+        Path directory = Files.createTempDirectory("anilib-library-configuration-migration");
+        Path file = directory.resolve("library.configuration");
+        try {
+            writeVersionOneLibraryConfiguration(file);
+            LibraryConfigurationSnapshot migrated = new FileLibraryConfiguration(file).snapshot();
+            counter.check(migrated.categories().getFirst().scope() == LibraryCategoryScope.SHARED,
+                    "version one categories must remain available to anime and manga after migration");
+            counter.check(readVersion(file, CONFIGURATION_MAGIC) == CURRENT_CONFIGURATION_VERSION,
+                    "opening a legacy library configuration must rewrite the current version");
+            counter.check(noTemporaryFiles(directory),
+                    "library configuration migration must not leave temporary files");
         } finally {
             deleteDirectory(directory);
         }
@@ -223,6 +245,24 @@ final class LibraryPersistenceTest {
         }
     }
 
+    private static void writeVersionOneLibraryConfiguration(Path file) throws IOException {
+        try (DataOutputStream output = new DataOutputStream(
+                new BufferedOutputStream(Files.newOutputStream(file)))) {
+            output.writeInt(CONFIGURATION_MAGIC);
+            output.writeInt(1);
+            output.writeUTF(LibraryDisplayMode.GRID.name());
+            output.writeUTF(LibraryDisplayDensity.COMFORTABLE.name());
+            output.writeUTF(LibrarySort.TITLE_ASCENDING.name());
+            output.writeBoolean(false);
+            output.writeInt(1);
+            output.writeUTF("Legacy category");
+            output.writeUTF(LibraryDisplayMode.LIST.name());
+            output.writeUTF(LibraryDisplayDensity.COMPACT.name());
+            output.writeUTF(LibrarySort.ADDED_NEWEST.name());
+            output.writeUTF(LibraryCategoryUpdatePolicy.DEFAULT.name());
+        }
+    }
+
     private static void writeVersionOne(Path file, LibraryItemId id) throws IOException {
         Instant addedAt = Instant.parse("2026-01-02T03:04:05.123456789Z");
         try (DataOutputStream output = new DataOutputStream(
@@ -300,8 +340,12 @@ final class LibraryPersistenceTest {
     }
 
     private static int readVersion(Path file) throws IOException {
+        return readVersion(file, MAGIC);
+    }
+
+    private static int readVersion(Path file, int expectedMagic) throws IOException {
         try (DataInputStream input = new DataInputStream(Files.newInputStream(file))) {
-            if (input.readInt() != MAGIC) {
+            if (input.readInt() != expectedMagic) {
                 throw new AssertionError("Migrated file signature changed");
             }
             return input.readInt();

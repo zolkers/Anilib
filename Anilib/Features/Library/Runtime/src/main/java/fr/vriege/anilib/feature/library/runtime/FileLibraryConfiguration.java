@@ -2,6 +2,7 @@ package fr.vriege.anilib.feature.library.runtime;
 
 import fr.vriege.anilib.feature.library.LibraryCategory;
 import fr.vriege.anilib.feature.library.LibraryCategoryUpdatePolicy;
+import fr.vriege.anilib.feature.library.LibraryCategoryScope;
 import fr.vriege.anilib.feature.library.LibraryConfiguration;
 import fr.vriege.anilib.feature.library.LibraryConfigurationSnapshot;
 import fr.vriege.anilib.feature.library.LibraryDisplayDensity;
@@ -30,7 +31,8 @@ import java.util.Optional;
 
 public final class FileLibraryConfiguration implements LibraryConfiguration {
     private static final int MAGIC = 0x414E4C43;
-    private static final int VERSION = 1;
+    private static final int VERSION = 2;
+    private static final int FIRST_SUPPORTED_VERSION = 1;
     private static final int MAXIMUM_CATEGORIES = 10_000;
 
     private final Path file;
@@ -38,7 +40,11 @@ public final class FileLibraryConfiguration implements LibraryConfiguration {
 
     public FileLibraryConfiguration(Path file) {
         this.file = Objects.requireNonNull(file, "file must not be null").toAbsolutePath().normalize();
-        snapshot = load();
+        LoadedConfiguration loaded = load();
+        snapshot = loaded.snapshot();
+        if (loaded.version() < VERSION) {
+            save(snapshot);
+        }
     }
 
     @Override
@@ -65,9 +71,9 @@ public final class FileLibraryConfiguration implements LibraryConfiguration {
         }
     }
 
-    private LibraryConfigurationSnapshot load() {
+    private LoadedConfiguration load() {
         if (!Files.exists(file)) {
-            return LibraryConfigurationSnapshot.defaults();
+            return new LoadedConfiguration(VERSION, LibraryConfigurationSnapshot.defaults());
         }
         try (DataInputStream input = new DataInputStream(
                 new BufferedInputStream(Files.newInputStream(file)))) {
@@ -75,7 +81,7 @@ public final class FileLibraryConfiguration implements LibraryConfiguration {
                 throw new IOException("Invalid Anilib library configuration signature");
             }
             int version = input.readInt();
-            if (version != VERSION) {
+            if (version < FIRST_SUPPORTED_VERSION || version > VERSION) {
                 throw new IOException("Unsupported Anilib library configuration version: " + version);
             }
             LibraryDisplayPreferences preferences = new LibraryDisplayPreferences(
@@ -91,6 +97,9 @@ public final class FileLibraryConfiguration implements LibraryConfiguration {
             for (int index = 0; index < categoryCount; index++) {
                 categories.add(new LibraryCategory(
                         input.readUTF(),
+                        version >= 2
+                                ? LibraryCategoryScope.valueOf(input.readUTF())
+                                : LibraryCategoryScope.SHARED,
                         LibraryDisplayMode.valueOf(input.readUTF()),
                         LibraryDisplayDensity.valueOf(input.readUTF()),
                         LibrarySort.valueOf(input.readUTF()),
@@ -99,7 +108,9 @@ public final class FileLibraryConfiguration implements LibraryConfiguration {
             if (input.read() != -1) {
                 throw new IOException("Unexpected trailing library configuration data");
             }
-            return new LibraryConfigurationSnapshot(preferences, categories);
+            return new LoadedConfiguration(
+                    version,
+                    new LibraryConfigurationSnapshot(preferences, categories));
         } catch (EOFException exception) {
             throw failure("read truncated", exception);
         } catch (IOException | IllegalArgumentException exception) {
@@ -130,6 +141,7 @@ public final class FileLibraryConfiguration implements LibraryConfiguration {
             output.writeInt(value.categories().size());
             for (LibraryCategory category : value.categories()) {
                 output.writeUTF(category.name());
+                output.writeUTF(category.scope().name());
                 output.writeUTF(category.displayMode().name());
                 output.writeUTF(category.density().name());
                 output.writeUTF(category.sort().name());
@@ -156,5 +168,8 @@ public final class FileLibraryConfiguration implements LibraryConfiguration {
         return new LibraryStorageException(
                 "Unable to " + operation + " the Anilib library configuration",
                 cause);
+    }
+
+    private record LoadedConfiguration(int version, LibraryConfigurationSnapshot snapshot) {
     }
 }

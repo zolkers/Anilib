@@ -2,6 +2,7 @@ package fr.vriege.anilib.feature.library.ui;
 
 import fr.vriege.anilib.feature.library.LibraryCategory;
 import fr.vriege.anilib.feature.library.LibraryCategoryUpdatePolicy;
+import fr.vriege.anilib.feature.library.LibraryCategoryScope;
 import fr.vriege.anilib.feature.library.LibraryDisplayDensity;
 import fr.vriege.anilib.feature.library.LibraryDisplayMode;
 import fr.vriege.anilib.feature.library.LibraryItemId;
@@ -30,7 +31,7 @@ public interface LibraryPresentation {
 
     void setDefaultCategory(Optional<String> category);
 
-    void createCategory(String name);
+    void createCategory(String name, LibraryCategoryScope scope);
 
     void createCategory(LibraryCategory category);
 
@@ -51,6 +52,8 @@ public interface LibraryPresentation {
     void addToCategory(Set<LibraryItemId> ids, String category);
 
     void removeFromCategory(Set<LibraryItemId> ids, String category);
+
+    void setCategoryTitles(String category, Set<LibraryItemId> ids);
 
     void deleteTitles(Set<LibraryItemId> ids);
 

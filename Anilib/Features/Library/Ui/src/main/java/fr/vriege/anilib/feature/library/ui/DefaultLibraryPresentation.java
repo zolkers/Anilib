@@ -3,6 +3,7 @@ package fr.vriege.anilib.feature.library.ui;
 import fr.vriege.anilib.feature.library.LibraryCatalog;
 import fr.vriege.anilib.feature.library.LibraryCategory;
 import fr.vriege.anilib.feature.library.LibraryCategoryUpdatePolicy;
+import fr.vriege.anilib.feature.library.LibraryCategoryScope;
 import fr.vriege.anilib.feature.library.LibraryConfiguration;
 import fr.vriege.anilib.feature.library.LibraryConfigurationSnapshot;
 import fr.vriege.anilib.feature.library.LibraryDisplayDensity;
@@ -13,6 +14,7 @@ import fr.vriege.anilib.feature.library.LibraryItem;
 import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.library.LibrarySort;
 import fr.vriege.anilib.feature.library.LibraryTitleMetadata;
+import fr.vriege.anilib.feature.library.MediaKind;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -128,9 +130,9 @@ public final class DefaultLibraryPresentation implements LibraryPresentation {
     }
 
     @Override
-    public synchronized void createCategory(String name) {
+    public synchronized void createCategory(String name, LibraryCategoryScope scope) {
         LibraryConfigurationSnapshot current = normalizedConfiguration();
-        createCategory(LibraryCategory.defaults(name, current.displayPreferences()));
+        createCategory(LibraryCategory.defaults(name, scope, current.displayPreferences()));
     }
 
     @Override
@@ -151,6 +153,7 @@ public final class DefaultLibraryPresentation implements LibraryPresentation {
         LibraryCategory category = requireCategory(current.categories(), currentName);
         replaceCategory(currentName, new LibraryCategory(
                 nextName,
+                category.scope(),
                 category.displayMode(),
                 category.density(),
                 category.sort(),
@@ -179,7 +182,9 @@ public final class DefaultLibraryPresentation implements LibraryPresentation {
                 defaultCategory);
         List<LibraryItem> before = catalog.snapshot();
         List<LibraryItem> after = before.stream()
-                .map(item -> renameCategory(item, currentName, replacement.name()))
+                .map(item -> replacement.scope().supports(item.kind())
+                        ? renameCategory(item, currentName, replacement.name())
+                        : removeCategory(item, currentName))
                 .toList();
         replaceItemsAndConfiguration(
                 before,
@@ -237,6 +242,7 @@ public final class DefaultLibraryPresentation implements LibraryPresentation {
         LibraryCategory category = requireCategory(current.categories(), name);
         updateCategory(new LibraryCategory(
                 name,
+                category.scope(),
                 category.displayMode(),
                 category.density(),
                 category.sort(),
@@ -250,7 +256,9 @@ public final class DefaultLibraryPresentation implements LibraryPresentation {
 
     @Override
     public synchronized void addToCategory(Set<LibraryItemId> ids, String category) {
-        requireCategory(normalizedConfiguration().categories(), category);
+        LibraryCategory configured = requireCategory(normalizedConfiguration().categories(), category);
+        Set<LibraryItemId> selected = validatedSelection(ids);
+        ensureCompatibleSelection(configured, selected);
         replaceSelected(ids, item -> {
             Set<String> categories = new LinkedHashSet<>(item.categories());
             categories.add(category);
@@ -262,6 +270,22 @@ public final class DefaultLibraryPresentation implements LibraryPresentation {
     public synchronized void removeFromCategory(Set<LibraryItemId> ids, String category) {
         requireCategory(normalizedConfiguration().categories(), category);
         replaceSelected(ids, item -> removeCategory(item, category));
+    }
+
+    @Override
+    public synchronized void setCategoryTitles(String category, Set<LibraryItemId> ids) {
+        LibraryCategory configured = requireCategory(normalizedConfiguration().categories(), category);
+        Set<LibraryItemId> selected = Set.copyOf(Objects.requireNonNull(ids, "ids must not be null"));
+        Set<LibraryItemId> available = catalog.snapshot().stream()
+                .map(LibraryItem::id)
+                .collect(Collectors.toUnmodifiableSet());
+        if (!available.containsAll(selected)) {
+            throw new IllegalArgumentException("ids contain an unknown library title");
+        }
+        ensureCompatibleSelection(configured, selected);
+        catalog.replaceAll(catalog.snapshot().stream()
+                .map(item -> categoryAssignment(item, configured, selected.contains(item.id())))
+                .toList());
     }
 
     @Override
@@ -338,6 +362,7 @@ public final class DefaultLibraryPresentation implements LibraryPresentation {
                     selected.orElseThrow());
             updateCategory(new LibraryCategory(
                     category.name(),
+                    category.scope(),
                     mode.orElse(category.displayMode()),
                     density.orElse(category.density()),
                     sort.orElse(category.sort()),
@@ -417,8 +442,45 @@ public final class DefaultLibraryPresentation implements LibraryPresentation {
                 .sorted(TEXT_ORDER)
                 .forEach(name -> categories.putIfAbsent(
                         name,
-                        LibraryCategory.defaults(name, configuration.displayPreferences())));
+                        LibraryCategory.defaults(
+                                name,
+                                inferredScope(items, name),
+                                configuration.displayPreferences())));
         return List.copyOf(categories.values());
+    }
+
+    private void ensureCompatibleSelection(
+            LibraryCategory category,
+            Set<LibraryItemId> selection) {
+        boolean incompatible = catalog.snapshot().stream()
+                .filter(item -> selection.contains(item.id()))
+                .anyMatch(item -> !category.scope().supports(item.kind()));
+        if (incompatible) {
+            throw new IllegalArgumentException("Category and title library types must match");
+        }
+    }
+
+    private static LibraryItem categoryAssignment(
+            LibraryItem item,
+            LibraryCategory category,
+            boolean assigned) {
+        if (!category.scope().supports(item.kind()) || !assigned) {
+            return removeCategory(item, category.name());
+        }
+        Set<String> categories = new LinkedHashSet<>(item.categories());
+        categories.add(category.name());
+        return item.withCategories(categories);
+    }
+
+    private static LibraryCategoryScope inferredScope(Collection<LibraryItem> items, String name) {
+        boolean anime = items.stream()
+                .anyMatch(item -> item.kind() == MediaKind.ANIME && item.categories().contains(name));
+        boolean manga = items.stream()
+                .anyMatch(item -> item.kind() != MediaKind.ANIME && item.categories().contains(name));
+        if (anime && manga) {
+            return LibraryCategoryScope.SHARED;
+        }
+        return anime ? LibraryCategoryScope.ANIME : LibraryCategoryScope.MANGA;
     }
 
     private static LibraryCategory requireCategory(

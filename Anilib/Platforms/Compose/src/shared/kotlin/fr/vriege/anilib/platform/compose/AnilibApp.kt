@@ -783,10 +783,16 @@ private fun LibraryPageContent(
 ) {
     var revision by remember(presentation) { mutableStateOf(0) }
     val overview = remember(presentation, revision) { presentation.library() }
+    val scopedCategories = overview.categoryConfigurations()
+        .filter { it.scope().supports(kind) }
+        .map { it.name() }
     var query by remember { mutableStateOf("") }
     var searching by remember { mutableStateOf(false) }
-    var category by remember(presentation) {
-        mutableStateOf(overview.displayPreferences().defaultCategory().orElse(null))
+    var category by remember(presentation, kind) {
+        mutableStateOf(
+            overview.displayPreferences().defaultCategory().orElse(null)
+                ?.takeIf { it in scopedCategories },
+        )
     }
     var favoritesOnly by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -916,7 +922,7 @@ private fun LibraryPageContent(
                         Icon(Icons.Default.FavoriteBorder, contentDescription = "ui.unfavorite")
                     }
                     IconButton(
-                        enabled = selected.isNotEmpty() && overview.categories().isNotEmpty(),
+                        enabled = selected.isNotEmpty() && scopedCategories.isNotEmpty(),
                         onClick = { categoryAction = true },
                     ) {
                         Icon(Icons.Outlined.Category, contentDescription = "ui.category")
@@ -959,7 +965,7 @@ private fun LibraryPageContent(
                     label = { Text("ui.favorites") },
                 )
             }
-            if (overview.categories().isNotEmpty()) {
+            if (scopedCategories.isNotEmpty()) {
                 Row(
                     modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -980,7 +986,7 @@ private fun LibraryPageContent(
                         },
                         label = { Text("ui.default") },
                     )
-                    overview.categories().forEach { value ->
+                    scopedCategories.forEach { value ->
                         FilterChip(
                             selected = category == value,
                             onClick = {
@@ -1043,7 +1049,7 @@ private fun LibraryPageContent(
     }
     if (categoryAction) {
         BulkCategoryDialog(
-            categories = overview.categories(),
+            categories = scopedCategories,
             dismiss = { categoryAction = false },
             add = { value ->
                 update { presentation.addToCategory(selected, value) }
@@ -2346,16 +2352,30 @@ private fun librarySummary(overview: LibraryOverview): String =
 
 private fun cardMetadata(card: LibraryCard): String {
     val categoryText = joined(card.categories())
-    val progressText = card.progress().map(::progress).orElse("Not started")
+    val progressText = card.progress().map { progress(card.kind(), it) }.orElse("Not started")
     return "${formatEnum(card.kind())} | $categoryText | $progressText"
 }
 
-private fun progress(progress: LibraryProgress): String {
+private fun progress(kind: MediaKind, progress: LibraryProgress): String {
     if (progress.extent() == LibraryProgress.UNKNOWN_EXTENT) {
-        return progress.position().toString()
+        return if (kind == MediaKind.ANIME && progress.position() >= 1_000L) {
+            formatMediaPosition(progress.position())
+        } else {
+            progress.position().toString()
+        }
     }
     val percentage = (progress.completion().orElse(0.0) * 100.0).roundToInt()
-    return "${progress.position()} / ${progress.extent()} ($percentage%)"
+    val position = if (kind == MediaKind.ANIME && progress.extent() >= 1_000L) {
+        formatMediaPosition(progress.position())
+    } else {
+        progress.position().toString()
+    }
+    val extent = if (kind == MediaKind.ANIME && progress.extent() >= 1_000L) {
+        formatMediaPosition(progress.extent())
+    } else {
+        progress.extent().toString()
+    }
+    return "$position / $extent ($percentage%)"
 }
 
 private fun joined(values: List<String>): String =
