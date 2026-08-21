@@ -26,7 +26,7 @@ import java.util.List;
 public abstract class HttpSource implements CatalogueSource {
     private final NetworkHelper network = NetworkHelper.shared();
     private Long id;
-    private Headers headers;
+    private Object headers$delegate;
 
     public HttpSource() {
     }
@@ -36,10 +36,28 @@ public abstract class HttpSource implements CatalogueSource {
     protected final NetworkHelper getNetwork() { return network; }
 
     public final Headers getHeaders() {
-        if (headers == null) {
-            headers = headersBuilder().build();
+        Object delegate = headers$delegate;
+        if (delegate == null) {
+            synchronized (this) {
+                delegate = headers$delegate;
+                if (delegate == null) {
+                    delegate = headersBuilder().build();
+                    headers$delegate = delegate;
+                }
+            }
         }
-        return headers;
+        if (delegate instanceof Headers headers) {
+            return headers;
+        }
+        try {
+            Object value = delegate.getClass().getMethod("getValue").invoke(delegate);
+            if (value instanceof Headers headers) {
+                return headers;
+            }
+            throw new IllegalStateException("HTTP headers delegate returned an invalid value");
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalStateException("Unable to read the HTTP headers delegate", exception);
+        }
     }
 
     public OkHttpClient getClient() { return network.getClient(); }
@@ -146,6 +164,13 @@ public abstract class HttpSource implements CatalogueSource {
     public String getChapterUrl(SChapter chapter) { return pageListRequest(chapter).url().toString(); }
     protected void setUrlWithoutDomain(SManga manga, String url) {
         manga.setUrl(getUrlWithoutDomain(url));
+    }
+    protected void setUrlWithoutDomain(SChapter chapter, String url) {
+        chapter.setUrl(getUrlWithoutDomain(url));
+    }
+    public void prepareNewChapter(SChapter chapter) { }
+    public void prepareNewChapter(SChapter chapter, SManga manga) {
+        prepareNewChapter(chapter);
     }
     protected String getUrlWithoutDomain(String url) {
         URI value = URI.create(url);

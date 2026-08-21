@@ -1,5 +1,10 @@
 package fr.vriege.anilib.platform.desktopextensionhost.compat.android.content;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
 public abstract class Context {
     public static final int MODE_PRIVATE = 0;
     public static final int MODE_WORLD_READABLE = 1;
@@ -18,8 +23,30 @@ public abstract class Context {
     public Object getContentResolver() { return null; }
     public Object getMainLooper() { return null; }
     public Object getTheme() { return null; }
+    public File getCacheDir() { return CacheDirectory.VALUE; }
     public void startActivity(Intent intent) { }
     public SharedPreferences getSharedPreferences(String name, int mode) {
         return SourcePreferences.forSource(name.hashCode());
+    }
+
+    private static final class CacheDirectory {
+        private static final File VALUE = create();
+
+        private static File create() {
+            String temporaryDirectory = System.getProperty("java.io.tmpdir");
+            if (temporaryDirectory == null || temporaryDirectory.isBlank()) {
+                throw new IllegalStateException("The JVM temporary directory is unavailable");
+            }
+            Path directory = Path.of(temporaryDirectory)
+                    .toAbsolutePath()
+                    .normalize()
+                    .resolve("anilib-desktop-extension-host-cache");
+            try {
+                Files.createDirectories(directory);
+            } catch (IOException exception) {
+                throw new IllegalStateException("Unable to prepare the extension cache directory", exception);
+            }
+            return directory.toFile();
+        }
     }
 }
