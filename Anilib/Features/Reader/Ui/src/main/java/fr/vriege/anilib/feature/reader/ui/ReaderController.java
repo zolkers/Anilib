@@ -19,6 +19,13 @@ import java.util.Objects;
 import java.util.Set;
 
 public final class ReaderController implements AutoCloseable {
+    /**
+     * Sources list content units newest first, so walking towards index 0 reaches newer chapters
+     * and walking towards the end reaches older ones.
+     */
+    private static final int NEWER = -1;
+    private static final int OLDER = 1;
+
     private final ReaderService reader;
     private final LibraryItemId libraryItemId;
     private final SourceCatalogueItemId sourceItemId;
@@ -125,11 +132,11 @@ public final class ReaderController implements AutoCloseable {
     }
 
     public boolean nextContentUnit() {
-        return moveContentUnit(1);
+        return moveContentUnit(NEWER);
     }
 
     public boolean previousContentUnit() {
-        return moveContentUnit(-1);
+        return moveContentUnit(OLDER);
     }
 
     public Set<String> readContentIds() {
@@ -188,7 +195,7 @@ public final class ReaderController implements AutoCloseable {
                     return false;
                 }
                 openContentUnit(units.get(target).id());
-                if (delta < 0) {
+                if (delta == OLDER) {
                     // Reading backwards lands on the last page so the chapter continues seamlessly.
                     session.goToPage(session.snapshot().pageCount() - 1);
                 }
