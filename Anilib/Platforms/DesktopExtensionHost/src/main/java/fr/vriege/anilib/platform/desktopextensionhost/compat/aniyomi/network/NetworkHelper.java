@@ -15,6 +15,9 @@ public final class NetworkHelper {
         cookieJar = CookieJar.NO_COOKIES;
         client = new OkHttpClient.Builder()
                 .cookieJar(cookieJar)
+                .addInterceptor(new UncaughtExceptionInterceptor())
+                .addInterceptor(new UserAgentInterceptor(USER_AGENT))
+                .addInterceptor(new CloudflareInterceptor())
                 .callTimeout(25L, TimeUnit.SECONDS)
                 .connectTimeout(10L, TimeUnit.SECONDS)
                 .readTimeout(20L, TimeUnit.SECONDS)

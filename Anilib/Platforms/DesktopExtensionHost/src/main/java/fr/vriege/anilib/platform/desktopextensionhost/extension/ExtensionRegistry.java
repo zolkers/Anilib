@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.stream.Stream;
 import java.util.jar.JarFile;
 import java.util.Locale;
@@ -158,7 +159,15 @@ public final class ExtensionRegistry {
             return false;
         }
         try (JarFile jar = new JarFile(archive.toFile())) {
-            return jar.getJarEntry("META-INF/anilib-desktop-extension.properties") != null;
+            var marker = jar.getJarEntry("META-INF/anilib-desktop-extension.properties");
+            if (marker == null) {
+                return false;
+            }
+            Properties properties = new Properties();
+            try (var input = jar.getInputStream(marker)) {
+                properties.load(input);
+            }
+            return ExtensionBytecodeRelocator.FORMAT.equals(properties.getProperty("format"));
         } catch (IOException exception) {
             return false;
         }

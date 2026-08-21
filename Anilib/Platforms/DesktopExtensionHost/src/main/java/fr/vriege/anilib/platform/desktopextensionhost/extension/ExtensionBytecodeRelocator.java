@@ -9,6 +9,7 @@ import org.objectweb.asm.commons.Remapper;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldInsnNode;
+import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.InsnNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
@@ -36,6 +37,7 @@ import java.util.Arrays;
 import java.util.Locale;
 
 public final class ExtensionBytecodeRelocator {
+    static final String FORMAT = "2";
     private static final int MAX_ENTRIES = 25_000;
     private static final long MAX_EXPANDED_BYTES = 256L * 1024L * 1024L;
     private static final String TARGET = "fr/vriege/anilib/platform/desktopextensionhost/compat/";
@@ -87,7 +89,7 @@ public final class ExtensionBytecodeRelocator {
             putUnique(transformed, className, transformation.bytes());
         }
         putUnique(transformed, "META-INF/anilib-desktop-extension.properties",
-                ("format=1\nrelocatedClasses=" + relocatedClasses + "\nrepairs=" + repairs + "\n")
+                ("format=" + FORMAT + "\nrelocatedClasses=" + relocatedClasses + "\nrepairs=" + repairs + "\n")
                         .getBytes(StandardCharsets.UTF_8));
         writeEntries(output, transformed);
         return new RelocationResult(relocatedClasses, repairs, unresolved.stream().sorted().toList());
@@ -119,6 +121,7 @@ public final class ExtensionBytecodeRelocator {
             repairs += repairWrongConstructorOwners(node, classes);
             repairs += repairDirectObjectStores(node, classes);
             repairs += repairLocalObjectStores(node, classes);
+            repairs += repairBrokenStringLazyInitializers(node, classes);
         }
         return repairs;
     }
@@ -443,6 +446,102 @@ public final class ExtensionBytecodeRelocator {
                 && "<init>".equals(method.name)
                 && "java/lang/Object".equals(method.owner)
                 && "()V".equals(method.desc);
+    }
+
+    private static int repairBrokenStringLazyInitializers(
+            ClassNode owner,
+            Map<String, ClassNode> classes) {
+        if (owner.methods.stream().noneMatch(method -> "getBaseUrl".equals(method.name)
+                && "()Ljava/lang/String;".equals(method.desc))) {
+            return 0;
+        }
+        int repairs = 0;
+        for (MethodNode method : owner.methods) {
+            if (!"<init>".equals(method.name)) {
+                continue;
+            }
+            for (AbstractInsnNode instruction : method.instructions.toArray()) {
+                if (!(instruction instanceof TypeInsnNode created)
+                        || created.getOpcode() != Opcodes.NEW
+                        || !"java/lang/Object".equals(created.desc)) {
+                    continue;
+                }
+                AbstractInsnNode duplicate = nextMeaningful(created);
+                AbstractInsnNode constructor = nextMeaningful(duplicate);
+                AbstractInsnNode lazyCall = nextMeaningful(constructor);
+                AbstractInsnNode store = nextMeaningful(lazyCall);
+                if (duplicate == null || duplicate.getOpcode() != Opcodes.DUP
+                        || !(constructor instanceof MethodInsnNode initialized)
+                        || initialized.getOpcode() != Opcodes.INVOKESPECIAL
+                        || !"java/lang/Object".equals(initialized.owner)
+                        || !"<init>".equals(initialized.name)
+                        || !"()V".equals(initialized.desc)
+                        || !(lazyCall instanceof MethodInsnNode lazy)
+                        || lazy.getOpcode() != Opcodes.INVOKESTATIC
+                        || !"kotlin/LazyKt".equals(lazy.owner)
+                        || !"lazy".equals(lazy.name)
+                        || !"(Lkotlin/jvm/functions/Function0;)Lkotlin/Lazy;".equals(lazy.desc)
+                        || !(store instanceof FieldInsnNode field)
+                        || field.getOpcode() != Opcodes.PUTFIELD
+                        || !"Lkotlin/Lazy;".equals(field.desc)
+                        || !stringLazyField(classes, field.owner, field.name)) {
+                    continue;
+                }
+                InsnList replacement = new InsnList();
+                replacement.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                replacement.add(new MethodInsnNode(
+                        Opcodes.INVOKESTATIC,
+                        TARGET + "aniyomi/source/online/ExtensionLazySupport",
+                        "baseUrlHostInitializer",
+                        "(Ljava/lang/Object;)Ljava/lang/Object;",
+                        false));
+                replacement.add(new TypeInsnNode(Opcodes.CHECKCAST, "kotlin/jvm/functions/Function0"));
+                method.instructions.insertBefore(created, replacement);
+                method.instructions.remove(created);
+                method.instructions.remove(duplicate);
+                method.instructions.remove(constructor);
+                repairs++;
+            }
+        }
+        return repairs;
+    }
+
+    private static boolean stringLazyField(
+            Map<String, ClassNode> classes,
+            String owner,
+            String fieldName) {
+        for (ClassNode candidate : classes.values()) {
+            for (MethodNode method : candidate.methods) {
+                for (AbstractInsnNode instruction : method.instructions) {
+                    if (!(instruction instanceof FieldInsnNode field)
+                            || field.getOpcode() != Opcodes.GETFIELD
+                            || !owner.equals(field.owner)
+                            || !fieldName.equals(field.name)) {
+                        continue;
+                    }
+                    AbstractInsnNode getValue = nextMeaningful(field);
+                    AbstractInsnNode cast = nextMeaningful(getValue);
+                    if (getValue instanceof MethodInsnNode call
+                            && call.getOpcode() == Opcodes.INVOKEINTERFACE
+                            && "kotlin/Lazy".equals(call.owner)
+                            && "getValue".equals(call.name)
+                            && cast instanceof TypeInsnNode converted
+                            && converted.getOpcode() == Opcodes.CHECKCAST
+                            && "java/lang/String".equals(converted.desc)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    private static AbstractInsnNode nextMeaningful(AbstractInsnNode instruction) {
+        AbstractInsnNode current = instruction == null ? null : instruction.getNext();
+        while (current != null && current.getOpcode() < 0) {
+            current = current.getNext();
+        }
+        return current;
     }
 
     private static AbstractInsnNode previousMeaningful(AbstractInsnNode instruction) {

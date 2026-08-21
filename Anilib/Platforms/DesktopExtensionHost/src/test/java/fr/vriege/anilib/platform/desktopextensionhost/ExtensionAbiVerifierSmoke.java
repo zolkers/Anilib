@@ -3,6 +3,7 @@ package fr.vriege.anilib.platform.desktopextensionhost;
 import fr.vriege.anilib.platform.desktopextensionhost.extension.ExtensionAbiVerifier;
 import fr.vriege.anilib.platform.desktopextensionhost.extension.ExtensionRegistry;
 import fr.vriege.anilib.platform.desktopextensionhost.extension.ExtensionRuntimeCatalog;
+import fr.vriege.anilib.platform.desktopextensionhost.extension.ExtensionSourceOperations;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
@@ -100,10 +101,17 @@ final class ExtensionAbiVerifierSmoke {
         var installed = registry.install(apk);
         try (ExtensionRuntimeCatalog catalog = new ExtensionRuntimeCatalog(registry);
                 ExtensionRuntimeCatalog.Snapshot snapshot = catalog.discover()) {
-            if (!snapshot.failures().isEmpty()
-                    || snapshot.sources().stream().noneMatch(
-                            source -> source.packageName().equals(installed.metadata().packageName()))) {
+            var source = snapshot.sources().stream()
+                    .filter(candidate -> candidate.packageName().equals(installed.metadata().packageName()))
+                    .findFirst();
+            if (!snapshot.failures().isEmpty() || source.isEmpty()) {
                 throw new IllegalStateException("Installed extension runtime failed: " + snapshot.failures());
+            }
+            try (ExtensionSourceOperations operations = new ExtensionSourceOperations(catalog)) {
+                var page = operations.mangaCatalogue(source.orElseThrow().id(), "popular", 1, "");
+                if (page.getMangas().isEmpty()) {
+                    throw new IllegalStateException("Installed extension catalogue returned no manga");
+                }
             }
         }
     }

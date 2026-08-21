@@ -32,7 +32,8 @@ final class ExtensionRelocationSmoke {
             writeInput(input);
             ExtensionBytecodeRelocator.RelocationResult result =
                     new ExtensionBytecodeRelocator().relocate(input, output);
-            if (result.relocatedClasses() != 2 || !result.unresolvedPrefixes().isEmpty()) {
+            if (result.relocatedClasses() != 3 || result.repairedInstructions() != 3
+                    || !result.unresolvedPrefixes().isEmpty()) {
                 throw new IllegalStateException("Extension ABI relocation result is invalid: " + result);
             }
             try (JarFile jar = new JarFile(output.toFile())) {
@@ -43,7 +44,9 @@ final class ExtensionRelocationSmoke {
                         || !"sample/Extension".equals(new ClassReader(bytes).getClassName())) {
                     throw new IllegalStateException("Extension ABI was not relocated in class bytecode");
                 }
-                if (jar.getJarEntry("META-INF/anilib-desktop-extension.properties") == null) {
+                JarEntry marker = jar.getJarEntry("META-INF/anilib-desktop-extension.properties");
+                if (marker == null || !new String(jar.getInputStream(marker).readAllBytes(),
+                        StandardCharsets.UTF_8).contains("format=2")) {
                     throw new IllegalStateException("Prepared extension marker is missing");
                 }
             }
@@ -51,6 +54,11 @@ final class ExtensionRelocationSmoke {
                 Class<?> enumType = Class.forName("sample.BrokenEnum", true, loader);
                 if (enumType.getField("ITEM").get(null) == null) {
                     throw new IllegalStateException("Converted enum constant was not repaired");
+                }
+                Object lazy = Class.forName("sample.BrokenLazy", true, loader)
+                        .getConstructor().newInstance();
+                if (!"example.invalid".equals(lazy.getClass().getMethod("read").invoke(lazy))) {
+                    throw new IllegalStateException("Converted base URL host lazy was not repaired");
                 }
             } catch (ReflectiveOperationException exception) {
                 throw new IllegalStateException("Converted enum cannot be loaded", exception);
@@ -76,6 +84,7 @@ final class ExtensionRelocationSmoke {
             jar.write(writer.toByteArray());
             jar.closeEntry();
             writeBrokenEnum(jar);
+            writeBrokenLazy(jar);
         }
     }
 
@@ -99,6 +108,49 @@ final class ExtensionRelocationSmoke {
         initializer.visitEnd();
         writer.visitEnd();
         jar.putNextEntry(new JarEntry("sample/BrokenEnum.class"));
+        jar.write(writer.toByteArray());
+        jar.closeEntry();
+    }
+
+    private static void writeBrokenLazy(JarOutputStream jar) throws IOException {
+        ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+        writer.visit(Opcodes.V21, Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL,
+                "sample/BrokenLazy", null, "java/lang/Object", null);
+        writer.visitField(Opcodes.ACC_PRIVATE | Opcodes.ACC_FINAL,
+                "host", "Lkotlin/Lazy;", null, null).visitEnd();
+        var constructor = writer.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
+        constructor.visitCode();
+        constructor.visitVarInsn(Opcodes.ALOAD, 0);
+        constructor.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
+        constructor.visitVarInsn(Opcodes.ALOAD, 0);
+        constructor.visitTypeInsn(Opcodes.NEW, "java/lang/Object");
+        constructor.visitInsn(Opcodes.DUP);
+        constructor.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
+        constructor.visitMethodInsn(Opcodes.INVOKESTATIC, "kotlin/LazyKt", "lazy",
+                "(Lkotlin/jvm/functions/Function0;)Lkotlin/Lazy;", false);
+        constructor.visitFieldInsn(Opcodes.PUTFIELD, "sample/BrokenLazy", "host", "Lkotlin/Lazy;");
+        constructor.visitInsn(Opcodes.RETURN);
+        constructor.visitMaxs(0, 0);
+        constructor.visitEnd();
+        var baseUrl = writer.visitMethod(Opcodes.ACC_PUBLIC, "getBaseUrl",
+                "()Ljava/lang/String;", null, null);
+        baseUrl.visitCode();
+        baseUrl.visitLdcInsn("https://example.invalid/path");
+        baseUrl.visitInsn(Opcodes.ARETURN);
+        baseUrl.visitMaxs(1, 1);
+        baseUrl.visitEnd();
+        var read = writer.visitMethod(Opcodes.ACC_PUBLIC, "read", "()Ljava/lang/String;", null, null);
+        read.visitCode();
+        read.visitVarInsn(Opcodes.ALOAD, 0);
+        read.visitFieldInsn(Opcodes.GETFIELD, "sample/BrokenLazy", "host", "Lkotlin/Lazy;");
+        read.visitMethodInsn(Opcodes.INVOKEINTERFACE, "kotlin/Lazy", "getValue",
+                "()Ljava/lang/Object;", true);
+        read.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/String");
+        read.visitInsn(Opcodes.ARETURN);
+        read.visitMaxs(1, 1);
+        read.visitEnd();
+        writer.visitEnd();
+        jar.putNextEntry(new JarEntry("sample/BrokenLazy.class"));
         jar.write(writer.toByteArray());
         jar.closeEntry();
     }

@@ -4,6 +4,7 @@ import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.FetchType;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.SAnime;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.SEpisode;
+import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.network.NetworkHelper;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.source.model.MangasPage;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.source.model.SChapter;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.source.model.SManga;
@@ -38,6 +39,7 @@ final class ExtensionSourceModelSmoke {
             throw new IllegalStateException("Combined manga update ABI is invalid");
         }
         verifyReflectiveHeadersDelegate();
+        verifyDefaultNetworkInterceptors();
 
         SAnime anime = SAnime.Companion.create();
         anime.setUrl("/anime");
@@ -83,6 +85,18 @@ final class ExtensionSourceModelSmoke {
         }
         if (!"available".equals(source.getHeaders().get("X-Anilib-Compatibility"))) {
             throw new IllegalStateException("Reflective HTTP headers delegate was ignored");
+        }
+    }
+
+    private static void verifyDefaultNetworkInterceptors() {
+        List<String> names = NetworkHelper.shared().getClient().interceptors().stream()
+                .map(interceptor -> interceptor.getClass().getSimpleName())
+                .toList();
+        if (!names.equals(List.of(
+                "UncaughtExceptionInterceptor",
+                "UserAgentInterceptor",
+                "CloudflareInterceptor"))) {
+            throw new IllegalStateException("Default source network interceptors are invalid: " + names);
         }
     }
 
