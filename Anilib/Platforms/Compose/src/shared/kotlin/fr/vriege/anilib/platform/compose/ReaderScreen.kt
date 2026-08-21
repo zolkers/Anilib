@@ -97,6 +97,7 @@ import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
 private const val READER_CONTROLS_HIDE_DELAY_MILLIS = 3_500L
+private const val CONTINUOUS_PREFETCH_MARGIN = 5
 private val READER_ZOOM_STEPS = floatArrayOf(0.25f, 0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f, 2.5f, 3f, 4f, 5f)
 
 @Composable
@@ -133,12 +134,15 @@ internal fun ReaderScreen(
     var continuousPageIndex by remember(controller, snapshot.contentUnit().id()) {
         mutableIntStateOf(snapshot.currentPageIndex())
     }
-    val continuous = snapshot.direction() == ReadingDirection.VERTICAL ||
-        snapshot.direction() == ReadingDirection.WEBTOON
+    val mode = remember(snapshot.direction()) { ReaderMode.of(snapshot.direction()) }
+    val continuous = mode.continuous
     var continuousWindow by remember(controller) {
         mutableStateOf<List<ReaderWindowChapter>>(emptyList())
     }
     var continuousInitialPage by remember(controller) { mutableIntStateOf(0) }
+    // The window is published as soon as the current chapter is known, so opening a chapter costs
+    // one source call. Neighbours are pulled in afterwards, in the background, and only once the
+    // reader is close to a chapter edge - the same trade-off Aniyomi makes.
     CrashSafeLaunchedEffect(controller, continuous, revision) {
         if (!continuous) return@CrashSafeLaunchedEffect
         val resolved = withContext(Dispatchers.IO) {
@@ -146,6 +150,20 @@ internal fun ReaderScreen(
         } ?: return@CrashSafeLaunchedEffect
         if (continuousWindow.isEmpty()) continuousInitialPage = resolved.second
         continuousWindow = resolved.first
+    }
+    CrashSafeLaunchedEffect(controller, continuous, snapshot.contentUnit().id(), continuousPageIndex) {
+        if (!continuous) return@CrashSafeLaunchedEffect
+        val pageCount = snapshot.pageCount()
+        val nearEdge = continuousPageIndex <= CONTINUOUS_PREFETCH_MARGIN ||
+            continuousPageIndex >= pageCount - 1 - CONTINUOUS_PREFETCH_MARGIN
+        if (!nearEdge) return@CrashSafeLaunchedEffect
+        val grown = withContext(Dispatchers.IO) {
+            runCatching {
+                controller.prefetchNeighbours()
+                controller.window()
+            }.getOrNull()
+        } ?: return@CrashSafeLaunchedEffect
+        if (grown.size != continuousWindow.size) continuousWindow = grown
     }
     CrashSafeLaunchedEffect(controller, snapshot.contentUnit().id()) {
         contentUnits = null
@@ -355,7 +373,7 @@ internal fun ReaderScreen(
         .focusRequester(focusRequester)
         .focusable()
         .onPreviewKeyEvent { event ->
-            val command = resolveReaderKeyCommand(event, snapshot.direction(), continuous) ?: return@onPreviewKeyEvent false
+            val command = resolveReaderKeyCommand(event, mode) ?: return@onPreviewKeyEvent false
             handleKeyCommand(command)
             true
         }
@@ -393,7 +411,7 @@ internal fun ReaderScreen(
                         } else {
                             ReaderInteractionAction.NONE
                         }
-                        execute(horizontalAction(action, snapshot.direction()))
+                        execute(horizontalAction(action, mode))
                     },
                 )
             }
@@ -402,7 +420,7 @@ internal fun ReaderScreen(
         val reducedMotion = LocalReducedMotion.current
         Box(modifier = Modifier.fillMaxSize().clipToBounds()) {
             Box(
-                modifier = if (continuous) {
+                modifier = if (!mode.twoAxisZoom) {
                     // Continuous reading zooms the page width only; height follows from the page
                     // aspect ratio, so the scroll keeps its natural feel at any zoom level.
                     Modifier.fillMaxSize()
@@ -472,7 +490,7 @@ internal fun ReaderScreen(
 
         if (!continuous) {
             ReaderTapZones(
-                direction = snapshot.direction(),
+                mode = mode,
                 interactions = interactions,
                 execute = ::execute,
             )
@@ -823,19 +841,19 @@ private fun readerColorFilter(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ReaderTapZones(
-    direction: ReadingDirection,
+    mode: ReaderMode,
     interactions: ReaderInteractionPreferences,
     execute: (ReaderInteractionAction) -> Unit,
 ) {
-    if (direction == ReadingDirection.VERTICAL || direction == ReadingDirection.WEBTOON) {
+    if (mode.continuous) {
         Column(modifier = Modifier.fillMaxSize()) {
             ReaderTapZone(Modifier.weight(0.36f).fillMaxWidth(), interactions.topTap(), interactions, execute)
             ReaderTapZone(Modifier.weight(0.28f).fillMaxWidth(), interactions.centerTap(), interactions, execute)
             ReaderTapZone(Modifier.weight(0.36f).fillMaxWidth(), interactions.bottomTap(), interactions, execute)
         }
     } else {
-        val left = horizontalAction(interactions.leftTap(), direction)
-        val right = horizontalAction(interactions.rightTap(), direction)
+        val left = horizontalAction(interactions.leftTap(), mode)
+        val right = horizontalAction(interactions.rightTap(), mode)
         Row(modifier = Modifier.fillMaxSize()) {
             ReaderTapZone(Modifier.weight(0.36f).fillMaxHeight(), left, interactions, execute)
             ReaderTapZone(Modifier.weight(0.28f).fillMaxHeight(), interactions.centerTap(), interactions, execute)
@@ -1487,9 +1505,9 @@ private fun nextAction(action: ReaderInteractionAction): ReaderInteractionAction
 
 private fun horizontalAction(
     action: ReaderInteractionAction,
-    direction: ReadingDirection,
+    mode: ReaderMode,
 ): ReaderInteractionAction {
-    if (direction != ReadingDirection.RIGHT_TO_LEFT) return action
+    if (!mode.mirrored) return action
     return when (action) {
         ReaderInteractionAction.PREVIOUS_PAGE -> ReaderInteractionAction.NEXT_PAGE
         ReaderInteractionAction.NEXT_PAGE -> ReaderInteractionAction.PREVIOUS_PAGE

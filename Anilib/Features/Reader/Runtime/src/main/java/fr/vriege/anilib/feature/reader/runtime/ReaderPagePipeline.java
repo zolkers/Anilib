@@ -34,6 +34,20 @@ final class ReaderPagePipeline implements AutoCloseable {
         this.executor = Objects.requireNonNull(executor, "executor must not be null");
     }
 
+    /**
+     * Starts fetching pages around {@code index} without waiting for any of them. Called when a
+     * session opens so a chapter begins downloading immediately instead of only after the first
+     * blocking read returns.
+     */
+    synchronized void warmUp(int index) {
+        if (pages.isEmpty()) {
+            return;
+        }
+        int start = Math.max(0, Math.min(index, pages.size() - 1));
+        prefetch(start);
+        prefetchAround(start);
+    }
+
     byte[] load(int index) {
         validateIndex(index);
         CompletableFuture<byte[]> pageFuture;

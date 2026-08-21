@@ -36,6 +36,13 @@ import java.util.UUID;
 import java.util.function.Function;
 
 public final class DefaultReaderService implements ReaderService, ReaderContentRegistrar, AutoCloseable {
+    /**
+     * Page reads are network-bound and several are in flight at once in continuous reading, where
+     * the viewport shows multiple pages and neighbouring chapters share this pool.
+     */
+    private static final int READER_PAGE_THREADS =
+            Math.min(8, Math.max(4, Runtime.getRuntime().availableProcessors()));
+
     private final SourceRegistry sources;
     private final LibraryCatalog library;
     private final ReaderPolicy policy;
@@ -60,7 +67,7 @@ public final class DefaultReaderService implements ReaderService, ReaderContentR
                 library,
                 policy,
                 Clock.systemUTC(),
-                ManagedExecutors.fixed("anilib-reader", 2),
+                ManagedExecutors.fixed("anilib-reader", READER_PAGE_THREADS),
                 persistenceAllowed);
     }
 
@@ -149,6 +156,7 @@ public final class DefaultReaderService implements ReaderService, ReaderContentR
                 .orElseThrow(() -> new ReaderException("Requested content unit was not found for this title"));
         List<SourcePageResource> pages = validatedPages(source, unit);
         ReaderPagePipeline pipeline = new ReaderPagePipeline(source::readPage, pages, policy, pageExecutor);
+        pipeline.warmUp(0);
         LibraryItemId transientId = new LibraryItemId("transient-reader-" + UUID.randomUUID());
         DefaultReaderSession[] holder = new DefaultReaderSession[1];
         DefaultReaderSession session = new DefaultReaderSession(
@@ -227,6 +235,7 @@ public final class DefaultReaderService implements ReaderService, ReaderContentR
                     initialPage)));
         }
         ReaderPagePipeline pipeline = new ReaderPagePipeline(pageReader, pages, policy, pageExecutor);
+        pipeline.warmUp(initialPage);
         DefaultReaderSession[] holder = new DefaultReaderSession[1];
         DefaultReaderSession session = new DefaultReaderSession(
                 library,

@@ -223,8 +223,11 @@ fun AnilibApp(
                 // Sources list episodes newest first, so the neighbour towards index 0 is the
                 // next episode and the one after it is the previous, matching the reader.
                 var episodeNeighbours by remember(playerController) {
-                    mutableStateOf<Pair<(() -> Unit)?, (() -> Unit)?>>(null to null)
+                    mutableStateOf<Pair<SourceEpisodeId?, SourceEpisodeId?>>(null to null)
                 }
+                // Guards the native player: opening a second session while one is still
+                // initialising tears the first down mid-init and faults the video layer.
+                var episodeSwitching by remember(playerController) { mutableStateOf(false) }
                 CrashSafeLaunchedEffect(playerController) {
                     val current = runCatching { playerController.snapshot() }.getOrNull()
                         ?: return@CrashSafeLaunchedEffect
@@ -233,25 +236,41 @@ fun AnilibApp(
                     }
                     val index = episodes.indexOfFirst { it.episode().id() == current.episode().id() }
                     if (index < 0) return@CrashSafeLaunchedEffect
-                    val switchTo: (SourceEpisodeId) -> () -> Unit = { episodeId ->
-                        {
+                    episodeNeighbours = episodes.getOrNull(index - 1)?.episode()?.id() to
+                        episodes.getOrNull(index + 1)?.episode()?.id()
+                }
+                val switchEpisode: (SourceEpisodeId) -> () -> Unit = { episodeId ->
+                    {
+                        val current = runCatching { playerController.snapshot() }.getOrNull()
+                        if (current != null && !episodeSwitching) {
+                            episodeSwitching = true
+                            val request = PendingPlayerRequest(Any(), current.title())
+                            pendingPlayer = request
                             scope.launch {
                                 withContext(Dispatchers.IO) {
                                     runCatching { player.open(current.libraryItemId(), episodeId) }
                                 }
-                                    .onSuccess {
-                                        playerError = null
-                                        activePlayer = it
+                                    .onSuccess { opened ->
+                                        if (pendingPlayer?.token === request.token) {
+                                            playerError = null
+                                            pendingPlayer = null
+                                            activePlayer = opened
+                                        } else {
+                                            // Superseded while opening: never install it.
+                                            opened.close()
+                                        }
                                     }
                                     .onFailure {
-                                        playerError = it.message ?: "The episode could not be opened."
+                                        if (pendingPlayer?.token === request.token) {
+                                            pendingPlayer = null
+                                            playerError = it.message
+                                                ?: "The episode could not be opened."
+                                        }
                                     }
+                                episodeSwitching = false
                             }
                         }
                     }
-                    episodeNeighbours =
-                        episodes.getOrNull(index - 1)?.episode()?.id()?.let(switchTo) to
-                            episodes.getOrNull(index + 1)?.episode()?.id()?.let(switchTo)
                 }
                 PlayerSelectionScreen(
                     playerController,
@@ -263,8 +282,12 @@ fun AnilibApp(
                     setPlayerBackgroundAudio,
                     enableAndroidPlayerControls,
                     enableDesktopPlayerControls,
-                    nextEpisode = episodeNeighbours.first,
-                    previousEpisode = episodeNeighbours.second,
+                    nextEpisode = episodeNeighbours.first
+                        ?.takeUnless { episodeSwitching }
+                        ?.let(switchEpisode),
+                    previousEpisode = episodeNeighbours.second
+                        ?.takeUnless { episodeSwitching }
+                        ?.let(switchEpisode),
                 ) {
                     activePlayer = null
                 }
