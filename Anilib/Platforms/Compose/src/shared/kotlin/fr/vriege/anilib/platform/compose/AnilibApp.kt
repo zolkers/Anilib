@@ -1,7 +1,13 @@
 package fr.vriege.anilib.platform.compose
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -36,10 +42,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.ViewList
+import androidx.compose.material.icons.filled.AddCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CollectionsBookmark
+import androidx.compose.material.icons.filled.CreateNewFolder
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -47,6 +58,7 @@ import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.NewReleases
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.RemoveCircle
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.GridView
@@ -88,6 +100,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -101,6 +114,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -170,6 +184,7 @@ import java.time.format.FormatStyle
 import java.util.Locale
 import java.util.Optional
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
@@ -1060,7 +1075,7 @@ private fun LibraryPageContent(
             categories = scopedCategories,
             dismiss = { categoryAction = false },
             create = { value ->
-                update {
+                try {
                     presentation.createCategory(
                         value,
                         if (kind == MediaKind.ANIME) {
@@ -1070,15 +1085,30 @@ private fun LibraryPageContent(
                         },
                     )
                     presentation.addToCategory(selected, value)
+                } finally {
+                    revision++
                 }
             },
             add = { value ->
-                update { presentation.addToCategory(selected, value) }
-                categoryAction = false
+                try {
+                    presentation.addToCategory(selected, value)
+                } finally {
+                    revision++
+                }
             },
             remove = { value ->
-                update { presentation.removeFromCategory(selected, value) }
-                categoryAction = false
+                try {
+                    presentation.removeFromCategory(selected, value)
+                } finally {
+                    revision++
+                }
+            },
+            delete = { value ->
+                try {
+                    presentation.deleteCategory(value)
+                } finally {
+                    revision++
+                }
             },
         )
     }
@@ -1129,51 +1159,300 @@ private fun BulkCategoryDialog(
     create: (String) -> Unit,
     add: (String) -> Unit,
     remove: (String) -> Unit,
+    delete: (String) -> Unit,
+) {
+    CategoryAssignmentDialog(
+        categories = categories,
+        assignedCategories = null,
+        dismiss = dismiss,
+        create = create,
+        add = add,
+        remove = remove,
+        delete = delete,
+    )
+}
+
+private enum class CategoryActionFeedbackType {
+    ADDED,
+    REMOVED,
+}
+
+private data class CategoryActionFeedback(
+    val category: String,
+    val type: CategoryActionFeedbackType,
+    val sequence: Int,
+)
+
+@Composable
+private fun CategoryAssignmentDialog(
+    categories: List<String>,
+    assignedCategories: Collection<String>?,
+    dismiss: () -> Unit,
+    create: (String) -> Unit,
+    add: (String) -> Unit,
+    remove: (String) -> Unit,
+    delete: (String) -> Unit,
 ) {
     var newCategory by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
+    var feedback by remember { mutableStateOf<CategoryActionFeedback?>(null) }
+    var feedbackSequence by remember { mutableStateOf(0) }
+    var categoryPendingDeletion by remember { mutableStateOf<String?>(null) }
+    val reducedMotion = LocalReducedMotion.current
+    val normalizedNewCategory = newCategory.trim()
+    val categoryAlreadyExists = normalizedNewCategory in categories
+
+    fun showFeedback(category: String, type: CategoryActionFeedbackType) {
+        feedbackSequence++
+        feedback = CategoryActionFeedback(category, type, feedbackSequence)
+    }
+
+    fun perform(action: () -> Unit, completed: () -> Unit = {}) {
+        runCatching(action)
+            .onSuccess {
+                error = null
+                completed()
+            }
+            .onFailure { failure ->
+                error = failure.message ?: "ui.unable.to.update.categories"
+            }
+    }
+
+    fun createNewCategory() {
+        if (normalizedNewCategory.isEmpty() || categoryAlreadyExists) return
+        val category = normalizedNewCategory
+        perform(
+            action = { create(category) },
+            completed = {
+                newCategory = ""
+                showFeedback(category, CategoryActionFeedbackType.ADDED)
+            },
+        )
+    }
+
+    LaunchedEffect(feedback) {
+        if (feedback != null) {
+            if (!reducedMotion) delay(700)
+            feedback = null
+        }
+    }
+
     AlertDialog(
         onDismissRequest = dismiss,
-        title = { Text("ui.update.categories") },
+        title = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("ui.update.categories", modifier = Modifier.weight(1f))
+                IconButton(onClick = dismiss) {
+                    Icon(Icons.Default.Close, contentDescription = "ui.close")
+                }
+            }
+        },
         text = {
-            Column {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    if (assignedCategories == null) {
+                        "ui.manage.categories.for.selected.titles"
+                    } else {
+                        "ui.select.categories.for.this.title"
+                    },
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 OutlinedTextField(
                     value = newCategory,
                     onValueChange = { newCategory = it },
                     label = { Text("ui.category.name") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                TextButton(
-                    enabled = newCategory.isNotBlank(),
-                    onClick = {
-                        create(newCategory.trim())
-                        newCategory = ""
+                    supportingText = if (categoryAlreadyExists) {
+                        { Text("ui.category.already.exists") }
+                    } else {
+                        null
                     },
-                    modifier = Modifier.align(Alignment.End),
-                ) {
-                    Text("ui.create.category")
-                }
-                categories.forEach { category ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(category, modifier = Modifier.weight(1f))
-                        TextButton(onClick = { add(category) }) {
-                            Text("ui.add")
+                    isError = categoryAlreadyExists,
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { createNewCategory() }),
+                    modifier = Modifier.fillMaxWidth(),
+                    trailingIcon = {
+                        IconButton(
+                            enabled = normalizedNewCategory.isNotEmpty() && !categoryAlreadyExists,
+                            onClick = ::createNewCategory,
+                        ) {
+                            Icon(
+                                Icons.Default.CreateNewFolder,
+                                contentDescription = "ui.create.category",
+                            )
                         }
-                        TextButton(onClick = { remove(category) }) {
-                            Text("ui.remove")
+                    },
+                )
+                if (categories.isEmpty()) {
+                    Text(
+                        "ui.no.categories.for.this.library.type",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    Text(
+                        UiTranslations.format(
+                            "dynamic.categories.count",
+                            LocalLanguagePack.current,
+                            categories.size,
+                        ),
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        items(categories, key = { it }) { category ->
+                            val assigned = assignedCategories?.let { category in it }
+                            val rowFeedback = feedback?.takeIf { it.category == category }
+                            val feedbackColor by animateColorAsState(
+                                targetValue = when {
+                                    !reducedMotion && rowFeedback?.type == CategoryActionFeedbackType.ADDED -> {
+                                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
+                                    }
+                                    !reducedMotion && rowFeedback?.type == CategoryActionFeedbackType.REMOVED -> {
+                                        MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.55f)
+                                    }
+                                    assigned == true -> {
+                                        MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f)
+                                    }
+                                    else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                                },
+                                animationSpec = tween(durationMillis = if (reducedMotion) 0 else 220),
+                                label = "category-action-feedback",
+                            )
+                            fun addToCategory() {
+                                perform(
+                                    action = { add(category) },
+                                    completed = {
+                                        showFeedback(category, CategoryActionFeedbackType.ADDED)
+                                    },
+                                )
+                            }
+                            fun removeFromCategory() {
+                                perform(
+                                    action = { remove(category) },
+                                    completed = {
+                                        showFeedback(category, CategoryActionFeedbackType.REMOVED)
+                                    },
+                                )
+                            }
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(feedbackColor)
+                                    .clickable(enabled = assigned != null) {
+                                        if (assigned == true) removeFromCategory() else addToCategory()
+                                    }
+                                    .padding(horizontal = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    category,
+                                    modifier = Modifier.weight(1f).padding(vertical = 10.dp),
+                                    fontWeight = if (assigned == true) FontWeight.SemiBold else null,
+                                )
+                                Box(
+                                    modifier = Modifier.size(24.dp),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    val indicator = when {
+                                        rowFeedback?.type == CategoryActionFeedbackType.REMOVED -> {
+                                            CategoryActionFeedbackType.REMOVED
+                                        }
+                                        assigned == true || rowFeedback != null -> CategoryActionFeedbackType.ADDED
+                                        else -> null
+                                    }
+                                    Crossfade(
+                                        targetState = indicator,
+                                        animationSpec = tween(if (reducedMotion) 0 else 180),
+                                        label = "category-state-indicator",
+                                    ) { state ->
+                                        if (state != null) {
+                                            Icon(
+                                                if (state == CategoryActionFeedbackType.REMOVED) {
+                                                    Icons.Default.RemoveCircle
+                                                } else {
+                                                    Icons.Default.CheckCircle
+                                                },
+                                                contentDescription = null,
+                                                tint = if (state == CategoryActionFeedbackType.REMOVED) {
+                                                    MaterialTheme.colorScheme.error
+                                                } else {
+                                                    MaterialTheme.colorScheme.primary
+                                                },
+                                            )
+                                        }
+                                    }
+                                }
+                                if (assigned == null) {
+                                    IconButton(onClick = ::addToCategory) {
+                                        Icon(Icons.Default.AddCircle, contentDescription = "ui.add")
+                                    }
+                                    IconButton(onClick = ::removeFromCategory) {
+                                        Icon(Icons.Default.RemoveCircle, contentDescription = "ui.remove")
+                                    }
+                                } else {
+                                    IconButton(
+                                        onClick = {
+                                            if (assigned) removeFromCategory() else addToCategory()
+                                        },
+                                    ) {
+                                        Icon(
+                                            if (assigned) Icons.Default.RemoveCircle else Icons.Default.AddCircle,
+                                            contentDescription = if (assigned) "ui.remove" else "ui.add",
+                                        )
+                                    }
+                                }
+                                IconButton(onClick = { categoryPendingDeletion = category }) {
+                                    Icon(
+                                        Icons.Default.Delete,
+                                        contentDescription = "ui.delete.category",
+                                        tint = MaterialTheme.colorScheme.error,
+                                    )
+                                }
+                            }
                         }
                     }
                 }
+                error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }
         },
         confirmButton = {},
-        dismissButton = {
-            TextButton(onClick = dismiss) { Text("ui.close") }
-        },
     )
+    categoryPendingDeletion?.let { category ->
+        AlertDialog(
+            onDismissRequest = { categoryPendingDeletion = null },
+            title = {
+                Text(UiTranslations.format("dynamic.delete.category", LocalLanguagePack.current, category))
+            },
+            text = { Text("ui.titles.stay.in.the.library.and.lose.this.category.assignment") },
+            confirmButton = {
+                IconButton(
+                    onClick = {
+                        perform(
+                            action = { delete(category) },
+                            completed = { categoryPendingDeletion = null },
+                        )
+                    },
+                ) {
+                    Icon(
+                        Icons.Default.DeleteForever,
+                        contentDescription = "ui.delete",
+                        tint = MaterialTheme.colorScheme.error,
+                    )
+                }
+            },
+            dismissButton = {
+                IconButton(onClick = { categoryPendingDeletion = null }) {
+                    Icon(Icons.Default.Close, contentDescription = "ui.cancel")
+                }
+            },
+        )
+    }
 }
 
 @Composable
@@ -1815,9 +2094,41 @@ private fun DetailsDestination(
                 presentation.editTitle(details.id(), title, metadata)
                 revision++
             },
-            setCategories = { selected ->
-                presentation.setTitleCategories(details.id(), selected)
-                revision++
+            createCategory = { value ->
+                try {
+                    presentation.createCategory(
+                        value,
+                        if (details.kind() == MediaKind.ANIME) {
+                            LibraryCategoryScope.ANIME
+                        } else {
+                            LibraryCategoryScope.MANGA
+                        },
+                    )
+                    presentation.addToCategory(setOf(details.id()), value)
+                } finally {
+                    revision++
+                }
+            },
+            addCategory = { value ->
+                try {
+                    presentation.addToCategory(setOf(details.id()), value)
+                } finally {
+                    revision++
+                }
+            },
+            removeCategory = { value ->
+                try {
+                    presentation.removeFromCategory(setOf(details.id()), value)
+                } finally {
+                    revision++
+                }
+            },
+            deleteCategory = { value ->
+                try {
+                    presentation.deleteCategory(value)
+                } finally {
+                    revision++
+                }
             },
             openTitleWeb = titlePage?.let { page -> ({ browserPage = page }) },
             openSourceWeb = sourcePage?.let { page -> ({ browserPage = page }) },
@@ -1862,7 +2173,10 @@ private fun DetailsPage(
     track: () -> Unit,
     favorite: () -> Unit,
     edit: (String, LibraryTitleMetadata) -> Unit,
-    setCategories: (Set<String>) -> Unit,
+    createCategory: (String) -> Unit,
+    addCategory: (String) -> Unit,
+    removeCategory: (String) -> Unit,
+    deleteCategory: (String) -> Unit,
     openTitleWeb: (() -> Unit)?,
     openSourceWeb: (() -> Unit)?,
     share: () -> Unit,
@@ -1978,10 +2292,10 @@ private fun DetailsPage(
             details = details,
             categories = categories,
             dismiss = { editingCategories = false },
-            save = { selected ->
-                setCategories(selected)
-                editingCategories = false
-            },
+            create = createCategory,
+            add = addCategory,
+            remove = removeCategory,
+            delete = deleteCategory,
         )
     }
 }
@@ -1991,71 +2305,21 @@ private fun TitleCategoriesDialog(
     details: LibraryDetails,
     categories: List<LibraryCategory>,
     dismiss: () -> Unit,
-    save: (Set<String>) -> Unit,
+    create: (String) -> Unit,
+    add: (String) -> Unit,
+    remove: (String) -> Unit,
+    delete: (String) -> Unit,
 ) {
-    var selected by remember(details.id(), categories) {
-        mutableStateOf<Set<String>>(
-            details.categories().filterTo(linkedSetOf()) { name ->
-                categories.any { it.name() == name }
-            },
-        )
-    }
-    var error by remember(details.id()) { mutableStateOf<String?>(null) }
-    AlertDialog(
-        onDismissRequest = dismiss,
-        title = { Text("ui.categories") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (categories.isEmpty()) {
-                    Text("ui.no.categories.for.this.library.type")
-                } else {
-                    Text(
-                        "ui.select.categories.for.this.title",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp)) {
-                        items(categories, key = LibraryCategory::name) { category ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        selected = selected.toggleCategory(category.name())
-                                    }
-                                    .padding(vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Checkbox(
-                                    checked = category.name() in selected,
-                                    onCheckedChange = {
-                                        selected = selected.toggleCategory(category.name())
-                                    },
-                                )
-                                Text(
-                                    category.name(),
-                                    modifier = Modifier.weight(1f).padding(start = 8.dp),
-                                )
-                            }
-                        }
-                    }
-                }
-                error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                enabled = categories.isNotEmpty(),
-                onClick = {
-                    runCatching { save(selected) }
-                        .onFailure { error = it.message ?: "ui.unable.to.update.categories" }
-                },
-            ) { Text("ui.save") }
-        },
-        dismissButton = { TextButton(onClick = dismiss) { Text("ui.cancel") } },
+    CategoryAssignmentDialog(
+        categories = categories.map(LibraryCategory::name),
+        assignedCategories = details.categories(),
+        dismiss = dismiss,
+        create = create,
+        add = add,
+        remove = remove,
+        delete = delete,
     )
 }
-
-private fun Set<String>.toggleCategory(value: String): Set<String> =
-    if (value in this) this - value else this + value
 
 @Composable
 private fun RelatedTitlesSection(

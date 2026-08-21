@@ -24,6 +24,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performMultiModalInput
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.printToString
 import androidx.compose.ui.test.pinch
 import androidx.compose.ui.test.v2.runComposeUiTest
@@ -145,6 +146,17 @@ class UiRouteScreenshotTest {
                 onNodeWithText("Acceptance manga").performClick()
                 waitForContentDescription("Read")
                 captureStable("Manga details with local chapters")
+                onNodeWithContentDescription("Categories").performClick()
+                waitForText("Update categories")
+                onNodeWithText("Category name").performTextInput("Reading")
+                onNodeWithContentDescription("Create category").performClick()
+                waitForText("Reading")
+                onNodeWithContentDescription("Delete category").performClick()
+                waitForText("Delete Reading?")
+                onNodeWithContentDescription("Delete").performClick()
+                waitForText("No categories are configured for this library type.")
+                onNodeWithContentDescription("Close").performClick()
+                waitForContentDescription("Read")
                 onNodeWithContentDescription("Read").performClick()
                 waitForContentDescription("Close reader")
                 captureStable("Reader with decoded local page")
