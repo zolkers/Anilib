@@ -37,6 +37,7 @@ public final class ReaderController implements AutoCloseable {
     private ReaderSession session;
     private ReaderSession olderSession;
     private ReaderSession newerSession;
+    private SourceContentUnitId neighboursResolvedFor;
 
     ReaderController(
             ReaderService reader,
@@ -226,25 +227,21 @@ public final class ReaderController implements AutoCloseable {
     public byte[] windowPage(int globalPage) {
         ReaderSession target;
         int local;
+        // Resolve the owning session under the lock, then read the page outside it: page loads hit
+        // the network or disk and must never serialise behind the controller monitor.
         synchronized (this) {
             refreshNeighbours();
-            int offset = 0;
-            if (olderSession != null) {
-                int count = olderSession.snapshot().pageCount();
-                if (globalPage < count) {
-                    target = olderSession;
-                    local = globalPage;
-                    return target.page(local);
-                }
-                offset = count;
-            }
+            int olderCount = olderSession == null ? 0 : olderSession.snapshot().pageCount();
             int currentCount = session.snapshot().pageCount();
-            if (globalPage < offset + currentCount) {
+            if (globalPage < olderCount) {
+                target = olderSession;
+                local = globalPage;
+            } else if (globalPage < olderCount + currentCount) {
                 target = session;
-                local = globalPage - offset;
+                local = globalPage - olderCount;
             } else if (newerSession != null) {
                 target = newerSession;
-                local = globalPage - offset - currentCount;
+                local = globalPage - olderCount - currentCount;
             } else {
                 throw new IllegalArgumentException("globalPage must address a page inside the window");
             }
@@ -295,22 +292,27 @@ public final class ReaderController implements AutoCloseable {
             newerSession = displaced;
             olderSession = null;
         }
+        neighboursResolvedFor = null;
         session.goToPage(pageIndex);
         markReadWhenComplete();
         refreshNeighbours();
     }
 
     private void refreshNeighbours() {
-        if (olderSession != null && newerSession != null) {
+        SourceContentUnitId current = session.snapshot().contentUnit().id();
+        // Resolve at most once per chapter. Without this the lookup below re-runs for every page
+        // read whenever a neighbour is legitimately absent (first or last chapter), turning each
+        // page load into a fresh source query.
+        if (current.equals(neighboursResolvedFor)) {
             return;
         }
+        neighboursResolvedFor = current;
         List<SourceContentUnit> units;
         try {
             units = contentUnits();
         } catch (RuntimeException ignored) {
             return;
         }
-        SourceContentUnitId current = session.snapshot().contentUnit().id();
         int index = -1;
         for (int candidate = 0; candidate < units.size(); candidate++) {
             if (units.get(candidate).id().equals(current)) {
@@ -342,6 +344,7 @@ public final class ReaderController implements AutoCloseable {
     }
 
     private void closeNeighbours() {
+        neighboursResolvedFor = null;
         if (olderSession != null) {
             olderSession.close();
             olderSession = null;

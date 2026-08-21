@@ -57,6 +57,7 @@ internal fun ReaderContinuousPages(
     direction: ReadingDirection,
     display: ReaderDisplayPreferences,
     revision: Int,
+    widthScale: Float,
     scrollTarget: Int?,
     consumeScrollTarget: () -> Unit,
     scrollStep: Int?,
@@ -111,6 +112,7 @@ internal fun ReaderContinuousPages(
             onDoubleClick = toggleZoom,
         ),
         verticalArrangement = Arrangement.spacedBy(spacing),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         items(entries.size, key = { entries[it].key }) { index ->
             when (val entry = entries[index]) {
@@ -123,6 +125,7 @@ internal fun ReaderContinuousPages(
                     direction = direction,
                     display = display,
                     revision = revision,
+                    widthScale = widthScale,
                     knownAspectRatio = pageAspectRatios[entry.key],
                     rememberAspectRatio = { pageAspectRatios[entry.key] = it },
                 )
@@ -185,6 +188,7 @@ private fun ReaderContinuousPage(
     direction: ReadingDirection,
     display: ReaderDisplayPreferences,
     revision: Int,
+    widthScale: Float,
     knownAspectRatio: Float?,
     rememberAspectRatio: (Float) -> Unit,
 ) {
@@ -220,7 +224,9 @@ private fun ReaderContinuousPage(
                     zoomed = false,
                     splitSecondHalf = false,
                     direction = direction,
-                    modifier = Modifier.fillMaxWidth().aspectRatio(image.width.toFloat() / image.height),
+                    modifier = Modifier
+                        .fillMaxWidth(widthScale.coerceIn(0.25f, 1f))
+                        .aspectRatio(image.width.toFloat() / image.height),
                 )
             },
             onFailure = { failure ->

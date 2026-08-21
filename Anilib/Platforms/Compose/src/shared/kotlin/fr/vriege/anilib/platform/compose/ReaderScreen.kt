@@ -402,14 +402,18 @@ internal fun ReaderScreen(
         val reducedMotion = LocalReducedMotion.current
         Box(modifier = Modifier.fillMaxSize().clipToBounds()) {
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer(
+                modifier = if (continuous) {
+                    // Continuous reading zooms the page width only; height follows from the page
+                    // aspect ratio, so the scroll keeps its natural feel at any zoom level.
+                    Modifier.fillMaxSize()
+                } else {
+                    Modifier.fillMaxSize().graphicsLayer(
                         scaleX = zoomScale,
                         scaleY = zoomScale,
                         translationX = zoomOffset.x,
                         translationY = zoomOffset.y,
-                    ),
+                    )
+                },
             ) {
                 if (continuous) {
                     // Deliberately not keyed on the chapter: the window spans neighbouring
@@ -422,6 +426,7 @@ internal fun ReaderScreen(
                         direction = snapshot.direction(),
                         display = display,
                         revision = revision,
+                        widthScale = zoomScale,
                         scrollTarget = continuousScrollTarget,
                         consumeScrollTarget = { continuousScrollTarget = null },
                         scrollStep = continuousScrollStep,
