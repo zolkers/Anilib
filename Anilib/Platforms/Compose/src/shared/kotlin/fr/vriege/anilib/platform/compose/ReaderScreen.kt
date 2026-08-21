@@ -486,6 +486,8 @@ internal fun ReaderScreen(
                 splitSecondHalf = splitSecondHalf,
                 dualPage = display.dualPage(),
                 splitPages = display.splitPages(),
+                previousChapter = { moveContentUnit(false) },
+                nextChapter = { moveContentUnit(true) },
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
         } else {
@@ -1486,9 +1488,12 @@ private fun ReaderBottomBar(
     splitSecondHalf: Boolean,
     dualPage: Boolean,
     splitPages: Boolean,
+    previousChapter: () -> Unit,
+    nextChapter: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var sliderValue by remember(pageIndex, pageCount) { mutableFloatStateOf(pageIndex.toFloat()) }
+    val language = LocalLanguagePack.current
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -1496,7 +1501,13 @@ private fun ReaderBottomBar(
             .padding(horizontal = 18.dp, vertical = 8.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.ChevronLeft, contentDescription = null, tint = Color.White)
+            IconButton(onClick = previousChapter) {
+                Icon(
+                    Icons.Default.ChevronLeft,
+                    contentDescription = UiTranslations.translate("ui.previous.chapter", language),
+                    tint = Color.White,
+                )
+            }
             Slider(
                 value = sliderValue,
                 onValueChange = { sliderValue = it },
@@ -1506,7 +1517,13 @@ private fun ReaderBottomBar(
                 enabled = pageCount > 1,
                 modifier = Modifier.weight(1f),
             )
-            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.White)
+            IconButton(onClick = nextChapter) {
+                Icon(
+                    Icons.Default.ChevronRight,
+                    contentDescription = UiTranslations.translate("ui.next.chapter", language),
+                    tint = Color.White,
+                )
+            }
         }
         Text(
             text = readerPageLabel(

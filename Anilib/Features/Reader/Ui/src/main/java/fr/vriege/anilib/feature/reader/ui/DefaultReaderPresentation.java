@@ -11,6 +11,7 @@ import fr.vriege.anilib.feature.source.SourceContentUnitId;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 public final class DefaultReaderPresentation implements ReaderPresentation {
     private final ReaderService reader;
@@ -32,6 +33,11 @@ public final class DefaultReaderPresentation implements ReaderPresentation {
     @Override
     public boolean canOpen(LibraryItemId libraryItemId) {
         return reader.canOpen(libraryItemId);
+    }
+
+    @Override
+    public Set<String> readContentIds(LibraryItemId libraryItemId) {
+        return readState.readContentIds(libraryItemId);
     }
 
     @Override

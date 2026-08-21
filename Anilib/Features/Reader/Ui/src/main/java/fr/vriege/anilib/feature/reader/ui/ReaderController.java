@@ -80,10 +80,15 @@ public final class ReaderController implements AutoCloseable {
 
     public void goToPage(int index) {
         session.goToPage(index);
+        markReadWhenComplete();
     }
 
     public boolean nextPage() {
-        return session.nextPage();
+        boolean moved = session.nextPage();
+        if (moved) {
+            markReadWhenComplete();
+        }
+        return moved;
     }
 
     public boolean previousPage() {
@@ -183,10 +188,24 @@ public final class ReaderController implements AutoCloseable {
                     return false;
                 }
                 openContentUnit(units.get(target).id());
+                if (delta < 0) {
+                    // Reading backwards lands on the last page so the chapter continues seamlessly.
+                    session.goToPage(session.snapshot().pageCount() - 1);
+                }
                 return true;
             }
         }
         return false;
+    }
+
+    private void markReadWhenComplete() {
+        if (libraryItemId == null) {
+            return;
+        }
+        ReaderSessionSnapshot current = session.snapshot();
+        if (current.currentPageIndex() >= current.pageCount() - 1) {
+            readState.setRead(libraryItemId, current.contentUnit().id().value(), true);
+        }
     }
 
     private void restoreReadingDirection() {
