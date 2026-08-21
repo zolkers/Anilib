@@ -112,7 +112,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -172,8 +171,6 @@ import fr.vriege.anilib.feature.updates.ui.UpdatePresentation
 import fr.vriege.anilib.feature.applicationupdate.ui.ApplicationUpdatePresentation
 import fr.vriege.anilib.framework.http.HttpCookieJar
 import fr.vriege.anilib.framework.http.AnilibHttpClient
-import fr.vriege.anilib.framework.http.HttpCachePolicy
-import fr.vriege.anilib.framework.http.HttpRequest
 import fr.vriege.anilib.feature.player.EpisodeSnapshot
 import java.net.URI
 import java.time.Duration
@@ -190,9 +187,7 @@ import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 private data class DetailPlatform(
-    val httpClient: AnilibHttpClient,
     val shareController: ShareController,
-    val pageDecoder: (ByteArray) -> ImageBitmap?,
 )
 
 private data class BrowseReturnTarget(
@@ -247,8 +242,8 @@ fun AnilibApp(
     darkTheme: Boolean = isSystemInDarkTheme(),
     reportUiFailure: (Throwable) -> Unit = {},
 ) {
-    val detailPlatform = remember(httpClient, shareController, pageDecoder) {
-        DetailPlatform(httpClient, shareController, pageDecoder)
+    val detailPlatform = remember(shareController) {
+        DetailPlatform(shareController)
     }
     val navigator = remember { LibraryNavigator() }
     val initialSettings = remember(settingsPresentation) { settingsPresentation.snapshot() }
@@ -2068,7 +2063,7 @@ private fun DetailsDestination(
             details = details,
             categories = categories,
             sourceName = sourceName,
-            artwork = { modifier -> MediaArtwork(details, detailPlatform, modifier) },
+            artwork = { modifier -> RemoteArtwork(details.artwork().orElse(null), details.title(), modifier) },
             chapters = chapters,
             episodes = episodes,
             unitError = unitError,
@@ -2448,56 +2443,6 @@ private fun RelatedTitleCard(card: LibraryCard, open: () -> Unit) {
     }
 }
 
-@Composable
-private fun MediaArtwork(details: LibraryDetails, platform: DetailPlatform, modifier: Modifier) {
-    val location = details.artwork().orElse(null)
-    var image by remember(location) { mutableStateOf<ImageBitmap?>(null) }
-    var failed by remember(location) { mutableStateOf(false) }
-    CrashSafeLaunchedEffect(location) {
-        image = null
-        failed = false
-        if (location == null || !(location.scheme.equals("http", true)
-                    || location.scheme.equals("https", true))) {
-            failed = location != null
-            return@CrashSafeLaunchedEffect
-        }
-        runCatching {
-            withContext(Dispatchers.IO) {
-                val response = platform.httpClient.execute(
-                    HttpRequest.builder(location)
-                        .cache(HttpCachePolicy.preferCache(Duration.ofDays(7)))
-                        .build(),
-                )
-                check(response.statusCode() in 200..299) {
-                    "Artwork request failed with HTTP ${response.statusCode()}"
-                }
-                platform.pageDecoder(response.body()) ?: error("Artwork format is not supported")
-            }
-        }.onSuccess { image = it }.onFailure { failed = true }
-    }
-    when {
-        image != null -> Image(
-            image!!,
-            contentDescription = UiTranslations.format(
-                "dynamic.title.artwork",
-                LocalLanguagePack.current,
-                details.title(),
-            ),
-            modifier = modifier,
-            contentScale = ContentScale.Crop,
-        )
-        location == null -> MediaArtworkPlaceholder("ui.no.artwork", modifier)
-        failed -> MediaArtworkPlaceholder("ui.artwork.unavailable", modifier)
-        else -> MediaArtworkPlaceholder("ui.loading.artwork", modifier)
-    }
-}
-
-@Composable
-private fun MediaArtworkPlaceholder(label: String, modifier: Modifier) {
-    Box(modifier = modifier, contentAlignment = Alignment.Center) {
-        Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
 
 @Composable
 private fun EditLibraryTitleDialog(

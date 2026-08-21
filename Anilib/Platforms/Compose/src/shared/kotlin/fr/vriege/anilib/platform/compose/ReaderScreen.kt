@@ -190,8 +190,27 @@ internal fun ReaderScreen(
         applyOrientationPolicy(display.orientationPolicy())
         onDispose { applyOrientationPolicy(ReaderOrientationPolicy.SYSTEM) }
     }
-    CrashSafeLaunchedEffect(controller) {
-        runCatching { focusRequester.requestFocus() }
+    CrashSafeLaunchedEffect(controller, settingsMenu, chapterMenu, readerMenu, readingModeMenu) {
+        if (!settingsMenu && !chapterMenu && !readerMenu && !readingModeMenu) {
+            runCatching { focusRequester.requestFocus() }
+        }
+    }
+
+    fun moveContentUnit(next: Boolean) {
+        if (readerBusy) return
+        scope.launch {
+            readerBusy = true
+            withContext(Dispatchers.IO) {
+                runCatching { if (next) controller.nextContentUnit() else controller.previousContentUnit() }
+            }.onSuccess { moved ->
+                if (moved) {
+                    splitSecondHalf = false
+                    actionMessage = null
+                    revision++
+                }
+            }.onFailure { actionMessage = it.message ?: "The chapter could not be opened." }
+            readerBusy = false
+        }
     }
 
     fun move(previous: Boolean) {
@@ -219,8 +238,12 @@ internal fun ReaderScreen(
         } else {
             controller.nextPage()
         }
-        if (moved) splitSecondHalf = previous && display.splitPages()
-        if (moved) revision++
+        if (moved) {
+            splitSecondHalf = previous && display.splitPages()
+            revision++
+        } else {
+            moveContentUnit(!previous)
+        }
     }
 
     fun setZoom(scale: Float) {
@@ -256,23 +279,6 @@ internal fun ReaderScreen(
                     revision++
                 }
                 .onFailure { actionMessage = it.message ?: "The chapter could not be opened." }
-            readerBusy = false
-        }
-    }
-
-    fun moveContentUnit(next: Boolean) {
-        if (readerBusy) return
-        scope.launch {
-            readerBusy = true
-            withContext(Dispatchers.IO) {
-                runCatching { if (next) controller.nextContentUnit() else controller.previousContentUnit() }
-            }.onSuccess { moved ->
-                if (moved) {
-                    splitSecondHalf = false
-                    actionMessage = null
-                    revision++
-                }
-            }.onFailure { actionMessage = it.message ?: "The chapter could not be opened." }
             readerBusy = false
         }
     }
@@ -409,6 +415,8 @@ internal fun ReaderScreen(
                             pageSelected = { continuousPageIndex = it },
                             toggleControls = { controlsVisible = !controlsVisible },
                             toggleZoom = { execute(ReaderInteractionAction.TOGGLE_ZOOM) },
+                            previousChapter = { moveContentUnit(false) },
+                            nextChapter = { moveContentUnit(true) },
                         )
                     }
                 } else decodedPage?.getOrNull()?.let { image ->

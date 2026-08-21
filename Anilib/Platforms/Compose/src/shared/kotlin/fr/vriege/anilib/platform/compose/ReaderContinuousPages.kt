@@ -6,14 +6,21 @@ import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Surface
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -55,23 +62,28 @@ internal fun ReaderContinuousPages(
     pageSelected: (Int) -> Unit,
     toggleControls: () -> Unit,
     toggleZoom: () -> Unit,
+    previousChapter: () -> Unit,
+    nextChapter: () -> Unit,
 ) {
     val firstPage = initialPage.coerceIn(0, (pageCount - 1).coerceAtLeast(0))
-    val listState = rememberLazyListState(initialFirstVisibleItemIndex = firstPage)
+    // +1 because index 0 is the "previous chapter" boundary item
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = firstPage + 1)
     val pageAspectRatios = remember(controller, pageCount) { mutableStateMapOf<Int, Float>() }
     val spacing = if (direction == ReadingDirection.WEBTOON) display.webtoonSpacingDp().dp else 15.dp
 
     CrashSafeLaunchedEffect(listState, controller) {
         snapshotFlow { listState.firstVisibleItemIndex }
             .distinctUntilChanged()
-            .collect { index ->
-                withContext(Dispatchers.IO) { controller.goToPage(index) }
-                pageSelected(index)
+            .collect { rawIndex ->
+                // rawIndex 0 = "previous chapter" boundary; page items start at rawIndex 1
+                val pageIndex = (rawIndex - 1).coerceIn(0, pageCount - 1)
+                withContext(Dispatchers.IO) { controller.goToPage(pageIndex) }
+                pageSelected(pageIndex)
             }
     }
     CrashSafeLaunchedEffect(scrollTarget) {
         scrollTarget?.let { target ->
-            listState.animateScrollToItem(target.coerceIn(0, pageCount - 1))
+            listState.animateScrollToItem(target.coerceIn(0, pageCount - 1) + 1)
             consumeScrollTarget()
         }
     }
@@ -91,6 +103,9 @@ internal fun ReaderContinuousPages(
         ),
         verticalArrangement = Arrangement.spacedBy(spacing),
     ) {
+        item(key = "chapter-start") {
+            ReaderChapterBoundary(previous = true, onClick = previousChapter)
+        }
         items(pageCount, key = { it }) { pageIndex ->
             ReaderContinuousPage(
                 controller = controller,
@@ -102,6 +117,9 @@ internal fun ReaderContinuousPages(
                 knownAspectRatio = pageAspectRatios[pageIndex],
                 rememberAspectRatio = { pageAspectRatios[pageIndex] = it },
             )
+        }
+        item(key = "chapter-end") {
+            ReaderChapterBoundary(previous = false, onClick = nextChapter)
         }
     }
 }
@@ -166,6 +184,33 @@ private fun ReaderContinuousPage(
                 }
             },
         )
+    }
+}
+
+@Composable
+private fun ReaderChapterBoundary(previous: Boolean, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().height(72.dp),
+        color = Color.Black,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Icon(
+                imageVector = if (previous) Icons.AutoMirrored.Filled.ArrowBack else Icons.AutoMirrored.Filled.ArrowForward,
+                contentDescription = null,
+                tint = Color.White.copy(alpha = 0.72f),
+                modifier = Modifier.size(20.dp),
+            )
+            Text(
+                text = if (previous) UiTranslations.translate("ui.previous.chapter", LocalLanguagePack.current)
+                    else UiTranslations.translate("ui.next.chapter", LocalLanguagePack.current),
+                color = Color.White.copy(alpha = 0.72f),
+            )
+        }
     }
 }
 
