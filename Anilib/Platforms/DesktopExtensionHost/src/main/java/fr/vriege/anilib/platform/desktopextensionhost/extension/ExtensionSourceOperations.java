@@ -115,12 +115,20 @@ public final class ExtensionSourceOperations implements AutoCloseable {
     public SManga mangaDetails(long sourceId, SourceModel model) {
         return execute(sourceId, ExtensionKind.MANGA, "manga.details", model.url(), source -> {
             SManga manga = manga(sourceId, model);
-            var modern = ExtensionOperationDispatcher.modernOrRx(
-                    source, "getMangaDetails", "fetchMangaDetails", manga);
-            SManga result = modern.available()
-                    ? ExtensionOperationDispatcher.result(modern.value(), SManga.class)
-                    : requestAndParse(source, "mangaDetailsRequest", new Object[]{manga},
-                            "mangaDetailsParse", SManga.class);
+            SManga result;
+            var update = ExtensionOperationDispatcher.suspend(
+                    source, "getMangaUpdate", manga, List.of(), true, false);
+            if (update.available()) {
+                result = ExtensionOperationDispatcher.result(
+                        ExtensionOperationDispatcher.invokeAny(update.value(), "getManga"), SManga.class);
+            } else {
+                var modern = ExtensionOperationDispatcher.modernOrRx(
+                        source, "getMangaDetails", "fetchMangaDetails", manga);
+                result = modern.available()
+                        ? ExtensionOperationDispatcher.result(modern.value(), SManga.class)
+                        : requestAndParse(source, "mangaDetailsRequest", new Object[]{manga},
+                                "mangaDetailsParse", SManga.class);
+            }
             result.setInitialized(true);
             mangaByUrl.put(new ModelKey(sourceId, result.getUrl()), result);
             return result;
@@ -136,10 +144,9 @@ public final class ExtensionSourceOperations implements AutoCloseable {
             if (update.available()) {
                 result = ExtensionOperationDispatcher.listResult(
                         ExtensionOperationDispatcher.invokeAny(update.value(), "getChapters"), SChapter.class);
-                var updated = ExtensionOperationDispatcher.ordinary(update.value(), "getManga");
-                if (updated.available() && updated.value() instanceof SManga value) {
-                    mangaByUrl.put(new ModelKey(sourceId, value.getUrl()), value);
-                }
+                SManga value = ExtensionOperationDispatcher.result(
+                        ExtensionOperationDispatcher.invokeAny(update.value(), "getManga"), SManga.class);
+                mangaByUrl.put(new ModelKey(sourceId, value.getUrl()), value);
             } else {
                 var modern = ExtensionOperationDispatcher.modernOrRx(
                         source, "getChapterList", "fetchChapterList", manga);
