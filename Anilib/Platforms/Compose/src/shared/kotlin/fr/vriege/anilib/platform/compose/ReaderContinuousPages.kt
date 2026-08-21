@@ -11,10 +11,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -29,32 +29,31 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import fr.vriege.anilib.feature.reader.ReaderDisplayPreferences
 import fr.vriege.anilib.feature.reader.ReadingDirection
 import fr.vriege.anilib.feature.reader.ui.ReaderController
+import fr.vriege.anilib.feature.reader.ui.ReaderWindowChapter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.withContext
 
 private const val CONTINUOUS_SCROLL_STEP_FRACTION = 0.85f
-private const val CHAPTER_START_KEY = "chapter-start"
-private const val CHAPTER_END_KEY = "chapter-end"
 
 /**
- * Blank run-off at each end of a chapter. Scrolling it fully into view flips to the adjacent
- * chapter, so reading stays a single uninterrupted scroll with nothing to tap.
+ * Continuous viewer over the reader's chapter window. Previous, current and next chapter pages
+ * live in one scroll sequence, so crossing a chapter never rebuilds the list - it only reports the
+ * new position, the way Aniyomi's webtoon viewer does. Item keys are chapter-scoped so the window
+ * can shift underneath without disturbing the scroll offset.
  */
-private val CHAPTER_BAND_HEIGHT = 96.dp
-
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun ReaderContinuousPages(
     controller: ReaderController,
     pageDecoder: (ByteArray) -> ImageBitmap?,
-    pageCount: Int,
-    initialPage: Int,
+    window: List<ReaderWindowChapter>,
+    initialGlobalPage: Int,
     direction: ReadingDirection,
     display: ReaderDisplayPreferences,
     revision: Int,
@@ -63,57 +62,37 @@ internal fun ReaderContinuousPages(
     scrollStep: Int?,
     consumeScrollStep: () -> Unit,
     pageSelected: (Int) -> Unit,
+    chapterChanged: () -> Unit,
     toggleControls: () -> Unit,
     toggleZoom: () -> Unit,
-    previousChapter: () -> Unit,
-    nextChapter: () -> Unit,
 ) {
-    val firstPage = initialPage.coerceIn(0, (pageCount - 1).coerceAtLeast(0))
-    // +1 because index 0 is the "previous chapter" boundary item
-    val listState = rememberLazyListState(initialFirstVisibleItemIndex = firstPage + 1)
-    val pageAspectRatios = remember(controller, pageCount) { mutableStateMapOf<Int, Float>() }
+    val current = window.firstOrNull { it.current() }
+    val entries = remember(window) { continuousEntries(window) }
+    val listState = rememberLazyListState(
+        initialFirstVisibleItemIndex = entries
+            .indexOfFirst { it is ContinuousEntry.Page && it.globalPage == initialGlobalPage }
+            .coerceAtLeast(0),
+    )
+    val pageAspectRatios = remember(controller) { mutableStateMapOf<String, Float>() }
     val spacing = if (direction == ReadingDirection.WEBTOON) display.webtoonSpacingDp().dp else 15.dp
 
-    CrashSafeLaunchedEffect(listState, controller) {
+    CrashSafeLaunchedEffect(listState, controller, entries) {
         snapshotFlow { listState.firstVisibleItemIndex }
             .distinctUntilChanged()
-            .collect { rawIndex ->
-                // rawIndex 0 = "previous chapter" boundary; page items start at rawIndex 1
-                val pageIndex = (rawIndex - 1).coerceIn(0, pageCount - 1)
-                withContext(Dispatchers.IO) { controller.goToPage(pageIndex) }
-                pageSelected(pageIndex)
+            .collect { index ->
+                val page = entries.getOrNull(index) as? ContinuousEntry.Page ?: return@collect
+                val moved = withContext(Dispatchers.IO) { controller.selectWindowPage(page.globalPage) }
+                pageSelected(page.localPage)
+                if (moved) chapterChanged()
             }
     }
-    // The bands only arm once the reader has been scrolled, so opening a chapter — which may
-    // already show a band on a short chapter — never flips straight back out of it.
-    var armed by remember(controller, pageCount) { mutableStateOf(false) }
-    CrashSafeLaunchedEffect(listState, controller, pageCount) {
-        snapshotFlow { listState.isScrollInProgress }.filter { it }.collect { armed = true }
-    }
-    CrashSafeLaunchedEffect(listState, controller, pageCount, armed) {
-        if (!armed) return@CrashSafeLaunchedEffect
-        snapshotFlow {
-            val info = listState.layoutInfo
-            val visible = info.visibleItemsInfo
-            val last = visible.lastOrNull()
-            val first = visible.firstOrNull()
-            when {
-                last != null && last.key == CHAPTER_END_KEY &&
-                    last.offset + last.size <= info.viewportEndOffset -> 1
-                first != null && first.key == CHAPTER_START_KEY &&
-                    first.offset >= info.viewportStartOffset -> -1
-                else -> 0
-            }
-        }.distinctUntilChanged().collect { crossed ->
-            when (crossed) {
-                1 -> nextChapter()
-                -1 -> previousChapter()
-            }
-        }
-    }
-    CrashSafeLaunchedEffect(scrollTarget) {
-        scrollTarget?.let { target ->
-            listState.animateScrollToItem(target.coerceIn(0, pageCount - 1) + 1)
+    CrashSafeLaunchedEffect(scrollTarget, entries) {
+        val target = scrollTarget
+        val chapter = current
+        if (target != null && chapter != null) {
+            val global = chapter.firstGlobalPage() + target.coerceIn(0, chapter.pageCount() - 1)
+            val index = entries.indexOfFirst { it is ContinuousEntry.Page && it.globalPage == global }
+            if (index >= 0) listState.animateScrollToItem(index)
             consumeScrollTarget()
         }
     }
@@ -133,31 +112,75 @@ internal fun ReaderContinuousPages(
         ),
         verticalArrangement = Arrangement.spacedBy(spacing),
     ) {
-        item(key = CHAPTER_START_KEY) {
-            Spacer(Modifier.fillMaxWidth().height(CHAPTER_BAND_HEIGHT))
-        }
-        items(pageCount, key = { it }) { pageIndex ->
-            ReaderContinuousPage(
-                controller = controller,
-                pageDecoder = pageDecoder,
-                pageIndex = pageIndex,
-                direction = direction,
-                display = display,
-                revision = revision,
-                knownAspectRatio = pageAspectRatios[pageIndex],
-                rememberAspectRatio = { pageAspectRatios[pageIndex] = it },
-            )
-        }
-        item(key = CHAPTER_END_KEY) {
-            Spacer(Modifier.fillMaxWidth().height(CHAPTER_BAND_HEIGHT))
+        items(entries.size, key = { entries[it].key }) { index ->
+            when (val entry = entries[index]) {
+                is ContinuousEntry.Transition -> ReaderChapterTransition(entry.label)
+                is ContinuousEntry.Page -> ReaderContinuousPage(
+                    controller = controller,
+                    pageDecoder = pageDecoder,
+                    globalPage = entry.globalPage,
+                    pageIndex = entry.localPage,
+                    direction = direction,
+                    display = display,
+                    revision = revision,
+                    knownAspectRatio = pageAspectRatios[entry.key],
+                    rememberAspectRatio = { pageAspectRatios[entry.key] = it },
+                )
+            }
         }
     }
+}
+
+private sealed interface ContinuousEntry {
+    val key: String
+
+    data class Page(
+        override val key: String,
+        val globalPage: Int,
+        val localPage: Int,
+    ) : ContinuousEntry
+
+    data class Transition(override val key: String, val label: String) : ContinuousEntry
+}
+
+/**
+ * Flattens the window into scroll entries. A slim transition sits between adjacent chapters so the
+ * hand-off stays legible without ever interrupting the scroll.
+ */
+private fun continuousEntries(window: List<ReaderWindowChapter>): List<ContinuousEntry> {
+    val entries = mutableListOf<ContinuousEntry>()
+    window.forEachIndexed { chapterIndex, chapter ->
+        val chapterId = chapter.contentUnit().id().value()
+        if (chapterIndex > 0) {
+            entries += ContinuousEntry.Transition("transition:$chapterId", chapter.contentUnit().title())
+        }
+        repeat(chapter.pageCount()) { local ->
+            entries += ContinuousEntry.Page(
+                key = "$chapterId#$local",
+                globalPage = chapter.firstGlobalPage() + local,
+                localPage = local,
+            )
+        }
+    }
+    return entries
+}
+
+@Composable
+private fun ReaderChapterTransition(title: String) {
+    Text(
+        text = title,
+        color = Color.White.copy(alpha = 0.38f),
+        style = MaterialTheme.typography.labelMedium,
+        textAlign = TextAlign.Center,
+        modifier = Modifier.fillMaxWidth().padding(vertical = 28.dp),
+    )
 }
 
 @Composable
 private fun ReaderContinuousPage(
     controller: ReaderController,
     pageDecoder: (ByteArray) -> ImageBitmap?,
+    globalPage: Int,
     pageIndex: Int,
     direction: ReadingDirection,
     display: ReaderDisplayPreferences,
@@ -165,14 +188,14 @@ private fun ReaderContinuousPage(
     knownAspectRatio: Float?,
     rememberAspectRatio: (Float) -> Unit,
 ) {
-    var retry by remember(controller, pageIndex) { mutableIntStateOf(0) }
-    var decoded by remember(controller, pageIndex, revision, retry) {
+    var retry by remember(controller, globalPage) { mutableIntStateOf(0) }
+    var decoded by remember(controller, globalPage, revision, retry) {
         mutableStateOf<Result<ImageBitmap>?>(null)
     }
-    CrashSafeLaunchedEffect(controller, pageIndex, revision, retry) {
+    CrashSafeLaunchedEffect(controller, globalPage, revision, retry) {
         val result = withContext(Dispatchers.IO) {
             runCatching {
-                requireNotNull(pageDecoder(controller.page(pageIndex))) {
+                requireNotNull(pageDecoder(controller.windowPage(globalPage))) {
                     "Unsupported page image format"
                 }
             }

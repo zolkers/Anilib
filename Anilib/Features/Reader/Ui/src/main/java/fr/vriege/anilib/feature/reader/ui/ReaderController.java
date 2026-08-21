@@ -14,6 +14,7 @@ import fr.vriege.anilib.feature.source.SourceContentUnit;
 import fr.vriege.anilib.feature.source.SourceContentUnitId;
 import fr.vriege.anilib.feature.source.SourceCatalogueItemId;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -34,6 +35,8 @@ public final class ReaderController implements AutoCloseable {
     private final ReaderDisplayPreferenceStore display;
     private final ReaderReadStateStore readState;
     private ReaderSession session;
+    private ReaderSession olderSession;
+    private ReaderSession newerSession;
 
     ReaderController(
             ReaderService reader,
@@ -120,7 +123,8 @@ public final class ReaderController implements AutoCloseable {
                 : reader.contentUnits(libraryItemId);
     }
 
-    public void openContentUnit(SourceContentUnitId contentUnitId) {
+    public synchronized void openContentUnit(SourceContentUnitId contentUnitId) {
+        closeNeighbours();
         ReadingDirection direction = session.snapshot().direction();
         ReaderSession next = libraryItemId == null
                 ? reader.open(transientTitle, contentUnitId)
@@ -181,8 +185,171 @@ public final class ReaderController implements AutoCloseable {
     }
 
     @Override
-    public void close() {
+    public synchronized void close() {
+        closeNeighbours();
         session.close();
+    }
+
+
+    /**
+     * The chapters the continuous viewer scrolls through as one uninterrupted sequence: the
+     * current chapter plus its already-resolved neighbours. Mirrors how Aniyomi keeps previous,
+     * current and next pages in a single list so crossing a chapter never rebuilds the view.
+     */
+    public synchronized List<ReaderWindowChapter> window() {
+        refreshNeighbours();
+        List<ReaderWindowChapter> chapters = new ArrayList<>(3);
+        int offset = 0;
+        if (olderSession != null) {
+            ReaderSessionSnapshot older = olderSession.snapshot();
+            chapters.add(new ReaderWindowChapter(older.contentUnit(), older.pageCount(), offset, false));
+            offset += older.pageCount();
+        }
+        ReaderSessionSnapshot current = session.snapshot();
+        chapters.add(new ReaderWindowChapter(current.contentUnit(), current.pageCount(), offset, true));
+        offset += current.pageCount();
+        if (newerSession != null) {
+            ReaderSessionSnapshot newer = newerSession.snapshot();
+            chapters.add(new ReaderWindowChapter(newer.contentUnit(), newer.pageCount(), offset, false));
+        }
+        return List.copyOf(chapters);
+    }
+
+    /** Global index of the current chapter's current page within {@link #window()}. */
+    public synchronized int windowPageIndex() {
+        refreshNeighbours();
+        int offset = olderSession == null ? 0 : olderSession.snapshot().pageCount();
+        return offset + session.snapshot().currentPageIndex();
+    }
+
+    /** Reads a page addressed by its index in the flattened window sequence. */
+    public byte[] windowPage(int globalPage) {
+        ReaderSession target;
+        int local;
+        synchronized (this) {
+            refreshNeighbours();
+            int offset = 0;
+            if (olderSession != null) {
+                int count = olderSession.snapshot().pageCount();
+                if (globalPage < count) {
+                    target = olderSession;
+                    local = globalPage;
+                    return target.page(local);
+                }
+                offset = count;
+            }
+            int currentCount = session.snapshot().pageCount();
+            if (globalPage < offset + currentCount) {
+                target = session;
+                local = globalPage - offset;
+            } else if (newerSession != null) {
+                target = newerSession;
+                local = globalPage - offset - currentCount;
+            } else {
+                throw new IllegalArgumentException("globalPage must address a page inside the window");
+            }
+        }
+        return target.page(local);
+    }
+
+    /**
+     * Reports the page the viewer scrolled to. Staying inside the current chapter only records
+     * progress; scrolling into a neighbour promotes that neighbour to current without reopening it,
+     * so the scroll position is never disturbed.
+     *
+     * @return true when the current chapter changed
+     */
+    public synchronized boolean selectWindowPage(int globalPage) {
+        refreshNeighbours();
+        int olderCount = olderSession == null ? 0 : olderSession.snapshot().pageCount();
+        int currentCount = session.snapshot().pageCount();
+        if (globalPage < olderCount) {
+            promote(olderSession, globalPage);
+            return true;
+        }
+        if (globalPage < olderCount + currentCount) {
+            goToPage(globalPage - olderCount);
+            return false;
+        }
+        if (newerSession != null) {
+            promote(newerSession, globalPage - olderCount - currentCount);
+            return true;
+        }
+        return false;
+    }
+
+    private void promote(ReaderSession target, int pageIndex) {
+        ReaderSession displaced = session;
+        boolean towardsNewer = target == newerSession;
+        session = target;
+        if (towardsNewer) {
+            if (olderSession != null) {
+                olderSession.close();
+            }
+            olderSession = displaced;
+            newerSession = null;
+        } else {
+            if (newerSession != null) {
+                newerSession.close();
+            }
+            newerSession = displaced;
+            olderSession = null;
+        }
+        session.goToPage(pageIndex);
+        markReadWhenComplete();
+        refreshNeighbours();
+    }
+
+    private void refreshNeighbours() {
+        if (olderSession != null && newerSession != null) {
+            return;
+        }
+        List<SourceContentUnit> units;
+        try {
+            units = contentUnits();
+        } catch (RuntimeException ignored) {
+            return;
+        }
+        SourceContentUnitId current = session.snapshot().contentUnit().id();
+        int index = -1;
+        for (int candidate = 0; candidate < units.size(); candidate++) {
+            if (units.get(candidate).id().equals(current)) {
+                index = candidate;
+                break;
+            }
+        }
+        if (index < 0) {
+            return;
+        }
+        if (olderSession == null && index + OLDER >= 0 && index + OLDER < units.size()) {
+            olderSession = openNeighbour(units.get(index + OLDER).id());
+        }
+        if (newerSession == null && index + NEWER >= 0 && index + NEWER < units.size()) {
+            newerSession = openNeighbour(units.get(index + NEWER).id());
+        }
+    }
+
+    private ReaderSession openNeighbour(SourceContentUnitId contentUnitId) {
+        try {
+            ReaderSession neighbour = libraryItemId == null
+                    ? reader.open(transientTitle, contentUnitId)
+                    : reader.open(libraryItemId, contentUnitId);
+            neighbour.setDirection(session.snapshot().direction());
+            return neighbour;
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    private void closeNeighbours() {
+        if (olderSession != null) {
+            olderSession.close();
+            olderSession = null;
+        }
+        if (newerSession != null) {
+            newerSession.close();
+            newerSession = null;
+        }
     }
 
     private boolean moveContentUnit(int delta) {

@@ -85,6 +85,7 @@ import fr.vriege.anilib.feature.reader.ReaderPageTransition
 import fr.vriege.anilib.feature.reader.ReaderRotation
 import fr.vriege.anilib.feature.reader.ReaderScaleMode
 import fr.vriege.anilib.feature.reader.ui.ReaderController
+import fr.vriege.anilib.feature.reader.ui.ReaderWindowChapter
 import fr.vriege.anilib.feature.settings.LanguagePack
 import fr.vriege.anilib.feature.source.SourceContentUnit
 import fr.vriege.anilib.feature.source.SourceContentUnitId
@@ -134,6 +135,18 @@ internal fun ReaderScreen(
     }
     val continuous = snapshot.direction() == ReadingDirection.VERTICAL ||
         snapshot.direction() == ReadingDirection.WEBTOON
+    var continuousWindow by remember(controller) {
+        mutableStateOf<List<ReaderWindowChapter>>(emptyList())
+    }
+    var continuousInitialPage by remember(controller) { mutableIntStateOf(0) }
+    CrashSafeLaunchedEffect(controller, continuous, revision) {
+        if (!continuous) return@CrashSafeLaunchedEffect
+        val resolved = withContext(Dispatchers.IO) {
+            runCatching { controller.window() to controller.windowPageIndex() }.getOrNull()
+        } ?: return@CrashSafeLaunchedEffect
+        if (continuousWindow.isEmpty()) continuousInitialPage = resolved.second
+        continuousWindow = resolved.first
+    }
     CrashSafeLaunchedEffect(controller, snapshot.contentUnit().id()) {
         contentUnits = null
         contentUnits = withContext(Dispatchers.IO) {
@@ -399,26 +412,25 @@ internal fun ReaderScreen(
                     ),
             ) {
                 if (continuous) {
-                    key(snapshot.contentUnit().id()) {
-                        ReaderContinuousPages(
-                            controller = controller,
-                            pageDecoder = pageDecoder,
-                            pageCount = snapshot.pageCount(),
-                            initialPage = snapshot.currentPageIndex(),
-                            direction = snapshot.direction(),
-                            display = display,
-                            revision = revision,
-                            scrollTarget = continuousScrollTarget,
-                            consumeScrollTarget = { continuousScrollTarget = null },
-                            scrollStep = continuousScrollStep,
-                            consumeScrollStep = { continuousScrollStep = null },
-                            pageSelected = { continuousPageIndex = it },
-                            toggleControls = { controlsVisible = !controlsVisible },
-                            toggleZoom = { execute(ReaderInteractionAction.TOGGLE_ZOOM) },
-                            previousChapter = { moveContentUnit(false) },
-                            nextChapter = { moveContentUnit(true) },
-                        )
-                    }
+                    // Deliberately not keyed on the chapter: the window spans neighbouring
+                    // chapters, so rebuilding here would undo the seamless scroll.
+                    ReaderContinuousPages(
+                        controller = controller,
+                        pageDecoder = pageDecoder,
+                        window = continuousWindow,
+                        initialGlobalPage = continuousInitialPage,
+                        direction = snapshot.direction(),
+                        display = display,
+                        revision = revision,
+                        scrollTarget = continuousScrollTarget,
+                        consumeScrollTarget = { continuousScrollTarget = null },
+                        scrollStep = continuousScrollStep,
+                        consumeScrollStep = { continuousScrollStep = null },
+                        pageSelected = { continuousPageIndex = it },
+                        chapterChanged = { revision++ },
+                        toggleControls = { controlsVisible = !controlsVisible },
+                        toggleZoom = { execute(ReaderInteractionAction.TOGGLE_ZOOM) },
+                    )
                 } else decodedPage?.getOrNull()?.let { image ->
                     val frame = ReaderPageFrame(
                         image,
