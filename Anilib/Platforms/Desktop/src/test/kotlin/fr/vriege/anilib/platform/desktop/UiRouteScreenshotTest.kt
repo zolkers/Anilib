@@ -211,6 +211,9 @@ class UiRouteScreenshotTest {
                     if (tab == "Manga sources") {
                         onNodeWithText("Acceptance web").performClick()
                         waitForContentDescription("Open source website")
+                        waitForContentDescription("Refresh")
+                        onNodeWithContentDescription("Refresh").performClick()
+                        waitForText("Catalogue refreshed")
                         onNodeWithContentDescription("Open source website").performClick()
                         waitForText("WebView unavailable")
                         captureStable("WebView unavailable state")
@@ -219,6 +222,8 @@ class UiRouteScreenshotTest {
                         waitForText("Local library")
                         onNodeWithText("Local library").performClick()
                         waitForText("Acceptance catalogue manga")
+                        onNodeWithContentDescription("Refresh").performClick()
+                        waitForText("Catalogue refreshed")
                         captureStable("Local source catalogue")
                         onNodeWithText("Acceptance catalogue manga").performClick()
                         waitForContentDescription("Read")
