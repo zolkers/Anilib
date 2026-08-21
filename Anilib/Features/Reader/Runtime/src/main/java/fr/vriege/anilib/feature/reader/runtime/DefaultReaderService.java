@@ -48,6 +48,8 @@ public final class DefaultReaderService implements ReaderService, ReaderContentR
     private final ReaderPolicy policy;
     private final Clock clock;
     private final ExecutorService pageExecutor;
+    private final ReaderPageCache pageCache;
+    private final ReaderPageLoadQueue pageQueue;
     private final BooleanSupplier persistenceAllowed;
     private final Set<DefaultReaderSession> sessions = new HashSet<>();
     private ReaderContentProvider contentProvider;
@@ -83,6 +85,10 @@ public final class DefaultReaderService implements ReaderService, ReaderContentR
         this.policy = Objects.requireNonNull(policy, "policy must not be null");
         this.clock = Objects.requireNonNull(clock, "clock must not be null");
         this.pageExecutor = Objects.requireNonNull(pageExecutor, "pageExecutor must not be null");
+        // One cache and one queue for the whole reader: continuous reading keeps several chapters
+        // open, and a per-chapter budget would scale memory with how far the reader has scrolled.
+        this.pageCache = new ReaderPageCache(policy.maximumCacheBytes());
+        this.pageQueue = new ReaderPageLoadQueue(READER_PAGE_THREADS, "anilib-reader-page");
         this.persistenceAllowed = Objects.requireNonNull(
                 persistenceAllowed,
                 "persistenceAllowed must not be null");
@@ -155,7 +161,7 @@ public final class DefaultReaderService implements ReaderService, ReaderContentR
                 .findFirst()
                 .orElseThrow(() -> new ReaderException("Requested content unit was not found for this title"));
         List<SourcePageResource> pages = validatedPages(source, unit);
-        ReaderPagePipeline pipeline = new ReaderPagePipeline(source::readPage, pages, policy, pageExecutor);
+        ReaderPagePipeline pipeline = new ReaderPagePipeline(source::readPage, pages, policy, pageCache, pageQueue);
         pipeline.warmUp(0);
         LibraryItemId transientId = new LibraryItemId("transient-reader-" + UUID.randomUUID());
         DefaultReaderSession[] holder = new DefaultReaderSession[1];
@@ -234,7 +240,7 @@ public final class DefaultReaderService implements ReaderService, ReaderContentR
                     clock.instant(),
                     initialPage)));
         }
-        ReaderPagePipeline pipeline = new ReaderPagePipeline(pageReader, pages, policy, pageExecutor);
+        ReaderPagePipeline pipeline = new ReaderPagePipeline(pageReader, pages, policy, pageCache, pageQueue);
         pipeline.warmUp(initialPage);
         DefaultReaderSession[] holder = new DefaultReaderSession[1];
         DefaultReaderSession session = new DefaultReaderSession(
@@ -358,6 +364,7 @@ public final class DefaultReaderService implements ReaderService, ReaderContentR
             closed = true;
             List.copyOf(sessions).forEach(DefaultReaderSession::close);
             sessions.clear();
+            pageQueue.close();
             pageExecutor.shutdownNow();
         }
     }

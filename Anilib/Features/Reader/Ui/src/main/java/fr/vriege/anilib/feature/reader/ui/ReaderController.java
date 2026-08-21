@@ -27,6 +27,12 @@ public final class ReaderController implements AutoCloseable {
     private static final int NEWER = -1;
     private static final int OLDER = 1;
 
+    /**
+     * Chapters kept open at once. Enough to scroll into either neighbour without a reload, while
+     * bounding how much a long reading session accumulates.
+     */
+    private static final int WINDOW_LIMIT = 3;
+
     private final ReaderService reader;
     private final LibraryItemId libraryItemId;
     private final SourceCatalogueItemId sourceItemId;
@@ -308,6 +314,27 @@ public final class ReaderController implements AutoCloseable {
             if (newer != null) {
                 windowSessions.add(newer);
             }
+        }
+        trimWindow();
+    }
+
+    /**
+     * Releases chapters that fell outside the window. Only the far end is trimmed, never a chapter
+     * adjacent to the current one, so the item list never changes near the reader's scroll anchor.
+     */
+    private void trimWindow() {
+        while (windowSessions.size() > WINDOW_LIMIT) {
+            int distanceToTop = currentSlot;
+            int distanceToBottom = windowSessions.size() - 1 - currentSlot;
+            if (distanceToTop <= 1 && distanceToBottom <= 1) {
+                return;
+            }
+            int victim = distanceToTop >= distanceToBottom ? 0 : windowSessions.size() - 1;
+            ReaderSession dropped = windowSessions.remove(victim);
+            if (victim == 0) {
+                currentSlot--;
+            }
+            dropped.close();
         }
     }
 

@@ -4,70 +4,73 @@ import fr.vriege.anilib.feature.reader.ReaderException;
 import fr.vriege.anilib.feature.reader.ReaderPolicy;
 import fr.vriege.anilib.feature.source.SourcePageResource;
 
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import java.util.concurrent.Executor;
 import java.util.function.Function;
 
+/**
+ * Loads the pages of one chapter against the reader's shared cache and priority queue.
+ *
+ * <p>Prefetching is forward-biased and bounded: reading moves in one direction, so spending the
+ * queue on pages behind the reader delays the ones ahead. Backwards lookahead is kept to a single
+ * page so stepping back is still instant.
+ */
 final class ReaderPagePipeline implements AutoCloseable {
+    /** Pages fetched ahead of the reader. Matches the lookahead mainstream readers settle on. */
+    private static final int FORWARD_PREFETCH = 4;
+
+    /** Pages kept behind the reader, enough to make a single step back instant. */
+    private static final int BACKWARD_PREFETCH = 1;
+
+    private final Object owner = new Object();
     private final Function<SourcePageResource, byte[]> pageReader;
     private final List<SourcePageResource> pages;
     private final ReaderPolicy policy;
-    private final Executor executor;
-    private final Map<Integer, byte[]> cache = new LinkedHashMap<>(16, 0.75f, true);
-    private final Map<Integer, CompletableFuture<byte[]>> loading = new LinkedHashMap<>();
-    private long cachedBytes;
-    private boolean closed;
+    private final ReaderPageCache cache;
+    private final ReaderPageLoadQueue queue;
+    private volatile boolean closed;
 
     ReaderPagePipeline(
             Function<SourcePageResource, byte[]> pageReader,
             List<SourcePageResource> pages,
             ReaderPolicy policy,
-            Executor executor) {
+            ReaderPageCache cache,
+            ReaderPageLoadQueue queue) {
         this.pageReader = Objects.requireNonNull(pageReader, "pageReader must not be null");
         this.pages = List.copyOf(pages);
         this.policy = Objects.requireNonNull(policy, "policy must not be null");
-        this.executor = Objects.requireNonNull(executor, "executor must not be null");
+        this.cache = Objects.requireNonNull(cache, "cache must not be null");
+        this.queue = Objects.requireNonNull(queue, "queue must not be null");
     }
 
     /**
-     * Starts fetching pages around {@code index} without waiting for any of them. Called when a
-     * session opens so a chapter begins downloading immediately instead of only after the first
-     * blocking read returns.
+     * Begins fetching around {@code index} without waiting, so a chapter starts downloading as
+     * soon as it opens rather than only once the first blocking read returns.
      */
-    synchronized void warmUp(int index) {
-        if (pages.isEmpty()) {
+    void warmUp(int index) {
+        if (pages.isEmpty() || closed) {
             return;
         }
         int start = Math.max(0, Math.min(index, pages.size() - 1));
-        prefetch(start);
+        request(start, ReaderPageLoadQueue.Priority.DEMAND);
         prefetchAround(start);
     }
 
     byte[] load(int index) {
         validateIndex(index);
-        CompletableFuture<byte[]> pageFuture;
-        synchronized (this) {
-            ensureOpen();
-            byte[] cached = cache.get(index);
-            if (cached != null) {
-                prefetchAround(index);
-                return cached.clone();
-            }
-            pageFuture = schedule(index);
+        ensureOpen();
+        byte[] cached = cache.get(new ReaderPageCache.Key(owner, index));
+        if (cached != null) {
+            prefetchAround(index);
+            return cached;
         }
-
+        CompletableFuture<byte[]> pageFuture = request(index, ReaderPageLoadQueue.Priority.DEMAND);
         try {
             byte[] loaded = pageFuture.join();
-            synchronized (this) {
-                ensureOpen();
-                prefetchAround(index);
-            }
-            return loaded.clone();
+            prefetchAround(index);
+            return loaded;
         } catch (CompletionException exception) {
             Throwable cause = exception.getCause() == null ? exception : exception.getCause();
             if (cause instanceof ReaderException readerException) {
@@ -77,72 +80,51 @@ final class ReaderPagePipeline implements AutoCloseable {
         }
     }
 
-    private synchronized CompletableFuture<byte[]> schedule(int index) {
-        byte[] cached = cache.get(index);
+    private CompletableFuture<byte[]> request(int index, ReaderPageLoadQueue.Priority priority) {
+        ReaderPageCache.Key key = new ReaderPageCache.Key(owner, index);
+        byte[] cached = cache.get(key);
         if (cached != null) {
             return CompletableFuture.completedFuture(cached);
         }
-        CompletableFuture<byte[]> existing = loading.get(index);
-        if (existing != null) {
-            return existing;
-        }
-
-        CompletableFuture<byte[]> scheduled = new CompletableFuture<>();
-        loading.put(index, scheduled);
-        executor.execute(() -> read(index, scheduled));
-        return scheduled;
+        return queue.submit(key, priority, () -> read(index, key));
     }
 
-    private void read(int index, CompletableFuture<byte[]> scheduled) {
-        try {
-            SourcePageResource resource = pages.get(index);
-            if (resource.estimatedBytes() > policy.maximumPageBytes()) {
-                throw new ReaderException("Reader page " + index + " exceeds the configured size limit");
-            }
-            byte[] bytes = Objects.requireNonNull(
-                    pageReader.apply(resource),
-                    "page reader returned null page bytes").clone();
-            if (bytes.length > policy.maximumPageBytes()) {
-                throw new ReaderException("Reader page " + index + " exceeds the configured size limit");
-            }
-            synchronized (this) {
-                loading.remove(index);
-                if (!closed) {
-                    put(index, bytes);
-                }
-            }
-            scheduled.complete(bytes);
-        } catch (RuntimeException exception) {
-            synchronized (this) {
-                loading.remove(index);
-            }
-            scheduled.completeExceptionally(exception);
+    private byte[] read(int index, ReaderPageCache.Key key) {
+        byte[] cached = cache.get(key);
+        if (cached != null) {
+            return cached;
         }
+        SourcePageResource resource = pages.get(index);
+        if (resource.estimatedBytes() > policy.maximumPageBytes()) {
+            throw new ReaderException("Reader page " + index + " exceeds the configured size limit");
+        }
+        byte[] bytes = Objects.requireNonNull(
+                pageReader.apply(resource),
+                "page reader returned null page bytes");
+        if (bytes.length > policy.maximumPageBytes()) {
+            throw new ReaderException("Reader page " + index + " exceeds the configured size limit");
+        }
+        if (!closed) {
+            cache.put(key, bytes);
+        }
+        return bytes;
     }
 
     private void prefetchAround(int index) {
-        for (int distance = 1; distance <= policy.prefetchDistance(); distance++) {
+        if (closed) {
+            return;
+        }
+        for (int distance = 1; distance <= FORWARD_PREFETCH; distance++) {
             prefetch(index + distance);
+        }
+        for (int distance = 1; distance <= BACKWARD_PREFETCH; distance++) {
             prefetch(index - distance);
         }
     }
 
     private void prefetch(int index) {
         if (index >= 0 && index < pages.size()) {
-            schedule(index);
-        }
-    }
-
-    private void put(int index, byte[] bytes) {
-        byte[] previous = cache.put(index, bytes);
-        if (previous != null) {
-            cachedBytes -= previous.length;
-        }
-        cachedBytes += bytes.length;
-        while (cachedBytes > policy.maximumCacheBytes() && !cache.isEmpty()) {
-            Map.Entry<Integer, byte[]> oldest = cache.entrySet().iterator().next();
-            cache.remove(oldest.getKey());
-            cachedBytes -= oldest.getValue().length;
+            request(index, ReaderPageLoadQueue.Priority.PREFETCH);
         }
     }
 
@@ -159,11 +141,11 @@ final class ReaderPagePipeline implements AutoCloseable {
     }
 
     @Override
-    public synchronized void close() {
+    public void close() {
         closed = true;
-        loading.values().forEach(future -> future.cancel(true));
-        loading.clear();
-        cache.clear();
-        cachedBytes = 0;
+        for (int index = 0; index < pages.size(); index++) {
+            queue.cancel(new ReaderPageCache.Key(owner, index));
+        }
+        cache.evictOwner(owner);
     }
 }
