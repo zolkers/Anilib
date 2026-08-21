@@ -14,6 +14,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -53,6 +54,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.ColorFilter as ComposeColorFilter
@@ -60,6 +63,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.PointerInputScope
@@ -92,6 +96,7 @@ import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
 private const val READER_CONTROLS_HIDE_DELAY_MILLIS = 3_500L
+private val READER_ZOOM_STEPS = floatArrayOf(0.25f, 0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f, 2.5f, 3f, 4f, 5f)
 
 @Composable
 internal fun ReaderScreen(
@@ -121,6 +126,8 @@ internal fun ReaderScreen(
     var decodedAdjacentPage by remember(controller) { mutableStateOf<Result<ImageBitmap>?>(null) }
     var readerBusy by remember(controller) { mutableStateOf(false) }
     var continuousScrollTarget by remember(controller) { mutableStateOf<Int?>(null) }
+    var continuousScrollStep by remember(controller) { mutableStateOf<Int?>(null) }
+    val focusRequester = remember(controller) { FocusRequester() }
     val snapshot = remember(controller, revision) { controller.snapshot() }
     var continuousPageIndex by remember(controller, snapshot.contentUnit().id()) {
         mutableIntStateOf(snapshot.currentPageIndex())
@@ -183,6 +190,9 @@ internal fun ReaderScreen(
         applyOrientationPolicy(display.orientationPolicy())
         onDispose { applyOrientationPolicy(ReaderOrientationPolicy.SYSTEM) }
     }
+    CrashSafeLaunchedEffect(controller) {
+        runCatching { focusRequester.requestFocus() }
+    }
 
     fun move(previous: Boolean) {
         if (display.splitPages()) {
@@ -213,16 +223,23 @@ internal fun ReaderScreen(
         if (moved) revision++
     }
 
+    fun setZoom(scale: Float) {
+        zoomScale = scale
+        if (scale <= 1.01f) zoomOffset = Offset.Zero
+    }
+
     fun execute(action: ReaderInteractionAction) {
         when (action) {
             ReaderInteractionAction.PREVIOUS_PAGE -> move(true)
             ReaderInteractionAction.NEXT_PAGE -> move(false)
             ReaderInteractionAction.TOGGLE_CONTROLS -> controlsVisible = !controlsVisible
             ReaderInteractionAction.TOGGLE_ZOOM -> {
-                zoomScale = if (zoomScale > 1.01f) 1f else 2f
-                zoomOffset = Offset.Zero
+                setZoom(if (zoomScale > 1.01f) 1f else 2f)
                 controlsVisible = false
             }
+            ReaderInteractionAction.ZOOM_IN -> setZoom(stepZoom(zoomScale, 1))
+            ReaderInteractionAction.ZOOM_OUT -> setZoom(stepZoom(zoomScale, -1))
+            ReaderInteractionAction.ZOOM_RESET -> setZoom(1f)
             ReaderInteractionAction.OPEN_MENU -> settingsMenu = true
             ReaderInteractionAction.NONE -> Unit
         }
@@ -260,6 +277,34 @@ internal fun ReaderScreen(
         }
     }
 
+    fun handleKeyCommand(command: ReaderKeyCommand) {
+        when (command) {
+            ReaderKeyCommand.PREVIOUS_PAGE -> execute(ReaderInteractionAction.PREVIOUS_PAGE)
+            ReaderKeyCommand.NEXT_PAGE -> execute(ReaderInteractionAction.NEXT_PAGE)
+            ReaderKeyCommand.SCROLL_UP -> continuousScrollStep = -1
+            ReaderKeyCommand.SCROLL_DOWN -> continuousScrollStep = 1
+            ReaderKeyCommand.PREVIOUS_CHAPTER -> moveContentUnit(false)
+            ReaderKeyCommand.NEXT_CHAPTER -> moveContentUnit(true)
+            ReaderKeyCommand.FIRST_PAGE -> if (continuous) {
+                continuousScrollTarget = 0
+            } else {
+                controller.goToPage(0)
+                splitSecondHalf = false
+                revision++
+            }
+            ReaderKeyCommand.LAST_PAGE -> if (continuous) {
+                continuousScrollTarget = (snapshot.pageCount() - 1).coerceAtLeast(0)
+            } else {
+                controller.goToPage((snapshot.pageCount() - 1).coerceAtLeast(0))
+                splitSecondHalf = false
+                revision++
+            }
+            ReaderKeyCommand.ZOOM_IN -> execute(ReaderInteractionAction.ZOOM_IN)
+            ReaderKeyCommand.ZOOM_OUT -> execute(ReaderInteractionAction.ZOOM_OUT)
+            ReaderKeyCommand.ZOOM_RESET -> execute(ReaderInteractionAction.ZOOM_RESET)
+        }
+    }
+
     fun setRead(contentUnitId: SourceContentUnitId, read: Boolean) {
         controller.setContentRead(contentUnitId, read)
         readContentIds = controller.readContentIds()
@@ -272,12 +317,11 @@ internal fun ReaderScreen(
     }
 
     fun transformZoom(pan: Offset, gestureZoom: Float) {
-        val nextScale = (zoomScale * gestureZoom).coerceIn(1f, 5f)
+        val nextScale = (zoomScale * gestureZoom).coerceIn(READER_ZOOM_STEPS.first(), READER_ZOOM_STEPS.last())
+        zoomScale = nextScale
         if (nextScale <= 1.01f) {
-            zoomScale = 1f
             zoomOffset = Offset.Zero
         } else {
-            zoomScale = nextScale
             zoomOffset += pan
             controlsVisible = false
         }
@@ -289,6 +333,13 @@ internal fun ReaderScreen(
         .background(Color.Black)
         .testTag("reader-canvas")
         .semantics { stateDescription = "${(zoomScale * 100f).roundToInt()}%" }
+        .focusRequester(focusRequester)
+        .focusable()
+        .onPreviewKeyEvent { event ->
+            val command = resolveReaderKeyCommand(event, snapshot.direction(), continuous) ?: return@onPreviewKeyEvent false
+            handleKeyCommand(command)
+            true
+        }
         .readerPlatformZoom { transformZoom(Offset.Zero, it) }
         .pointerInput(controller, snapshot.contentUnit().id(), snapshot.currentPageIndex()) {
             detectReaderPinchGestures(::transformZoom)
@@ -353,6 +404,8 @@ internal fun ReaderScreen(
                             revision = revision,
                             scrollTarget = continuousScrollTarget,
                             consumeScrollTarget = { continuousScrollTarget = null },
+                            scrollStep = continuousScrollStep,
+                            consumeScrollStep = { continuousScrollStep = null },
                             pageSelected = { continuousPageIndex = it },
                             toggleControls = { controlsVisible = !controlsVisible },
                             toggleZoom = { execute(ReaderInteractionAction.TOGGLE_ZOOM) },
@@ -1329,6 +1382,12 @@ private fun nextBrightness(value: Int): Int {
     return values[(index + 1) % values.size]
 }
 
+private fun stepZoom(current: Float, direction: Int): Float {
+    val index = READER_ZOOM_STEPS.indexOfFirst { it >= current - 0.001f }.let { if (it < 0) READER_ZOOM_STEPS.size - 1 else it }
+    val target = (index + direction).coerceIn(0, READER_ZOOM_STEPS.size - 1)
+    return READER_ZOOM_STEPS[target]
+}
+
 private fun nextTransition(value: ReaderPageTransition): ReaderPageTransition {
     val values = ReaderPageTransition.entries
     return values[(value.ordinal + 1) % values.size]
@@ -1352,6 +1411,9 @@ private fun readerActionKey(action: ReaderInteractionAction): String = when (act
     ReaderInteractionAction.NEXT_PAGE -> "ui.next.page"
     ReaderInteractionAction.TOGGLE_CONTROLS -> "ui.toggle.controls"
     ReaderInteractionAction.TOGGLE_ZOOM -> "ui.toggle.zoom"
+    ReaderInteractionAction.ZOOM_IN -> "ui.zoom.in"
+    ReaderInteractionAction.ZOOM_OUT -> "ui.zoom.out"
+    ReaderInteractionAction.ZOOM_RESET -> "ui.zoom.reset"
     ReaderInteractionAction.OPEN_MENU -> "ui.open.menu"
     ReaderInteractionAction.NONE -> "ui.none"
 }

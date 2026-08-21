@@ -2,6 +2,7 @@ package fr.vriege.anilib.platform.compose
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,6 +36,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.withContext
 
+private const val CONTINUOUS_SCROLL_STEP_FRACTION = 0.85f
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun ReaderContinuousPages(
@@ -47,6 +50,8 @@ internal fun ReaderContinuousPages(
     revision: Int,
     scrollTarget: Int?,
     consumeScrollTarget: () -> Unit,
+    scrollStep: Int?,
+    consumeScrollStep: () -> Unit,
     pageSelected: (Int) -> Unit,
     toggleControls: () -> Unit,
     toggleZoom: () -> Unit,
@@ -68,6 +73,13 @@ internal fun ReaderContinuousPages(
         scrollTarget?.let { target ->
             listState.animateScrollToItem(target.coerceIn(0, pageCount - 1))
             consumeScrollTarget()
+        }
+    }
+    CrashSafeLaunchedEffect(scrollStep) {
+        scrollStep?.let { step ->
+            val viewportHeight = listState.layoutInfo.viewportSize.height.toFloat()
+            listState.animateScrollBy(step * viewportHeight * CONTINUOUS_SCROLL_STEP_FRACTION)
+            consumeScrollStep()
         }
     }
 

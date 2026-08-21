@@ -5,6 +5,9 @@ public enum ReaderInteractionAction {
     NEXT_PAGE,
     TOGGLE_CONTROLS,
     TOGGLE_ZOOM,
+    ZOOM_IN,
+    ZOOM_OUT,
+    ZOOM_RESET,
     OPEN_MENU,
     NONE
 }
