@@ -1991,8 +1991,10 @@ private fun DetailsDestination(
     goBackOverride: (() -> Unit)?,
 ) {
     val id = destination.selectedTitle().orElse(null)
+    val scope = rememberCrashSafeCoroutineScope()
     var relatedBackStack by remember { mutableStateOf<List<LibraryItemId>>(emptyList()) }
     var revision by remember(id) { mutableStateOf(0) }
+    var refreshing by remember(id) { mutableStateOf(false) }
     var browserPage by remember(id) {
         mutableStateOf<SourceWebPage?>(null)
     }
@@ -2021,7 +2023,10 @@ private fun DetailsDestination(
     if (details == null) {
         MissingDetails(navigateBack)
     } else {
-        CrashSafeLaunchedEffect(details.id(), revision) {
+        val sourceId = details.origin()
+            .map { origin -> SourceId.of(origin.sourceId()) }
+            .orElse(null)
+        val reloadContent: suspend () -> Unit = {
             unitError = null
             if (details.kind() == MediaKind.ANIME) {
                 runCatching { withContext(Dispatchers.IO) { player.episodes(details.id()) } }
@@ -2032,6 +2037,9 @@ private fun DetailsDestination(
                     .onSuccess { chapters = it }
                     .onFailure { unitError = it.message ?: "Unable to load chapters." }
             }
+        }
+        CrashSafeLaunchedEffect(details.id(), revision) {
+            reloadContent()
         }
         val titlePage = details.origin().flatMap { origin ->
             runCatching {
@@ -2086,6 +2094,30 @@ private fun DetailsDestination(
                     .onFailure { unitError = it.message ?: "The episode could not be queued." }
             },
             track = { openTracking(details.id()) },
+            refreshing = refreshing,
+            refresh = sourceId?.let { refreshSourceId ->
+                {
+                    if (!refreshing) {
+                        refreshing = true
+                        unitError = null
+                        scope.launch {
+                            val refreshFailure = withContext(Dispatchers.IO) {
+                                runCatching {
+                                    if (discovery.supportsRefresh(refreshSourceId)) {
+                                        discovery.refresh(refreshSourceId)
+                                    }
+                                }.exceptionOrNull()
+                            }
+                            if (refreshFailure == null) {
+                                reloadContent()
+                            } else {
+                                unitError = refreshFailure.message ?: "The title could not be refreshed."
+                            }
+                            refreshing = false
+                        }
+                    }
+                }
+            },
             favorite = {
                 presentation.setFavorite(setOf(details.id()), !details.favorite())
                 revision++
@@ -2171,6 +2203,8 @@ private fun DetailsPage(
     downloadChapter: (SourceContentUnit) -> Unit,
     downloadEpisode: (EpisodeSnapshot) -> Unit,
     track: () -> Unit,
+    refreshing: Boolean,
+    refresh: (() -> Unit)?,
     favorite: () -> Unit,
     edit: (String, LibraryTitleMetadata) -> Unit,
     createCategory: (String) -> Unit,
@@ -2215,6 +2249,8 @@ private fun DetailsPage(
         canOpenPrimary = canWatch || canRead,
         errors = listOfNotNull(readerError, downloadError, unitError),
         toggleFavorite = favorite,
+        refreshing = refreshing,
+        refresh = refresh,
         track = track,
         openWeb = openTitleWeb ?: openSourceWeb ?: {},
         download = download,

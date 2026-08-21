@@ -32,7 +32,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Public
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tune
@@ -616,14 +615,12 @@ private fun SourceCatalogueScreen(
     var filterValues by remember(source.id()) { mutableStateOf<Map<String, String>>(emptyMap()) }
     var preferenceRevision by remember(source.id()) { mutableIntStateOf(0) }
     var requestRevision by remember(source.id()) { mutableIntStateOf(0) }
-    var refreshing by remember(source.id()) { mutableStateOf(false) }
     var notice by remember(source.id()) { mutableStateOf<String?>(null) }
     val definitions = remember(source.id()) { presentation.filters(source.id()) }
     val preferenceDefinitions = remember(source.id(), preferenceRevision) {
         presentation.preferences(source.id())
     }
     val sourceWebPage = remember(source.id()) { presentation.sourceWebPage(source.id()).orElse(null) }
-    val supportsRefresh = remember(source.id()) { presentation.supportsRefresh(source.id()) }
     var result by remember(source.id(), selectedListing, query, page, filterValues, preferenceRevision) {
         mutableStateOf<Result<SourcePage>?>(null)
     }
@@ -639,8 +636,8 @@ private fun SourceCatalogueScreen(
         if (query.isNotBlank()) {
             delay(SOURCE_SEARCH_DEBOUNCE_MILLIS)
         }
-        if (!refreshing) result = null
-        val refreshedResult = withContext(Dispatchers.IO) {
+        result = null
+        result = withContext(Dispatchers.IO) {
             runCatching {
                 val filters = filterValues.map { SourceFilterValue(it.key, it.value) }
                 if (query.isBlank()) {
@@ -648,34 +645,6 @@ private fun SourceCatalogueScreen(
                 } else {
                     presentation.search(source.id(), query, page, 30, filters)
                 }
-            }
-        }
-        result = refreshedResult
-        if (refreshing) {
-            notice = refreshedResult.fold(
-                onSuccess = { "ui.catalogue.refreshed" },
-                onFailure = { it.message ?: "Catalogue refresh failed" },
-            )
-            refreshing = false
-        }
-    }
-
-    fun refreshCatalogue() {
-        if (refreshing || result == null) return
-        refreshing = true
-        notice = null
-        if (!supportsRefresh) {
-            requestRevision++
-            return
-        }
-        scope.launch {
-            withContext(Dispatchers.IO) {
-                runCatching { presentation.refresh(source.id()) }
-            }.onSuccess {
-                requestRevision++
-            }.onFailure {
-                notice = it.message ?: "Source refresh failed"
-                refreshing = false
             }
         }
     }
@@ -727,19 +696,6 @@ private fun SourceCatalogueScreen(
                     }
                 },
                 actions = {
-                    IconButton(
-                        onClick = ::refreshCatalogue,
-                        enabled = result != null && !refreshing,
-                    ) {
-                        if (refreshing) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
-                                strokeWidth = 2.dp,
-                            )
-                        } else {
-                            Icon(Icons.Default.Refresh, contentDescription = "ui.refresh")
-                        }
-                    }
                     if (sourceWebPage != null) {
                         IconButton(onClick = { openWebPage(sourceWebPage) }) {
                             Icon(Icons.Default.Public, contentDescription = "ui.open.source.website")

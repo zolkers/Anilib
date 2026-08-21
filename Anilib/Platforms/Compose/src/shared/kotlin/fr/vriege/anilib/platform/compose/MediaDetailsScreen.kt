@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyListScope
@@ -28,8 +29,10 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
@@ -83,6 +86,8 @@ internal fun MediaDetailsScreen(
     canOpenPrimary: Boolean,
     errors: List<String>,
     toggleFavorite: () -> Unit,
+    refreshing: Boolean,
+    refresh: (() -> Unit)?,
     track: () -> Unit,
     openWeb: () -> Unit,
     download: () -> Unit,
@@ -103,16 +108,6 @@ internal fun MediaDetailsScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = toggleFavorite) {
-                        Icon(
-                            if (favorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                            contentDescription = if (favorite) {
-                                "ui.remove.from.library"
-                            } else {
-                                "ui.add.to.library"
-                            },
-                        )
-                    }
                     manageCategories?.let { action ->
                         IconButton(onClick = action) {
                             Icon(
@@ -131,6 +126,18 @@ internal fun MediaDetailsScreen(
                     }
                     IconButton(onClick = download, enabled = canDownload) {
                         Icon(Icons.Outlined.Download, contentDescription = "ui.download")
+                    }
+                    refresh?.let { action ->
+                        IconButton(onClick = action, enabled = !refreshing) {
+                            if (refreshing) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    strokeWidth = 2.dp,
+                                )
+                            } else {
+                                Icon(Icons.Default.Refresh, contentDescription = "ui.refresh")
+                            }
+                        }
                     }
                 },
             )
@@ -153,9 +160,11 @@ internal fun MediaDetailsScreen(
             item { MediaDetailsHero(model, artwork) }
             item {
                 MediaDetailsActions(
+                    favorite = favorite,
                     contentLabel = contentLabel,
                     canTrack = canTrack,
                     canOpenWeb = canOpenWeb,
+                    toggleFavorite = toggleFavorite,
                     track = track,
                     openWeb = openWeb,
                 )
@@ -213,9 +222,11 @@ private fun MediaDetailsHero(
 
 @Composable
 private fun MediaDetailsActions(
+    favorite: Boolean,
     contentLabel: String,
     canTrack: Boolean,
     canOpenWeb: Boolean,
+    toggleFavorite: () -> Unit,
     track: () -> Unit,
     openWeb: () -> Unit,
 ) {
@@ -223,15 +234,28 @@ private fun MediaDetailsActions(
         modifier = Modifier.widthIn(max = 720.dp).fillMaxWidth().padding(vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
     ) {
-        MediaDetailAction(Icons.Default.History, contentLabel, false) {}
-        MediaDetailAction(Icons.Default.MoreHoriz, "Tracking", canTrack, track)
-        MediaDetailAction(Icons.Default.Public, "WebView", canOpenWeb, openWeb)
+        MediaDetailAction(
+            icon = if (favorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+            label = if (favorite) "ui.remove.from.library" else "ui.add.to.library",
+            enabled = true,
+            action = toggleFavorite,
+            modifier = Modifier.weight(1f),
+        )
+        MediaDetailAction(Icons.Default.History, contentLabel, false, {}, Modifier.weight(1f))
+        MediaDetailAction(Icons.Default.MoreHoriz, "Tracking", canTrack, track, Modifier.weight(1f))
+        MediaDetailAction(Icons.Default.Public, "WebView", canOpenWeb, openWeb, Modifier.weight(1f))
     }
 }
 
 @Composable
-private fun MediaDetailAction(icon: ImageVector, label: String, enabled: Boolean, action: () -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(92.dp)) {
+private fun MediaDetailAction(
+    icon: ImageVector,
+    label: String,
+    enabled: Boolean,
+    action: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = modifier) {
         IconButton(onClick = action, enabled = enabled) {
             Icon(icon, contentDescription = label)
         }
