@@ -51,7 +51,10 @@ import fr.vriege.anilib.platform.compose.ComposePlayerBackend
 import fr.vriege.anilib.platform.compose.DesktopBrowserRuntime
 import fr.vriege.anilib.platform.compose.ShareController
 import java.awt.GraphicsEnvironment
+import java.awt.event.WindowAdapter
+import java.awt.event.WindowEvent
 import java.util.concurrent.atomic.AtomicBoolean
+import javax.swing.Timer
 import org.jetbrains.skia.Image
 
 fun main(arguments: Array<String>) {
@@ -255,6 +258,33 @@ fun main(arguments: Array<String>) {
                         }
                     },
                 ) {
+                    DisposableEffect(window) {
+                        var pendingExit: Timer? = null
+                        val listener = object : WindowAdapter() {
+                            override fun windowLostFocus(event: WindowEvent) {
+                                if (!playerFullscreen.value) return
+                                pendingExit?.stop()
+                                pendingExit = Timer(PLAYER_FULLSCREEN_FOCUS_GRACE_MILLIS) {
+                                    if (shouldExitPlayerFullscreen(playerFullscreen.value, window.isFocused)) {
+                                        setPlayerFullscreen(false)
+                                    }
+                                }.apply {
+                                    isRepeats = false
+                                    start()
+                                }
+                            }
+
+                            override fun windowGainedFocus(event: WindowEvent) {
+                                pendingExit?.stop()
+                                pendingExit = null
+                            }
+                        }
+                        window.addWindowFocusListener(listener)
+                        onDispose {
+                            pendingExit?.stop()
+                            window.removeWindowFocusListener(listener)
+                        }
+                    }
                     LaunchedEffect(window) {
                         windowState.placement = intendedWindowPlacement.value
                         window.isVisible = true
@@ -269,6 +299,13 @@ fun main(arguments: Array<String>) {
         crashShield.close()
     }
 }
+
+private const val PLAYER_FULLSCREEN_FOCUS_GRACE_MILLIS = 150
+
+internal fun shouldExitPlayerFullscreen(
+    playerFullscreen: Boolean,
+    windowFocused: Boolean,
+): Boolean = playerFullscreen && !windowFocused
 
 private fun ApplicationWindowMode.placement(): WindowPlacement = when (this) {
     ApplicationWindowMode.WINDOWED -> WindowPlacement.Floating

@@ -10,6 +10,13 @@ import kotlin.test.assertTrue
 
 class DesktopWindowModeTest {
     @Test
+    fun `player fullscreen exits when the application stays unfocused`() {
+        assertTrue(shouldExitPlayerFullscreen(playerFullscreen = true, windowFocused = false))
+        assertFalse(shouldExitPlayerFullscreen(playerFullscreen = true, windowFocused = true))
+        assertFalse(shouldExitPlayerFullscreen(playerFullscreen = false, windowFocused = false))
+    }
+
+    @Test
     fun `player fullscreen keeps the window decoration stable`() {
         ApplicationWindowMode.entries.forEach { applicationMode ->
             val before = windowUndecorated(
