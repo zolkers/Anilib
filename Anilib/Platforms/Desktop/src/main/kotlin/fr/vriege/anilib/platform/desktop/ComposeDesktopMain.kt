@@ -131,11 +131,11 @@ fun main(arguments: Array<String>) {
                             placementBeforeFullscreen.value = windowState.placement
                             applicationModeBeforeFullscreen.value = applicationWindowMode.value
                             playerWindowMode.value = settingsService.snapshot().playerWindowMode()
-                            intendedWindowPlacement.value = when (playerWindowMode.value) {
-                                PlayerWindowMode.WINDOWED -> windowState.placement
-                                PlayerWindowMode.FULLSCREEN -> WindowPlacement.Fullscreen
-                                PlayerWindowMode.BORDERLESS -> WindowPlacement.Maximized
-                            }
+                            intendedWindowPlacement.value = playerWindowMode.value.placement(
+                                current = windowState.placement,
+                                applicationUndecorated =
+                                    applicationWindowMode.value == ApplicationWindowMode.BORDERLESS,
+                            )
                         } else if (applicationModeBeforeFullscreen.value == applicationWindowMode.value) {
                             intendedWindowPlacement.value = placementBeforeFullscreen.value
                         } else {
@@ -180,11 +180,11 @@ fun main(arguments: Array<String>) {
                     }
                 }
             }
-            val windowUndecorated = applicationFullscreen.value || if (playerFullscreen.value) {
-                playerWindowMode.value == PlayerWindowMode.BORDERLESS
-            } else {
-                applicationWindowMode.value == ApplicationWindowMode.BORDERLESS
-            }
+            val windowUndecorated = windowUndecorated(
+                applicationFullscreen = applicationFullscreen.value,
+                playerFullscreen = playerFullscreen.value,
+                applicationWindowMode = applicationWindowMode.value,
+            )
             val content = remember {
                 movableContentOf {
                     DesktopAnilibContent(
@@ -275,6 +275,30 @@ private fun ApplicationWindowMode.placement(): WindowPlacement = when (this) {
     ApplicationWindowMode.MAXIMIZED,
     ApplicationWindowMode.BORDERLESS,
     -> WindowPlacement.Maximized
+}
+
+internal fun PlayerWindowMode.placement(
+    current: WindowPlacement,
+    applicationUndecorated: Boolean,
+): WindowPlacement = when (this) {
+    PlayerWindowMode.WINDOWED -> current
+    PlayerWindowMode.FULLSCREEN -> WindowPlacement.Fullscreen
+    PlayerWindowMode.BORDERLESS -> if (applicationUndecorated) {
+        WindowPlacement.Maximized
+    } else {
+        WindowPlacement.Fullscreen
+    }
+}
+
+internal fun windowUndecorated(
+    applicationFullscreen: Boolean,
+    playerFullscreen: Boolean,
+    applicationWindowMode: ApplicationWindowMode,
+): Boolean = if (playerFullscreen) {
+    // This value keys the Window. Keep it stable while video is active so its native surface survives.
+    applicationWindowMode == ApplicationWindowMode.BORDERLESS
+} else {
+    applicationFullscreen || applicationWindowMode == ApplicationWindowMode.BORDERLESS
 }
 
 @Composable
