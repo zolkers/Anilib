@@ -220,6 +220,39 @@ fun AnilibApp(
                     downloads::enqueue,
                 ) { activeReader = null }
             } else if (playerController != null) {
+                // Sources list episodes newest first, so the neighbour towards index 0 is the
+                // next episode and the one after it is the previous, matching the reader.
+                var episodeNeighbours by remember(playerController) {
+                    mutableStateOf<Pair<(() -> Unit)?, (() -> Unit)?>>(null to null)
+                }
+                CrashSafeLaunchedEffect(playerController) {
+                    val current = runCatching { playerController.snapshot() }.getOrNull()
+                        ?: return@CrashSafeLaunchedEffect
+                    val episodes = withContext(Dispatchers.IO) {
+                        runCatching { player.episodes(current.libraryItemId()) }.getOrDefault(emptyList())
+                    }
+                    val index = episodes.indexOfFirst { it.episode().id() == current.episode().id() }
+                    if (index < 0) return@CrashSafeLaunchedEffect
+                    val switchTo: (SourceEpisodeId) -> () -> Unit = { episodeId ->
+                        {
+                            scope.launch {
+                                withContext(Dispatchers.IO) {
+                                    runCatching { player.open(current.libraryItemId(), episodeId) }
+                                }
+                                    .onSuccess {
+                                        playerError = null
+                                        activePlayer = it
+                                    }
+                                    .onFailure {
+                                        playerError = it.message ?: "The episode could not be opened."
+                                    }
+                            }
+                        }
+                    }
+                    episodeNeighbours =
+                        episodes.getOrNull(index - 1)?.episode()?.id()?.let(switchTo) to
+                            episodes.getOrNull(index + 1)?.episode()?.id()?.let(switchTo)
+                }
                 PlayerSelectionScreen(
                     playerController,
                     playerFullscreen,
@@ -230,6 +263,8 @@ fun AnilibApp(
                     setPlayerBackgroundAudio,
                     enableAndroidPlayerControls,
                     enableDesktopPlayerControls,
+                    nextEpisode = episodeNeighbours.first,
+                    previousEpisode = episodeNeighbours.second,
                 ) {
                     activePlayer = null
                 }

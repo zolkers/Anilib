@@ -68,6 +68,8 @@ internal fun PlayerSelectionScreen(
     setBackgroundAudio: (Boolean) -> Unit,
     enableAndroidControls: Boolean,
     enableDesktopControls: Boolean,
+    nextEpisode: (() -> Unit)? = null,
+    previousEpisode: (() -> Unit)? = null,
     goBack: () -> Unit,
 ) {
     var revision by remember(controller) { mutableIntStateOf(0) }
@@ -99,7 +101,7 @@ internal fun PlayerSelectionScreen(
     DisposableEffect(controller) {
         onDispose { currentSetFullscreen(false) }
     }
-    val playerSurface = remember(controller) {
+    val playerSurface = remember(controller, nextEpisode, previousEpisode) {
         movableContentOf<Boolean> { expanded ->
             PlayerVideoSurface(
                 controller,
@@ -112,6 +114,8 @@ internal fun PlayerSelectionScreen(
                 setBackgroundAudio,
                 enableAndroidControls,
                 enableDesktopControls,
+                nextEpisode = nextEpisode,
+                previousEpisode = previousEpisode,
                 progressChanged = {
                     livePlayback.value = controller.snapshot().playback()
                 },

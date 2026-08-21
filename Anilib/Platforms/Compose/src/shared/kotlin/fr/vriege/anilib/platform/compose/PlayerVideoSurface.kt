@@ -25,6 +25,8 @@ import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay10
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.ScreenRotation
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
@@ -78,6 +80,8 @@ internal fun PlayerVideoSurface(
     setBackgroundAudio: (Boolean) -> Unit,
     enableAndroidControls: Boolean,
     enableDesktopControls: Boolean,
+    nextEpisode: (() -> Unit)? = null,
+    previousEpisode: (() -> Unit)? = null,
     progressChanged: () -> Unit,
 ) {
     val bridge = playback as? ComposePlayerPlayback
@@ -286,6 +290,19 @@ internal fun PlayerVideoSurface(
                             modifier = Modifier.align(Alignment.Center),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
+                            IconButton(
+                                onClick = { previousEpisode?.invoke() },
+                                enabled = previousEpisode != null,
+                            ) {
+                                Icon(
+                                    Icons.Default.SkipPrevious,
+                                    contentDescription = UiTranslations.translate(
+                                        "ui.previous.episode",
+                                        LocalLanguagePack.current,
+                                    ),
+                                    tint = Color.White.copy(alpha = if (previousEpisode == null) 0.3f else 1f),
+                                )
+                            }
                             IconButton(onClick = { seekBy(-10_000L) }) {
                                 Icon(Icons.Default.Replay10, "Seek back", tint = Color.White)
                             }
@@ -299,6 +316,19 @@ internal fun PlayerVideoSurface(
                             }
                             IconButton(onClick = { seekBy(10_000L) }) {
                                 Icon(Icons.Default.Forward10, "Seek forward", tint = Color.White)
+                            }
+                            IconButton(
+                                onClick = { nextEpisode?.invoke() },
+                                enabled = nextEpisode != null,
+                            ) {
+                                Icon(
+                                    Icons.Default.SkipNext,
+                                    contentDescription = UiTranslations.translate(
+                                        "ui.next.episode",
+                                        LocalLanguagePack.current,
+                                    ),
+                                    tint = Color.White.copy(alpha = if (nextEpisode == null) 0.3f else 1f),
+                                )
                             }
                         }
                         Column(
