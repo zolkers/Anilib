@@ -17,6 +17,7 @@ import fr.vriege.anilib.feature.player.PlayerBackend;
 import fr.vriege.anilib.feature.player.PlayerBackends;
 import fr.vriege.anilib.feature.player.bundle.PlayerPlugin;
 import fr.vriege.anilib.feature.tracker.TrackerCapabilities;
+import fr.vriege.anilib.feature.tracker.anilist.AniListTracker;
 import fr.vriege.anilib.feature.tracker.anilist.AniListTrackerBundle;
 import fr.vriege.anilib.feature.tracker.bundle.TrackerPlugin;
 import fr.vriege.anilib.feature.tracker.kitsu.KitsuTrackerBundle;
@@ -33,6 +34,7 @@ import fr.vriege.anilib.kernel.AnilibPlugin;
 import fr.vriege.anilib.kernel.StartedAnilib;
 import fr.vriege.anilib.kernel.runtime.DefaultPluginEngine;
 
+import java.net.URI;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -174,9 +176,11 @@ public final class StandardAnilib {
         plugins.add(new DownloadPlugin(downloads));
         plugins.add(new PlayerPlugin(playbackState, playerPreferences, playerBackend));
         plugins.add(new TrackerPlugin(trackingState));
-        plugins.add(new AniListTrackerBundle(oauthClientId(
-                "anilib.tracker.anilist.client-id",
-                "ANILIB_ANILIST_CLIENT_ID")));
+        plugins.add(new AniListTrackerBundle(
+                oauthClientId(
+                        "anilib.tracker.anilist.client-id",
+                        "ANILIB_ANILIST_CLIENT_ID"),
+                oauthCallbackUri()));
         plugins.add(new KitsuTrackerBundle());
         plugins.add(new UpdatePlugin(updateState, updateNotifier));
         plugins.add(ApplicationUpdatePlugin.currentRuntime(
@@ -198,5 +202,13 @@ public final class StandardAnilib {
             return configured;
         }
         return Objects.requireNonNullElse(System.getenv(environment), "").strip();
+    }
+
+    private static URI oauthCallbackUri() {
+        String configured = System.getProperty("anilib.tracker.anilist.callback-uri", "").strip();
+        if (configured.isEmpty()) {
+            configured = Objects.requireNonNullElse(System.getenv("ANILIB_ANILIST_CALLBACK_URI"), "").strip();
+        }
+        return configured.isEmpty() ? AniListTracker.DEFAULT_CALLBACK : URI.create(configured);
     }
 }

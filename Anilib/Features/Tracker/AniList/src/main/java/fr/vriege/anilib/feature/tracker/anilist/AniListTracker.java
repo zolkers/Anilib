@@ -40,7 +40,7 @@ import fr.vriege.anilib.feature.library.LibraryItemId;
 public final class AniListTracker implements Tracker {
     private static final URI ENDPOINT = URI.create("https://graphql.anilist.co/");
     private static final URI AUTHORIZE_ENDPOINT = URI.create("https://anilist.co/api/v2/oauth/authorize");
-    private static final URI CALLBACK = URI.create("anilib://oauth/anilist");
+    public static final URI DEFAULT_CALLBACK = URI.create("http://127.0.0.1:43697/oauth/anilist/callback");
     private static final TrackerId ID = TrackerId.of("anilist");
     private static final TrackerDescriptor DESCRIPTOR = new TrackerDescriptor(
             ID,
@@ -66,17 +66,23 @@ public final class AniListTracker implements Tracker {
             + "media { id type episodes chapters siteUrl title { userPreferred } }";
     private final AnilibHttpClient client;
     private final String clientId;
+    private final URI callbackUri;
     private String token;
     private String accountName = "";
     private String authorizationState;
 
     public AniListTracker(AnilibHttpClient client) {
-        this(client, "");
+        this(client, "", DEFAULT_CALLBACK);
     }
 
     public AniListTracker(AnilibHttpClient client, String clientId) {
+        this(client, clientId, DEFAULT_CALLBACK);
+    }
+
+    public AniListTracker(AnilibHttpClient client, String clientId, URI callbackUri) {
         this.client = Objects.requireNonNull(client, "client must not be null");
         this.clientId = Objects.requireNonNull(clientId, "clientId must not be null").strip();
+        this.callbackUri = requireLoopbackCallback(callbackUri);
     }
 
     @Override
@@ -118,14 +124,14 @@ public final class AniListTracker implements Tracker {
         }
         authorizationState = UUID.randomUUID().toString();
         String query = "client_id=" + encode(clientId)
-                + "&redirect_uri=" + encode(CALLBACK.toASCIIString())
+                + "&redirect_uri=" + encode(callbackUri.toASCIIString())
                 + "&response_type=token&state=" + encode(authorizationState);
-        return Optional.of(new TrackerAuthorization(URI.create(AUTHORIZE_ENDPOINT + "?" + query), CALLBACK));
+        return Optional.of(new TrackerAuthorization(URI.create(AUTHORIZE_ENDPOINT + "?" + query), callbackUri));
     }
 
     @Override
     public void completeAuthorization(URI callbackUri) {
-        TrackerAuthorization authorization = new TrackerAuthorization(AUTHORIZE_ENDPOINT, CALLBACK);
+        TrackerAuthorization authorization = new TrackerAuthorization(AUTHORIZE_ENDPOINT, this.callbackUri);
         URI callback = Objects.requireNonNull(callbackUri, "callbackUri must not be null");
         if (!authorization.accepts(callback)) {
             throw new TrackerException("AniList returned an unexpected OAuth callback");
@@ -403,6 +409,23 @@ public final class AniListTracker implements Tracker {
         } catch (NumberFormatException exception) {
             throw new TrackerException("AniList identity is not numeric", exception);
         }
+    }
+
+    private static URI requireLoopbackCallback(URI value) {
+        URI callback = Objects.requireNonNull(value, "callbackUri must not be null");
+        if (!"http".equalsIgnoreCase(callback.getScheme())
+                || !"127.0.0.1".equals(callback.getHost())
+                || callback.getPort() < 1
+                || callback.getPort() > 65535
+                || callback.getRawPath() == null
+                || !callback.getRawPath().matches("/[A-Za-z0-9/_-]+")
+                || callback.getRawQuery() != null
+                || callback.getRawFragment() != null
+                || callback.getUserInfo() != null) {
+            throw new IllegalArgumentException(
+                    "AniList callbackUri must be an explicit http://127.0.0.1:<port>/path loopback URI");
+        }
+        return callback;
     }
 
     private void requireOwned(TrackerEntry entry) {

@@ -37,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -67,13 +68,16 @@ import fr.vriege.anilib.feature.tracker.TrackerSyncDirection
 import fr.vriege.anilib.feature.tracker.TrackerSyncPreferences
 import fr.vriege.anilib.feature.tracker.TrackerSyncReport
 import fr.vriege.anilib.feature.tracker.ui.TrackerPresentation
+import java.net.BindException
 import java.net.URI
 import java.time.LocalDate
 import java.util.Optional
 import java.util.OptionalDouble
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1054,6 +1058,17 @@ private fun TrackerAuthorizationScreen(
     authorized: () -> Unit,
     failed: (String) -> Unit,
 ) {
+    if (authorization.isLoopback()) {
+        TrackerLoopbackAuthorizationScreen(
+            account = account,
+            authorization = authorization,
+            presentation = presentation,
+            close = close,
+            authorized = authorized,
+            failed = failed,
+        )
+        return
+    }
     var resolvedRuntime by remember(runtimeStatus) {
         mutableStateOf(runtimeStatus.currentOrNull())
     }
@@ -1156,6 +1171,111 @@ private fun TrackerAuthorizationScreen(
         }
     }
 }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TrackerLoopbackAuthorizationScreen(
+    account: TrackerAccount,
+    authorization: TrackerAuthorization,
+    presentation: TrackerPresentation,
+    close: () -> Unit,
+    authorized: () -> Unit,
+    failed: (String) -> Unit,
+) {
+    val uriHandler = LocalUriHandler.current
+    var waiting by remember(authorization) { mutableStateOf(true) }
+    var localError by remember(authorization) { mutableStateOf<String?>(null) }
+
+    CrashSafeLaunchedEffect(authorization) {
+        waiting = true
+        localError = null
+        var receiver: LoopbackOAuthReceiver? = null
+        try {
+            receiver = withContext(Dispatchers.IO) {
+                LoopbackOAuthReceiver(authorization.callbackUri())
+            }
+            uriHandler.openUri(authorization.authorizationUri().toString())
+            val callback = withTimeout(OAUTH_CALLBACK_TIMEOUT_MILLIS) {
+                withContext(Dispatchers.IO) { receiver.awaitCallback() }
+            }
+            withContext(Dispatchers.IO) {
+                presentation.completeAuthorization(account.descriptor().id(), callback)
+            }
+            authorized()
+        } catch (exception: CancellationException) {
+            throw exception
+        } catch (exception: Throwable) {
+            val message = when (exception) {
+                is BindException -> "ui.tracker.oauth.local.callback.in.use"
+                else -> exception.message ?: "ui.tracker.oauth.failure"
+            }
+            localError = message
+            failed(message)
+        } finally {
+            waiting = false
+            receiver?.close()
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        UiTranslations.format(
+                            "dynamic.sign.in",
+                            LocalLanguagePack.current,
+                            account.descriptor().name(),
+                        ),
+                    )
+                },
+                navigationIcon = {
+                    IconButton(onClick = close) {
+                        Icon(Icons.Default.Close, contentDescription = "ui.close.browser")
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        Box(
+            modifier = Modifier.fillMaxSize().padding(padding).padding(24.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    if (waiting) {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        Text("ui.tracker.oauth.finish.in.browser")
+                        Text(
+                            "ui.tracker.oauth.local.callback.description",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        TextButton(onClick = {
+                            uriHandler.openUri(authorization.authorizationUri().toString())
+                        }) {
+                            Text("ui.tracker.oauth.reopen.browser")
+                        }
+                    }
+                    localError?.let { message ->
+                        Text(message, color = MaterialTheme.colorScheme.error)
+                        Button(onClick = close) {
+                            Text("ui.close")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun TrackerAuthorization.isLoopback(): Boolean =
+    callbackUri().scheme.equals("http", ignoreCase = true) && callbackUri().host == "127.0.0.1"
+
+private const val OAUTH_CALLBACK_TIMEOUT_MILLIS = 5 * 60 * 1_000L
 
 @Composable
 private fun ObserveTracking(presentation: TrackerPresentation, changed: () -> Unit) {

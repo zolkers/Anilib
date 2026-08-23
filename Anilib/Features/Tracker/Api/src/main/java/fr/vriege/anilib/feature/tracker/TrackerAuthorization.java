@@ -16,6 +16,7 @@ public record TrackerAuthorization(URI authorizationUri, URI callbackUri) {
         URI value = Objects.requireNonNull(candidate, "candidate must not be null");
         return callbackUri.getScheme().equalsIgnoreCase(value.getScheme())
                 && equalHost(callbackUri.getHost(), value.getHost())
+                && callbackUri.getPort() == value.getPort()
                 && Objects.equals(callbackUri.getPath(), value.getPath());
     }
 

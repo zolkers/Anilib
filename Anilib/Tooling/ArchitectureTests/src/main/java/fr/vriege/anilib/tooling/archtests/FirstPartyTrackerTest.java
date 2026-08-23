@@ -7,6 +7,7 @@ import fr.vriege.anilib.feature.tracker.TrackerCapabilities;
 import fr.vriege.anilib.feature.tracker.TrackerAuthorization;
 import fr.vriege.anilib.feature.tracker.TrackerCredentials;
 import fr.vriege.anilib.feature.tracker.TrackerEntry;
+import fr.vriege.anilib.feature.tracker.TrackerException;
 import fr.vriege.anilib.feature.tracker.TrackerSearchResult;
 import fr.vriege.anilib.feature.tracker.TrackerStatus;
 import fr.vriege.anilib.feature.tracker.anilist.AniListTracker;
@@ -80,8 +81,23 @@ final class FirstPartyTrackerTest {
                         && queryParameter(authorization.authorizationUri().getRawQuery(), "client_id").equals("1234")
                         && queryParameter(
                                 authorization.authorizationUri().getRawQuery(),
+                                "redirect_uri").equals(AniListTracker.DEFAULT_CALLBACK.toASCIIString())
+                        && queryParameter(
+                                authorization.authorizationUri().getRawQuery(),
                                 "response_type").equals("token"),
                 "AniList login must begin on its official OAuth website");
+        counter.check(authorization.callbackUri().equals(AniListTracker.DEFAULT_CALLBACK)
+                        && !authorization.accepts(URI.create(
+                                "http://127.0.0.1:43698/oauth/anilist/callback#access_token=wrong-port")),
+                "AniList login must return only through the exact local callback port");
+        boolean wrongPortRejected = false;
+        try {
+            tracker.completeAuthorization(URI.create(
+                    "http://127.0.0.1:43698/oauth/anilist/callback#access_token=token-value&state=" + state));
+        } catch (TrackerException expected) {
+            wrongPortRejected = true;
+        }
+        counter.check(wrongPortRejected, "AniList must reject a callback delivered through another local port");
         tracker.completeAuthorization(URI.create(
                 authorization.callbackUri() + "#access_token=token-value&state=" + state));
         counter.check(tracker.isAuthenticated() && tracker.accountName().equals("alice"),

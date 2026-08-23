@@ -11,8 +11,8 @@ An installed tracker exposes its authentication method, supported media kinds,
 statuses, score scale, date support, and private-entry support. The shared UI
 then provides:
 
-- provider-website OAuth with automatic callback handling, plus sign-in and
-  sign-out for password and token adapters;
+- provider-website OAuth with an automatic loopback callback, plus sign-in
+  and sign-out for password and token adapters;
 - remote title search and explicit binding;
 - status, fractional progress, score, start date, finish date, and privacy;
 - remote refresh and confirmed adapter-owned removal;
@@ -47,8 +47,15 @@ live accounts.
 The Standard product reads AniList's public OAuth client identifier from the
 `anilib.tracker.anilist.client-id` JVM property or the
 `ANILIB_ANILIST_CLIENT_ID` environment variable. The registered provider
-application must use the exact callback URI `anilib://oauth/anilist`; no client
-secret belongs in either application.
+application must use the exact callback URI
+`http://127.0.0.1:43697/oauth/anilist/callback`. Anilib binds that address only
+while a login is active, opens the provider in the system browser, validates
+the OAuth state and exact callback port, and stops the local listener after
+completion, cancellation, or timeout. The callback can be overridden with
+`anilib.tracker.anilist.callback-uri` or `ANILIB_ANILIST_CALLBACK_URI`, but it
+must remain an explicit `http://127.0.0.1:<port>/path` URI and must exactly
+match AniList's registered redirect. No client secret belongs in the
+application, and no Anilib-hosted authentication service is involved.
 
 Synchronization preferences and pending local changes are written atomically
 beside the tracking mirror. Remote refresh timestamps let the newest-wins policy
