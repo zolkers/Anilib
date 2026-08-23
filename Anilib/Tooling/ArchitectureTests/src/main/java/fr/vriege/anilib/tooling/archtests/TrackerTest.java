@@ -73,9 +73,9 @@ final class TrackerTest {
             new SourceCatalogueItemId(READING_SOURCE_ID, "tracked-manga");
     private static final SourceContentUnit READING_CHAPTER = new SourceContentUnit(
             new SourceContentUnitId(READING_ITEM_ID, "chapter-7.5"),
-            "Chapter 7.5",
-            7.5d,
+            "Vol. 2 Ch. 7,5 - The host must recognize this number",
             Optional.empty());
+    private static final double READING_CHAPTER_PROGRESS = 7.5d;
 
     private TrackerTest() {
     }
@@ -270,13 +270,13 @@ final class TrackerTest {
                     item.id(),
                     READING_CHAPTER.id().value(),
                     true);
-            awaitTrackedProgress(service, item, tracker, READING_CHAPTER.number(), TrackerStatus.READING);
+            awaitTrackedProgress(service, item, tracker, READING_CHAPTER_PROGRESS, TrackerStatus.READING);
             TrackerEntry tracked = service.entries(item.id()).getFirst();
-            counter.check(tracked.progress() == READING_CHAPTER.number()
+            counter.check(tracked.progress() == READING_CHAPTER_PROGRESS
                             && tracked.totalUnits() == 12
                             && tracked.status() == TrackerStatus.READING
                             && tracker.updates.get() == 1,
-                    "reading tracking must push the chapter and reading status without losing the remote total");
+                    "reading tracking must recognize an extension chapter title and push reading progress");
         } finally {
             deleteDirectory(directory);
         }
