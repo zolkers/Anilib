@@ -347,7 +347,7 @@ private fun MediaContentSectionHeader(
             selection?.let {
                 TextButton(onClick = it.toggle) {
                     Text(UiTranslations.translate(
-                        if (it.selecting) "ui.clear" else "ui.select",
+                        if (it.selecting) "ui.deselect" else "ui.select",
                         LocalLanguagePack.current,
                     ))
                 }
