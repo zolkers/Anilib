@@ -88,6 +88,7 @@ final class PlayerTest {
     static int run() {
         Counter counter = new Counter();
         verifiesSelectionAndPersistence(counter);
+        switchesEpisodeSessionsIndependently(counter);
         migratesLegacySecondProgress(counter);
         completesPlaybackAtConfiguredThreshold(counter);
         verifiesPreferencePolicies(counter);
@@ -96,6 +97,37 @@ final class PlayerTest {
         cleansOrphanedPlaybackState(counter);
         rejectsInvalidSourceResults(counter);
         return counter.value;
+    }
+
+    private static void switchesEpisodeSessionsIndependently(Counter counter) {
+        Path directory = temporaryDirectory("anilib-player-episode-switch");
+        RecordingBackend backend = new RecordingBackend();
+        try (StartedAnilib application = StandardAnilib.start(
+                directory,
+                new UrlConnectionHttpTransport(),
+                backend,
+                List.of(sourcePlugin(new TestStreamingSource(false))))) {
+            LibraryItem item = animeItem("player-episode-switch");
+            application.capability(LibraryCapabilities.CATALOG).save(item);
+            PlayerPresentation presentation = application.capability(PlayerUiCapabilities.PRESENTATION);
+            PlayerController first = presentation.open(item.id(), FIRST_EPISODE.id());
+            PlayerController second = null;
+            try {
+                second = presentation.open(item.id(), SECOND_EPISODE.id());
+                first.close();
+                counter.check(backend.opened.getFirst().closed && !backend.opened.getLast().closed,
+                        "replacing an episode must close only the superseded playback handle");
+                second.play();
+                counter.check(second.snapshot().episode().id().equals(SECOND_EPISODE.id())
+                                && second.playback().snapshot().status() == PlayerPlaybackStatus.PLAYING,
+                        "the replacement episode must remain playable after the previous session closes");
+            } finally {
+                first.close();
+                if (second != null) second.close();
+            }
+        } finally {
+            deleteDirectory(directory);
+        }
     }
 
     private static void migratesLegacySecondProgress(Counter counter) {

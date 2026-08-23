@@ -36,6 +36,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
@@ -209,6 +210,13 @@ fun AnilibApp(
             val playerController = activePlayer
             val playerRequest = pendingPlayer
             val trackingTitle = activeTrackingTitle
+            val currentSetPlayerFullscreen = rememberUpdatedState(setPlayerFullscreen)
+            DisposableEffect(playerController != null) {
+                val resetFullscreenOnDispose = playerController != null
+                onDispose {
+                    if (resetFullscreenOnDispose) currentSetPlayerFullscreen.value(false)
+                }
+            }
             if (readerController != null) {
                 DisposableEffect(readerController) {
                     onDispose { readerController.close() }
@@ -289,6 +297,7 @@ fun AnilibApp(
                         ?.takeUnless { episodeSwitching }
                         ?.let(switchEpisode),
                 ) {
+                    pendingPlayer = null
                     activePlayer = null
                 }
             } else if (playerRequest != null) {

@@ -98,10 +98,10 @@ internal fun PlayerSelectionScreen(
             .onFailure { commandError = it.message ?: "The player command failed." }
     }
     val currentSetFullscreen by rememberUpdatedState(setFullscreen)
-    DisposableEffect(controller) {
-        onDispose { currentSetFullscreen(false) }
-    }
-    val playerSurface = remember(controller, nextEpisode, previousEpisode) {
+    val currentNextEpisode = rememberUpdatedState(nextEpisode)
+    val currentPreviousEpisode = rememberUpdatedState(previousEpisode)
+    // Callback identities change while neighbours resolve; the native surface must not.
+    val playerSurface = remember(controller) {
         movableContentOf<Boolean> { expanded ->
             PlayerVideoSurface(
                 controller,
@@ -114,8 +114,8 @@ internal fun PlayerSelectionScreen(
                 setBackgroundAudio,
                 enableAndroidControls,
                 enableDesktopControls,
-                nextEpisode = nextEpisode,
-                previousEpisode = previousEpisode,
+                nextEpisode = currentNextEpisode.value,
+                previousEpisode = currentPreviousEpisode.value,
                 progressChanged = {
                     livePlayback.value = controller.snapshot().playback()
                 },
