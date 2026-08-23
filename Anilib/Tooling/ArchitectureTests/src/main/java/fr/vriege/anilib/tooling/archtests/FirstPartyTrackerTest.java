@@ -91,13 +91,11 @@ final class FirstPartyTrackerTest {
         String state = queryParameter(authorization.authorizationUri().getRawQuery(), "state");
         counter.check(authorization.authorizationUri().getHost().equals("anilist.co")
                         && queryParameter(authorization.authorizationUri().getRawQuery(), "client_id").equals("1234")
-                        && queryParameter(
-                                authorization.authorizationUri().getRawQuery(),
-                                "redirect_uri").equals(AniListTracker.DEFAULT_CALLBACK.toASCIIString())
+                        && !authorization.authorizationUri().getRawQuery().contains("redirect_uri=")
                         && queryParameter(
                                 authorization.authorizationUri().getRawQuery(),
                                 "response_type").equals("token"),
-                "AniList login must begin on its official OAuth website");
+                "AniList login must use the provider's implicit grant without overriding its registered redirect");
         counter.check(authorization.callbackUri().equals(AniListTracker.DEFAULT_CALLBACK)
                         && !authorization.accepts(URI.create(
                                 "http://127.0.0.1:43698/oauth/anilist/callback#access_token=wrong-port")),

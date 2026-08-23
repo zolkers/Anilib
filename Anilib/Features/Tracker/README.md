@@ -52,7 +52,9 @@ application must use the exact callback URI
 `http://127.0.0.1:43697/oauth/anilist/callback`. Anilib binds that address only
 while a login is active, opens the provider in the system browser, validates
 the OAuth state and exact callback port, and stops the local listener after
-completion, cancellation, or timeout. The callback can be overridden with
+completion, cancellation, or timeout. The implicit authorization request lets
+AniList select the redirect registered for the client instead of sending a
+`redirect_uri` override. The callback can be overridden with
 `anilib.tracker.anilist.callback-uri` or `ANILIB_ANILIST_CALLBACK_URI`, but it
 must remain an explicit `http://127.0.0.1:<port>/path` URI and must exactly
 match AniList's registered redirect. No client secret belongs in the

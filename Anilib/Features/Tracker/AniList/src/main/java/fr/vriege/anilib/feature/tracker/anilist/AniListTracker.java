@@ -124,7 +124,6 @@ public final class AniListTracker implements Tracker {
         }
         authorizationState = UUID.randomUUID().toString();
         String query = "client_id=" + encode(clientId)
-                + "&redirect_uri=" + encode(callbackUri.toASCIIString())
                 + "&response_type=token&state=" + encode(authorizationState);
         return Optional.of(new TrackerAuthorization(URI.create(AUTHORIZE_ENDPOINT + "?" + query), callbackUri));
     }
