@@ -83,6 +83,7 @@ internal fun MediaDetailsScreen(
     canTrack: Boolean,
     canOpenWeb: Boolean,
     canDownload: Boolean,
+    canShare: Boolean,
     primaryLabel: String,
     canOpenPrimary: Boolean,
     errors: List<String>,
@@ -122,7 +123,7 @@ internal fun MediaDetailsScreen(
                             Icon(Icons.Default.Edit, contentDescription = "ui.edit")
                         }
                     }
-                    IconButton(onClick = share) {
+                    IconButton(onClick = share, enabled = canShare) {
                         Icon(Icons.Default.Share, contentDescription = "ui.share")
                     }
                     IconButton(onClick = download, enabled = canDownload) {
@@ -301,6 +302,7 @@ internal fun MediaUnitRow(
     open: () -> Unit,
     download: () -> Unit,
     muted: Boolean = false,
+    canDownload: Boolean = true,
     selectionMode: Boolean = false,
     selected: Boolean = false,
     select: () -> Unit = {},
@@ -322,7 +324,7 @@ internal fun MediaUnitRow(
             Text(title, fontWeight = FontWeight.Medium)
             Text(summary, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        IconButton(onClick = download, enabled = !selectionMode) {
+        IconButton(onClick = download, enabled = canDownload && !selectionMode) {
             Icon(
                 Icons.Outlined.Download,
                 contentDescription = UiTranslations.format(

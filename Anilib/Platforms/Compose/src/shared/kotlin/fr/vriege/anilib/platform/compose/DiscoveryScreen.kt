@@ -85,8 +85,12 @@ import fr.vriege.anilib.feature.library.LibraryItemId
 import fr.vriege.anilib.feature.library.ui.LibraryCard
 import fr.vriege.anilib.feature.library.ui.LibraryPresentation
 import fr.vriege.anilib.feature.source.SourceCatalogueItem
+import fr.vriege.anilib.feature.source.SourceContentUnit
+import fr.vriege.anilib.feature.source.SourceContentUnitId
 import fr.vriege.anilib.feature.source.SourceContentKind
 import fr.vriege.anilib.feature.source.SourceDescriptor
+import fr.vriege.anilib.feature.source.SourceEpisode
+import fr.vriege.anilib.feature.source.SourceEpisodeId
 import fr.vriege.anilib.feature.source.SourceFilterDefinition
 import fr.vriege.anilib.feature.source.SourceFilterType
 import fr.vriege.anilib.feature.source.SourceFilterValue
@@ -97,6 +101,7 @@ import fr.vriege.anilib.feature.source.SourcePermission
 import fr.vriege.anilib.feature.source.SourcePreferenceType
 import fr.vriege.anilib.feature.source.SourceId
 import fr.vriege.anilib.feature.source.SourceWebPage
+import fr.vriege.anilib.feature.source.SourceTitleDetails
 import fr.vriege.anilib.framework.http.HttpCookieJar
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
@@ -124,16 +129,15 @@ internal fun DiscoveryScreen(
     apkExtensionPlatform: ApkExtensionPlatform,
     browserCookies: HttpCookieJar,
     browserRuntimeStatus: BrowserRuntimeStatus,
-    initialSource: SourceDescriptor?,
-    initialListing: SourceListing,
-    openDetails: (LibraryItemId, MediaKind, SourceDescriptor, SourceListing) -> Unit,
-    returnTargetConsumed: () -> Unit,
+    openSourceReader: (String, SourceContentUnitId) -> Unit,
+    openSourcePlayer: (String, SourceEpisodeId) -> Unit,
     navigationVisibilityChanged: (Boolean) -> Unit,
     manageExtensions: () -> Unit,
 ) {
+    val scope = rememberCrashSafeCoroutineScope()
     var section by remember { mutableStateOf(BrowseSection.ANIME_SOURCES) }
-    var selectedSource by remember { mutableStateOf(initialSource) }
-    var listing by remember { mutableStateOf(initialListing) }
+    var selectedSource by remember { mutableStateOf<SourceDescriptor?>(null) }
+    var listing by remember { mutableStateOf(SourceListing.POPULAR) }
     var globalSearch by remember { mutableStateOf(false) }
     var globalQuery by remember { mutableStateOf("") }
     var sourceBrowseRevision by remember { mutableIntStateOf(0) }
@@ -143,11 +147,6 @@ internal fun DiscoveryScreen(
     var extensionRevision by remember { mutableIntStateOf(0) }
     var updatingSources by remember { mutableStateOf<Set<SourceId>>(emptySet()) }
     val mainDestination = selectedSource == null && browserPage == null
-    val scope = rememberCrashSafeCoroutineScope()
-    DisposableEffect(initialSource, initialListing) {
-        if (initialSource != null) returnTargetConsumed()
-        onDispose { }
-    }
     DisposableEffect(mainDestination, navigationVisibilityChanged) {
         navigationVisibilityChanged(mainDestination)
         onDispose { }
@@ -212,7 +211,8 @@ internal fun DiscoveryScreen(
             presentation = presentation,
             library = library,
             openWebPage = { browserPage = it },
-            openDetails = openDetails,
+            openSourceReader = openSourceReader,
+            openSourcePlayer = openSourcePlayer,
             navigateUp = { selectedSource = null },
         )
         return
@@ -597,11 +597,13 @@ private fun SourceCatalogueScreen(
     presentation: DiscoveryPresentation,
     library: LibraryPresentation,
     openWebPage: (SourceWebPage) -> Unit,
-    openDetails: (LibraryItemId, MediaKind, SourceDescriptor, SourceListing) -> Unit,
+    openSourceReader: (String, SourceContentUnitId) -> Unit,
+    openSourcePlayer: (String, SourceEpisodeId) -> Unit,
     navigateUp: () -> Unit,
 ) {
     val scope = rememberCrashSafeCoroutineScope()
     var selectedListing by remember(source.id(), listing) { mutableStateOf(listing) }
+    var selectedItem by remember(source.id()) { mutableStateOf<SourceCatalogueItem?>(null) }
     var query by remember(source.id()) { mutableStateOf("") }
     var searchActive by remember(source.id()) { mutableStateOf(false) }
     var page by remember(source.id(), selectedListing) { mutableIntStateOf(1) }
@@ -623,6 +625,20 @@ private fun SourceCatalogueScreen(
     val sourceWebPage = remember(source.id()) { presentation.sourceWebPage(source.id()).orElse(null) }
     var result by remember(source.id(), selectedListing, query, page, filterValues, preferenceRevision) {
         mutableStateOf<Result<SourcePage>?>(null)
+    }
+
+    selectedItem?.let { item ->
+        SourceTitleScreen(
+            item = item,
+            source = source,
+            presentation = presentation,
+            library = library,
+            openWebPage = openWebPage,
+            openReader = openSourceReader,
+            openPlayer = openSourcePlayer,
+            navigateUp = { selectedItem = null },
+        )
+        return
     }
     CrashSafeLaunchedEffect(
         source.id(),
@@ -796,37 +812,206 @@ private fun SourceCatalogueScreen(
                 CatalogueContent(
                     page = sourcePage,
                     grid = grid,
-                    open = { item ->
+                    open = { item -> selectedItem = item },
+                    add = { item ->
                         scope.launch {
                             withContext(Dispatchers.IO) {
-                                runCatching { presentation.addToLibrary(item) }
-                            }.onSuccess { id ->
-                                notice = null
-                                openDetails(
-                                    id,
-                                    if (item.contentKind() == SourceContentKind.ANIME) {
-                                        MediaKind.ANIME
-                                    } else {
-                                        MediaKind.MANGA
-                                    },
-                                    source,
-                                    selectedListing,
-                                )
+                                runCatching {
+                                    val id = presentation.addToLibrary(item)
+                                    library.setFavorite(setOf(id), true)
+                                }
+                            }.onSuccess {
+                                notice = "${item.title()} added to Library"
                             }.onFailure {
-                                notice = it.message ?: "The title could not be opened"
+                                notice = it.message ?: "The title could not be added to Library"
                             }
                         }
-                    },
-                    add = { item ->
-                        val id = presentation.addToLibrary(item)
-                        library.setFavorite(setOf(id), true)
-                        notice = "${item.title()} added to Library"
                     },
                     webPage = { item -> presentation.titleWebPage(item.id()).orElse(null) },
                     openWebPage = openWebPage,
                 )
                 Pagination(page, sourcePage.hasNextPage()) { next -> page = next }
                 }
+            }
+        }
+    }
+}
+
+private data class SourceTitleContent(
+    val details: SourceTitleDetails,
+    val chapters: List<SourceContentUnit>,
+    val episodes: List<SourceEpisode>,
+)
+
+private fun loadSourceTitleContent(
+    presentation: DiscoveryPresentation,
+    item: SourceCatalogueItem,
+): SourceTitleContent = SourceTitleContent(
+    details = presentation.titleDetails(item),
+    chapters = if (item.contentKind() == SourceContentKind.ANIME) {
+        emptyList()
+    } else {
+        presentation.contentUnits(item.id())
+    },
+    episodes = if (item.contentKind() == SourceContentKind.ANIME) {
+        presentation.episodes(item.id())
+    } else {
+        emptyList()
+    },
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SourceTitleScreen(
+    item: SourceCatalogueItem,
+    source: SourceDescriptor,
+    presentation: DiscoveryPresentation,
+    library: LibraryPresentation,
+    openWebPage: (SourceWebPage) -> Unit,
+    openReader: (String, SourceContentUnitId) -> Unit,
+    openPlayer: (String, SourceEpisodeId) -> Unit,
+    navigateUp: () -> Unit,
+) {
+    val scope = rememberCrashSafeCoroutineScope()
+    var result by remember(item.id()) { mutableStateOf<Result<SourceTitleContent>?>(null) }
+    var libraryItemId by remember(item.id()) {
+        mutableStateOf(presentation.libraryItem(item.id()).orElse(null))
+    }
+    var favorite by remember(item.id(), libraryItemId) {
+        mutableStateOf(
+            libraryItemId?.let { library.details(it).orElse(null)?.favorite() } == true,
+        )
+    }
+    var favoritePending by remember(item.id()) { mutableStateOf(false) }
+    var actionError by remember(item.id()) { mutableStateOf<String?>(null) }
+    val titleWebPage = remember(item.id()) { presentation.titleWebPage(item.id()).orElse(null) }
+
+    CrashSafeLaunchedEffect(item.id()) {
+        result = withContext(Dispatchers.IO) {
+            runCatching { loadSourceTitleContent(presentation, item) }
+        }
+    }
+
+    val content = result?.getOrNull()
+    if (content == null) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text(item.title(), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    navigationIcon = {
+                        IconButton(onClick = navigateUp) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "ui.back")
+                        }
+                    },
+                )
+            },
+        ) { padding ->
+            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                val failure = result?.exceptionOrNull()
+                if (failure == null) {
+                    CircularProgressIndicator()
+                } else {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(failure.message ?: "The title could not be loaded")
+                        TextButton(onClick = {
+                            result = null
+                            scope.launch {
+                                result = withContext(Dispatchers.IO) {
+                                    runCatching { loadSourceTitleContent(presentation, item) }
+                                }
+                            }
+                        }) { Text("ui.retry") }
+                    }
+                }
+            }
+        }
+        return
+    }
+
+    fun toggleFavorite() {
+        if (favoritePending) return
+        favoritePending = true
+        scope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val id = libraryItemId ?: presentation.addToLibrary(item)
+                    library.setFavorite(setOf(id), !favorite)
+                    id
+                }
+            }.onSuccess { id ->
+                libraryItemId = id
+                favorite = !favorite
+                actionError = null
+            }.onFailure {
+                actionError = it.message ?: "The library could not be updated"
+            }
+            favoritePending = false
+        }
+    }
+
+    val details = content.details
+    val primaryChapter = content.chapters.firstOrNull()
+    val primaryEpisode = content.episodes.firstOrNull()
+    MediaDetailsScreen(
+        model = MediaDetailsUiModel(
+            title = details.title(),
+            authors = details.authors(),
+            status = formatEnum(details.status()),
+            sourceName = source.displayName(),
+            description = details.description(),
+            genres = details.genres(),
+        ),
+        artwork = { modifier -> RemoteArtwork(details.thumbnail().orElse(null), details.title(), modifier) },
+        favorite = favorite,
+        contentLabel = if (item.contentKind() == SourceContentKind.ANIME) {
+            "${content.episodes.size} episodes"
+        } else {
+            "${content.chapters.size} chapters"
+        },
+        canTrack = false,
+        canOpenWeb = titleWebPage != null,
+        canDownload = false,
+        canShare = false,
+        primaryLabel = if (item.contentKind() == SourceContentKind.ANIME) "ui.watch" else "ui.read",
+        canOpenPrimary = primaryEpisode != null || primaryChapter != null,
+        errors = listOfNotNull(actionError),
+        toggleFavorite = ::toggleFavorite,
+        refreshing = favoritePending,
+        refresh = null,
+        track = {},
+        openWeb = { titleWebPage?.let(openWebPage) },
+        download = {},
+        share = {},
+        manageCategories = null,
+        edit = null,
+        openPrimary = {
+            primaryEpisode?.let { openPlayer(details.title(), it.id()) }
+                ?: primaryChapter?.let { openReader(details.title(), it.id()) }
+        },
+        goBack = navigateUp,
+    ) {
+        if (content.chapters.isNotEmpty()) {
+            item { MediaContentHeading("${content.chapters.size} chapters") }
+            items(content.chapters, key = { it.id().value() }) { chapter ->
+                MediaUnitRow(
+                    title = chapter.title(),
+                    summary = chapter.publishedAt().map(mediaDateTimeFormatter::format).orElse(""),
+                    open = { openReader(details.title(), chapter.id()) },
+                    download = {},
+                    canDownload = false,
+                )
+            }
+        }
+        if (content.episodes.isNotEmpty()) {
+            item { MediaContentHeading("${content.episodes.size} episodes") }
+            items(content.episodes, key = { it.id().value() }) { episode ->
+                MediaUnitRow(
+                    title = episode.title(),
+                    summary = episode.scanlator().orElse(""),
+                    open = { openPlayer(details.title(), episode.id()) },
+                    download = {},
+                    canDownload = false,
+                )
             }
         }
     }

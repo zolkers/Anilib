@@ -116,7 +116,7 @@ internal fun LibraryPageContent(
         .map { it.name() }
     var query by remember { mutableStateOf("") }
     var searching by remember { mutableStateOf(false) }
-    var favoritesOnly by remember { mutableStateOf(false) }
+    var favoritesOnly by remember(kind) { mutableStateOf(true) }
     var category by remember(presentation, kind) {
         mutableStateOf(
             overview.displayPreferences().defaultCategory().orElse(null)

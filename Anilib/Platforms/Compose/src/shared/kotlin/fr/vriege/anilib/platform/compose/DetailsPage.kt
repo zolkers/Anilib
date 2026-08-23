@@ -395,6 +395,7 @@ internal fun DetailsPage(
         canTrack = canTrack,
         canOpenWeb = openTitleWeb != null || openSourceWeb != null,
         canDownload = canDownload,
+        canShare = true,
         primaryLabel = if (canWatch) "ui.watch" else "ui.read",
         canOpenPrimary = canWatch || canRead,
         errors = listOfNotNull(readerError, downloadError, unitError),

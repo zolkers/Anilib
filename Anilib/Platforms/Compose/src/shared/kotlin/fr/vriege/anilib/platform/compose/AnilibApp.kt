@@ -69,9 +69,7 @@ import fr.vriege.anilib.feature.settings.StartScreen
 import fr.vriege.anilib.feature.settings.ThemeFamily
 import fr.vriege.anilib.feature.settings.ThemeMode
 import fr.vriege.anilib.feature.settings.ui.SettingsPresentation
-import fr.vriege.anilib.feature.source.SourceDescriptor
 import fr.vriege.anilib.feature.source.SourceEpisodeId
-import fr.vriege.anilib.feature.source.SourceListing
 import fr.vriege.anilib.feature.reader.ui.ReaderController
 import fr.vriege.anilib.feature.reader.ui.ReaderPresentation
 import fr.vriege.anilib.feature.reader.ReaderOrientationPolicy
@@ -89,11 +87,6 @@ import kotlinx.coroutines.withContext
 
 internal data class DetailPlatform(
     val shareController: ShareController,
-)
-
-internal data class BrowseReturnTarget(
-    val source: SourceDescriptor,
-    val listing: SourceListing,
 )
 
 internal data class PendingPlayerRequest(
@@ -240,7 +233,13 @@ fun AnilibApp(
                     val current = runCatching { playerController.snapshot() }.getOrNull()
                         ?: return@CrashSafeLaunchedEffect
                     val episodes = withContext(Dispatchers.IO) {
-                        runCatching { player.episodes(current.libraryItemId()) }.getOrDefault(emptyList())
+                        runCatching {
+                            if (presentation.details(current.libraryItemId()).isPresent) {
+                                player.episodes(current.libraryItemId())
+                            } else {
+                                player.episodes(current.episode().id().itemId())
+                            }
+                        }.getOrDefault(emptyList())
                     }
                     val index = episodes.indexOfFirst { it.episode().id() == current.episode().id() }
                     if (index < 0) return@CrashSafeLaunchedEffect
@@ -256,7 +255,13 @@ fun AnilibApp(
                             pendingPlayer = request
                             scope.launch {
                                 withContext(Dispatchers.IO) {
-                                    runCatching { player.open(current.libraryItemId(), episodeId) }
+                                    runCatching {
+                                        if (presentation.details(current.libraryItemId()).isPresent) {
+                                            player.open(current.libraryItemId(), episodeId)
+                                        } else {
+                                            player.open(current.title(), episodeId)
+                                        }
+                                    }
                                 }
                                     .onSuccess { opened ->
                                         if (pendingPlayer?.token === request.token) {
@@ -333,6 +338,18 @@ fun AnilibApp(
                             .onFailure { readerError = it.message ?: "The reader could not be opened." }
                     }
                 }
+                val openSourceReader: (String, SourceContentUnitId) -> Unit = { title, contentUnitId ->
+                    scope.launch {
+                        withContext(Dispatchers.IO) {
+                            runCatching { reader.open(title, contentUnitId) }
+                        }
+                            .onSuccess {
+                                readerError = null
+                                activeReader = it
+                            }
+                            .onFailure { readerError = it.message ?: "The reader could not be opened." }
+                    }
+                }
                 val enqueueDownload: (LibraryItemId) -> Unit = { id ->
                     runCatching { downloads.enqueue(id) }
                         .onSuccess { downloadError = null }
@@ -355,6 +372,30 @@ fun AnilibApp(
                                     ?: error("No episodes are available from this source.")
                                 player.open(id, selectedEpisode)
                             }
+                        }
+                            .onSuccess {
+                                if (pendingPlayer?.token === request.token) {
+                                    playerError = null
+                                    activePlayer = it
+                                    pendingPlayer = null
+                                } else {
+                                    it.close()
+                                }
+                            }
+                            .onFailure {
+                                if (pendingPlayer?.token === request.token) {
+                                    pendingPlayer = null
+                                    playerError = it.message ?: "The episode could not be opened."
+                                }
+                            }
+                    }
+                }
+                val openSourcePlayer: (String, SourceEpisodeId) -> Unit = { title, episodeId ->
+                    val request = PendingPlayerRequest(token = Any(), title = title)
+                    pendingPlayer = request
+                    scope.launch {
+                        withContext(Dispatchers.IO) {
+                            runCatching { player.open(title, episodeId) }
                         }
                             .onSuccess {
                                 if (pendingPlayer?.token === request.token) {
@@ -415,8 +456,10 @@ fun AnilibApp(
                         navigate,
                         openSection,
                         openReader,
+                        openSourceReader,
                         readerError,
                         openPlayer,
+                        openSourcePlayer,
                         enqueueDownload,
                         downloadError,
                         { activeTrackingTitle = it },
@@ -484,8 +527,10 @@ internal fun AdaptiveShell(
     navigate: ((LibraryNavigator) -> Unit) -> Unit,
     openSection: (AppSection) -> Unit,
     openReader: (LibraryItemId, SourceContentUnitId?) -> Unit,
+    openSourceReader: (String, SourceContentUnitId) -> Unit,
     readerError: String?,
     openPlayer: (LibraryItemId, SourceEpisodeId?) -> Unit,
+    openSourcePlayer: (String, SourceEpisodeId) -> Unit,
     enqueueDownload: (LibraryItemId) -> Unit,
     downloadError: String?,
     openTracking: (LibraryItemId) -> Unit,
@@ -527,8 +572,10 @@ internal fun AdaptiveShell(
                     navigate,
                     openSection,
                     openReader,
+                    openSourceReader,
                     readerError,
                     openPlayer,
+                    openSourcePlayer,
                     enqueueDownload,
                     downloadError,
                     openTracking,
@@ -617,8 +664,10 @@ internal fun AppDestination(
     navigate: ((LibraryNavigator) -> Unit) -> Unit,
     openSection: (AppSection) -> Unit,
     openReader: (LibraryItemId, SourceContentUnitId?) -> Unit,
+    openSourceReader: (String, SourceContentUnitId) -> Unit,
     readerError: String?,
     openPlayer: (LibraryItemId, SourceEpisodeId?) -> Unit,
+    openSourcePlayer: (String, SourceEpisodeId) -> Unit,
     enqueueDownload: (LibraryItemId) -> Unit,
     downloadError: String?,
     openTracking: (LibraryItemId) -> Unit,
@@ -627,7 +676,6 @@ internal fun AppDestination(
     closeMore: () -> Unit,
     browseDestinationChanged: (Boolean) -> Unit,
 ) {
-    var browseReturnTarget by remember { mutableStateOf<BrowseReturnTarget?>(null) }
     when (section) {
         AppSection.ANIME,
         AppSection.MANGA,
@@ -650,12 +698,7 @@ internal fun AppDestination(
                 enqueueDownload,
                 downloadError,
                 openTracking,
-                goBackOverride = browseReturnTarget?.let {
-                    {
-                        navigate(LibraryNavigator::openLibrary)
-                        openSection(AppSection.BROWSE)
-                    }
-                },
+                goBackOverride = null,
             )
             else -> LibraryPageContent(
                 presentation,
@@ -673,14 +716,8 @@ internal fun AppDestination(
             apkExtensionPlatform,
             browserCookies,
             browserRuntimeStatus,
-            initialSource = browseReturnTarget?.source,
-            initialListing = browseReturnTarget?.listing ?: SourceListing.POPULAR,
-            openDetails = { id, kind, source, listing ->
-                browseReturnTarget = BrowseReturnTarget(source, listing)
-                navigate { it.openDetails(id) }
-                openSection(if (kind == MediaKind.ANIME) AppSection.ANIME else AppSection.MANGA)
-            },
-            returnTargetConsumed = { browseReturnTarget = null },
+            openSourceReader = openSourceReader,
+            openSourcePlayer = openSourcePlayer,
             navigationVisibilityChanged = browseDestinationChanged,
             manageExtensions = {
                 openSection(AppSection.MORE)
