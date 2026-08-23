@@ -530,14 +530,19 @@ internal fun TitleTrackingScreen(
     goBack: () -> Unit,
 ) {
     var revision by remember(itemId) { mutableStateOf(0) }
+    var managingAccounts by remember(itemId) { mutableStateOf(false) }
     var searching by remember { mutableStateOf<TrackerAccount?>(null) }
     var login by remember { mutableStateOf<TrackerAccount?>(null) }
     var webAuthorization by remember { mutableStateOf<Pair<TrackerAccount, TrackerAuthorization>?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCrashSafeCoroutineScope()
     ObserveTracking(presentation) { revision++ }
-    val accounts = remember(revision, kind) {
-        presentation.accounts().filter { it.descriptor().supportedKinds().contains(kind) }
+    val allAccounts = remember(revision) { presentation.accounts() }
+    val accounts = remember(allAccounts, kind) {
+        allAccounts.filter { it.descriptor().supportedKinds().contains(kind) }
+    }
+    val hasConnectedTracker = allAccounts.any {
+        it.authenticated() || it.descriptor().authentication() == TrackerAuthentication.NONE
     }
     val entries = remember(revision, itemId) {
         presentation.entries(itemId).associateBy(TrackerEntry::trackerId)
@@ -551,6 +556,15 @@ internal fun TitleTrackingScreen(
                 }
                 .onFailure { error = it.message ?: "Tracking operation failed." }
         }
+    }
+
+    if (managingAccounts) {
+        TrackerAccountsScreen(
+            presentation = presentation,
+            browserRuntimeStatus = browserRuntimeStatus,
+            goBack = { managingAccounts = false },
+        )
+        return
     }
 
     webAuthorization?.let { (account, authorization) ->
@@ -637,10 +651,17 @@ internal fun TitleTrackingScreen(
             contentPadding = PaddingValues(top = 14.dp, bottom = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            if (accounts.isEmpty()) {
-                item { EmptyPage("ui.sign.in.tracking.from.more") }
+            if (!hasConnectedTracker) {
+                item {
+                    TrackerConnectionPrompt { managingAccounts = true }
+                }
+            } else if (accounts.isEmpty()) {
+                item { EmptyPage("ui.no.tracker.bundle.enabled") }
             }
-            items(accounts, key = { it.descriptor().id().value() }) { account ->
+            items(
+                items = if (hasConnectedTracker) accounts else emptyList(),
+                key = { it.descriptor().id().value() },
+            ) { account ->
                 val entry = entries[account.descriptor().id()]
                 if (entry == null) {
                     UnboundTrackerCard(account) {
@@ -684,6 +705,30 @@ internal fun TitleTrackingScreen(
             }
             error?.let { message ->
                 item { Text(message, color = MaterialTheme.colorScheme.error) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TrackerConnectionPrompt(openTrackerAccounts: () -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text("ui.no.tracker.connected", fontWeight = FontWeight.SemiBold)
+            Text(
+                "ui.connect.tracker.to.track.title",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Button(onClick = openTrackerAccounts) {
+                Text("ui.sign.in")
             }
         }
     }
