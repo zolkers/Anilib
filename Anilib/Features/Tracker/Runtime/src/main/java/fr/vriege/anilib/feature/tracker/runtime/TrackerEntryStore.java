@@ -2,8 +2,10 @@ package fr.vriege.anilib.feature.tracker.runtime;
 
 import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.tracker.TrackerEntry;
+import fr.vriege.anilib.feature.tracker.TrackerAiringSchedule;
 import fr.vriege.anilib.feature.tracker.TrackerException;
 import fr.vriege.anilib.feature.tracker.TrackerId;
+import fr.vriege.anilib.feature.tracker.TrackerMediaMetadata;
 import fr.vriege.anilib.feature.tracker.TrackerStatus;
 
 import java.io.IOException;
@@ -27,7 +29,8 @@ import java.util.Optional;
 import java.util.OptionalDouble;
 
 final class TrackerEntryStore {
-    private static final String HEADER = "ANILIB_TRACKING\t1";
+    private static final String HEADER_V1 = "ANILIB_TRACKING\t1";
+    private static final String HEADER = "ANILIB_TRACKING\t2";
     private static final long MAXIMUM_FILE_BYTES = 64L * 1024L * 1024L;
     private static final int MAXIMUM_ENTRIES = 1_000_000;
     private static final Base64.Encoder ENCODER = Base64.getUrlEncoder().withoutPadding();
@@ -99,15 +102,17 @@ final class TrackerEntryStore {
                 throw new TrackerException("Tracker state file exceeds the supported size");
             }
             List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
-            if (lines.isEmpty() || !lines.getFirst().equals(HEADER)) {
+            if (lines.isEmpty()
+                    || (!lines.getFirst().equals(HEADER) && !lines.getFirst().equals(HEADER_V1))) {
                 throw new TrackerException("Unsupported tracker state format");
             }
+            boolean legacy = lines.getFirst().equals(HEADER_V1);
             if (lines.size() - 1 > MAXIMUM_ENTRIES) {
                 throw new TrackerException("Tracker state contains too many entries");
             }
             for (int index = 1; index < lines.size(); index++) {
                 if (!lines.get(index).isBlank()) {
-                    TrackerEntry entry = decode(lines.get(index));
+                    TrackerEntry entry = decode(lines.get(index), legacy);
                     if (entries.putIfAbsent(Key.of(entry), entry) != null) {
                         throw new TrackerException("Tracker state contains duplicate entries");
                     }
@@ -162,15 +167,24 @@ final class TrackerEntryStore {
                 entry.finishDate().map(LocalDate::toString).orElse(""),
                 Boolean.toString(entry.privateEntry()),
                 entry.remoteUri().map(URI::toString).map(TrackerEntryStore::text).orElse(""),
-                entry.updatedAt().toString());
+                entry.updatedAt().toString(),
+                entry.metadata().artworkUri().map(URI::toString).map(TrackerEntryStore::text).orElse(""),
+                entry.metadata().format().map(TrackerEntryStore::text).orElse(""),
+                entry.metadata().publishingStatus().map(TrackerEntryStore::text).orElse(""),
+                entry.metadata().nextAiring().map(value -> Long.toString(value.episode())).orElse(""),
+                entry.metadata().nextAiring().map(value -> value.airingAt().toString()).orElse(""));
     }
 
-    private static TrackerEntry decode(String line) {
+    private static TrackerEntry decode(String line, boolean legacy) {
         try {
             String[] fields = line.split("\t", -1);
-            if (fields.length != 14 || !fields[0].equals("ENTRY")) {
+            int expectedFields = legacy ? 14 : 19;
+            if (fields.length != expectedFields || !fields[0].equals("ENTRY")) {
                 throw new IllegalArgumentException("invalid field count");
             }
+            TrackerMediaMetadata metadata = legacy
+                    ? TrackerMediaMetadata.empty()
+                    : metadata(fields);
             return new TrackerEntry(
                     new LibraryItemId(plain(fields[1])),
                     TrackerId.of(plain(fields[2])),
@@ -184,10 +198,29 @@ final class TrackerEntryStore {
                     fields[10].isEmpty() ? Optional.empty() : Optional.of(LocalDate.parse(fields[10])),
                     parseBoolean(fields[11]),
                     fields[12].isEmpty() ? Optional.empty() : Optional.of(URI.create(plain(fields[12]))),
-                    Instant.parse(fields[13]));
+                    Instant.parse(fields[13]),
+                    metadata);
         } catch (IllegalArgumentException exception) {
             throw new TrackerException("Invalid tracker state entry", exception);
         }
+    }
+
+    private static TrackerMediaMetadata metadata(String[] fields) {
+        boolean hasEpisode = !fields[17].isEmpty();
+        boolean hasAiringAt = !fields[18].isEmpty();
+        if (hasEpisode != hasAiringAt) {
+            throw new IllegalArgumentException("incomplete airing schedule");
+        }
+        Optional<TrackerAiringSchedule> nextAiring = hasEpisode
+                ? Optional.of(new TrackerAiringSchedule(
+                        Long.parseLong(fields[17]),
+                        Instant.parse(fields[18])))
+                : Optional.empty();
+        return new TrackerMediaMetadata(
+                fields[14].isEmpty() ? Optional.empty() : Optional.of(URI.create(plain(fields[14]))),
+                fields[15].isEmpty() ? Optional.empty() : Optional.of(plain(fields[15])),
+                fields[16].isEmpty() ? Optional.empty() : Optional.of(plain(fields[16])),
+                nextAiring);
     }
 
     private static void moveAtomically(Path source, Path destination) throws IOException {

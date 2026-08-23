@@ -23,7 +23,8 @@ public record TrackerEntry(
         Optional<LocalDate> finishDate,
         boolean privateEntry,
         Optional<URI> remoteUri,
-        Instant updatedAt) {
+        Instant updatedAt,
+        TrackerMediaMetadata metadata) {
     public TrackerEntry {
         Objects.requireNonNull(libraryItemId, "libraryItemId must not be null");
         Objects.requireNonNull(trackerId, "trackerId must not be null");
@@ -48,6 +49,25 @@ public record TrackerEntry(
         finishDate = Objects.requireNonNull(finishDate, "finishDate must not be null");
         remoteUri = Objects.requireNonNull(remoteUri, "remoteUri must not be null");
         Objects.requireNonNull(updatedAt, "updatedAt must not be null");
+        metadata = Objects.requireNonNull(metadata, "metadata must not be null");
+    }
+
+    public TrackerEntry(
+            LibraryItemId libraryItemId,
+            TrackerId trackerId,
+            String remoteId,
+            String title,
+            double progress,
+            long totalUnits,
+            TrackerStatus status,
+            OptionalDouble score,
+            Optional<LocalDate> startDate,
+            Optional<LocalDate> finishDate,
+            boolean privateEntry,
+            Optional<URI> remoteUri,
+            Instant updatedAt) {
+        this(libraryItemId, trackerId, remoteId, title, progress, totalUnits, status, score,
+                startDate, finishDate, privateEntry, remoteUri, updatedAt, TrackerMediaMetadata.empty());
     }
 
     public TrackerEntry withProgress(double value) {
@@ -91,6 +111,7 @@ public record TrackerEntry(
                 nextFinish,
                 nextPrivate,
                 remoteUri,
-                Instant.now());
+                Instant.now(),
+                metadata);
     }
 }

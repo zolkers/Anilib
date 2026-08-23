@@ -63,9 +63,12 @@ import fr.vriege.anilib.feature.source.SourceWebPage
 import fr.vriege.anilib.feature.reader.ui.ReaderPresentation
 import fr.vriege.anilib.feature.player.ui.PlayerPresentation
 import fr.vriege.anilib.feature.tracker.ui.TrackerPresentation
+import fr.vriege.anilib.feature.tracker.TrackerAiringSchedule
+import fr.vriege.anilib.feature.tracker.TrackerMediaMetadata
 import fr.vriege.anilib.framework.http.HttpCookieJar
 import fr.vriege.anilib.feature.player.EpisodeSnapshot
 import java.net.URI
+import java.time.Instant
 import java.util.Optional
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -96,6 +99,7 @@ internal fun DetailsDestination(
     val scope = rememberCrashSafeCoroutineScope()
     var relatedBackStack by remember { mutableStateOf<List<LibraryItemId>>(emptyList()) }
     var revision by remember(id) { mutableStateOf(0) }
+    var trackerRevision by remember(id) { mutableStateOf(0) }
     var refreshing by remember(id) { mutableStateOf(false) }
     var browserPage by remember(id) {
         mutableStateOf<SourceWebPage?>(null)
@@ -104,6 +108,7 @@ internal fun DetailsDestination(
     var episodes by remember(id) { mutableStateOf(listOf<EpisodeSnapshot>()) }
     var unitError by remember(id) { mutableStateOf<String?>(null) }
     var readChapterIds by remember(id) { mutableStateOf(setOf<String>()) }
+    ObserveTracking(tracking) { trackerRevision++ }
     val details = remember(id, revision) { id?.let { presentation.details(it).orElse(null) } }
     val navigateBack: () -> Unit = {
         val previous = relatedBackStack.lastOrNull()
@@ -129,6 +134,31 @@ internal fun DetailsDestination(
         val sourceId = details.origin()
             .map { origin -> SourceId.of(origin.sourceId()) }
             .orElse(null)
+        val trackedEntries = remember(details.id(), trackerRevision) {
+            tracking.entries(details.id())
+        }
+        val nextAiring = trackedEntries.asSequence()
+            .mapNotNull { it.metadata().nextAiring().orElse(null) }
+            .filter { it.airingAt().isAfter(Instant.now()) }
+            .minByOrNull(TrackerAiringSchedule::airingAt)
+        CrashSafeLaunchedEffect(details.id()) {
+            val metadataNeedsRefresh = trackedEntries.any { entry ->
+                val metadata = entry.metadata()
+                val nextAiring = metadata.nextAiring().orElse(null)
+                metadata == TrackerMediaMetadata.empty()
+                    || metadata.publishingStatus().orElse("") == "RELEASING" &&
+                    (nextAiring == null || !nextAiring.airingAt().isAfter(Instant.now()))
+            }
+            if (metadataNeedsRefresh) {
+                trackedEntries.forEach { entry ->
+                    runCatching {
+                        withContext(Dispatchers.IO) {
+                            tracking.refresh(details.id(), entry.trackerId())
+                        }
+                    }
+                }
+            }
+        }
         val reloadContent: suspend () -> Unit = {
             unitError = null
             if (details.kind() == MediaKind.ANIME) {
@@ -185,6 +215,7 @@ internal fun DetailsDestination(
             canWatch = runCatching { player.canOpen(details.id()) }.getOrDefault(false),
             canDownload = runCatching { downloads.canEnqueue(details.id()) }.getOrDefault(false),
             canTrack = true,
+            nextAiring = nextAiring,
             readerError = readerError,
             downloadError = downloadError,
             read = { chapter -> openReader(details.id(), chapter?.id()) },
@@ -336,6 +367,7 @@ internal fun DetailsPage(
     canWatch: Boolean,
     canDownload: Boolean,
     canTrack: Boolean,
+    nextAiring: TrackerAiringSchedule?,
     readerError: String?,
     downloadError: String?,
     read: (SourceContentUnit?) -> Unit,
@@ -385,7 +417,8 @@ internal fun DetailsPage(
             status = formatEnum(details.publicationStatus()),
             sourceName = sourceName,
             description = details.description(),
-        genres = details.genres(),
+            genres = details.genres(),
+            nextAiring = nextAiring,
         ),
         artwork = artwork,
         favorite = details.favorite(),

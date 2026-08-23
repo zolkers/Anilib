@@ -2,9 +2,11 @@ package fr.vriege.anilib.platform.compose
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,18 +14,23 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -40,12 +47,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Sync
 import com.multiplatform.webview.web.LoadingState
 import com.multiplatform.webview.web.WebView
@@ -737,13 +746,43 @@ private fun TrackerEntryCard(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                TrackerProviderIcon(account)
-                Spacer(Modifier.size(12.dp))
-                Column {
-                    Text(descriptor.name(), color = MaterialTheme.colorScheme.primary)
-                    Text(entry.title(), fontWeight = FontWeight.SemiBold)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                RemoteArtwork(
+                    entry.metadata().artworkUri().orElse(null),
+                    entry.title(),
+                    modifier = Modifier.width(64.dp).height(92.dp).clip(RoundedCornerShape(9.dp)),
+                )
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        TrackerProviderIcon(account)
+                        Spacer(Modifier.size(8.dp))
+                        Text(descriptor.name(), color = MaterialTheme.colorScheme.primary)
+                    }
+                    Text(
+                        entry.title(),
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    val metadata = buildList {
+                        entry.metadata().format().ifPresent { add(readableTrackerValue(it)) }
+                        entry.metadata().publishingStatus().ifPresent { add(readableTrackerValue(it)) }
+                    }
+                    if (metadata.isNotEmpty()) {
+                        Text(
+                            metadata.joinToString(" · "),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
                 }
+            }
+            entry.metadata().nextAiring().orElse(null)?.let { schedule ->
+                Spacer(Modifier.height(12.dp))
+                NextAiringBanner(schedule)
             }
             Spacer(Modifier.height(12.dp))
             Text(
@@ -940,112 +979,214 @@ private fun TrackerSearchScreen(
     var results by remember { mutableStateOf<List<TrackerSearchResult>>(emptyList()) }
     var selected by remember { mutableStateOf<TrackerSearchResult?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
+    var loading by remember { mutableStateOf(true) }
     val scope = rememberCrashSafeCoroutineScope()
-    selected?.let { result ->
-        AlertDialog(
-            onDismissRequest = { selected = null },
-            title = { Text(UiTranslations.format("dynamic.track", LocalLanguagePack.current, result.title())) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(
-                        UiTranslations.format(
-                            "dynamic.provider",
-                            LocalLanguagePack.current,
-                            account.descriptor().name(),
-                        ),
-                    )
-                    Text(
-                        UiTranslations.format(
-                            "dynamic.media",
-                            LocalLanguagePack.current,
-                            UiTranslations.translate(
-                                if (result.kind().name == "ANIME") "ui.anime" else "ui.manga",
-                                LocalLanguagePack.current,
-                            ),
-                        ),
-                    )
-                    Text(
-                        if (result.totalUnits() >= 0) {
-                            UiTranslations.format(
-                                "dynamic.length.units",
-                                LocalLanguagePack.current,
-                                result.totalUnits(),
-                            )
-                        } else {
-                            UiTranslations.translate("ui.length.unknown", LocalLanguagePack.current)
-                        },
-                    )
-                    result.remoteUri().orElse(null)?.let {
-                        Text(UiTranslations.format("dynamic.remote.page", LocalLanguagePack.current, it))
+    val search: (String) -> Unit = { requested ->
+        if (requested.isNotBlank()) {
+            loading = true
+            error = null
+            selected = null
+            scope.launch {
+                runCatching {
+                    withContext(Dispatchers.IO) {
+                        presentation.search(account.descriptor().id(), requested, kind)
                     }
+                }.onSuccess {
+                    results = it
+                    loading = false
+                }.onFailure {
+                    error = it.message ?: "Search failed."
+                    loading = false
                 }
-            },
-            confirmButton = {
-                Button(onClick = {
-                    scope.launch {
-                        runCatching {
-                            withContext(Dispatchers.IO) { presentation.bind(itemId, result) }
-                        }.onSuccess { bound() }
-                            .onFailure { error = it.message ?: "Unable to add tracking." }
-                    }
-                }) { Text("ui.add.tracking") }
-            },
-            dismissButton = { TextButton(onClick = { selected = null }) { Text("ui.cancel") } },
-        )
+            }
+        }
     }
+    CrashSafeLaunchedEffect(account.descriptor().id(), kind, title) { search(title) }
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(account.descriptor().name()) },
-                navigationIcon = { TextButton(onClick = close) { Text("ui.back") } },
-            )
-        },
-    ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
-            OutlinedTextField(
-                value = query,
-                onValueChange = { query = it },
-                label = { Text("ui.search.title") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(8.dp))
-            Button(
-                enabled = query.isNotBlank(),
-                onClick = {
-                    scope.launch {
-                        runCatching {
-                            withContext(Dispatchers.IO) {
-                                presentation.search(account.descriptor().id(), query, kind)
-                            }
-                        }.onSuccess {
-                            results = it
-                            error = null
-                        }.onFailure { error = it.message ?: "Search failed." }
+                title = {
+                    Text(
+                        account.descriptor().name(),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
+                navigationIcon = {
+                    IconButton(onClick = close) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "ui.back")
                     }
                 },
-            ) {
-                Text("ui.search")
-            }
-            error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(results, key = TrackerSearchResult::remoteId) { result ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth().clickable { selected = result },
-                    ) {
-                        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-                            Text(result.title(), fontWeight = FontWeight.Medium)
+            )
+        },
+        bottomBar = {
+            selected?.let { result ->
+                Surface(tonalElevation = 6.dp, shadowElevation = 8.dp) {
+                    Box(Modifier.fillMaxWidth().padding(12.dp), contentAlignment = Alignment.Center) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().widthIn(max = 900.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
                             Text(
-                                if (result.totalUnits() >= 0) "${result.totalUnits()} units" else "Unknown length",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                result.title(),
+                                modifier = Modifier.weight(1f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                             )
+                            Button(onClick = {
+                                scope.launch {
+                                    runCatching {
+                                        withContext(Dispatchers.IO) { presentation.bind(itemId, result) }
+                                    }.onSuccess { bound() }
+                                        .onFailure { error = it.message ?: "Unable to add tracking." }
+                                }
+                            }) {
+                                Text("ui.add.tracking")
+                            }
                         }
+                    }
+                }
+            }
+        },
+    ) { padding ->
+        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    label = { Text("ui.search.title") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                )
+                IconButton(enabled = query.isNotBlank() && !loading, onClick = { search(query) }) {
+                    Icon(Icons.Default.Search, contentDescription = "ui.search")
+                }
+            }
+            HorizontalDivider()
+            error?.let {
+                Text(
+                    it,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+            }
+            if (loading) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            } else if (results.isEmpty()) {
+                EmptyPage("ui.no.results")
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                items(results, key = TrackerSearchResult::remoteId) { result ->
+                        TrackerSearchResultCard(
+                            result = result,
+                            selected = selected == result,
+                            select = { selected = result },
+                        )
                     }
                 }
             }
         }
     }
 }
+
+@Composable
+private fun TrackerSearchResultCard(
+    result: TrackerSearchResult,
+    selected: Boolean,
+    select: () -> Unit,
+) {
+    val shape = RoundedCornerShape(16.dp)
+    Card(
+        modifier = Modifier.fillMaxWidth().widthIn(max = 900.dp)
+            .border(
+                width = if (selected) 2.dp else 1.dp,
+                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                shape = shape,
+            )
+            .clickable(onClick = select),
+        shape = shape,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            RemoteArtwork(
+                result.metadata().artworkUri().orElse(null),
+                result.title(),
+                modifier = Modifier.width(72.dp).height(104.dp).clip(RoundedCornerShape(10.dp)),
+            )
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                Text(
+                    result.title(),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    trackerSearchSummary(result),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                result.metadata().nextAiring().orElse(null)?.let { schedule ->
+                    Text(
+                        UiTranslations.format(
+                            "dynamic.next.episode.number",
+                            LocalLanguagePack.current,
+                            schedule.episode(),
+                        ),
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
+            }
+            if (selected) {
+                Icon(
+                    Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun trackerSearchSummary(result: TrackerSearchResult): String {
+    val language = LocalLanguagePack.current
+    return listOfNotNull(
+        result.metadata().format().map(::readableTrackerValue).orElse(null),
+        result.metadata().publishingStatus().map(::readableTrackerValue).orElse(null),
+        if (result.totalUnits() >= 0) {
+            UiTranslations.format(
+                if (result.kind() == MediaKind.ANIME) "dynamic.episodes.count" else "dynamic.chapters.count",
+                language,
+                result.totalUnits(),
+            )
+        } else {
+            UiTranslations.translate("ui.length.unknown", language)
+        },
+    ).joinToString(" · ")
+}
+
+private fun readableTrackerValue(value: String): String = value
+    .replace('_', ' ')
+    .lowercase()
+    .replaceFirstChar(Char::uppercase)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1278,7 +1419,7 @@ private fun TrackerAuthorization.isLoopback(): Boolean =
 private const val OAUTH_CALLBACK_TIMEOUT_MILLIS = 5 * 60 * 1_000L
 
 @Composable
-private fun ObserveTracking(presentation: TrackerPresentation, changed: () -> Unit) {
+internal fun ObserveTracking(presentation: TrackerPresentation, changed: () -> Unit) {
     DisposableEffect(presentation) {
         val registration = presentation.observe(changed)
         onDispose { registration.close() }

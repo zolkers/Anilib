@@ -124,8 +124,12 @@ final class FirstPartyTrackerTest {
         LibraryItem item = LibraryItem.create("Fixture anime", MediaKind.ANIME);
         TrackerSearchResult result = tracker.search("Fixture", MediaKind.ANIME).getFirst();
         TrackerEntry bound = tracker.bind(item, result);
-        counter.check(result.remoteId().equals("42") && bound.status() == TrackerStatus.PLANNING,
-                "AniList search results must bind through SaveMediaListEntry");
+        counter.check(result.remoteId().equals("42")
+                        && result.metadata().artworkUri().isPresent()
+                        && result.metadata().nextAiring().orElseThrow().episode() == 13L
+                        && bound.status() == TrackerStatus.PLANNING
+                        && bound.metadata().publishingStatus().orElseThrow().equals("RELEASING"),
+                "AniList search results must bind rich media and airing metadata through SaveMediaListEntry");
         TrackerEntry edited = bound.withStatus(TrackerStatus.WATCHING)
                 .withProgress(3.0D)
                 .withScore(OptionalDouble.of(8.0D))
@@ -180,6 +184,9 @@ final class FirstPartyTrackerTest {
     private static String aniListMedia() {
         return "{\"id\":42,\"type\":\"ANIME\",\"episodes\":12,\"chapters\":null,"
                 + "\"siteUrl\":\"https://anilist.co/anime/42\","
+                + "\"coverImage\":{\"large\":\"https://images.example/anime-42.jpg\"},"
+                + "\"format\":\"TV\",\"status\":\"RELEASING\","
+                + "\"nextAiringEpisode\":{\"episode\":13,\"airingAt\":1790000000},"
                 + "\"title\":{\"userPreferred\":\"Fixture anime\"}}";
     }
 

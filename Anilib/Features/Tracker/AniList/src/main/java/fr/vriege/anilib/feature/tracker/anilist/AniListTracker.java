@@ -4,6 +4,7 @@ import fr.vriege.anilib.feature.library.LibraryItem;
 import fr.vriege.anilib.feature.library.MediaKind;
 import fr.vriege.anilib.feature.tracker.Tracker;
 import fr.vriege.anilib.feature.tracker.TrackerAuthentication;
+import fr.vriege.anilib.feature.tracker.TrackerAiringSchedule;
 import fr.vriege.anilib.feature.tracker.TrackerAuthorization;
 import fr.vriege.anilib.feature.tracker.TrackerCredentials;
 import fr.vriege.anilib.feature.tracker.TrackerDescriptor;
@@ -11,6 +12,7 @@ import fr.vriege.anilib.feature.tracker.TrackerEntry;
 import fr.vriege.anilib.feature.tracker.TrackerException;
 import fr.vriege.anilib.feature.tracker.TrackerId;
 import fr.vriege.anilib.feature.tracker.TrackerIcon;
+import fr.vriege.anilib.feature.tracker.TrackerMediaMetadata;
 import fr.vriege.anilib.feature.tracker.TrackerSearchResult;
 import fr.vriege.anilib.feature.tracker.TrackerSdk;
 import fr.vriege.anilib.feature.tracker.TrackerStatus;
@@ -63,7 +65,8 @@ public final class AniListTracker implements Tracker {
             true);
     private static final String ENTRY_FIELDS = "id status progress repeat score private updatedAt "
             + "startedAt { year month day } completedAt { year month day } "
-            + "media { id type episodes chapters siteUrl title { userPreferred } }";
+            + "media { id type episodes chapters siteUrl title { userPreferred } "
+            + "coverImage { large } format status nextAiringEpisode { episode airingAt } }";
     private final AnilibHttpClient client;
     private final String clientId;
     private final URI callbackUri;
@@ -169,7 +172,8 @@ public final class AniListTracker implements Tracker {
         }
         String graph = "query ($search: String!, $type: MediaType!) { Page(page: 1, perPage: 25) { "
                 + "media(search: $search, type: $type, sort: SEARCH_MATCH) { "
-                + "id type episodes chapters siteUrl title { userPreferred } } } }";
+                + "id type episodes chapters siteUrl title { userPreferred } coverImage { large } "
+                + "format status nextAiringEpisode { episode airingAt } } } }";
         Map<String, Object> page = TrackerJson.memberObject(data(
                 graph,
                 Map.of("search", value, "type", mediaType(kind))), "Page");
@@ -272,7 +276,8 @@ public final class AniListTracker implements Tracker {
                 TrackerJson.memberString(TrackerJson.memberObject(media, "title"), "userPreferred"),
                 kind,
                 total,
-                uri(media.get("siteUrl")));
+                uri(media.get("siteUrl")),
+                metadata(media));
     }
 
     private static TrackerEntry entry(LibraryItem item, Map<String, Object> value) {
@@ -300,7 +305,31 @@ public final class AniListTracker implements Tracker {
                 fuzzyDate(value.get("completedAt")),
                 TrackerJson.booleanValue(value.get("private"), false),
                 uri(media.get("siteUrl")),
-                instant(value.get("updatedAt")));
+                instant(value.get("updatedAt")),
+                metadata(media));
+    }
+
+    private static TrackerMediaMetadata metadata(Map<String, Object> media) {
+        Optional<URI> artwork = Optional.empty();
+        if (media.get("coverImage") instanceof Map<?, ?> value) {
+            artwork = uri(TrackerJson.object(value, "AniList cover image").get("large"));
+        }
+        Optional<TrackerAiringSchedule> nextAiring = Optional.empty();
+        if (media.get("nextAiringEpisode") instanceof Map<?, ?> value) {
+            Map<String, Object> schedule = TrackerJson.object(value, "AniList airing schedule");
+            long episode = optionalLong(schedule.get("episode"));
+            long airingAt = optionalLong(schedule.get("airingAt"));
+            if (episode > 0L && airingAt > 0L) {
+                nextAiring = Optional.of(new TrackerAiringSchedule(
+                        episode,
+                        Instant.ofEpochSecond(airingAt)));
+            }
+        }
+        return new TrackerMediaMetadata(
+                artwork,
+                TrackerJson.optionalString(media.get("format")),
+                TrackerJson.optionalString(media.get("status")),
+                nextAiring);
     }
 
     private static String mediaType(MediaKind kind) {

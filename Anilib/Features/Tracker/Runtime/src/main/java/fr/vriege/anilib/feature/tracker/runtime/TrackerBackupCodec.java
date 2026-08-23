@@ -2,7 +2,9 @@ package fr.vriege.anilib.feature.tracker.runtime;
 
 import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.tracker.TrackerEntry;
+import fr.vriege.anilib.feature.tracker.TrackerAiringSchedule;
 import fr.vriege.anilib.feature.tracker.TrackerId;
+import fr.vriege.anilib.feature.tracker.TrackerMediaMetadata;
 import fr.vriege.anilib.feature.tracker.TrackerStatus;
 import fr.vriege.anilib.framework.backup.BackupCodecException;
 import fr.vriege.anilib.framework.backup.BackupSectionCodec;
@@ -32,7 +34,7 @@ import java.util.OptionalDouble;
 public final class TrackerBackupCodec implements BackupSectionCodec {
     private static final BackupSectionId SECTION_ID = BackupSectionId.of("tracking");
     private static final int MAGIC = 0x5452414B;
-    private static final int CURRENT_VERSION = 1;
+    private static final int CURRENT_VERSION = 2;
     private static final int MAXIMUM_ENTRIES = 1_000_000;
     private static final Comparator<TrackerEntry> ORDER = Comparator
             .comparing((TrackerEntry entry) -> entry.libraryItemId().value())
@@ -114,10 +116,19 @@ public final class TrackerBackupCodec implements BackupSectionCodec {
         output.writeBoolean(entry.privateEntry());
         writeOptional(output, entry.remoteUri().map(URI::toString));
         output.writeUTF(entry.updatedAt().toString());
+        writeOptional(output, entry.metadata().artworkUri().map(URI::toString));
+        writeOptional(output, entry.metadata().format());
+        writeOptional(output, entry.metadata().publishingStatus());
+        output.writeBoolean(entry.metadata().nextAiring().isPresent());
+        if (entry.metadata().nextAiring().isPresent()) {
+            TrackerAiringSchedule schedule = entry.metadata().nextAiring().orElseThrow();
+            output.writeLong(schedule.episode());
+            output.writeUTF(schedule.airingAt().toString());
+        }
     }
 
     private static List<TrackerEntry> decode(int version, byte[] payload) {
-        if (version != CURRENT_VERSION) {
+        if (version < 1 || version > CURRENT_VERSION) {
             throw new BackupCodecException("Unsupported tracking backup version: " + version);
         }
         try (DataInputStream input = new DataInputStream(new ByteArrayInputStream(
@@ -146,9 +157,13 @@ public final class TrackerBackupCodec implements BackupSectionCodec {
                 Optional<LocalDate> finish = readOptional(input).map(LocalDate::parse);
                 boolean privateEntry = input.readBoolean();
                 Optional<URI> uri = readOptional(input).map(URI::create);
+                Instant updatedAt = Instant.parse(input.readUTF());
+                TrackerMediaMetadata metadata = version >= 2
+                        ? readMetadata(input)
+                        : TrackerMediaMetadata.empty();
                 TrackerEntry entry = new TrackerEntry(
                         itemId, trackerId, remoteId, title, progress, total, status, score,
-                        start, finish, privateEntry, uri, Instant.parse(input.readUTF()));
+                        start, finish, privateEntry, uri, updatedAt, metadata);
                 if (unique.putIfAbsent(Key.of(entry), entry) != null) {
                     throw new BackupCodecException("Tracking section contains duplicate entries");
                 }
@@ -163,6 +178,16 @@ public final class TrackerBackupCodec implements BackupSectionCodec {
         } catch (IOException | IllegalArgumentException exception) {
             throw new BackupCodecException("Invalid tracking section", exception);
         }
+    }
+
+    private static TrackerMediaMetadata readMetadata(DataInputStream input) throws IOException {
+        Optional<URI> artwork = readOptional(input).map(URI::create);
+        Optional<String> format = readOptional(input);
+        Optional<String> publishingStatus = readOptional(input);
+        Optional<TrackerAiringSchedule> nextAiring = input.readBoolean()
+                ? Optional.of(new TrackerAiringSchedule(input.readLong(), Instant.parse(input.readUTF())))
+                : Optional.empty();
+        return new TrackerMediaMetadata(artwork, format, publishingStatus, nextAiring);
     }
 
     private static void writeOptional(DataOutputStream output, Optional<String> value) throws IOException {

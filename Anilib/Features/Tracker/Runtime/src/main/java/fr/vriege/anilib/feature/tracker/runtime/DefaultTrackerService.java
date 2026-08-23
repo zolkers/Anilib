@@ -234,7 +234,7 @@ public final class DefaultTrackerService implements TrackerService, AutoCloseabl
                         bounded, effectiveTotal, status, current.score(), current.startDate(),
                         status == TrackerStatus.COMPLETED && current.finishDate().isEmpty()
                                 ? Optional.of(LocalDate.now()) : current.finishDate(),
-                        current.privateEntry(), current.remoteUri(), Instant.now());
+                        current.privateEntry(), current.remoteUri(), Instant.now(), current.metadata());
                 if (syncPreferences().automatic()) {
                     update(replacement);
                 } else {
@@ -578,7 +578,7 @@ public final class DefaultTrackerService implements TrackerService, AutoCloseabl
         return new TrackerEntry(
                 requested.libraryItemId(), requested.trackerId(), requested.remoteId(), requested.title(),
                 requested.progress(), requested.totalUnits(), status, requested.score(), start, finish,
-                requested.privateEntry(), requested.remoteUri(), requested.updatedAt());
+                requested.privateEntry(), requested.remoteUri(), requested.updatedAt(), requested.metadata());
     }
 
     private void notifyListeners() {

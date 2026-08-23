@@ -20,6 +20,7 @@ import fr.vriege.anilib.feature.source.StreamingSource;
 import fr.vriege.anilib.feature.tracker.Tracker;
 import fr.vriege.anilib.feature.tracker.TrackerApiVersion;
 import fr.vriege.anilib.feature.tracker.TrackerAuthentication;
+import fr.vriege.anilib.feature.tracker.TrackerAiringSchedule;
 import fr.vriege.anilib.feature.tracker.TrackerCapabilities;
 import fr.vriege.anilib.feature.tracker.TrackerCredentials;
 import fr.vriege.anilib.feature.tracker.TrackerDescriptor;
@@ -28,6 +29,7 @@ import fr.vriege.anilib.feature.tracker.TrackerException;
 import fr.vriege.anilib.feature.tracker.TrackerExtensionManifest;
 import fr.vriege.anilib.feature.tracker.TrackerExtensionPlugin;
 import fr.vriege.anilib.feature.tracker.TrackerId;
+import fr.vriege.anilib.feature.tracker.TrackerMediaMetadata;
 import fr.vriege.anilib.feature.tracker.TrackerSearchResult;
 import fr.vriege.anilib.feature.tracker.TrackerService;
 import fr.vriege.anilib.feature.tracker.TrackerStatus;
@@ -94,8 +96,10 @@ final class TrackerTest {
             TrackerSearchResult candidate = service.search(TestTracker.ID, "Tracked", MediaKind.ANIME)
                     .getFirst();
             TrackerEntry bound = service.bind(item.id(), candidate);
-            counter.check(bound.status() == TrackerStatus.PLANNING && service.entries(item.id()).size() == 1,
-                    "search results must bind to one durable title entry");
+            counter.check(bound.status() == TrackerStatus.PLANNING
+                            && bound.metadata().nextAiring().orElseThrow().episode() == 13L
+                            && service.entries(item.id()).size() == 1,
+                    "search results must bind rich metadata to one durable title entry");
             TrackerEntry edited = bound
                     .withStatus(TrackerStatus.WATCHING)
                     .withProgress(3.0)
@@ -128,8 +132,9 @@ final class TrackerTest {
         try (StartedAnilib application = StandardAnilib.start(directory, List.of(extension(second)))) {
             TrackerService service = application.capability(TrackerCapabilities.SERVICE);
             counter.check(service.entries(item.id()).size() == 1
-                            && service.entries(item.id()).getFirst().progress() == 12.0,
-                    "tracker entries must survive a complete product restart");
+                            && service.entries(item.id()).getFirst().progress() == 12.0
+                            && service.entries(item.id()).getFirst().metadata().artworkUri().isPresent(),
+                    "tracker entries and media metadata must survive a complete product restart");
             counter.check(service.remove(item.id(), TestTracker.ID) && second.removals.get() == 1,
                     "unlink must delete remotely before removing the durable local binding");
             counter.check(service.entries(item.id()).isEmpty(),
@@ -332,7 +337,12 @@ final class TrackerTest {
         public List<TrackerSearchResult> search(String query, MediaKind kind) {
             return List.of(new TrackerSearchResult(
                     ID, "remote-1", "Tracked anime", kind, 12,
-                    Optional.of(URI.create("https://tracker.example/anime/1"))));
+                    Optional.of(URI.create("https://tracker.example/anime/1")),
+                    new TrackerMediaMetadata(
+                            Optional.of(URI.create("https://tracker.example/anime/1/cover.jpg")),
+                            Optional.of("TV"),
+                            Optional.of("RELEASING"),
+                            Optional.of(new TrackerAiringSchedule(13L, Instant.parse("2026-09-01T12:00:00Z"))))));
         }
 
         @Override
@@ -340,7 +350,7 @@ final class TrackerTest {
             return new TrackerEntry(
                     item.id(), ID, result.remoteId(), result.title(), 0.0, result.totalUnits(),
                     TrackerStatus.PLANNING, OptionalDouble.empty(), Optional.empty(), Optional.empty(),
-                    false, result.remoteUri(), Instant.now());
+                    false, result.remoteUri(), Instant.now(), result.metadata());
         }
 
         @Override
@@ -355,7 +365,7 @@ final class TrackerTest {
                     entry.libraryItemId(), entry.trackerId(), entry.remoteId(),
                     "Tracked anime refreshed", entry.progress(), entry.totalUnits(), entry.status(),
                     entry.score(), entry.startDate(), entry.finishDate(), entry.privateEntry(),
-                    entry.remoteUri(), Instant.now());
+                    entry.remoteUri(), Instant.now(), entry.metadata());
         }
 
         @Override

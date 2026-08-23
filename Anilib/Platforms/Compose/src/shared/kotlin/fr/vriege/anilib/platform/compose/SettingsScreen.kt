@@ -244,7 +244,7 @@ private fun SettingsHome(
     val reader = settingMatches(query, "Reader", "Reading mode controls display navigation")
     val player = settingMatches(query, "Player", "Playback decoder audio subtitles gestures")
     val downloads = settingMatches(query, "Downloads", "Wi-Fi queue storage offline")
-    val tracking = settingMatches(query, "Tracking", "AniList Kitsu progress synchronization services")
+    val tracking = settingMatches(query, "Tracking", "AniList progress synchronization service")
     val advanced = settingMatches(query, "Data and storage", "Cookies cache WebView database cleanup")
     val about = settingMatches(query, "About", "Version licences diagnostics update channel")
     Scaffold(

@@ -13,7 +13,8 @@ public record TrackerSearchResult(
         String title,
         MediaKind kind,
         long totalUnits,
-        Optional<URI> remoteUri) {
+        Optional<URI> remoteUri,
+        TrackerMediaMetadata metadata) {
     public static final long UNKNOWN_TOTAL = -1L;
 
     public TrackerSearchResult {
@@ -25,5 +26,16 @@ public record TrackerSearchResult(
             throw new IllegalArgumentException("totalUnits must be non-negative or unknown");
         }
         remoteUri = Objects.requireNonNull(remoteUri, "remoteUri must not be null");
+        metadata = Objects.requireNonNull(metadata, "metadata must not be null");
+    }
+
+    public TrackerSearchResult(
+            TrackerId trackerId,
+            String remoteId,
+            String title,
+            MediaKind kind,
+            long totalUnits,
+            Optional<URI> remoteUri) {
+        this(trackerId, remoteId, title, kind, totalUnits, remoteUri, TrackerMediaMetadata.empty());
     }
 }

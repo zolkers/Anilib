@@ -60,6 +60,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
+import fr.vriege.anilib.feature.tracker.TrackerAiringSchedule
 import androidx.compose.foundation.shape.RoundedCornerShape
 
 internal val mediaDateTimeFormatter: DateTimeFormatter = DateTimeFormatter
@@ -74,6 +75,7 @@ internal data class MediaDetailsUiModel(
     val sourceName: String,
     val description: String,
     val genres: List<String>,
+    val nextAiring: TrackerAiringSchedule? = null,
 )
 
 internal data class MediaUnitSelectionUiModel(
@@ -185,6 +187,14 @@ internal fun MediaDetailsScreen(
                     track = track,
                     openWeb = openWeb,
                 )
+            }
+            model.nextAiring?.let { schedule ->
+                item {
+                    NextAiringBanner(
+                        schedule,
+                        Modifier.widthIn(max = 900.dp).padding(vertical = 8.dp),
+                    )
+                }
             }
             item {
                 Column(Modifier.widthIn(max = 900.dp).fillMaxWidth()) {
