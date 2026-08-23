@@ -215,6 +215,7 @@ internal fun DetailsDestination(
             canWatch = runCatching { player.canOpen(details.id()) }.getOrDefault(false),
             canDownload = runCatching { downloads.canEnqueue(details.id()) }.getOrDefault(false),
             canTrack = true,
+            trackingCount = trackedEntries.size,
             nextAiring = nextAiring,
             readerError = readerError,
             downloadError = downloadError,
@@ -367,6 +368,7 @@ internal fun DetailsPage(
     canWatch: Boolean,
     canDownload: Boolean,
     canTrack: Boolean,
+    trackingCount: Int,
     nextAiring: TrackerAiringSchedule?,
     readerError: String?,
     downloadError: String?,
@@ -435,6 +437,7 @@ internal fun DetailsPage(
             )
         },
         canTrack = canTrack,
+        trackingCount = trackingCount,
         canOpenWeb = openTitleWeb != null || openSourceWeb != null,
         canDownload = canDownload,
         canShare = true,

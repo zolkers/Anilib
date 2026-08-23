@@ -24,17 +24,18 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.outlined.Category
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.outlined.Category
 import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -98,6 +99,7 @@ internal fun MediaDetailsScreen(
     favorite: Boolean,
     contentLabel: String,
     canTrack: Boolean,
+    trackingCount: Int,
     canOpenWeb: Boolean,
     canDownload: Boolean,
     canShare: Boolean,
@@ -182,6 +184,7 @@ internal fun MediaDetailsScreen(
                     favorite = favorite,
                     contentLabel = contentLabel,
                     canTrack = canTrack,
+                    trackingCount = trackingCount,
                     canOpenWeb = canOpenWeb,
                     toggleFavorite = toggleFavorite,
                     track = track,
@@ -252,6 +255,7 @@ private fun MediaDetailsActions(
     favorite: Boolean,
     contentLabel: String,
     canTrack: Boolean,
+    trackingCount: Int,
     canOpenWeb: Boolean,
     toggleFavorite: () -> Unit,
     track: () -> Unit,
@@ -269,7 +273,14 @@ private fun MediaDetailsActions(
             modifier = Modifier.weight(1f),
         )
         MediaDetailAction(Icons.Default.History, contentLabel, false, {}, Modifier.weight(1f))
-        MediaDetailAction(Icons.Default.MoreHoriz, "Tracking", canTrack, track, Modifier.weight(1f))
+        MediaDetailAction(
+            icon = if (trackingCount > 0) Icons.Default.CheckCircle else Icons.Outlined.Sync,
+            label = "ui.tracking",
+            enabled = canTrack,
+            action = track,
+            modifier = Modifier.weight(1f),
+            selected = trackingCount > 0,
+        )
         MediaDetailAction(Icons.Default.Public, "WebView", canOpenWeb, openWeb, Modifier.weight(1f))
     }
 }
@@ -281,10 +292,19 @@ private fun MediaDetailAction(
     enabled: Boolean,
     action: () -> Unit,
     modifier: Modifier = Modifier,
+    selected: Boolean = false,
 ) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = modifier) {
         IconButton(onClick = action, enabled = enabled) {
-            Icon(icon, contentDescription = label)
+            Icon(
+                icon,
+                contentDescription = label,
+                tint = when {
+                    selected -> MaterialTheme.colorScheme.primary
+                    enabled -> MaterialTheme.colorScheme.onSurface
+                    else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                },
+            )
         }
         Text(
             label,

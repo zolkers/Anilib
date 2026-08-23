@@ -978,6 +978,7 @@ private fun SourceTitleScreen(
             "${content.chapters.size} chapters"
         },
         canTrack = false,
+        trackingCount = 0,
         canOpenWeb = titleWebPage != null,
         canDownload = false,
         canShare = false,
