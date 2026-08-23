@@ -48,6 +48,10 @@ def compileRxjavaModuleInfo = tasks.register('compileRxjavaModuleInfo', JavaComp
     source(rxjavaModuleSource)
     destinationDirectory = layout.buildDirectory.dir('classes/rxjava-module-info')
     classpath = files()
+    javaCompiler = javaToolchains.compilerFor {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+    options.release = 21
     doFirst {
         options.compilerArgs.addAll([
                 '--patch-module',
