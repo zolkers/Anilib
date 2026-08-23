@@ -1,12 +1,14 @@
 package fr.vriege.anilib.feature.reader.runtime;
 
 import fr.vriege.anilib.feature.library.LibraryItemId;
+import fr.vriege.anilib.feature.reader.ReaderReadEvent;
 import fr.vriege.anilib.feature.reader.ReaderReadStateStore;
 
 import java.util.Objects;
 import java.util.Collection;
 import java.util.Set;
 import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 
 public final class PrivacyAwareReaderReadStateStore implements ReaderReadStateStore {
     private final ReaderReadStateStore delegate;
@@ -38,5 +40,10 @@ public final class PrivacyAwareReaderReadStateStore implements ReaderReadStateSt
         if (persistenceAllowed.getAsBoolean()) {
             delegate.setRead(libraryItemId, contentIds, read);
         }
+    }
+
+    @Override
+    public AutoCloseable observe(Consumer<ReaderReadEvent> listener) {
+        return delegate.observe(listener);
     }
 }

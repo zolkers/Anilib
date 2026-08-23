@@ -492,6 +492,7 @@ internal fun DetailsPage(
                         if (!selectingChapters) selectedChapterIds = emptySet()
                     },
                     selectAll = { selectedChapterIds = chapters.map { it.id().value() }.toSet() },
+                    deselectAll = { selectedChapterIds = emptySet() },
                     select = { chapterId ->
                         selectedChapterIds = if (chapterId in selectedChapterIds) {
                             selectedChapterIds - chapterId
@@ -547,6 +548,7 @@ internal fun DetailsPage(
                         if (!selectingEpisodes) selectedEpisodeIds = emptySet()
                     },
                     selectAll = { selectedEpisodeIds = episodes.map { it.episode().id() }.toSet() },
+                    deselectAll = { selectedEpisodeIds = emptySet() },
                     select = { episodeId ->
                         val id = episodes.first { it.episode().id().value() == episodeId }.episode().id()
                         selectedEpisodeIds = if (id in selectedEpisodeIds) {

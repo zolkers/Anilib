@@ -4,6 +4,7 @@ import fr.vriege.anilib.feature.library.LibraryItemId;
 
 import java.util.Collection;
 import java.util.Set;
+import java.util.function.Consumer;
 
 public interface ReaderReadStateStore {
     Set<String> readContentIds(LibraryItemId libraryItemId);
@@ -15,4 +16,6 @@ public interface ReaderReadStateStore {
             setRead(libraryItemId, contentId, read);
         }
     }
+
+    AutoCloseable observe(Consumer<ReaderReadEvent> listener);
 }

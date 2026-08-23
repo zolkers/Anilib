@@ -1,6 +1,8 @@
 package fr.vriege.anilib.platform.compose
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -86,6 +88,7 @@ internal data class MediaUnitSelectionUiModel(
     val negativeLabel: String,
     val toggle: () -> Unit,
     val selectAll: () -> Unit,
+    val deselectAll: () -> Unit,
     val select: (String) -> Unit,
     val markPositive: () -> Unit,
     val markNegative: () -> Unit,
@@ -330,6 +333,7 @@ internal fun MediaGenreChips(genres: List<String>) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 internal fun <T> LazyListScope.mediaUnitsSection(
     label: String,
     units: List<T>,
@@ -342,8 +346,8 @@ internal fun <T> LazyListScope.mediaUnitsSection(
     download: ((T) -> Unit)? = null,
 ) {
     if (units.isEmpty()) return
-    item(key = "media-section:$label") {
-        MediaContentSectionHeader(label, selection)
+    stickyHeader(key = "media-section:$label") {
+        MediaContentSectionHeader(label, units.size, selection)
     }
     items(units, key = key) { unit ->
         val unitKey = key(unit)
@@ -364,9 +368,16 @@ internal fun <T> LazyListScope.mediaUnitsSection(
 @Composable
 private fun MediaContentSectionHeader(
     label: String,
+    unitCount: Int,
     selection: MediaUnitSelectionUiModel?,
 ) {
-    Column(modifier = Modifier.widthIn(max = 900.dp).fillMaxWidth().padding(top = 12.dp)) {
+    Column(
+        modifier = Modifier
+            .widthIn(max = 900.dp)
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(top = 12.dp),
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 label,
@@ -384,6 +395,7 @@ private fun MediaContentSectionHeader(
             }
         }
         if (selection?.selecting == true) {
+            val allSelected = selection.selectedKeys.size == unitCount
             Row(
                 modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 verticalAlignment = Alignment.CenterVertically,
@@ -397,8 +409,11 @@ private fun MediaContentSectionHeader(
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.padding(horizontal = 8.dp),
                 )
-                TextButton(onClick = selection.selectAll) {
-                    Text(UiTranslations.translate("ui.select.all", LocalLanguagePack.current))
+                TextButton(onClick = if (allSelected) selection.deselectAll else selection.selectAll) {
+                    Text(UiTranslations.translate(
+                        if (allSelected) "ui.deselect.all" else "ui.select.all",
+                        LocalLanguagePack.current,
+                    ))
                 }
                 TextButton(
                     onClick = selection.markPositive,

@@ -233,12 +233,24 @@ public final class AniyomiMangaSourceAdapter {
                 SourceContentUnit unit = new SourceContentUnit(
                         id,
                         AniyomiAnimeSourceAdapter.firstText(chapter, "getName"),
+                        chapterNumber(AniyomiAnimeSourceAdapter.invokeOptional(
+                                chapter,
+                                "getChapter_number").orElse(SourceContentUnit.UNKNOWN_NUMBER)),
                         AniyomiAnimeSourceAdapter.uploadedAt(
                                 AniyomiAnimeSourceAdapter.invokeOptional(chapter, "getDate_upload").orElse(null)));
                 chapterById.put(id, chapter);
                 units.add(unit);
             }
             return List.copyOf(units);
+        }
+
+        private static double chapterNumber(Object value) {
+            if (value instanceof Number number
+                    && Double.isFinite(number.doubleValue())
+                    && number.doubleValue() >= SourceContentUnit.UNKNOWN_NUMBER) {
+                return number.doubleValue();
+            }
+            return SourceContentUnit.UNKNOWN_NUMBER;
         }
 
         @Override

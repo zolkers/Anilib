@@ -1,6 +1,7 @@
 package fr.vriege.anilib.feature.reader.runtime;
 
 import fr.vriege.anilib.feature.library.LibraryItemId;
+import fr.vriege.anilib.feature.reader.ReaderReadEvent;
 import fr.vriege.anilib.feature.reader.ReaderReadStateStore;
 
 import java.io.IOException;
@@ -16,10 +17,13 @@ import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 public final class FileReaderReadStateStore implements ReaderReadStateStore {
     private final Path file;
+    private final CopyOnWriteArrayList<Consumer<ReaderReadEvent>> listeners = new CopyOnWriteArrayList<>();
 
     public FileReaderReadStateStore(Path file) {
         this.file = Objects.requireNonNull(file, "file must not be null").toAbsolutePath().normalize();
@@ -60,7 +64,16 @@ public final class FileReaderReadStateStore implements ReaderReadStateStore {
         }
         if (!selected.isEmpty()) {
             write(entries);
+            ReaderReadEvent event = new ReaderReadEvent(libraryItemId, selected, read);
+            listeners.forEach(listener -> listener.accept(event));
         }
+    }
+
+    @Override
+    public AutoCloseable observe(Consumer<ReaderReadEvent> listener) {
+        Consumer<ReaderReadEvent> value = Objects.requireNonNull(listener, "listener must not be null");
+        listeners.add(value);
+        return () -> listeners.remove(value);
     }
 
     private Set<Entry> entries() {

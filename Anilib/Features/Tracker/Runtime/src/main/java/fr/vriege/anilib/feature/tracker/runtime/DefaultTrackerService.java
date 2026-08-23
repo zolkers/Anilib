@@ -588,7 +588,7 @@ public final class DefaultTrackerService implements TrackerService, AutoCloseabl
         }
     }
 
-    private static TrackerEntry normalizeProgress(
+    private TrackerEntry normalizeProgress(
             Tracker tracker,
             TrackerEntry current,
             TrackerEntry requested) {
@@ -596,10 +596,19 @@ public final class DefaultTrackerService implements TrackerService, AutoCloseabl
         Optional<LocalDate> start = requested.startDate();
         Optional<LocalDate> finish = requested.finishDate();
         if (requested.progress() > 0.0D && status == TrackerStatus.PLANNING) {
-            if (tracker.descriptor().statuses().contains(TrackerStatus.WATCHING)) {
-                status = TrackerStatus.WATCHING;
-            } else if (tracker.descriptor().statuses().contains(TrackerStatus.READING)) {
-                status = TrackerStatus.READING;
+            MediaKind kind = library.find(requested.libraryItemId())
+                    .map(LibraryItem::kind)
+                    .orElse(MediaKind.OTHER);
+            TrackerStatus preferred = kind == MediaKind.MANGA || kind == MediaKind.NOVEL
+                    ? TrackerStatus.READING
+                    : TrackerStatus.WATCHING;
+            TrackerStatus fallback = preferred == TrackerStatus.READING
+                    ? TrackerStatus.WATCHING
+                    : TrackerStatus.READING;
+            if (tracker.descriptor().statuses().contains(preferred)) {
+                status = preferred;
+            } else if (tracker.descriptor().statuses().contains(fallback)) {
+                status = fallback;
             }
             if (tracker.descriptor().supportsDates() && start.isEmpty()) {
                 start = Optional.of(LocalDate.now());

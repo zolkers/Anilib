@@ -7,13 +7,18 @@ import fr.vriege.anilib.feature.library.LibraryItem;
 import fr.vriege.anilib.feature.library.LibraryOrigin;
 import fr.vriege.anilib.feature.library.MediaKind;
 import fr.vriege.anilib.feature.player.PlayerCapabilities;
+import fr.vriege.anilib.feature.reader.ReaderCapabilities;
+import fr.vriege.anilib.feature.source.PagedSource;
 import fr.vriege.anilib.feature.source.SourceCatalogueItemId;
 import fr.vriege.anilib.feature.source.SourceContentKind;
+import fr.vriege.anilib.feature.source.SourceContentUnit;
+import fr.vriege.anilib.feature.source.SourceContentUnitId;
 import fr.vriege.anilib.feature.source.SourceDescriptor;
 import fr.vriege.anilib.feature.source.SourceEpisode;
 import fr.vriege.anilib.feature.source.SourceEpisodeId;
 import fr.vriege.anilib.feature.source.SourceExtensionPlugin;
 import fr.vriege.anilib.feature.source.SourceId;
+import fr.vriege.anilib.feature.source.SourcePageResource;
 import fr.vriege.anilib.feature.source.SourceSdk;
 import fr.vriege.anilib.feature.source.SourceVideoStream;
 import fr.vriege.anilib.feature.source.StreamingSource;
@@ -62,6 +67,14 @@ final class TrackerTest {
             "Episode 7",
             7.0d,
             Optional.empty(),
+            Optional.empty());
+    private static final SourceId READING_SOURCE_ID = SourceId.of("test.tracker-reading");
+    private static final SourceCatalogueItemId READING_ITEM_ID =
+            new SourceCatalogueItemId(READING_SOURCE_ID, "tracked-manga");
+    private static final SourceContentUnit READING_CHAPTER = new SourceContentUnit(
+            new SourceContentUnitId(READING_ITEM_ID, "chapter-7.5"),
+            "Chapter 7.5",
+            7.5d,
             Optional.empty());
 
     private TrackerTest() {
@@ -158,6 +171,7 @@ final class TrackerTest {
             deleteDirectory(incompatibleDirectory);
         }
         advancesTrackerFromCompletedPlayback(counter);
+        advancesTrackerFromReadChapter(counter);
         persistsOAuthSession(counter);
         return counter.value;
     }
@@ -220,7 +234,12 @@ final class TrackerTest {
                     item.id(),
                     Set.of(PLAYBACK_EPISODE.id()),
                     true);
-            awaitTrackedProgress(service, item, tracker, PLAYBACK_EPISODE.episodeNumber());
+            awaitTrackedProgress(
+                    service,
+                    item,
+                    tracker,
+                    PLAYBACK_EPISODE.episodeNumber(),
+                    TrackerStatus.WATCHING);
             TrackerEntry tracked = service.entries(item.id()).getFirst();
             counter.check(tracked.progress() == PLAYBACK_EPISODE.episodeNumber()
                             && tracked.totalUnits() == 12
@@ -232,10 +251,47 @@ final class TrackerTest {
         }
     }
 
+    private static void advancesTrackerFromReadChapter(Counter counter) {
+        Path directory = temporaryDirectory();
+        TestTracker tracker = new TestTracker();
+        tracker.authenticated = true;
+        tracker.account = "alice";
+        try (StartedAnilib application = StandardAnilib.start(
+                directory,
+                List.of(extension(tracker), readingSourceExtension()))) {
+            LibraryItem item = LibraryItem.create("Tracked manga", MediaKind.MANGA)
+                    .withOrigin(new LibraryOrigin(
+                            READING_SOURCE_ID.toString(),
+                            READING_ITEM_ID.value()));
+            application.capability(LibraryCapabilities.CATALOG).save(item);
+            TrackerService service = application.capability(TrackerCapabilities.SERVICE);
+            service.bind(item.id(), service.search(TestTracker.ID, item.title(), item.kind()).getFirst());
+            application.capability(ReaderCapabilities.READ_STATE).setRead(
+                    item.id(),
+                    READING_CHAPTER.id().value(),
+                    true);
+            awaitTrackedProgress(service, item, tracker, READING_CHAPTER.number(), TrackerStatus.READING);
+            TrackerEntry tracked = service.entries(item.id()).getFirst();
+            counter.check(tracked.progress() == READING_CHAPTER.number()
+                            && tracked.totalUnits() == 12
+                            && tracked.status() == TrackerStatus.READING
+                            && tracker.updates.get() == 1,
+                    "reading tracking must push the chapter and reading status without losing the remote total");
+        } finally {
+            deleteDirectory(directory);
+        }
+    }
+
     private static SourceExtensionPlugin playbackSourceExtension() {
         return new SourceExtensionPlugin(
                 ComponentDescriptor.of("extension.tracker-playback", "Tracker playback", "1.0.0"),
                 new PlaybackStreamingSource());
+    }
+
+    private static SourceExtensionPlugin readingSourceExtension() {
+        return new SourceExtensionPlugin(
+                ComponentDescriptor.of("extension.tracker-reading", "Tracker reading", "1.0.0"),
+                new ReadingPagedSource());
     }
 
     private static TrackerExtensionPlugin extension(TestTracker tracker) {
@@ -287,11 +343,12 @@ final class TrackerTest {
             TrackerService service,
             LibraryItem item,
             TestTracker tracker,
-            double expected) {
+            double expected,
+            TrackerStatus expectedStatus) {
         for (int attempt = 0; attempt < 300; attempt++) {
             TrackerEntry entry = service.entries(item.id()).getFirst();
             if (entry.progress() == expected
-                    && entry.status() == TrackerStatus.WATCHING
+                    && entry.status() == expectedStatus
                     && tracker.updates.get() == 1) {
                 return;
             }
@@ -302,7 +359,7 @@ final class TrackerTest {
                 throw new AssertionError("Interrupted while awaiting playback tracking", exception);
             }
         }
-        throw new AssertionError("Completed playback did not update the remote tracker");
+        throw new AssertionError("Completed media unit did not update the remote tracker");
     }
 
     private static final class PlaybackStreamingSource implements StreamingSource {
@@ -325,6 +382,34 @@ final class TrackerTest {
         @Override
         public List<SourceVideoStream> streams(SourceEpisodeId episodeId) {
             return List.of();
+        }
+    }
+
+    private static final class ReadingPagedSource implements PagedSource {
+        @Override
+        public SourceDescriptor descriptor() {
+            return new SourceDescriptor(
+                    READING_SOURCE_ID,
+                    "Tracker reading",
+                    "1.0.0",
+                    "en",
+                    Set.of(SourceContentKind.MANGA),
+                    SourceSdk.API_VERSION);
+        }
+
+        @Override
+        public List<SourceContentUnit> contentUnits(SourceCatalogueItemId itemId) {
+            return List.of(READING_CHAPTER);
+        }
+
+        @Override
+        public List<SourcePageResource> pages(SourceContentUnitId contentUnitId) {
+            return List.of();
+        }
+
+        @Override
+        public byte[] readPage(SourcePageResource page) {
+            return new byte[0];
         }
     }
 

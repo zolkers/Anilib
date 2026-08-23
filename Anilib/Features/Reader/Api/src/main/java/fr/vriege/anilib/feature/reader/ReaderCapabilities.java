@@ -7,6 +7,8 @@ public final class ReaderCapabilities {
             CapabilityKey.of("feature.reader.service", ReaderService.class);
     public static final CapabilityKey<ReaderContentRegistrar> CONTENT_REGISTRAR =
             CapabilityKey.of("feature.reader.content-registrar", ReaderContentRegistrar.class);
+    public static final CapabilityKey<ReaderReadStateStore> READ_STATE =
+            CapabilityKey.of("feature.reader.read-state", ReaderReadStateStore.class);
 
     private ReaderCapabilities() {
     }

@@ -216,6 +216,7 @@ public final class FileSystemLocalContentSource
                     .map(chapter -> new SourceContentUnit(
                             new SourceContentUnitId(itemId, "chapter:" + chapter.relativePath()),
                             chapter.title(),
+                            chapter.number(),
                             chapter.uploadedAt()))
                     .toList();
         }

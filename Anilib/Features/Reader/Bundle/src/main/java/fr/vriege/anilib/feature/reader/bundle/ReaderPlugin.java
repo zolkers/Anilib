@@ -4,6 +4,7 @@ import fr.vriege.anilib.feature.library.LibraryCapabilities;
 import fr.vriege.anilib.feature.library.LibraryCatalog;
 import fr.vriege.anilib.feature.reader.ReaderCapabilities;
 import fr.vriege.anilib.feature.reader.ReaderPolicy;
+import fr.vriege.anilib.feature.reader.ReaderReadStateStore;
 import fr.vriege.anilib.feature.reader.runtime.DefaultReaderService;
 import fr.vriege.anilib.feature.reader.runtime.FileReaderDisplayPreferenceStore;
 import fr.vriege.anilib.feature.reader.runtime.FileReaderInteractionPreferenceStore;
@@ -31,6 +32,7 @@ public final class ReaderPlugin implements AnilibPlugin {
             .requires(SettingsCapabilities.SERVICE)
             .provides(ReaderCapabilities.SERVICE)
             .provides(ReaderCapabilities.CONTENT_REGISTRAR)
+            .provides(ReaderCapabilities.READ_STATE)
             .provides(ReaderUiCapabilities.PRESENTATION)
             .build();
 
@@ -87,14 +89,16 @@ public final class ReaderPlugin implements AnilibPlugin {
                 library,
                 policy,
                 () -> !settings.snapshot().incognitoMode()));
+        ReaderReadStateStore readStateStore = new PrivacyAwareReaderReadStateStore(
+                new FileReaderReadStateStore(readState),
+                () -> !settings.snapshot().incognitoMode());
         context.publish(ReaderCapabilities.SERVICE, service);
         context.publish(ReaderCapabilities.CONTENT_REGISTRAR, service);
+        context.publish(ReaderCapabilities.READ_STATE, readStateStore);
         context.publish(ReaderUiCapabilities.PRESENTATION, new DefaultReaderPresentation(
                 service,
                 new FileReaderInteractionPreferenceStore(interactionPreferences),
                 new FileReaderDisplayPreferenceStore(displayPreferences),
-                new PrivacyAwareReaderReadStateStore(
-                        new FileReaderReadStateStore(readState),
-                        () -> !settings.snapshot().incognitoMode())));
+                readStateStore));
     }
 }

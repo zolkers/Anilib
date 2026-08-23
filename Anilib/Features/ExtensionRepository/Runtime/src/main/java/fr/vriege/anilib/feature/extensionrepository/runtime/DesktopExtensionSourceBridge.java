@@ -685,7 +685,11 @@ public final class DesktopExtensionSourceBridge {
             for (Object value : array(document, "chapters")) {
                 Map<String, Object> chapter = object(value);
                 SourceContentUnitId id = new SourceContentUnitId(itemId, text(chapter, "url"));
-                result.add(new SourceContentUnit(id, text(chapter, "name"), instant(chapter.get("date_upload"))));
+                result.add(new SourceContentUnit(
+                        id,
+                        text(chapter, "name"),
+                        doubleValue(chapter.get("chapter_number"), SourceContentUnit.UNKNOWN_NUMBER),
+                        instant(chapter.get("date_upload"))));
             }
             return List.copyOf(result);
         }

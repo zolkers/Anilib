@@ -14,6 +14,7 @@ import fr.vriege.anilib.feature.reader.ReaderInteractionAction;
 import fr.vriege.anilib.feature.reader.ReaderInteractionPreferences;
 import fr.vriege.anilib.feature.reader.ReaderException;
 import fr.vriege.anilib.feature.reader.ReaderPolicy;
+import fr.vriege.anilib.feature.reader.ReaderReadEvent;
 import fr.vriege.anilib.feature.reader.ReaderOrientationPolicy;
 import fr.vriege.anilib.feature.reader.ReaderPageTransition;
 import fr.vriege.anilib.feature.reader.ReaderService;
@@ -46,6 +47,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -103,6 +105,8 @@ final class ReaderTest {
             Path file = directory.resolve("reader-read-state.properties");
             LibraryItemId title = new LibraryItemId("reader-read-title");
             FileReaderReadStateStore store = new FileReaderReadStateStore(file);
+            List<ReaderReadEvent> events = new ArrayList<>();
+            store.observe(events::add);
             store.setRead(title, "chapter-2", true);
             counter.check(new FileReaderReadStateStore(file).readContentIds(title).contains("chapter-2"),
                     "reader chapter read state must survive a Desktop restart");
@@ -115,6 +119,11 @@ final class ReaderTest {
             store.setRead(title, Set.of("chapter-1", "chapter-3"), false);
             counter.check(store.readContentIds(title).equals(Set.of("chapter-2")),
                     "reader catalogues must persist one bulk mark-unread action");
+            counter.check(events.size() == 4
+                            && events.get(2).contentIds().size() == 3
+                            && events.get(3).contentIds().size() == 2
+                            && !events.get(3).read(),
+                    "reader read-state changes must publish one event per user action");
         } catch (IOException exception) {
             throw new AssertionError("Unable to test reader read state", exception);
         } finally {
