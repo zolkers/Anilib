@@ -767,7 +767,6 @@ internal fun AppDestination(
             )
             MoreDestination.ABOUT -> AboutScreen(componentCount, applicationUpdates, closeMore)
             null -> MorePage(
-                componentCount,
                 settings,
                 settingsPresentation::setIncognitoMode,
                 downloads,

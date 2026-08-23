@@ -44,7 +44,6 @@ import fr.vriege.anilib.feature.settings.SettingsSnapshot
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun MorePage(
-    componentCount: Int,
     settings: SettingsSnapshot,
     setIncognitoMode: (Boolean) -> Unit,
     downloads: DownloadPresentation,
@@ -151,11 +150,7 @@ internal fun MorePage(
                 AnilibGroup(modifier = Modifier.padding(horizontal = 16.dp)) {
                     MoreRow(
                         "ui.settings",
-                        UiTranslations.format(
-                            "dynamic.bundle.count",
-                            LocalLanguagePack.current,
-                            componentCount,
-                        ),
+                        "ui.manage.application.preferences",
                         Icons.Outlined.Settings,
                         openSettings,
                     )
