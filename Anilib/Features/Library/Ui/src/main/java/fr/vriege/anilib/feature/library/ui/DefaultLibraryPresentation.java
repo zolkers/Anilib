@@ -307,7 +307,7 @@ public final class DefaultLibraryPresentation implements LibraryPresentation {
             throw new IllegalArgumentException("Category and title library types must match");
         }
         LibraryItem categorized = item.withCategories(selected);
-        catalog.save(selected.isEmpty() ? categorized : categorized.withFavorite(true));
+        catalog.save(categorized);
     }
 
     @Override

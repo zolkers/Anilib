@@ -817,8 +817,7 @@ private fun SourceCatalogueScreen(
                         scope.launch {
                             withContext(Dispatchers.IO) {
                                 runCatching {
-                                    val id = presentation.addToLibrary(item)
-                                    library.setFavorite(setOf(id), true)
+                                    presentation.addToLibrary(item)
                                 }
                             }.onSuccess {
                                 notice = "${item.title()} added to Library"

@@ -167,8 +167,9 @@ final class DiscoveryTest {
                     .items().getFirst();
             LibraryItemId libraryItemId = discovery.addToLibrary(localItem);
             counter.check(discovery.addToLibrary(localItem).equals(libraryItemId)
-                            && library.snapshot().size() == 1,
-                    "adding the same source identity twice must not duplicate the library title");
+                            && library.snapshot().size() == 1
+                            && !library.find(libraryItemId).orElseThrow().favorite(),
+                    "adding a source title must be idempotent and must not make it a favorite");
             LibraryItem enriched = library.find(libraryItemId).orElseThrow()
                     .withCategories(Set.of("Reading"))
                     .withFavorite(true)

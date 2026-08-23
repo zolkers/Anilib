@@ -130,10 +130,10 @@ final class LibraryPresentationTest {
         presentation.setTitleCategories(new LibraryItemId("zulu"), Set.of());
         counter.check(catalog.find(new LibraryItemId("alpha")).orElseThrow()
                         .categories().equals(Set.of("Archive"))
-                        && catalog.find(new LibraryItemId("alpha")).orElseThrow().favorite()
+                        && !catalog.find(new LibraryItemId("alpha")).orElseThrow().favorite()
                         && catalog.find(new LibraryItemId("zulu")).orElseThrow()
                         .categories().isEmpty(),
-                "title categories must replace assignments and add categorized titles to the library");
+                "title categories must replace assignments without changing favorite state");
         presentation.deleteTitles(Set.of(new LibraryItemId("beta")));
         counter.check(catalog.find(new LibraryItemId("beta")).isEmpty()
                         && catalog.find(new LibraryItemId("alpha")).orElseThrow()
