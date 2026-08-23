@@ -68,7 +68,7 @@ final class SourcePublisherTest {
             check(metadata.artifacts().size() == 2
                             && metadata.artifacts().getFirst().format()
                             == ExtensionArtifactFormat.ANIYOMI_APK,
-                    "publisher must merge the Android fallback and portable Bundle into one package entry");
+                    "publisher must merge the APK fallback and portable Bundle into one package entry");
 
             byte[] bundleBytes = Files.readAllBytes(bundle);
             DefaultExtensionInstallationService installation = new DefaultExtensionInstallationService(
@@ -91,12 +91,12 @@ final class SourcePublisherTest {
                         .find(SourceId.of("example.catalogue"))
                         .orElseThrow();
                 check(source.popular(new SourceBrowseRequest(1, 20, List.of(), Map.of())).items().size() == 3,
-                        "official source must load through the shared Android/desktop product graph");
+                        "official source must load through the Desktop product graph");
             }
             check(Files.isRegularFile(repository.resolve("index.min.json")),
                     "publisher must emit the minified dynamic index");
             check(Files.isRegularFile(repository.resolve("apk").resolve(
-                            "anilib-android-" + packageHash(metadata.packageName()) + "-v1.apk"))
+                            "anilib-apk-" + packageHash(metadata.packageName()) + "-v1.apk"))
                             && Files.readString(repository.resolve("checksums.sha256"), StandardCharsets.UTF_8)
                             .lines().count() == 2,
                     "publisher must copy both artifacts and emit deterministic SHA-256 checksums");

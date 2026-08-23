@@ -21,9 +21,8 @@ Symlinks, unexpected names, size changes, digest changes, signature failures,
 cross-channel releases, redirects outside HTTPS, and oversized responses are
 rejected.
 
-Android owns PackageInstaller sessions and the unknown-source permission flow.
 Desktop owns the native installer hand-off for MSI, DEB, and notarized DMG
-artifacts. Neither adapter silently elevates privileges or bypasses the
+artifacts. The adapter never silently elevates privileges or bypasses the
 operating system confirmation UI.
 
 ## Release key provisioning
@@ -36,6 +35,6 @@ release that trusts the successor key before signing exclusively with it.
 
 The application-release workflow fails closed when the secret is absent,
 checks every producer checksum, signs the exact manifest bytes, publishes the
-manifest beside all four installers, requests GitHub artifact provenance, and
+manifest beside all three installers, requests GitHub artifact provenance, and
 marks beta tags as prereleases. The operational ceremony is recorded in
 `distribution/RELEASE_ACCEPTANCE.md`.

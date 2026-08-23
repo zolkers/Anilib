@@ -13,8 +13,6 @@ public final class ApplicationReleaseRule implements AnilibJavaRule {
             Path.of(".github", "workflows", "application-release.yml");
     private static final Path DESKTOP_WORKFLOW =
             Path.of(".github", "workflows", "desktop-release.yml");
-    private static final Path ANDROID_WORKFLOW =
-            Path.of(".github", "workflows", "android-release.yml");
 
     public ApplicationReleaseRule() {
     }
@@ -33,7 +31,6 @@ public final class ApplicationReleaseRule implements AnilibJavaRule {
                 diagnostics,
                 "v[0-9]+.[0-9]+.[0-9]+",
                 "uses: ./.github/workflows/desktop-release.yml",
-                "uses: ./.github/workflows/android-release.yml",
                 "require-signing: true",
                 "actions/download-artifact@v8.0.1",
                 "sha256sum --check SHA256SUMS",
@@ -56,15 +53,6 @@ public final class ApplicationReleaseRule implements AnilibJavaRule {
                 "notarizeDmg",
                 "compose.desktop.mac.sign=true",
                 "xcrun stapler validate");
-        requireTokens(
-                repository,
-                ANDROID_WORKFLOW,
-                diagnostics,
-                "workflow_call:",
-                "Validate production signing secrets",
-                "*-unsigned.apk",
-                "apksigner",
-                "--print-certs");
         return List.copyOf(diagnostics);
     }
 

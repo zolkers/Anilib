@@ -5,15 +5,16 @@ import fr.vriege.anilib.foundation.validation.Preconditions;
 import java.util.Optional;
 
 public record ExtensionPlatformAvailability(
-        boolean android,
         boolean desktop,
-        Optional<ExtensionArtifactMetadata> androidArtifact,
-        Optional<ExtensionArtifactMetadata> desktopArtifact) {
+        Optional<ExtensionArtifactMetadata> portableArtifact,
+        Optional<ExtensionArtifactMetadata> apkArtifact,
+        Optional<ExtensionArtifactMetadata> preferredArtifact) {
     public ExtensionPlatformAvailability {
-        androidArtifact = Preconditions.requireNonNull(androidArtifact, "androidArtifact");
-        desktopArtifact = Preconditions.requireNonNull(desktopArtifact, "desktopArtifact");
-        if (android != androidArtifact.isPresent() || desktop != desktopArtifact.isPresent()) {
-            throw new IllegalArgumentException("platform availability must match selected artifacts");
+        portableArtifact = Preconditions.requireNonNull(portableArtifact, "portableArtifact");
+        apkArtifact = Preconditions.requireNonNull(apkArtifact, "apkArtifact");
+        preferredArtifact = Preconditions.requireNonNull(preferredArtifact, "preferredArtifact");
+        if (desktop != preferredArtifact.isPresent()) {
+            throw new IllegalArgumentException("desktop availability must match the preferred artifact");
         }
     }
 
@@ -21,19 +22,12 @@ public record ExtensionPlatformAvailability(
         ExtensionPackageMetadata metadata = Preconditions.requireNonNull(extensionPackage, "extensionPackage");
         Optional<ExtensionArtifactMetadata> portable = artifact(metadata, ExtensionArtifactFormat.ANILIB_BUNDLE);
         Optional<ExtensionArtifactMetadata> apk = artifact(metadata, ExtensionArtifactFormat.ANIYOMI_APK);
-        Optional<ExtensionArtifactMetadata> android = portable.isPresent() ? portable : apk;
+        Optional<ExtensionArtifactMetadata> preferred = portable.isPresent() ? portable : apk;
         return new ExtensionPlatformAvailability(
-                android.isPresent(),
-                portable.isPresent(),
-                android,
-                portable);
-    }
-
-    public Optional<ExtensionArtifactMetadata> preferredArtifact(ExtensionHostPlatform platform) {
-        return switch (Preconditions.requireNonNull(platform, "platform")) {
-            case ANDROID -> androidArtifact;
-            case DESKTOP -> desktopArtifact;
-        };
+                preferred.isPresent(),
+                portable,
+                apk,
+                preferred);
     }
 
     private static Optional<ExtensionArtifactMetadata> artifact(

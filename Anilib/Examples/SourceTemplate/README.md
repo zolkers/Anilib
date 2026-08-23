@@ -2,7 +2,7 @@
 
 This is a complete portable source repository example. Its Java packages use
 `fr.vriege.anilib`, its module depends only on the Source SDK, and the produced
-Bundle runs unchanged on Android and desktop.
+Bundle runs unchanged in the Desktop extension runtime.
 
 ## Build and publish locally
 
@@ -17,7 +17,7 @@ From the Anilib repository root:
 Keep `private.key` secret. Users import the content of `public.key` once, then
 add either the published `index.json` URL or the GitHub repository URL in
 Anilib. `published` contains the signed JAR plus full and minified indexes.
-To keep an Android APK as a fallback during migration, add
+To keep an AniYomi/Mihon APK as a fallback during migration, add
 `apk=path/to/fallback.apk` to `source-publisher.properties`. The publisher
 keeps one logical `pkg` entry, copies the APK under `apk/`, prefers the signed
 Bundle in both Anilib applications, and emits `checksums.sha256` for both files.

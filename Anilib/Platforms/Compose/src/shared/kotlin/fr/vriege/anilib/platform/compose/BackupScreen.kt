@@ -444,7 +444,7 @@ private fun BackupPolicyDialog(
                     singleLine = true,
                 )
                 Text(
-                    "ui.export.uses.the.native.document.picker.including.android.saf",
+                    "ui.export.uses.the.native.desktop.document.picker",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 validationError?.let { Text(it, color = MaterialTheme.colorScheme.error) }

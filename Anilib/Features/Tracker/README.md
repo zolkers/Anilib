@@ -2,8 +2,8 @@
 
 Tracker is a removable vertical for Aniyomi-style external anime and manga
 tracking. Shared Java owns the SDK, installed-service registry, durable title
-bindings, mutations, backup codec, and platform-neutral presentation. Android
-and desktop render the same account and title workflows.
+bindings, mutations, backup codec, and platform-neutral presentation. Desktop
+renders the account and title workflows.
 
 ## User workflow
 
@@ -24,9 +24,10 @@ then provides:
   resolution plus explicit conflict review;
 - durable local mirrors and a feature-owned `tracking` backup section.
 
-Credentials are never persisted by Tracker Core. An opted-in adapter owns its
-session and secret storage policy; Anilib persists only remote title bindings
-and their latest non-secret state.
+Password credentials are never persisted. Opted-in OAuth and token adapters may
+export a bounded local session snapshot, which Tracker Runtime stores outside
+backups and removes before logout; remote title bindings remain independently
+durable.
 
 ## First-party providers
 

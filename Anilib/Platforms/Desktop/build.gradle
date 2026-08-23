@@ -67,7 +67,7 @@ compose.desktop {
         nativeDistributions {
             packageName = 'Anilib'
             packageVersion = packageVersionValue
-            description = 'Cross-platform anime and manga library, reader, and player'
+            description = 'Desktop anime and manga library, reader, and player'
             copyright = 'Copyright 2026 Victor Riegert'
             vendor = 'Anilib'
             licenseFile.set(rootProject.file('LICENSE'))

@@ -196,10 +196,10 @@ final class ExtensionRepositoryTest {
                 "code":1,"version":"1","sources":[{"name":"APK","lang":"en","id":"1"}]}]
                 """).getFirst();
         ExtensionPlatformAvailability apkAvailability = ExtensionPlatformAvailability.from(apkOnly);
-        counter.check(apkAvailability.android() && !apkAvailability.desktop()
-                        && apkAvailability.androidArtifact().orElseThrow().format()
+        counter.check(apkAvailability.desktop()
+                        && apkAvailability.apkArtifact().orElseThrow().format()
                         == ExtensionArtifactFormat.ANIYOMI_APK,
-                "APK-only packages must be Android-only");
+                "APK-only packages must remain available through the Desktop extension host");
 
         ExtensionPackageMetadata portableOnly = parser.parse(INDEX, """
                 [{"name":"Bundle","pkg":"vendor.bundle","lang":"en","code":1,"version":"1",
@@ -208,10 +208,10 @@ final class ExtensionRepositoryTest {
                 "sources":[{"name":"Bundle","lang":"en","id":"2"}]}]
                 """.formatted(SHA_256)).getFirst();
         ExtensionPlatformAvailability portableAvailability = ExtensionPlatformAvailability.from(portableOnly);
-        counter.check(portableAvailability.android() && portableAvailability.desktop()
-                        && portableAvailability.androidArtifact().orElseThrow().format()
+        counter.check(portableAvailability.desktop()
+                        && portableAvailability.preferredArtifact().orElseThrow().format()
                         == ExtensionArtifactFormat.ANILIB_BUNDLE,
-                "portable-only packages must select the Bundle on Android and desktop");
+                "portable-only packages must select the Bundle on Desktop");
 
         String dualJson = """
                 [{"name":"Dual","pkg":"vendor.dual","apk":"fallback.apk","lang":"en",
@@ -221,11 +221,10 @@ final class ExtensionRepositoryTest {
                 """.formatted(SHA_256);
         ExtensionPlatformAvailability dualAvailability = ExtensionPlatformAvailability.from(
                 parser.parse(INDEX, dualJson).getFirst());
-        counter.check(dualAvailability.androidArtifact().orElseThrow().format()
+        counter.check(dualAvailability.preferredArtifact().orElseThrow().format()
                         == ExtensionArtifactFormat.ANILIB_BUNDLE
-                        && dualAvailability.desktopArtifact().orElseThrow().format()
-                        == ExtensionArtifactFormat.ANILIB_BUNDLE,
-                "dual packages must prefer the portable Bundle on every host");
+                        && dualAvailability.apkArtifact().isPresent(),
+                "dual packages must prefer the portable Bundle while retaining the APK fallback");
         counter.expectIllegalArgument(
                 () -> parser.parse(INDEX, """
                         [{"name":"Invalid","pkg":"vendor.invalid","lang":"en","code":1,"version":"1",
@@ -519,7 +518,7 @@ final class ExtensionRepositoryTest {
                     "extension language choices must be normalized and survive product restart");
             counter.check(reopened.pinnedPackages().equals(
                             Set.of("publisher:anime/source", "publisher:manga/source")),
-                    "pinned extension packages must survive Android and desktop restart");
+                    "pinned extension packages must survive a Desktop restart");
         } finally {
             deleteDirectory(directory);
         }
@@ -685,7 +684,7 @@ final class ExtensionRepositoryTest {
                         "the shared update channel must verify and install all available updates");
                 updates.setAutomaticUpdatesEnabled(true);
                 counter.check(new FileExtensionUpdatePolicyStore(policyFile).load(),
-                        "automatic source-update opt-in must survive Android and desktop restart");
+                        "automatic source-update opt-in must survive a Desktop restart");
             }
         } finally {
             deleteDirectory(directory);
@@ -713,7 +712,7 @@ final class ExtensionRepositoryTest {
                         && extension.hasReadme()
                         && extension.contentKind() == ExtensionContentKind.ANIME
                         && extension.compatibility() == ApkExtensionCompatibility.COMPATIBLE_METADATA,
-                "Android discovery metadata must retain the external APK extension contract and media kind");
+                "Desktop discovery metadata must retain the external APK extension contract and media kind");
         counter.check(ApkExtensionPlatforms.unavailable().discoverInstalled().isEmpty(),
                 "platforms without APK support must expose an empty APK inventory");
         ApkExtensionRuntimeReport preflight = new ApkExtensionRuntimeReport(
@@ -795,7 +794,7 @@ final class ExtensionRepositoryTest {
         counter.check(web.homePage().equals(URI.create("https://example.test"))
                         && web.titlePage(page.items().getFirst().id()).orElseThrow()
                         .equals(URI.create("https://example.test/anime/example")),
-                "an Android APK source must expose its own website and resolve relative title paths");
+                "an APK source must expose its own website and resolve relative title paths");
         authorized.set(false);
         counter.expectSecurity(
                 () -> catalogue.popular(new SourceBrowseRequest(1, 20, List.of(), Map.of())),
@@ -873,7 +872,7 @@ final class ExtensionRepositoryTest {
         counter.check(catalogue.preferences().equals(preferences.definitions()),
                 "configurable APK sources must expose their preference schema through the shared Source API");
         counter.check(applied.get().equals(selected),
-                "shared Android and desktop preference selections must reach the APK source before requests");
+                "Desktop preference selections must reach the APK source before requests");
     }
 
     private static void adaptsModernMangaSource(Counter counter) {

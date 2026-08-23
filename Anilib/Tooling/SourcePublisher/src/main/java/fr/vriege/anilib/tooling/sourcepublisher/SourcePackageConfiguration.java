@@ -93,7 +93,7 @@ record SourcePackageConfiguration(
         if (apk.isEmpty()) {
             throw new IllegalStateException("Package does not declare an APK artifact");
         }
-        return "anilib-android-" + packageHash(packageName) + "-v" + versionCode + ".apk";
+        return "anilib-apk-" + packageHash(packageName) + "-v" + versionCode + ".apk";
     }
 
     private static String required(Properties properties, String name) {

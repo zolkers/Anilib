@@ -194,11 +194,11 @@ final class HttpFrameworkTest {
             HttpResponse portable = portableClient.execute(
                     HttpRequest.builder(root.resolve("/cache")).build());
             counter.check(portable.bodyAsUtf8().equals("response-3"),
-                    "URL connection transport must execute the Android-compatible path");
+                    "URL connection transport must execute the dependency-free fallback path");
             HttpResponse portableRedirect = portableClient.execute(
                     HttpRequest.builder(root.resolve("/redirect")).build());
             counter.check(portableRedirect.statusCode() == 302,
-                    "Android-compatible transport must not bypass source origin authorization");
+                    "fallback transport must not bypass source origin authorization");
         } finally {
             server.stop(0);
             deleteTree(directory);

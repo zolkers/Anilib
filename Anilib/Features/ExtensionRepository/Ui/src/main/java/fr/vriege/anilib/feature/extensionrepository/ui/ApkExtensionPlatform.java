@@ -16,16 +16,16 @@ public interface ApkExtensionPlatform {
 
     default String availabilityDescription() {
         return available()
-                ? "APK extensions can be installed on Android. Portable Anilib Bundles work on every platform."
-                : "This device installs portable Anilib Bundles. APK execution is not configured.";
+                ? "AniYomi and Mihon APK extensions run through the Desktop compatibility host."
+                : "APK extension execution is not configured on this Desktop installation.";
     }
 
     default String installActionLabel() {
-        return "Install on Android";
+        return "Install extension";
     }
 
     default String installProgressLabel() {
-        return "Handing APK to Android";
+        return "Installing extension APK";
     }
 
     default boolean uninstallationSupported() {

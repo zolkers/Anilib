@@ -3,7 +3,7 @@
 Discovery owns the Aniyomi-style Browse workflow shared by every Anilib
 product. The Bundle publishes a Java `DiscoveryService` and a platform-neutral
 `DiscoveryPresentation`; the adaptive Compose platform renders that same
-presentation on Android and desktop.
+presentation on Desktop.
 
 The service provides:
 
@@ -17,7 +17,7 @@ The service provides:
 - installed anime/manga extension lists with declared permission and exact
   network-origin details.
 - durable per-media language visibility and pinned source ordering shared by
-  Android and desktop.
+  Desktop.
 - durable per-source grid/list catalogue display and item action menus.
 
 Discovery does not install or scan extensions. Product configurations still

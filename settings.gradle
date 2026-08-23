@@ -1,7 +1,6 @@
 pluginManagement {
     repositories {
         gradlePluginPortal()
-        google()
         mavenCentral()
     }
 }
@@ -80,7 +79,6 @@ include ':Anilib:Configurations:Standard'
 include ':Anilib:Platforms:Compose'
 include ':Anilib:Platforms:DesktopExtensionHost'
 include ':Anilib:Platforms:Desktop'
-include ':Anilib:Platforms:Android'
 include ':Anilib:Tooling:JavaQuality'
 include ':Anilib:Tooling:ExtensionPortability'
 include ':Anilib:Tooling:SourcePublisher'

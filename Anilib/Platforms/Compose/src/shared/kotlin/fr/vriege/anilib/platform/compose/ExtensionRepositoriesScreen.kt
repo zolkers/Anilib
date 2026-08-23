@@ -1329,6 +1329,9 @@ private fun ExtensionDetailScreen(
     val portable = extension.artifacts().any {
         it.format() == ExtensionArtifactFormat.ANILIB_BUNDLE
     }
+    val apk = extension.artifacts().any {
+        it.format() == ExtensionArtifactFormat.ANIYOMI_APK
+    }
     val blockedByAdultPolicy = extension.adult() && !adultContentEnabled
     Scaffold(
         topBar = {
@@ -1480,13 +1483,13 @@ private fun ExtensionDetailScreen(
                     Text(extension.changelog().orElse("No changelog supplied by this repository."))
                 }
             }
-            if (installed == null && !apkInstalled && !portable && installApk == null) {
+            if (installed == null && !apkInstalled && !portable && apk && installApk == null) {
                 item {
                     ExtensionDetailCard {
-                        Text("ui.android.only.extension", fontWeight = FontWeight.Medium)
+                        Text("ui.apk.extension.runtime.is.unavailable", fontWeight = FontWeight.Medium)
                         Text(
-                            "ui.this.repository.entry.contains.an.apk.open.the.same.repository.in.anilib.on.android." +
-                                "to.install.it.or.use.a.repository.that.publishes.portable.anilib.bundles",
+                            "ui.enable.the.desktop.extension.runtime.or.use.a.repository.that.publishes.portable." +
+                                "anilib.bundles",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -1772,13 +1775,11 @@ private fun ExtensionPackageCard(
                     )
                 }
                 val availability = ExtensionPlatformAvailability.from(extension)
-                val portable = availability.desktop()
-                val apk = availability.androidArtifact().map {
-                    it.format() == ExtensionArtifactFormat.ANIYOMI_APK
-                }.orElse(false)
-                if (installed == null && !apkInstalled && !portable && apk && installApk == null) {
+                val portable = availability.portableArtifact().isPresent
+                val apk = availability.apkArtifact().isPresent
+                if (installed == null && !apkInstalled && apk && installApk == null) {
                     Text(
-                        "ui.android.only.extension.install.it.from.anilib.on.android",
+                        "ui.apk.extension.runtime.is.unavailable",
                         color = MaterialTheme.colorScheme.tertiary,
                         style = MaterialTheme.typography.bodySmall,
                     )

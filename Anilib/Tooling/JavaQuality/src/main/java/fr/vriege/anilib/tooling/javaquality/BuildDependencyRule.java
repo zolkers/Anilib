@@ -20,25 +20,17 @@ public final class BuildDependencyRule implements AnilibJavaRule {
     private static final Pattern REPOSITORY = Pattern.compile(
             "^\\s*(google\\(\\)|mavenCentral\\(\\)|maven \\{ url = uri\\('([^']+)'\\) })\\s*$");
     private static final Set<String> ALLOWED_PLUGINS = Set.of("application", "base", "java", "java-library");
-    private static final String ANDROID_BUILD = "Anilib/Platforms/Android/build.gradle";
     private static final String COMPOSE_BUILD = "Anilib/Platforms/Compose/build.gradle";
     private static final String DESKTOP_BUILD = "Anilib/Platforms/Desktop/build.gradle";
     private static final String DESKTOP_EXTENSION_HOST_BUILD = "Anilib/Platforms/DesktopExtensionHost/build.gradle";
     private static final String ROOT_BUILD = "build.gradle";
     private static final Map<String, Set<String>> ALLOWED_EXTERNAL_DEPENDENCIES = Map.ofEntries(
             Map.entry(
-                    ANDROID_BUILD,
-                    Set.of(
-                            "'androidx.activity:activity-compose:1.13.0'",
-                            "'androidx.preference:preference-ktx:1.2.1'",
-                            "'io.github.kevinnzou:compose-webview-multiplatform:2.0.3'")),
-            Map.entry(
                     COMPOSE_BUILD,
                     Set.of(
                             "compose.foundation",
                             "compose.material3",
                             "compose.materialIconsExtended",
-                            "'androidx.media3:media3-exoplayer-hls:1.10.1'",
                             "'io.github.kevinnzou:compose-webview-multiplatform:2.0.3'",
                             "'io.github.kdroidfilter:composemediaplayer:0.11.4'")),
             Map.entry(
@@ -66,16 +58,10 @@ public final class BuildDependencyRule implements AnilibJavaRule {
                             "'org.jsoup:jsoup:1.19.1'")));
     private static final Map<String, Set<String>> ALLOWED_EXTERNAL_PLUGINS = Map.ofEntries(
             Map.entry(
-                    ANDROID_BUILD,
-                    Set.of(
-                            "com.android.application@null",
-                            "org.jetbrains.kotlin.plugin.compose@null")),
-            Map.entry(
                     COMPOSE_BUILD,
                     Set.of(
-                            "com.android.kotlin.multiplatform.library@null",
                             "org.jetbrains.compose@null",
-                            "org.jetbrains.kotlin.multiplatform@null",
+                            "org.jetbrains.kotlin.jvm@null",
                             "org.jetbrains.kotlin.plugin.compose@null")),
             Map.entry(
                     DESKTOP_BUILD,
@@ -86,14 +72,10 @@ public final class BuildDependencyRule implements AnilibJavaRule {
             Map.entry(
                     ROOT_BUILD,
                     Set.of(
-                            "com.android.application@9.1.1",
-                            "com.android.kotlin.multiplatform.library@9.1.1",
                             "org.jetbrains.compose@1.11.1",
                             "org.jetbrains.kotlin.jvm@2.4.10",
-                            "org.jetbrains.kotlin.multiplatform@2.4.10",
                             "org.jetbrains.kotlin.plugin.compose@2.4.10")));
     private static final Set<String> ALLOWED_REPOSITORY_BUILDS = Set.of(
-            ANDROID_BUILD,
             COMPOSE_BUILD,
             DESKTOP_BUILD,
             DESKTOP_EXTENSION_HOST_BUILD);

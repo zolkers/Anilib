@@ -22,7 +22,6 @@ final class ApplicationReleaseRuleTest {
             write(application, """
                     v[0-9]+.[0-9]+.[0-9]+
                     uses: ./.github/workflows/desktop-release.yml
-                    uses: ./.github/workflows/android-release.yml
                     require-signing: true
                     actions/download-artifact@v8.0.1
                     sha256sum --check SHA256SUMS
@@ -41,14 +40,10 @@ final class ApplicationReleaseRuleTest {
                     ANILIB_WINDOWS_CERTIFICATE_BASE64 signtool.exe notarizeDmg
                     compose.desktop.mac.sign=true xcrun stapler validate
                     """);
-            write(repository.resolve(".github/workflows/android-release.yml"), """
-                    workflow_call: Validate production signing secrets
-                    *-unsigned.apk apksigner --print-certs
-                    """);
             ApplicationReleaseRule rule = new ApplicationReleaseRule();
             RepositorySnapshot snapshot = snapshot(repository);
             check(rule.analyze(snapshot).isEmpty(),
-                    "a signed multi-platform publication contract must pass");
+                    "a signed Desktop publication contract must pass");
             Files.writeString(application, "gh release create", StandardCharsets.UTF_8);
             check(rule.analyze(snapshot).stream()
                             .anyMatch(diagnostic -> diagnostic.message().contains("actions/attest@v4")),

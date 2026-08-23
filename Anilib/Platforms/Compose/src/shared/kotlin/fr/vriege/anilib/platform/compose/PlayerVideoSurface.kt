@@ -27,7 +27,6 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material.icons.filled.ScreenRotation
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -54,7 +53,6 @@ import androidx.compose.ui.unit.dp
 import fr.vriege.anilib.feature.player.PlayerPlayback
 import fr.vriege.anilib.feature.player.PlayerAdvancedCapability
 import fr.vriege.anilib.feature.player.PlayerAdvancedState
-import fr.vriege.anilib.feature.player.PlayerOrientationPolicy
 import fr.vriege.anilib.feature.player.ui.PlayerController
 import io.github.kdroidfilter.composemediaplayer.VideoPlayerSurface
 import io.github.kdroidfilter.composemediaplayer.rememberVideoPlayerState
@@ -74,12 +72,7 @@ internal fun PlayerVideoSurface(
     playback: PlayerPlayback,
     fullscreen: Boolean,
     setFullscreen: (Boolean) -> Unit,
-    applyOrientationPolicy: (PlayerOrientationPolicy) -> Unit,
-    requestPictureInPicture: () -> Unit,
     setPlayerActive: (Boolean) -> Unit,
-    setBackgroundAudio: (Boolean) -> Unit,
-    enableAndroidControls: Boolean,
-    enableDesktopControls: Boolean,
     nextEpisode: (() -> Unit)? = null,
     previousEpisode: (() -> Unit)? = null,
     progressChanged: () -> Unit,
@@ -97,24 +90,15 @@ internal fun PlayerVideoSurface(
     var locked by remember(bridge) { mutableStateOf(false) }
     var brightness by remember(bridge) { mutableFloatStateOf(1f) }
     var volume by remember(bridge) { mutableFloatStateOf(bridge.snapshot().volume()) }
-    var orientation by remember(bridge) { mutableStateOf(PlayerOrientationPolicy.SYSTEM) }
     var customMenu by remember(bridge) { mutableStateOf(false) }
     var advancedMenu by remember(bridge) { mutableStateOf(false) }
-    var backgroundAudio by remember(bridge) { mutableStateOf(false) }
     var leftAction by remember(bridge) { mutableStateOf(PlayerCustomAction.SEEK_BACK) }
     var rightAction by remember(bridge) { mutableStateOf(PlayerCustomAction.SEEK_FORWARD) }
     var drag by remember(bridge) { mutableStateOf(Offset.Zero) }
     var dragStartX by remember(bridge) { mutableFloatStateOf(0f) }
-    DisposableEffect(orientation, applyOrientationPolicy) {
-        applyOrientationPolicy(orientation)
-        onDispose { applyOrientationPolicy(PlayerOrientationPolicy.SYSTEM) }
-    }
-    DisposableEffect(bridge, setPlayerActive, setBackgroundAudio) {
+    DisposableEffect(bridge, setPlayerActive) {
         setPlayerActive(true)
-        onDispose {
-            setBackgroundAudio(false)
-            setPlayerActive(false)
-        }
+        onDispose { setPlayerActive(false) }
     }
     DisposableEffect(bridge, player) {
         bridge.attach(player)
@@ -173,12 +157,6 @@ internal fun PlayerVideoSurface(
         controller.setPlaybackSpeed(if (index < 0) speeds.first() else speeds[index])
     }
 
-    fun cycleOrientation() {
-        revealControls()
-        val values = PlayerOrientationPolicy.entries
-        orientation = values[(orientation.ordinal + 1) % values.size]
-    }
-
     fun execute(action: PlayerCustomAction) {
         revealControls()
         when (action) {
@@ -190,7 +168,6 @@ internal fun PlayerVideoSurface(
                 volume = if (volume > 0f) 0f else 1f
                 controller.setVolume(volume)
             }
-            PlayerCustomAction.ORIENTATION -> cycleOrientation()
         }
     }
 
@@ -419,34 +396,13 @@ internal fun PlayerVideoSurface(
                         TextButton(onClick = ::cycleSpeed) {
                             Text("${bridge.snapshot().playbackSpeed()}×", color = Color.White)
                         }
-                        if (enableAndroidControls) {
-                            TextButton(onClick = {
-                                revealControls()
-                                requestPictureInPicture()
-                            }) {
-                                Text("PiP", color = Color.White)
-                            }
-                            TextButton(onClick = {
-                                revealControls()
-                                backgroundAudio = !backgroundAudio
-                                setBackgroundAudio(backgroundAudio)
-                            }) {
-                                Text(
-                                    if (backgroundAudio) "Background on" else "Background off",
-                                    color = Color.White,
-                                )
-                            }
-                        }
-                        if (enableDesktopControls && controller.advancedCapabilities().isNotEmpty()) {
+                        if (controller.advancedCapabilities().isNotEmpty()) {
                             TextButton(onClick = {
                                 revealControls()
                                 advancedMenu = true
                             }) {
                                 Text("ui.advanced", color = Color.White)
                             }
-                        }
-                        IconButton(onClick = ::cycleOrientation) {
-                            Icon(Icons.Default.ScreenRotation, "Orientation", tint = Color.White)
                         }
                         IconButton(onClick = {
                             revealControls()
@@ -600,7 +556,6 @@ private enum class PlayerCustomAction(val labelKey: String) {
     PLAY_PAUSE("ui.play.pause"),
     SPEED("ui.speed"),
     MUTE("ui.mute"),
-    ORIENTATION("ui.rotate"),
 }
 
 @Composable

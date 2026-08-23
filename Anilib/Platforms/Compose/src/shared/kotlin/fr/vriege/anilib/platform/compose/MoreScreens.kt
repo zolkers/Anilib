@@ -826,7 +826,7 @@ internal fun AboutScreen(
                 }
             }
             SummaryCard("ui.source.format", "ui.signed.portable.anilib.bundles")
-            SummaryCard("ui.platforms", "ui.android.and.desktop")
+            SummaryCard("ui.platforms", "ui.desktop")
             snapshot.error().orElse(null)?.let { error ->
                 Text(error, color = MaterialTheme.colorScheme.error)
             }

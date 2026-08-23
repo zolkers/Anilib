@@ -18,8 +18,7 @@ retained. Cache keys include the method, normalized URI, request headers, and
 applied cookies; file names are SHA-256 digests and writes use atomic moves.
 
 Desktop selects `JdkHttpTransport`, backed by the Java 21 HTTP client and HTTP/2.
-Android selects `UrlConnectionHttpTransport`, which is available in its native
-runtime. Both use the same policy engine and 16 MiB response safety limit. A
+The policy engine enforces a 16 MiB response safety limit. A
 redirect response is returned to the caller instead of followed automatically,
 which lets a permission-scoped source client authorize every origin hop. A future
 platform can supply another `HttpTransport` without changing a source or

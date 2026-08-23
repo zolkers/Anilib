@@ -14,7 +14,7 @@ public final class ApkExtensionPlatforms {
         @Override
         public CompletableFuture<String> install(ExtensionPackageMetadata extensionPackage) {
             return CompletableFuture.failedFuture(
-                    new UnsupportedOperationException("APK extensions can only be installed on Android"));
+                    new UnsupportedOperationException("The Desktop APK extension host is unavailable"));
         }
     };
 

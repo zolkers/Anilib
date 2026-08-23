@@ -1,5 +1,0 @@
-title=Anilib
-shortDescription=Cross-platform anime and manga library, reader, and player
-fullDescription=Manage anime and manga, browse user-configured sources, read chapters, play episodes, download for offline use, back up data, and synchronize optional trackers. Anilib ships no third-party catalogue.
-category=Entertainment
-privacyPolicyUrl=REQUIRED_BEFORE_STORE_SUBMISSION

@@ -16,15 +16,8 @@ jobs:
       version: ${{ github.ref_name }}
       require-signing: true
     secrets: inherit
-  android:
-    uses: ./.github/workflows/android-release.yml
-    with:
-      version: ${{ github.ref_name }}
-      version-code: ${{ github.run_number }}
-      require-signing: true
-    secrets: inherit
   publish:
-    needs: [desktop, android]
+    needs: [desktop]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -42,16 +35,16 @@ jobs:
         shell: bash
         run: |
           mkdir release-assets
-          for artifact in anilib-windows anilib-linux anilib-macos anilib-android; do
+          for artifact in anilib-windows anilib-linux anilib-macos; do
             directory="release-artifacts/$artifact"
             test -f "$directory/SHA256SUMS"
             (cd "$directory" && sha256sum --check SHA256SUMS)
             cp "$directory/SHA256SUMS" "release-assets/SHA256SUMS-${artifact#anilib-}.txt"
           done
           find release-artifacts -type f \
-            \( -name '*.msi' -o -name '*.deb' -o -name '*.dmg' -o -name '*.apk' \) \
+            \( -name '*.msi' -o -name '*.deb' -o -name '*.dmg' \) \
             -exec cp {} release-assets/ \;
-          test "$(find release-assets -type f | wc -l)" -eq 8
+          test "$(find release-assets -type f | wc -l)" -eq 6
       - name: Create signed in-application update manifest
         shell: bash
         env:
@@ -81,7 +74,6 @@ jobs:
             printf 'artifact.%s=%s|%s|%s|https://github.com/zolkers/Anilib/releases/download/%s/%s\n' \
               "$platform" "$name" "$size" "$digest" "$TAG" "$name" >> "$MANIFEST"
           }
-          add_artifact android '*.apk'
           add_artifact windows '*.msi'
           add_artifact linux '*.deb'
           add_artifact macos '*.dmg'
@@ -100,7 +92,6 @@ jobs:
             release-assets/*.msi
             release-assets/*.deb
             release-assets/*.dmg
-            release-assets/*.apk
       - name: Publish immutable GitHub release assets
         shell: bash
         env:

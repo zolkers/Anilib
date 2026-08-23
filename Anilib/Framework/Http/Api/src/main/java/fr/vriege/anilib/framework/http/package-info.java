@@ -22,6 +22,6 @@
  * {@link fr.vriege.anilib.framework.http.HttpCookieJar},
  * {@link fr.vriege.anilib.framework.http.HttpResponseCache}, and
  * {@link fr.vriege.anilib.framework.http.HttpRateLimiter}. This keeps shared
- * behavior independent of desktop or Android networking types.</p>
+ * behavior independent of Desktop networking types.</p>
  */
 package fr.vriege.anilib.framework.http;

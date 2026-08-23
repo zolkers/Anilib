@@ -78,7 +78,6 @@ import kotlinx.coroutines.withContext
 internal fun SettingsScreen(
     presentation: SettingsPresentation,
     settings: SettingsSnapshot,
-    supportsDesktopWindowModes: Boolean,
     maintenance: NetworkMaintenance,
     browserDataController: BrowserDataController,
     diagnosticExportPicker: BackupImportPicker,
@@ -152,7 +151,6 @@ internal fun SettingsScreen(
             destination = selected,
             presentation = presentation,
             settings = settings,
-            supportsDesktopWindowModes = supportsDesktopWindowModes,
             result = result,
             openDownloads = openDownloads,
             openBackup = openBackup,
@@ -391,7 +389,6 @@ private fun SettingsDetail(
     destination: SettingsDestination,
     presentation: SettingsPresentation,
     settings: SettingsSnapshot,
-    supportsDesktopWindowModes: Boolean,
     result: String?,
     openDownloads: () -> Unit,
     openBackup: () -> Unit,
@@ -457,16 +454,14 @@ private fun SettingsDetail(
                             presentation.setNavigationStyle(settings.navigationStyle().next())
                         }
                     }
-                    if (supportsDesktopWindowModes) {
-                        item { SettingsSection("ui.desktop.window") }
-                        item {
-                            SettingsRow(
-                                "ui.application.window.mode",
-                                applicationWindowModeLabel(settings.applicationWindowMode()),
-                            ) { choosingApplicationWindowMode = true }
-                        }
+                    item { SettingsSection("ui.desktop.window") }
+                    item {
+                        SettingsRow(
+                            "ui.application.window.mode",
+                            applicationWindowModeLabel(settings.applicationWindowMode()),
+                        ) { choosingApplicationWindowMode = true }
                     }
-                    item { SettingsHint("ui.appearance.changes.apply.immediately.on.android.and.desktop") }
+                    item { SettingsHint("ui.appearance.changes.apply.immediately.on.desktop") }
                 }
                 SettingsDestination.PRIVACY -> {
                     item { SettingsSection("ui.content") }
@@ -508,17 +503,15 @@ private fun SettingsDetail(
                 }
                 SettingsDestination.PLAYER -> {
                     item { SettingsSection("ui.player.behavior") }
-                    if (supportsDesktopWindowModes) {
-                        item {
-                            SettingsRow(
-                                "ui.player.window.mode",
-                                playerWindowModeLabel(settings.playerWindowMode()),
-                            ) { choosingPlayerWindowMode = true }
-                        }
+                    item {
+                        SettingsRow(
+                            "ui.player.window.mode",
+                            playerWindowModeLabel(settings.playerWindowMode()),
+                        ) { choosingPlayerWindowMode = true }
                     }
                     item { SettingsRow("ui.quality.and.subtitles", "ui.choose.them.from.the.episode.screen") }
                     item { SettingsRow("ui.resume", "ui.playback.position.is.retained.per.episode") }
-                    item { SettingsHint("ui.android.and.desktop.use.the.same.stream.and.subtitle.policy") }
+                    item { SettingsHint("ui.stream.and.subtitle.policy.is.shared.across.player.sessions") }
                 }
                 SettingsDestination.DOWNLOADS -> {
                     item { SettingsSection("ui.network") }

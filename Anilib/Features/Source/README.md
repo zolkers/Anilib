@@ -76,8 +76,8 @@ search, persistence, adding titles to Library, and migration.
 
 Filter schemas cover headers, separators, text, checkboxes, tri-state values,
 select lists, and sorts. Preference schemas cover switches, text, and select
-lists. Platforms render those schemas; extensions never import Compose,
-Android, or desktop UI types.
+lists. The platform renders those schemas; extensions never import Compose or
+Desktop UI types.
 
 ## Paged content shape
 
@@ -95,7 +95,7 @@ locations, transport format, request headers, quality labels, and immutable
 subtitle tracks. The Player validates ownership and duplicate identities before
 publishing any selection to a platform adapter. Sources still own discovery and
 resolution; inward Player code never imports a platform media SDK. The selected
-platform backend must preserve stream and subtitle headers. Anilib's standard
-Android/Desktop adapter does so through a playback-scoped loopback relay that
+platform backend must preserve stream and subtitle headers. Anilib's Desktop
+adapter does so through a playback-scoped loopback relay that
 also propagates response cookies, byte ranges, redirects, and rewritten HLS
 resource locations.

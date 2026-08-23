@@ -76,7 +76,6 @@ import fr.vriege.anilib.feature.reader.ui.ReaderPresentation
 import fr.vriege.anilib.feature.reader.ReaderOrientationPolicy
 import fr.vriege.anilib.feature.player.ui.PlayerController
 import fr.vriege.anilib.feature.player.ui.PlayerPresentation
-import fr.vriege.anilib.feature.player.PlayerOrientationPolicy
 import fr.vriege.anilib.feature.tracker.ui.TrackerPresentation
 import fr.vriege.anilib.feature.updates.ui.UpdatePresentation
 import fr.vriege.anilib.feature.applicationupdate.ui.ApplicationUpdatePresentation
@@ -121,14 +120,9 @@ fun AnilibApp(
     shareController: ShareController,
     pageDecoder: (ByteArray) -> ImageBitmap?,
     applyReaderOrientationPolicy: (ReaderOrientationPolicy) -> Unit,
-    applyPlayerOrientationPolicy: (PlayerOrientationPolicy) -> Unit,
-    requestPlayerPictureInPicture: () -> Unit,
     playerFullscreen: Boolean,
     setPlayerFullscreen: (Boolean) -> Unit,
     setPlayerActive: (Boolean) -> Unit,
-    setPlayerBackgroundAudio: (Boolean) -> Unit,
-    enableAndroidPlayerControls: Boolean,
-    enableDesktopPlayerControls: Boolean,
     componentCount: Int,
     darkTheme: Boolean = isSystemInDarkTheme(),
     reportUiFailure: (Throwable) -> Unit = {},
@@ -291,12 +285,7 @@ fun AnilibApp(
                     playerController,
                     playerFullscreen,
                     setPlayerFullscreen,
-                    applyPlayerOrientationPolicy,
-                    requestPlayerPictureInPicture,
                     setPlayerActive,
-                    setPlayerBackgroundAudio,
-                    enableAndroidPlayerControls,
-                    enableDesktopPlayerControls,
                     nextEpisode = episodeNeighbours.first
                         ?.takeUnless { episodeSwitching }
                         ?.let(switchEpisode),
@@ -439,7 +428,6 @@ fun AnilibApp(
                         showGlobalNavigation,
                         useNavigationRail,
                         { browseMainDestination = it },
-                        enableDesktopPlayerControls,
                         componentCount,
                         navigate,
                         openSection,
@@ -530,7 +518,6 @@ internal fun AdaptiveShell(
     showGlobalNavigation: Boolean,
     useNavigationRail: Boolean,
     browseDestinationChanged: (Boolean) -> Unit,
-    supportsPlayerWindowModes: Boolean,
     componentCount: Int,
     navigate: ((LibraryNavigator) -> Unit) -> Unit,
     openSection: (AppSection) -> Unit,
@@ -575,7 +562,6 @@ internal fun AdaptiveShell(
                     detailPlatform,
                     destination,
                     section,
-                    supportsPlayerWindowModes,
                     componentCount,
                     navigate,
                     openSection,
@@ -667,7 +653,6 @@ internal fun AppDestination(
     detailPlatform: DetailPlatform,
     destination: LibraryNavigationState,
     section: AppSection,
-    supportsPlayerWindowModes: Boolean,
     componentCount: Int,
     navigate: ((LibraryNavigator) -> Unit) -> Unit,
     openSection: (AppSection) -> Unit,
@@ -763,7 +748,6 @@ internal fun AppDestination(
             MoreDestination.SETTINGS -> SettingsScreen(
                 settingsPresentation,
                 settings,
-                supportsPlayerWindowModes,
                 networkMaintenance,
                 browserDataController,
                 backupImportPicker,

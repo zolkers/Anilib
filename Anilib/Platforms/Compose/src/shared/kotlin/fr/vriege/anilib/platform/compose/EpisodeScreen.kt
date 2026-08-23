@@ -48,7 +48,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import fr.vriege.anilib.feature.player.PlaybackState
-import fr.vriege.anilib.feature.player.PlayerOrientationPolicy
 import fr.vriege.anilib.feature.player.PlayerDecoderPolicy
 import fr.vriege.anilib.feature.player.PlayerPreferences
 import fr.vriege.anilib.feature.player.PlayerQualityPolicy
@@ -62,12 +61,7 @@ internal fun PlayerSelectionScreen(
     controller: PlayerController,
     fullscreen: Boolean,
     setFullscreen: (Boolean) -> Unit,
-    applyOrientationPolicy: (PlayerOrientationPolicy) -> Unit,
-    requestPictureInPicture: () -> Unit,
     setPlayerActive: (Boolean) -> Unit,
-    setBackgroundAudio: (Boolean) -> Unit,
-    enableAndroidControls: Boolean,
-    enableDesktopControls: Boolean,
     nextEpisode: (() -> Unit)? = null,
     previousEpisode: (() -> Unit)? = null,
     goBack: () -> Unit,
@@ -108,12 +102,7 @@ internal fun PlayerSelectionScreen(
                 controller.playback(),
                 expanded,
                 currentSetFullscreen,
-                applyOrientationPolicy,
-                requestPictureInPicture,
                 setPlayerActive,
-                setBackgroundAudio,
-                enableAndroidControls,
-                enableDesktopControls,
                 nextEpisode = currentNextEpisode.value,
                 previousEpisode = currentPreviousEpisode.value,
                 progressChanged = {

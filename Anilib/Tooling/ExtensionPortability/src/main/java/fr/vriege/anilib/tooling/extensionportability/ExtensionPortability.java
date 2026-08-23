@@ -31,7 +31,7 @@ public final class ExtensionPortability {
             ".java", ".kt", ".kts", ".gradle", ".xml", ".properties", ".toml");
     private static final List<Detector> DETECTORS = List.of(
             detector("ANDROID_SDK", PortabilitySeverity.ADAPTATION_REQUIRED,
-                    "Android SDK types must stay in the Android adapter", "\\b(?:android|androidx)\\."),
+                    "Android SDK types require the isolated Desktop compatibility host", "\\b(?:android|androidx)\\."),
             detector("ANIYOMI_HOST_ABI", PortabilitySeverity.ADAPTATION_REQUIRED,
                     "Aniyomi host ABI calls need explicit Anilib Source adapters", "\\b(?:eu\\.kanade|tachiyomi)\\b"),
             detector("COMPILE_ONLY_HOST_DEPENDENCY", PortabilitySeverity.ADAPTATION_REQUIRED,

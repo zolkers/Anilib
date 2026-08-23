@@ -5,9 +5,9 @@ paths. GitHub Releases remains the mandatory signed distribution channel;
 stores are adapters and never replace the reproducible Gradle artifacts or the
 signed update manifest.
 
-`store/android`, `store/windows`, and `store/macos` contain the canonical
-English listing copy. A submission may transform that copy into Play Console,
-Partner Center, or App Store Connect formats. Store credentials, generated
+`store/windows` and `store/macos` contain the canonical
+English listing copy. A submission may transform that copy into Partner Center
+or App Store Connect formats. Store credentials, generated
 screenshots, notarization tickets, certificates, and uploaded packages are not
 committed.
 

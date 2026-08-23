@@ -258,14 +258,14 @@ final class DiscoveryTest {
         try (StartedAnilib product = StandardAnilib.start(directory, List.of(reopenedPlugin))) {
             DiscoveryPresentation presentation = product.capability(DiscoveryUiCapabilities.PRESENTATION);
             counter.check(presentation.pinnedSources().equals(Set.of(REMOTE_SOURCE)),
-                    "pinned sources must survive Android and desktop restart");
+                    "pinned sources must survive a Desktop restart");
             counter.check(!presentation.enabledSourceLanguages(SourceContentKind.MANGA).contains("en"),
-                    "source language choices must survive Android and desktop restart");
+                    "source language choices must survive a Desktop restart");
             counter.check(!presentation.sourceEnabled(REMOTE_SOURCE),
-                    "individual extension source choices must survive Android and desktop restart");
+                    "individual extension source choices must survive a Desktop restart");
             counter.check(presentation.catalogueDisplayMode(REMOTE_SOURCE)
                             == DiscoveryCatalogueDisplayMode.LIST,
-                    "catalogue display choices must survive Android and desktop restart");
+                    "catalogue display choices must survive a Desktop restart");
         }
     }
 

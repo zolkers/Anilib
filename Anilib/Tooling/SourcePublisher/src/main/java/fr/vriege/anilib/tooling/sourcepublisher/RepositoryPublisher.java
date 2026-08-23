@@ -66,9 +66,9 @@ final class RepositoryPublisher {
             SourcePackageConfiguration configuration,
             Path apkPath,
             Path output) {
-        byte[] apk = PublisherFiles.read(apkPath, "Android fallback APK");
+        byte[] apk = PublisherFiles.read(apkPath, "AniYomi/Mihon fallback APK");
         if (apk.length == 0) {
-            throw new IllegalArgumentException("Android fallback APK must not be empty");
+            throw new IllegalArgumentException("AniYomi/Mihon fallback APK must not be empty");
         }
         PublisherFiles.write(output.resolve("apk").resolve(configuration.apkArtifactName()), apk);
         return sha256(apk);

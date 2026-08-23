@@ -105,7 +105,7 @@ final class ReaderTest {
             FileReaderReadStateStore store = new FileReaderReadStateStore(file);
             store.setRead(title, "chapter-2", true);
             counter.check(new FileReaderReadStateStore(file).readContentIds(title).contains("chapter-2"),
-                    "reader chapter read state must survive Android and desktop restart");
+                    "reader chapter read state must survive a Desktop restart");
             store.setRead(title, "chapter-2", false);
             counter.check(store.readContentIds(title).isEmpty(),
                     "reader chapters must support a durable mark-unread action");
@@ -145,7 +145,7 @@ final class ReaderTest {
             store.save(customized);
             ReaderDisplayPreferences reopened = new FileReaderDisplayPreferenceStore(file).snapshot();
             counter.check(reopened.equals(customized),
-                    "reader display preferences must survive Android and desktop restart");
+                    "reader display preferences must survive a Desktop restart");
             LibraryItemId overriddenTitle = new LibraryItemId("reader-title-override");
             ReaderDisplayPreferences override = ReaderDisplayPreferences.defaults();
             store.saveOverride(overriddenTitle, override);
@@ -186,7 +186,7 @@ final class ReaderTest {
             new FileReaderInteractionPreferenceStore(file).save(customized);
             ReaderInteractionPreferences reopened = new FileReaderInteractionPreferenceStore(file).snapshot();
             counter.check(reopened.equals(customized),
-                    "reader tap zones and gestures must survive Android and desktop restart");
+                    "reader tap zones and gestures must survive a Desktop restart");
         } catch (IOException exception) {
             throw new AssertionError("Unable to test reader interaction preferences", exception);
         } finally {
@@ -247,7 +247,7 @@ final class ReaderTest {
                 counter.check(resumed.snapshot().currentPageIndex() == 1,
                         "reader must resume the persisted page after a product restart");
                 counter.check(controller.snapshot().direction() == ReadingDirection.WEBTOON,
-                        "reader mode must survive Android and desktop restart");
+                        "reader mode must survive a Desktop restart");
             }
         } catch (IOException exception) {
             throw new AssertionError("Unable to prepare local reader test", exception);

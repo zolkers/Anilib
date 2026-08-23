@@ -35,7 +35,7 @@ dynamically through its default branch, trying `index.pb`, `index.min.json`, and
 `index.json`, then through the conventional publication branch `repo`. Relative
 Bundle URLs remain relative to the fetched raw index.
 
-The shared Android/desktop repository screen stores its language selection and
+The Desktop repository screen stores its language selection and
 pinned package identities beside the repository list. An empty language
 selection means that all currently available languages are shown, so newly
 published languages are visible by default. At least one available language
@@ -50,22 +50,20 @@ keeps repository discovery complete without bypassing the user's content
 policy. Platform lists remain lazy, so a catalogue containing thousands of
 entries does not eagerly create every card.
 
-Installed portable Bundles and platform APKs are grouped ahead of the
+Installed portable Bundles and extension APKs are grouped ahead of the
 available catalogue and can be searched by extension, package, source, or
 language. Removal always requires confirmation. Portable artifacts are deleted
-from Anilib's managed store, Android delegates APK removal to the system package
-installer, and desktop uses Anilib's embedded extension-host uninstall endpoint. Dynamic
+from Anilib's managed store, while Desktop uses Anilib's embedded extension-host
+uninstall endpoint for APKs. Dynamic
 sources are detached immediately; sources selected during startup disappear on
 the next restart. Removing a repository is a separate confirmed action and
 keeps extensions already installed from it.
 
-The shared UI makes artifact support explicit. Android shows an `Install on
-Android` action for APK entries and hands the HTTPS artifact to the system
-package installer. Desktop exposes `Install for desktop` through its bundled
-Anilib host; a compatible APK activates its new Source Bundles
+The UI makes artifact support explicit. Desktop exposes `Install for desktop`
+through its bundled Anilib host; a compatible APK activates its new Source Bundles
 immediately, while an APK that yields no executable source is rolled back and
 reported as failed. Signed portable Anilib Bundles keep
-the ordinary `Install` action on both platforms. Pinning updates the
+the ordinary `Install` action. Pinning updates the
 filled/outlined icon and catalogue ordering immediately, and an empty Browse
 extension tab links directly to repository management.
 
@@ -95,12 +93,12 @@ Aniyomi client:
 }
 ```
 
-The `apk` artifact remains Android-only. The `anilib` Bundle is the portable
-artifact used by Android and desktop after checksum, signature, compatibility,
-and installation validation. Repository discovery and artifact installation
-are separate capabilities so merely viewing an index never executes code.
-When both exist, the shared availability model selects the Bundle on Android
-and desktop; Android exposes the APK action only when no Bundle exists.
+The `apk` artifact runs on Desktop through the isolated AniYomi/Mihon
+compatibility host. The `anilib` Bundle is the preferred native artifact after
+checksum, signature, compatibility, and installation validation. Repository
+discovery and artifact installation are separate capabilities so merely viewing
+an index never executes code. When both exist, the availability model selects
+the native Bundle and retains the APK as repository metadata.
 
 `Tooling/SourcePublisher` accepts an optional `apk=<local-file.apk>` in a package
 configuration. It copies that fallback under `apk/`, emits one entry for the
@@ -111,23 +109,21 @@ private Ed25519 key in the repository secret.
 
 The active extension system belongs to Anilib: shared contracts use artifact-
 specific APK and portable Bundle terminology. `Aniyomi` names are restricted to
-the repository-shape and Android host-ABI compatibility adapters.
+the repository-shape and Desktop host-ABI compatibility adapters.
 
-## Android APK extension discovery
+## Desktop APK extension discovery
 
-On Android, the shared repository screen also lists separately installed
-Aniyomi and Mihon-compatible extension APKs that are visible under Android's
-normal package-visibility rules. The platform adapter recognizes the
+On Desktop, the repository screen also lists AniYomi and Mihon-compatible APKs
+installed in Anilib's managed extension store. The compatibility host recognizes the
 `tachiyomi.animeextension` and `tachiyomi.extension` features,
 projects entrypoint/factory, library, content, documentation, torrent, and
 SHA-256 signing-certificate metadata into a Java UI contract, and labels malformed
 or unsupported packages. Anime and manga packages receive separate library-version
-and host-class preflights. Discovery never loads extension bytecode and Anilib
-does not request `QUERY_ALL_PACKAGES`.
+and host-class preflights. Discovery never loads extension bytecode.
 
 Metadata compatibility does not grant trust. The shared screen displays the
 complete current certificate fingerprint in a confirmation dialog before the
-Android adapter stores a package-specific decision. A signer change invalidates
+Desktop host stores a package-specific decision. A signer change invalidates
 that decision. Trusted packages receive a non-initializing host-ABI preflight;
 missing Aniyomi, RxJava, OkHttp, jsoup, Injekt, NanoHTTPD, coroutine,
 serialization, preference, and torrent classes remain visible as a blocked
@@ -135,8 +131,8 @@ runtime state. Forgetting trust is immediate.
 
 Discovery alone is metadata compatibility only. Existing Aniyomi APKs compile against the
 Aniyomi source API and host-provided external libraries, so they are not executed
-until the Android compatibility runtime can satisfy that ABI. When preflight is
-green, Android now constructs the declared source or source factory before
+until the Desktop compatibility runtime can satisfy that ABI. When preflight is
+green, Desktop constructs the declared source or source factory before
 Standard startup and adapts catalogue pages, episodes, streams, request headers,
 and subtitles into explicit Anilib Source Bundles. The reflection bridge accepts
 both ext-lib 16 RxJava calls and ext-lib 17 suspend catalogue, combined episode
@@ -144,8 +140,8 @@ update, hoster, and video calls. Text, checkbox, tri-state, select, sort, and
 grouped extension filters are projected into the shared discovery model and
 written back to a fresh ABI filter list for each search. Configurable anime
 sources project AndroidX switch, text, and select controls into the same Source
-preference schema used by portable Bundles. Anilib's shared Android/desktop
-screen owns the durable selection; the Android adapter commits its request
+preference schema used by portable Bundles. Anilib's Desktop screen owns the
+durable selection; the compatibility host commits its request
 snapshot into the APK source's expected `SharedPreferences` immediately before
 the source call. Metadata-compatible manga APKs use a separate adapter for
 RxJava or suspend catalogue/search calls, combined manga/chapter updates,
@@ -154,8 +150,8 @@ filters, preferences, and the Anilib Reader contract. One package failure does n
 select a partial Bundle and is displayed in the shared repository screen. Each
 bridged operation rechecks the currently installed signer, so forgetting trust
 or replacing the APK immediately blocks subsequent calls.
-Signed portable Anilib Bundles remain the preferred source artifact executed on both
-Android and desktop without that compatibility ABI.
+Signed portable Anilib Bundles remain the preferred source artifact executed on
+Desktop without that compatibility ABI.
 
 Portable artifacts are accepted only when `sha256`, `signature`, `keyId`, and
 `api` are present, the user has explicitly imported the publisher's X.509
@@ -199,7 +195,7 @@ publisher.
 
 ## Update channel
 
-The shared Android/desktop screen exposes available updates, a verified
+The Desktop screen exposes available updates, a verified
 `Update all` action, and an opt-in automatic channel. Automatic checks run every
 six hours and update only when `pkg` is unchanged, the version code increases,
 the artifact is portable, and its Ed25519 `keyId` exactly matches the publisher
