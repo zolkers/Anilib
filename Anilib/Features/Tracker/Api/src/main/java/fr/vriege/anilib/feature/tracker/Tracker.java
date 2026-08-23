@@ -5,6 +5,7 @@ import fr.vriege.anilib.feature.library.MediaKind;
 
 import java.net.URI;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 public interface Tracker {
@@ -15,6 +16,14 @@ public interface Tracker {
     String accountName();
 
     void authenticate(TrackerCredentials credentials);
+
+    default Optional<TrackerSession> session() {
+        return Optional.empty();
+    }
+
+    default void restoreSession(TrackerSession session) {
+        authenticate(Objects.requireNonNull(session, "session must not be null").credentials());
+    }
 
     default Optional<TrackerAuthorization> beginAuthorization() {
         return Optional.empty();

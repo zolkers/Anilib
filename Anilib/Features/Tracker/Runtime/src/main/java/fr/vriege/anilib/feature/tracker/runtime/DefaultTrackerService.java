@@ -17,6 +17,7 @@ import fr.vriege.anilib.feature.tracker.TrackerException;
 import fr.vriege.anilib.feature.tracker.TrackerId;
 import fr.vriege.anilib.feature.tracker.TrackerRegistry;
 import fr.vriege.anilib.feature.tracker.TrackerSearchResult;
+import fr.vriege.anilib.feature.tracker.TrackerSession;
 import fr.vriege.anilib.feature.tracker.TrackerService;
 import fr.vriege.anilib.feature.tracker.TrackerStatus;
 import fr.vriege.anilib.feature.tracker.TrackerSyncConflict;
@@ -48,6 +49,7 @@ public final class DefaultTrackerService implements TrackerService, AutoCloseabl
     private final TrackerEntryStore entries;
     private final TrackerSyncPreferenceStore preferences;
     private final TrackerPendingSyncStore pendingSynchronizations;
+    private final TrackerSessionStore sessions;
     private final CopyOnWriteArrayList<Runnable> listeners = new CopyOnWriteArrayList<>();
     private final Map<BindingKey, TrackerSyncConflict> conflicts = new LinkedHashMap<>();
     private final Set<BindingKey> dirtyEntries = new HashSet<>();
@@ -64,6 +66,7 @@ public final class DefaultTrackerService implements TrackerService, AutoCloseabl
         preferences = new TrackerSyncPreferenceStore(file.resolveSibling("tracking-sync.properties"));
         pendingSynchronizations = new TrackerPendingSyncStore(
                 file.resolveSibling("tracking-sync-pending.anilib"));
+        sessions = new TrackerSessionStore(file.resolveSibling("tracking-sessions.anilib"));
         pendingSynchronizations.load().forEach(value -> dirtyEntries.add(
                 new BindingKey(value.libraryItemId(), value.trackerId())));
         libraryObservation = library.observe(this::libraryChanged);
@@ -72,11 +75,7 @@ public final class DefaultTrackerService implements TrackerService, AutoCloseabl
     @Override
     public List<TrackerAccount> accounts() {
         return registry.trackers().stream()
-                .map(tracker -> new TrackerAccount(
-                        tracker.descriptor(),
-                        tracker.descriptor().authentication() == TrackerAuthentication.NONE
-                                || tracker.isAuthenticated(),
-                        tracker.accountName()))
+                .map(this::account)
                 .toList();
     }
 
@@ -91,6 +90,7 @@ public final class DefaultTrackerService implements TrackerService, AutoCloseabl
         if (!tracker.isAuthenticated()) {
             throw new TrackerException("Tracker did not establish an authenticated session");
         }
+        persistSession(tracker);
         notifyListeners();
         queueAutomaticSynchronization();
     }
@@ -115,13 +115,16 @@ public final class DefaultTrackerService implements TrackerService, AutoCloseabl
         if (!tracker.isAuthenticated()) {
             throw new TrackerException("Tracker did not establish an authenticated session");
         }
+        persistSession(tracker);
         notifyListeners();
         queueAutomaticSynchronization();
     }
 
     @Override
     public void logout(TrackerId trackerId) {
-        tracker(trackerId).logout();
+        Tracker tracker = tracker(trackerId);
+        sessions.remove(trackerId);
+        tracker.logout();
         notifyListeners();
     }
 
@@ -513,11 +516,43 @@ public final class DefaultTrackerService implements TrackerService, AutoCloseabl
 
     private Tracker readyTracker(TrackerId id) {
         Tracker tracker = tracker(id);
+        restoreSession(tracker);
         if (tracker.descriptor().authentication() != TrackerAuthentication.NONE
                 && !tracker.isAuthenticated()) {
             throw new TrackerException("Tracker account is not authenticated: " + id);
         }
         return tracker;
+    }
+
+    private TrackerAccount account(Tracker tracker) {
+        restoreSession(tracker);
+        return new TrackerAccount(
+                tracker.descriptor(),
+                tracker.descriptor().authentication() == TrackerAuthentication.NONE
+                        || tracker.isAuthenticated(),
+                tracker.accountName());
+    }
+
+    private void restoreSession(Tracker tracker) {
+        if (tracker.isAuthenticated()
+                || tracker.descriptor().authentication() == TrackerAuthentication.NONE) {
+            return;
+        }
+        sessions.find(tracker.descriptor().id()).ifPresent(session -> {
+            try {
+                tracker.restoreSession(session);
+            } catch (RuntimeException exception) {
+                sessions.remove(tracker.descriptor().id());
+                tracker.logout();
+            }
+        });
+    }
+
+    private void persistSession(Tracker tracker) {
+        Optional<TrackerSession> session = tracker.session();
+        if (session.isPresent()) {
+            sessions.save(tracker.descriptor().id(), session.orElseThrow());
+        }
     }
 
     private static TrackerEntry validate(Tracker tracker, TrackerEntry entry, LibraryItemId itemId) {

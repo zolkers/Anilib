@@ -31,6 +31,7 @@ import fr.vriege.anilib.feature.tracker.TrackerExtensionPlugin;
 import fr.vriege.anilib.feature.tracker.TrackerId;
 import fr.vriege.anilib.feature.tracker.TrackerMediaMetadata;
 import fr.vriege.anilib.feature.tracker.TrackerSearchResult;
+import fr.vriege.anilib.feature.tracker.TrackerSession;
 import fr.vriege.anilib.feature.tracker.TrackerService;
 import fr.vriege.anilib.feature.tracker.TrackerStatus;
 import fr.vriege.anilib.foundation.component.ComponentDescriptor;
@@ -159,7 +160,47 @@ final class TrackerTest {
             deleteDirectory(incompatibleDirectory);
         }
         advancesTrackerFromCompletedPlayback(counter);
+        persistsOAuthSession(counter);
         return counter.value;
+    }
+
+    private static void persistsOAuthSession(Counter counter) {
+        Path directory = temporaryDirectory();
+        PersistentTracker first = new PersistentTracker();
+        try (StartedAnilib application = StandardAnilib.start(
+                directory,
+                List.of(persistentExtension(first)))) {
+            application.capability(TrackerCapabilities.SERVICE).authenticate(
+                    PersistentTracker.ID,
+                    TrackerCredentials.oauthResult("durable-token"));
+        }
+        PersistentTracker second = new PersistentTracker();
+        try (StartedAnilib application = StandardAnilib.start(
+                directory,
+                List.of(persistentExtension(second)))) {
+            TrackerService service = application.capability(TrackerCapabilities.SERVICE);
+            var account = service.accounts().stream()
+                    .filter(value -> value.descriptor().id().equals(PersistentTracker.ID))
+                    .findFirst()
+                    .orElseThrow();
+            counter.check(account.authenticated() && account.accountName().equals("alice")
+                            && second.restorations.get() == 1,
+                    "OAuth tracker sessions must restore across a complete product restart");
+            service.logout(PersistentTracker.ID);
+        }
+        PersistentTracker third = new PersistentTracker();
+        try (StartedAnilib application = StandardAnilib.start(
+                directory,
+                List.of(persistentExtension(third)))) {
+            var account = application.capability(TrackerCapabilities.SERVICE).accounts().stream()
+                    .filter(value -> value.descriptor().id().equals(PersistentTracker.ID))
+                    .findFirst()
+                    .orElseThrow();
+            counter.check(!account.authenticated() && third.restorations.get() == 0,
+                    "tracker logout must delete the durable OAuth session");
+        } finally {
+            deleteDirectory(directory);
+        }
     }
 
     private static void advancesTrackerFromCompletedPlayback(Counter counter) {
@@ -212,6 +253,14 @@ final class TrackerTest {
                 TrackerExtensionManifest.offline(
                         ComponentDescriptor.of("tracker.test", "Test Tracker", "1.0.0"),
                         TestTracker.ID),
+                ignored -> tracker);
+    }
+
+    private static TrackerExtensionPlugin persistentExtension(PersistentTracker tracker) {
+        return new TrackerExtensionPlugin(
+                TrackerExtensionManifest.offline(
+                        ComponentDescriptor.of("tracker.persistent", "Persistent Tracker", "1.0.0"),
+                        PersistentTracker.ID),
                 ignored -> tracker);
     }
 
@@ -371,6 +420,85 @@ final class TrackerTest {
         @Override
         public void remove(TrackerEntry entry) {
             removals.incrementAndGet();
+        }
+    }
+
+    private static final class PersistentTracker implements Tracker {
+        private static final TrackerId ID = TrackerId.of("test.persistent-tracker");
+        private static final TrackerDescriptor DESCRIPTOR = new TrackerDescriptor(
+                ID,
+                "Persistent Tracker",
+                new TrackerApiVersion(1, 0),
+                Set.of(MediaKind.ANIME),
+                TrackerAuthentication.OAUTH,
+                List.of(TrackerStatus.WATCHING, TrackerStatus.PLANNING),
+                List.of(),
+                false,
+                false);
+        private final AtomicInteger restorations = new AtomicInteger();
+        private String token;
+
+        @Override
+        public TrackerDescriptor descriptor() {
+            return DESCRIPTOR;
+        }
+
+        @Override
+        public boolean isAuthenticated() {
+            return token != null;
+        }
+
+        @Override
+        public String accountName() {
+            return isAuthenticated() ? "alice" : "";
+        }
+
+        @Override
+        public void authenticate(TrackerCredentials credentials) {
+            token = credentials.secret();
+        }
+
+        @Override
+        public Optional<TrackerSession> session() {
+            return isAuthenticated()
+                    ? Optional.of(new TrackerSession(TrackerCredentials.oauthResult(token), "alice"))
+                    : Optional.empty();
+        }
+
+        @Override
+        public void restoreSession(TrackerSession session) {
+            token = session.credentials().secret();
+            restorations.incrementAndGet();
+        }
+
+        @Override
+        public void logout() {
+            token = null;
+        }
+
+        @Override
+        public List<TrackerSearchResult> search(String query, MediaKind kind) {
+            return List.of();
+        }
+
+        @Override
+        public TrackerEntry bind(LibraryItem item, TrackerSearchResult result) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public TrackerEntry update(TrackerEntry entry) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public TrackerEntry refresh(TrackerEntry entry) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void remove(TrackerEntry entry) {
+            throw new UnsupportedOperationException();
         }
     }
 

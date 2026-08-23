@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -610,29 +611,32 @@ internal fun TitleTrackingScreen(
         return
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("ui.tracking") },
-                navigationIcon = { TextButton(onClick = goBack) { Text("ui.back") } },
-            )
-        },
-    ) { padding ->
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 24.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("ui.tracking", style = MaterialTheme.typography.titleLarge)
+                Text(
+                    title,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            IconButton(onClick = goBack) {
+                Icon(Icons.Default.Close, contentDescription = "ui.close")
+            }
+        }
+        HorizontalDivider()
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp),
+            modifier = Modifier.fillMaxWidth().heightIn(max = 620.dp),
+            contentPadding = PaddingValues(top = 14.dp, bottom = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-                    TextButton(onClick = { action { presentation.synchronize(itemId) } }) {
-                        Text("ui.sync")
-                    }
-                }
-            }
             if (accounts.isEmpty()) {
                 item { EmptyPage("ui.sign.in.tracking.from.more") }
             }
@@ -667,6 +671,15 @@ internal fun TitleTrackingScreen(
                         refresh = { action { presentation.refresh(itemId, entry.trackerId()) } },
                         remove = { action { presentation.remove(itemId, entry.trackerId()) } },
                     )
+                }
+            }
+            if (entries.isNotEmpty()) {
+                item {
+                    TextButton(onClick = { action { presentation.synchronize(itemId) } }) {
+                        Icon(Icons.Outlined.Sync, contentDescription = null)
+                        Spacer(Modifier.size(8.dp))
+                        Text("ui.sync")
+                    }
                 }
             }
             error?.let { message ->
@@ -785,46 +798,51 @@ private fun TrackerEntryCard(
                 NextAiringBanner(schedule)
             }
             Spacer(Modifier.height(12.dp))
-            Text(
-                UiTranslations.format(
-                    "dynamic.status",
-                    LocalLanguagePack.current,
-                    UiTranslations.translate(trackerStatusKey(entry.status()), LocalLanguagePack.current),
-                ),
-            )
-            Text(UiTranslations.format("dynamic.progress", LocalLanguagePack.current, trackerProgress(entry)))
-            Text(
-                UiTranslations.format(
-                    "dynamic.score",
-                    LocalLanguagePack.current,
-                    entry.score().let {
-                        if (it.isPresent) {
-                            it.orElse(0.0).toString()
-                        } else {
-                            UiTranslations.translate("ui.not.set", LocalLanguagePack.current)
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHighest,
+            ) {
+                Column(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        TrackerMetric(
+                            "ui.status",
+                            UiTranslations.translate(
+                                trackerStatusKey(entry.status()),
+                                LocalLanguagePack.current,
+                            ),
+                            Modifier.weight(1f),
+                        )
+                        TrackerMetric("ui.progress", trackerProgress(entry), Modifier.weight(1f))
+                        TrackerMetric(
+                            "ui.score",
+                            entry.score().let {
+                                if (it.isPresent) it.orElse(0.0).toString()
+                                else UiTranslations.translate("ui.not.set", LocalLanguagePack.current)
+                            },
+                            Modifier.weight(1f),
+                        )
+                    }
+                    if (descriptor.supportsDates()) {
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            TrackerMetric(
+                                "ui.started",
+                                entry.startDate().map(LocalDate::toString).orElse(
+                                    UiTranslations.translate("ui.not.set", LocalLanguagePack.current),
+                                ),
+                                Modifier.weight(1f),
+                            )
+                            TrackerMetric(
+                                "ui.finished",
+                                entry.finishDate().map(LocalDate::toString).orElse(
+                                    UiTranslations.translate("ui.not.set", LocalLanguagePack.current),
+                                ),
+                                Modifier.weight(1f),
+                            )
                         }
-                    },
-                ),
-            )
-            if (descriptor.supportsDates()) {
-                Text(
-                    UiTranslations.format(
-                        "dynamic.started",
-                        LocalLanguagePack.current,
-                        entry.startDate().map(LocalDate::toString).orElse(
-                            UiTranslations.translate("ui.not.set", LocalLanguagePack.current),
-                        ),
-                    ),
-                )
-                Text(
-                    UiTranslations.format(
-                        "dynamic.finished",
-                        LocalLanguagePack.current,
-                        entry.finishDate().map(LocalDate::toString).orElse(
-                            UiTranslations.translate("ui.not.set", LocalLanguagePack.current),
-                        ),
-                    ),
-                )
+                    }
+                }
             }
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -833,6 +851,27 @@ private fun TrackerEntryCard(
                 TextButton(onClick = { confirmingRemove = true }) { Text("ui.remove") }
             }
         }
+    }
+}
+
+@Composable
+private fun TrackerMetric(label: String, value: String, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier.padding(horizontal = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        Text(
+            label,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.labelMedium,
+        )
+        Text(
+            value,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 

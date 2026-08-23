@@ -20,6 +20,7 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationRail
@@ -94,6 +95,7 @@ internal data class PendingPlayerRequest(
     val title: String,
 )
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AnilibApp(
     presentation: LibraryPresentation,
@@ -309,20 +311,6 @@ fun AnilibApp(
                 PlayerLoadingScreen(playerRequest.title) {
                     pendingPlayer = null
                 }
-            } else if (trackingTitle != null) {
-                val details = presentation.details(trackingTitle).orElse(null)
-                if (details == null) {
-                    activeTrackingTitle = null
-                } else {
-                    TitleTrackingScreen(
-                        presentation = tracking,
-                        browserRuntimeStatus = browserRuntimeStatus,
-                        itemId = trackingTitle,
-                        title = details.title(),
-                        kind = details.kind(),
-                        goBack = { activeTrackingTitle = null },
-                    )
-                }
             } else {
                 val openReader: (LibraryItemId, SourceContentUnitId?) -> Unit = { id, contentUnitId ->
                     scope.launch {
@@ -467,6 +455,26 @@ fun AnilibApp(
                         { moreDestination = it },
                         { moreDestination = null },
                     )
+                }
+                trackingTitle?.let { itemId ->
+                    val details = presentation.details(itemId).orElse(null)
+                    if (details == null) {
+                        activeTrackingTitle = null
+                    } else {
+                        ModalBottomSheet(
+                            onDismissRequest = { activeTrackingTitle = null },
+                            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                        ) {
+                            TitleTrackingScreen(
+                                presentation = tracking,
+                                browserRuntimeStatus = browserRuntimeStatus,
+                                itemId = itemId,
+                                title = details.title(),
+                                kind = details.kind(),
+                                goBack = { activeTrackingTitle = null },
+                            )
+                        }
+                    }
                 }
             }
             }

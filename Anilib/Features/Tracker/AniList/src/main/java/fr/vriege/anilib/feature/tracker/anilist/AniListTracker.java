@@ -14,6 +14,7 @@ import fr.vriege.anilib.feature.tracker.TrackerId;
 import fr.vriege.anilib.feature.tracker.TrackerIcon;
 import fr.vriege.anilib.feature.tracker.TrackerMediaMetadata;
 import fr.vriege.anilib.feature.tracker.TrackerSearchResult;
+import fr.vriege.anilib.feature.tracker.TrackerSession;
 import fr.vriege.anilib.feature.tracker.TrackerSdk;
 import fr.vriege.anilib.feature.tracker.TrackerStatus;
 import fr.vriege.anilib.feature.tracker.providersupport.TrackerJson;
@@ -118,6 +119,24 @@ public final class AniListTracker implements Tracker {
             logout();
             throw exception;
         }
+    }
+
+    @Override
+    public Optional<TrackerSession> session() {
+        return isAuthenticated()
+                ? Optional.of(new TrackerSession(TrackerCredentials.oauthResult(token), accountName))
+                : Optional.empty();
+    }
+
+    @Override
+    public void restoreSession(TrackerSession session) {
+        TrackerSession value = Objects.requireNonNull(session, "session must not be null");
+        if (value.credentials().authentication() != TrackerAuthentication.OAUTH) {
+            throw new TrackerException("AniList requires an OAuth session");
+        }
+        token = value.credentials().secret();
+        accountName = value.accountName();
+        authorizationState = null;
     }
 
     @Override
