@@ -539,7 +539,7 @@ internal fun ReaderScreen(
                 titleOverride = titleDisplayOverride,
                 updateInteractions = {
                     controller.setInteractions(it)
-                    interactions = it
+                    interactions = controller.interactions()
                 },
                 updateDisplay = {
                     controller.setDisplay(it, titleDisplayOverride)

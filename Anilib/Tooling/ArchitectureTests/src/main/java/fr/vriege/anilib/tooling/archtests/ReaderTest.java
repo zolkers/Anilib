@@ -69,9 +69,31 @@ final class ReaderTest {
         verifiesBoundedPipeline(counter);
         suppressesIncognitoPersistence(counter);
         persistsInteractionPreferences(counter);
+        repairsDuplicateHorizontalTapDirections(counter);
         persistsDisplayPreferences(counter);
         persistsReadState(counter);
         return counter.value;
+    }
+
+    private static void repairsDuplicateHorizontalTapDirections(Counter counter) {
+        ReaderInteractionPreferences defaults = ReaderInteractionPreferences.defaults();
+        ReaderInteractionPreferences duplicate = new ReaderInteractionPreferences(
+                ReaderInteractionAction.NEXT_PAGE,
+                defaults.centerTap(),
+                ReaderInteractionAction.NEXT_PAGE,
+                defaults.topTap(),
+                defaults.bottomTap(),
+                defaults.swipeLeft(),
+                defaults.swipeRight(),
+                defaults.swipeUp(),
+                defaults.swipeDown(),
+                defaults.doubleTap(),
+                defaults.longPress());
+        ReaderInteractionPreferences repaired = duplicate.withUsableHorizontalTaps();
+        counter.check(
+                repaired.leftTap() == ReaderInteractionAction.PREVIOUS_PAGE
+                        && repaired.rightTap() == ReaderInteractionAction.NEXT_PAGE,
+                "reader horizontal tap zones must always expose opposite page directions");
     }
 
     private static void persistsReadState(Counter counter) {

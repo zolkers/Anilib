@@ -36,10 +36,13 @@ import fr.vriege.anilib.feature.reader.ReadingDirection
 import fr.vriege.anilib.feature.reader.ui.ReaderController
 import fr.vriege.anilib.feature.reader.ui.ReaderWindowChapter
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.withContext
 
 private const val CONTINUOUS_SCROLL_STEP_FRACTION = 0.85f
+private const val DECODE_PREFETCH_AHEAD = 3
+private const val DECODE_PREFETCH_BEHIND = 2
 
 /**
  * Continuous viewer over the reader's chapter window. Previous, current and next chapter pages
@@ -75,6 +78,8 @@ internal fun ReaderContinuousPages(
             .coerceAtLeast(0),
     )
     val pageAspectRatios = remember(controller) { mutableStateMapOf<String, Float>() }
+    val decodeScope = rememberCrashSafeCoroutineScope()
+    val decodedPages = remember(controller) { ReaderDecodedPageCache(decodeScope) }
     val spacing = if (direction == ReadingDirection.WEBTOON) display.webtoonSpacingDp().dp else 15.dp
 
     CrashSafeLaunchedEffect(listState, controller, entries) {
@@ -104,6 +109,28 @@ internal fun ReaderContinuousPages(
             consumeScrollStep()
         }
     }
+    CrashSafeLaunchedEffect(listState, controller, entries, revision) {
+        snapshotFlow {
+            val visible = listState.layoutInfo.visibleItemsInfo
+            if (visible.isEmpty()) null else visible.first().index to visible.last().index
+        }
+            .distinctUntilChanged()
+            .collectLatest { range ->
+                if (range == null) return@collectLatest
+                val targets = buildList {
+                    for (index in (range.second + 1)..(range.second + DECODE_PREFETCH_AHEAD)) add(index)
+                    for (index in (range.first - 1) downTo (range.first - DECODE_PREFETCH_BEHIND)) add(index)
+                }
+                for (index in targets) {
+                    val page = entries.getOrNull(index) as? ContinuousEntry.Page ?: continue
+                    decodedPages.load(page.key) {
+                        requireNotNull(pageDecoder(controller.windowPage(page.globalPage))) {
+                            "Unsupported page image format"
+                        }
+                    }
+                }
+            }
+    }
 
     LazyColumn(
         state = listState,
@@ -126,6 +153,8 @@ internal fun ReaderContinuousPages(
                     display = display,
                     revision = revision,
                     widthScale = widthScale,
+                    pageKey = entry.key,
+                    decodedPages = decodedPages,
                     knownAspectRatio = pageAspectRatios[entry.key],
                     rememberAspectRatio = { pageAspectRatios[entry.key] = it },
                 )
@@ -189,19 +218,20 @@ private fun ReaderContinuousPage(
     display: ReaderDisplayPreferences,
     revision: Int,
     widthScale: Float,
+    pageKey: String,
+    decodedPages: ReaderDecodedPageCache,
     knownAspectRatio: Float?,
     rememberAspectRatio: (Float) -> Unit,
 ) {
     var retry by remember(controller, globalPage) { mutableIntStateOf(0) }
-    var decoded by remember(controller, globalPage, revision, retry) {
-        mutableStateOf<Result<ImageBitmap>?>(null)
+    var decoded by remember(controller, pageKey, revision, retry) {
+        mutableStateOf(decodedPages.get(pageKey)?.let { Result.success(it) })
     }
-    CrashSafeLaunchedEffect(controller, globalPage, revision, retry) {
-        val result = withContext(Dispatchers.IO) {
-            runCatching {
-                requireNotNull(pageDecoder(controller.windowPage(globalPage))) {
-                    "Unsupported page image format"
-                }
+    CrashSafeLaunchedEffect(controller, pageKey, revision, retry) {
+        if (decoded != null) return@CrashSafeLaunchedEffect
+        val result = decodedPages.load(pageKey) {
+            requireNotNull(pageDecoder(controller.windowPage(globalPage))) {
+                "Unsupported page image format"
             }
         }
         result.getOrNull()?.let { rememberAspectRatio(it.width.toFloat() / it.height) }

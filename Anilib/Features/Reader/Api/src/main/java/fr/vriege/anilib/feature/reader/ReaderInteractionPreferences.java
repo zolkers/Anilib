@@ -42,4 +42,29 @@ public record ReaderInteractionPreferences(
                 ReaderInteractionAction.TOGGLE_ZOOM,
                 ReaderInteractionAction.OPEN_MENU);
     }
+
+    /**
+     * Repairs a degenerate horizontal layout where both physical edges turn the same way.
+     * Direction mirroring is applied later by the viewer, so the stored baseline is always
+     * left=previous and right=next.
+     */
+    public ReaderInteractionPreferences withUsableHorizontalTaps() {
+        boolean leftTurnsPage = leftTap == ReaderInteractionAction.PREVIOUS_PAGE
+                || leftTap == ReaderInteractionAction.NEXT_PAGE;
+        if (!leftTurnsPage || leftTap != rightTap) {
+            return this;
+        }
+        return new ReaderInteractionPreferences(
+                ReaderInteractionAction.PREVIOUS_PAGE,
+                centerTap,
+                ReaderInteractionAction.NEXT_PAGE,
+                topTap,
+                bottomTap,
+                swipeLeft,
+                swipeRight,
+                swipeUp,
+                swipeDown,
+                doubleTap,
+                longPress);
+    }
 }

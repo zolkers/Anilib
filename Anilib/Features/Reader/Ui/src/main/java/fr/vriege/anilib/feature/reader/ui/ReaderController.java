@@ -160,11 +160,13 @@ public final class ReaderController implements AutoCloseable {
     }
 
     public ReaderInteractionPreferences interactions() {
-        return interactions.snapshot();
+        return interactions.snapshot().withUsableHorizontalTaps();
     }
 
     public void setInteractions(ReaderInteractionPreferences preferences) {
-        interactions.save(preferences);
+        interactions.save(Objects.requireNonNull(
+                preferences,
+                "preferences must not be null").withUsableHorizontalTaps());
     }
 
     public ReaderDisplayPreferences display() {
