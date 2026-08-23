@@ -1,7 +1,6 @@
 package fr.vriege.anilib.platform.compose
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,7 +34,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -369,6 +367,17 @@ internal fun DetailsPage(
     var selectedChapterIds by remember(details.id()) { mutableStateOf<Set<String>>(emptySet()) }
     var selectingEpisodes by remember(details.id()) { mutableStateOf(false) }
     var selectedEpisodeIds by remember(details.id()) { mutableStateOf<Set<SourceEpisodeId>>(emptySet()) }
+    val languagePack = LocalLanguagePack.current
+    val chaptersLabel = UiTranslations.format(
+        "dynamic.chapters.count",
+        languagePack,
+        chapters.size,
+    )
+    val episodesLabel = UiTranslations.format(
+        "dynamic.episodes.count",
+        languagePack,
+        episodes.size,
+    )
     MediaDetailsScreen(
         model = MediaDetailsUiModel(
             title = details.title(),
@@ -411,138 +420,119 @@ internal fun DetailsPage(
         openPrimary = if (canWatch) watch else ({ read(null) }),
         goBack = goBack,
     ) {
-            if (chapters.isNotEmpty()) {
-                item {
-                    ContentSelectionHeader(
-                        label = UiTranslations.format(
-                            "dynamic.chapters.count",
-                            LocalLanguagePack.current,
-                            chapters.size,
-                        ),
-                        selecting = selectingChapters,
-                        selectedCount = selectedChapterIds.size,
-                        toggleSelection = {
-                            selectingChapters = !selectingChapters
-                            if (!selectingChapters) selectedChapterIds = emptySet()
-                        },
-                        selectAll = { selectedChapterIds = chapters.map { it.id().value() }.toSet() },
-                        markPositive = {
-                            markChapters(selectedChapterIds, true)
-                            selectedChapterIds = emptySet()
-                            selectingChapters = false
-                        },
-                        markNegative = {
-                            markChapters(selectedChapterIds, false)
-                            selectedChapterIds = emptySet()
-                            selectingChapters = false
-                        },
-                        positiveLabel = "ui.mark.read",
-                        negativeLabel = "ui.mark.unread",
-                    )
-                }
-                items(chapters, key = { it.id().value() }) { chapter ->
+            mediaUnitsSection(
+                label = chaptersLabel,
+                units = chapters,
+                key = { it.id().value() },
+                title = SourceContentUnit::title,
+                summary = { chapter ->
                     val chapterId = chapter.id().value()
                     val chapterRead = chapterId in readChapterIds
-                    val resumeAt = chapterProgress
-                        ?.takeIf { it.contentId() == chapterId && !chapterRead }
-                    val summary = listOfNotNull(
+                    val resumeAt = chapterProgress?.takeIf {
+                        it.contentId() == chapterId && !chapterRead
+                    }
+                    listOfNotNull(
                         chapter.publishedAt().map(mediaDateTimeFormatter::format).orElse(null),
                         when {
-                            chapterRead -> UiTranslations.translate("ui.read", LocalLanguagePack.current)
+                            chapterRead -> UiTranslations.translate("ui.read", languagePack)
                             resumeAt != null -> UiTranslations.format(
                                 "dynamic.page.of",
-                                LocalLanguagePack.current,
+                                languagePack,
                                 resumeAt.position() + 1,
                                 resumeAt.extent() + 1,
                             )
                             else -> null
                         },
                     ).ifEmpty { listOf("Available") }.joinToString(" · ")
-                    MediaUnitRow(
-                        title = chapter.title(),
-                        summary = summary,
-                        open = { read(chapter) },
-                        download = { downloadChapter(chapter) },
-                        muted = chapterRead,
-                        selectionMode = selectingChapters,
-                        selected = chapterId in selectedChapterIds,
-                        select = {
-                            selectedChapterIds = if (chapterId in selectedChapterIds) {
-                                selectedChapterIds - chapterId
-                            } else {
-                                selectedChapterIds + chapterId
-                            }
-                        },
-                    )
-                }
-            }
-            if (episodes.isNotEmpty()) {
-                item {
-                    ContentSelectionHeader(
-                        label = UiTranslations.format(
-                            "dynamic.episodes.count",
-                            LocalLanguagePack.current,
-                            episodes.size,
-                        ),
-                        selecting = selectingEpisodes,
-                        selectedCount = selectedEpisodeIds.size,
-                        toggleSelection = {
-                            selectingEpisodes = !selectingEpisodes
-                            if (!selectingEpisodes) selectedEpisodeIds = emptySet()
-                        },
-                        selectAll = {
-                            selectedEpisodeIds = episodes.map { it.episode().id() }.toSet()
-                        },
-                        markPositive = {
-                            markEpisodes(selectedEpisodeIds, true)
-                            selectedEpisodeIds = emptySet()
-                            selectingEpisodes = false
-                        },
-                        markNegative = {
-                            markEpisodes(selectedEpisodeIds, false)
-                            selectedEpisodeIds = emptySet()
-                            selectingEpisodes = false
-                        },
-                        positiveLabel = "ui.mark.watched",
-                        negativeLabel = "ui.mark.unwatched",
-                    )
-                }
-                items(episodes, key = { it.episode().id().value() }) { episode ->
+                },
+                muted = { it.id().value() in readChapterIds },
+                selection = MediaUnitSelectionUiModel(
+                    selecting = selectingChapters,
+                    selectedKeys = selectedChapterIds,
+                    positiveLabel = "ui.mark.read",
+                    negativeLabel = "ui.mark.unread",
+                    toggle = {
+                        selectingChapters = !selectingChapters
+                        if (!selectingChapters) selectedChapterIds = emptySet()
+                    },
+                    selectAll = { selectedChapterIds = chapters.map { it.id().value() }.toSet() },
+                    select = { chapterId ->
+                        selectedChapterIds = if (chapterId in selectedChapterIds) {
+                            selectedChapterIds - chapterId
+                        } else {
+                            selectedChapterIds + chapterId
+                        }
+                    },
+                    markPositive = {
+                        markChapters(selectedChapterIds, true)
+                        selectedChapterIds = emptySet()
+                        selectingChapters = false
+                    },
+                    markNegative = {
+                        markChapters(selectedChapterIds, false)
+                        selectedChapterIds = emptySet()
+                        selectingChapters = false
+                    },
+                ),
+                open = read,
+                download = if (canDownload) downloadChapter else null,
+            )
+            mediaUnitsSection(
+                label = episodesLabel,
+                units = episodes,
+                key = { it.episode().id().value() },
+                title = { it.episode().title() },
+                summary = { episode ->
                     val playback = episode.playback().orElse(null)
-                    val metadata = listOfNotNull(
+                    listOfNotNull(
                         episode.episode().uploadedAt().map(mediaDateTimeFormatter::format).orElse(null),
                         episode.episode().scanlator().orElse(null),
                         playback?.let {
                             if (it.completed()) {
-                                UiTranslations.translate("ui.watched", LocalLanguagePack.current)
+                                UiTranslations.translate("ui.watched", languagePack)
                             } else {
                                 UiTranslations.format(
                                     "dynamic.progress",
-                                    LocalLanguagePack.current,
+                                    languagePack,
                                     formatMediaPosition(it.positionMillis()),
                                 )
                             }
                         },
                     ).ifEmpty { listOf("Available") }.joinToString(" · ")
-                    MediaUnitRow(
-                        title = episode.episode().title(),
-                        summary = metadata,
-                        open = { watchEpisode(episode) },
-                        download = { downloadEpisode(episode) },
-                        muted = playback?.completed() == true,
-                        selectionMode = selectingEpisodes,
-                        selected = episode.episode().id() in selectedEpisodeIds,
-                        select = {
-                            val episodeId = episode.episode().id()
-                            selectedEpisodeIds = if (episodeId in selectedEpisodeIds) {
-                                selectedEpisodeIds - episodeId
-                            } else {
-                                selectedEpisodeIds + episodeId
-                            }
-                        },
-                    )
-                }
-            }
+                },
+                muted = { it.playback().map { state -> state.completed() }.orElse(false) },
+                selection = MediaUnitSelectionUiModel(
+                    selecting = selectingEpisodes,
+                    selectedKeys = selectedEpisodeIds.map { it.value() }.toSet(),
+                    positiveLabel = "ui.mark.watched",
+                    negativeLabel = "ui.mark.unwatched",
+                    toggle = {
+                        selectingEpisodes = !selectingEpisodes
+                        if (!selectingEpisodes) selectedEpisodeIds = emptySet()
+                    },
+                    selectAll = { selectedEpisodeIds = episodes.map { it.episode().id() }.toSet() },
+                    select = { episodeId ->
+                        val id = episodes.first { it.episode().id().value() == episodeId }.episode().id()
+                        selectedEpisodeIds = if (id in selectedEpisodeIds) {
+                            selectedEpisodeIds - id
+                        } else {
+                            selectedEpisodeIds + id
+                        }
+                    },
+                    markPositive = {
+                        markEpisodes(selectedEpisodeIds, true)
+                        selectedEpisodeIds = emptySet()
+                        selectingEpisodes = false
+                    },
+                    markNegative = {
+                        markEpisodes(selectedEpisodeIds, false)
+                        selectedEpisodeIds = emptySet()
+                        selectingEpisodes = false
+                    },
+                ),
+                open = watchEpisode,
+                download = if (canDownload) downloadEpisode else null,
+            )
             if (related.isNotEmpty()) {
                 item {
                     RelatedTitlesSection(related) { card -> openRelated(card.id()) }
@@ -569,61 +559,6 @@ internal fun DetailsPage(
             remove = removeCategory,
             delete = deleteCategory,
         )
-    }
-}
-
-@Composable
-private fun ContentSelectionHeader(
-    label: String,
-    selecting: Boolean,
-    selectedCount: Int,
-    toggleSelection: () -> Unit,
-    selectAll: () -> Unit,
-    markPositive: () -> Unit,
-    markNegative: () -> Unit,
-    positiveLabel: String,
-    negativeLabel: String,
-) {
-    Column(modifier = Modifier.widthIn(max = 900.dp).fillMaxWidth().padding(top = 12.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                label,
-                modifier = Modifier.weight(1f).padding(top = 8.dp, bottom = 4.dp),
-                fontWeight = FontWeight.SemiBold,
-                style = MaterialTheme.typography.titleMedium,
-            )
-            TextButton(onClick = toggleSelection) {
-                Text(UiTranslations.translate(
-                    if (selecting) "ui.clear" else "ui.select",
-                    LocalLanguagePack.current,
-                ))
-            }
-        }
-        if (selecting) {
-            Row(
-                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    UiTranslations.format(
-                        "dynamic.selected.count",
-                        LocalLanguagePack.current,
-                        selectedCount,
-                    ),
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(horizontal = 8.dp),
-                )
-                TextButton(onClick = selectAll) {
-                    Text(UiTranslations.translate("ui.select.all", LocalLanguagePack.current))
-                }
-                TextButton(onClick = markPositive, enabled = selectedCount > 0) {
-                    Text(UiTranslations.translate(positiveLabel, LocalLanguagePack.current))
-                }
-                TextButton(onClick = markNegative, enabled = selectedCount > 0) {
-                    Text(UiTranslations.translate(negativeLabel, LocalLanguagePack.current))
-                }
-            }
-        }
     }
 }
 

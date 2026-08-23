@@ -952,6 +952,16 @@ private fun SourceTitleScreen(
     val details = content.details
     val primaryChapter = content.chapters.firstOrNull()
     val primaryEpisode = content.episodes.firstOrNull()
+    val chaptersLabel = UiTranslations.format(
+        "dynamic.chapters.count",
+        LocalLanguagePack.current,
+        content.chapters.size,
+    )
+    val episodesLabel = UiTranslations.format(
+        "dynamic.episodes.count",
+        LocalLanguagePack.current,
+        content.episodes.size,
+    )
     MediaDetailsScreen(
         model = MediaDetailsUiModel(
             title = details.title(),
@@ -990,30 +1000,22 @@ private fun SourceTitleScreen(
         },
         goBack = navigateUp,
     ) {
-        if (content.chapters.isNotEmpty()) {
-            item { MediaContentHeading("${content.chapters.size} chapters") }
-            items(content.chapters, key = { it.id().value() }) { chapter ->
-                MediaUnitRow(
-                    title = chapter.title(),
-                    summary = chapter.publishedAt().map(mediaDateTimeFormatter::format).orElse(""),
-                    open = { openReader(details.title(), chapter.id()) },
-                    download = {},
-                    canDownload = false,
-                )
-            }
-        }
-        if (content.episodes.isNotEmpty()) {
-            item { MediaContentHeading("${content.episodes.size} episodes") }
-            items(content.episodes, key = { it.id().value() }) { episode ->
-                MediaUnitRow(
-                    title = episode.title(),
-                    summary = episode.scanlator().orElse(""),
-                    open = { openPlayer(details.title(), episode.id()) },
-                    download = {},
-                    canDownload = false,
-                )
-            }
-        }
+        mediaUnitsSection(
+            label = chaptersLabel,
+            units = content.chapters,
+            key = { it.id().value() },
+            title = SourceContentUnit::title,
+            summary = { it.publishedAt().map(mediaDateTimeFormatter::format).orElse("Available") },
+            open = { chapter -> openReader(details.title(), chapter.id()) },
+        )
+        mediaUnitsSection(
+            label = episodesLabel,
+            units = content.episodes,
+            key = { it.id().value() },
+            title = SourceEpisode::title,
+            summary = { it.scanlator().orElse("Available") },
+            open = { episode -> openPlayer(details.title(), episode.id()) },
+        )
     }
 }
 

@@ -1,6 +1,7 @@
 package fr.vriege.anilib.platform.compose
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -19,6 +20,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Category
@@ -41,6 +44,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -52,7 +56,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -71,6 +74,18 @@ internal data class MediaDetailsUiModel(
     val sourceName: String,
     val description: String,
     val genres: List<String>,
+)
+
+internal data class MediaUnitSelectionUiModel(
+    val selecting: Boolean,
+    val selectedKeys: Set<String>,
+    val positiveLabel: String,
+    val negativeLabel: String,
+    val toggle: () -> Unit,
+    val selectAll: () -> Unit,
+    val select: (String) -> Unit,
+    val markPositive: () -> Unit,
+    val markNegative: () -> Unit,
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -285,14 +300,91 @@ internal fun MediaGenreChips(genres: List<String>) {
     }
 }
 
+internal fun <T> LazyListScope.mediaUnitsSection(
+    label: String,
+    units: List<T>,
+    key: (T) -> String,
+    title: (T) -> String,
+    summary: (T) -> String,
+    muted: (T) -> Boolean = { false },
+    selection: MediaUnitSelectionUiModel? = null,
+    open: (T) -> Unit,
+    download: ((T) -> Unit)? = null,
+) {
+    if (units.isEmpty()) return
+    item(key = "media-section:$label") {
+        MediaContentSectionHeader(label, selection)
+    }
+    items(units, key = key) { unit ->
+        val unitKey = key(unit)
+        MediaUnitRow(
+            title = title(unit),
+            summary = summary(unit),
+            open = { open(unit) },
+            download = { download?.invoke(unit) },
+            muted = muted(unit),
+            canDownload = download != null,
+            selectionMode = selection?.selecting == true,
+            selected = unitKey in selection?.selectedKeys.orEmpty(),
+            select = { selection?.select?.invoke(unitKey) },
+        )
+    }
+}
+
 @Composable
-internal fun MediaContentHeading(label: String) {
-    Text(
-        label,
-        modifier = Modifier.widthIn(max = 900.dp).fillMaxWidth().padding(top = 20.dp, bottom = 8.dp),
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 18.sp,
-    )
+private fun MediaContentSectionHeader(
+    label: String,
+    selection: MediaUnitSelectionUiModel?,
+) {
+    Column(modifier = Modifier.widthIn(max = 900.dp).fillMaxWidth().padding(top = 12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                label,
+                modifier = Modifier.weight(1f).padding(top = 8.dp, bottom = 4.dp),
+                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.titleMedium,
+            )
+            selection?.let {
+                TextButton(onClick = it.toggle) {
+                    Text(UiTranslations.translate(
+                        if (it.selecting) "ui.clear" else "ui.select",
+                        LocalLanguagePack.current,
+                    ))
+                }
+            }
+        }
+        if (selection?.selecting == true) {
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    UiTranslations.format(
+                        "dynamic.selected.count",
+                        LocalLanguagePack.current,
+                        selection.selectedKeys.size,
+                    ),
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(horizontal = 8.dp),
+                )
+                TextButton(onClick = selection.selectAll) {
+                    Text(UiTranslations.translate("ui.select.all", LocalLanguagePack.current))
+                }
+                TextButton(
+                    onClick = selection.markPositive,
+                    enabled = selection.selectedKeys.isNotEmpty(),
+                ) {
+                    Text(UiTranslations.translate(selection.positiveLabel, LocalLanguagePack.current))
+                }
+                TextButton(
+                    onClick = selection.markNegative,
+                    enabled = selection.selectedKeys.isNotEmpty(),
+                ) {
+                    Text(UiTranslations.translate(selection.negativeLabel, LocalLanguagePack.current))
+                }
+            }
+        }
+    }
 }
 
 @Composable
