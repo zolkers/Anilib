@@ -42,6 +42,8 @@ import java.util.List;
 import java.util.Objects;
 
 public final class StandardAnilib {
+    private static final String DEFAULT_ANILIST_CLIENT_ID = "49321";
+
     private StandardAnilib() {
     }
 
@@ -201,7 +203,8 @@ public final class StandardAnilib {
         if (!configured.isEmpty()) {
             return configured;
         }
-        return Objects.requireNonNullElse(System.getenv(environment), "").strip();
+        configured = Objects.requireNonNullElse(System.getenv(environment), "").strip();
+        return configured.isEmpty() ? DEFAULT_ANILIST_CLIENT_ID : configured;
     }
 
     private static URI oauthCallbackUri() {

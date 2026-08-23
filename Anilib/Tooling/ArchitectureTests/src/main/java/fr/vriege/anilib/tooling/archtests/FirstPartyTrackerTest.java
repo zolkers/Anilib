@@ -9,6 +9,7 @@ import fr.vriege.anilib.feature.tracker.TrackerCredentials;
 import fr.vriege.anilib.feature.tracker.TrackerEntry;
 import fr.vriege.anilib.feature.tracker.TrackerException;
 import fr.vriege.anilib.feature.tracker.TrackerSearchResult;
+import fr.vriege.anilib.feature.tracker.TrackerService;
 import fr.vriege.anilib.feature.tracker.TrackerStatus;
 import fr.vriege.anilib.feature.tracker.anilist.AniListTracker;
 import fr.vriege.anilib.feature.tracker.kitsu.KitsuTracker;
@@ -55,12 +56,23 @@ final class FirstPartyTrackerTest {
                     throw new AssertionError("Provider bundles must not access the network during startup");
                 },
                 List.of())) {
-            List<String> ids = application.capability(TrackerCapabilities.SERVICE).accounts().stream()
+            TrackerService service = application.capability(TrackerCapabilities.SERVICE);
+            List<String> ids = service.accounts().stream()
                     .map(account -> account.descriptor().id().value())
                     .sorted()
                     .toList();
             counter.check(ids.equals(List.of("anilist", "kitsu")),
                     "the standard product must select both first-party tracker bundles explicitly");
+            TrackerAuthorization authorization = service.beginAuthorization(
+                    service.accounts().stream()
+                            .filter(account -> account.descriptor().id().value().equals("anilist"))
+                            .findFirst()
+                            .orElseThrow()
+                            .descriptor()
+                            .id());
+            counter.check(!queryParameter(
+                            authorization.authorizationUri().getRawQuery(), "client_id").isBlank(),
+                    "the standard product must ship a usable public AniList client identifier");
         } finally {
             deleteDirectory(directory);
         }

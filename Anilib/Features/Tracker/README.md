@@ -44,8 +44,9 @@ manifests restrict HTTP access to the single exact provider origin, and fixture
 tests exercise their full authentication and entry lifecycle without requiring
 live accounts.
 
-The Standard product reads AniList's public OAuth client identifier from the
-`anilib.tracker.anilist.client-id` JVM property or the
+The Standard product ships the public AniList OAuth client identifier `49321`,
+so release users do not need to configure authentication. Development builds
+can override it with the `anilib.tracker.anilist.client-id` JVM property or the
 `ANILIB_ANILIST_CLIENT_ID` environment variable. The registered provider
 application must use the exact callback URI
 `http://127.0.0.1:43697/oauth/anilist/callback`. Anilib binds that address only
