@@ -930,7 +930,7 @@ private fun TrackerEditDialog(
 ) {
     val descriptor = account.descriptor()
     var status by remember(entry) { mutableStateOf(entry.status()) }
-    var progress by remember(entry) { mutableStateOf(entry.progress().toString()) }
+    var progress by remember(entry) { mutableStateOf(trackerProgressValue(entry.progress())) }
     var score by remember(entry) {
         mutableStateOf(if (entry.score().isPresent) entry.score().orElse(0.0).toString() else "")
     }
@@ -1528,8 +1528,13 @@ private fun secretLabel(authentication: TrackerAuthentication): String = when (a
     TrackerAuthentication.NONE -> "Credential"
 }
 
-private fun trackerProgress(entry: TrackerEntry): String =
-    if (entry.totalUnits() >= 0) "${entry.progress()} / ${entry.totalUnits()}" else entry.progress().toString()
+private fun trackerProgress(entry: TrackerEntry): String {
+    val progress = trackerProgressValue(entry.progress())
+    return if (entry.totalUnits() >= 0) "$progress / ${entry.totalUnits()}" else progress
+}
+
+private fun trackerProgressValue(progress: Double): String =
+    if (progress == progress.toLong().toDouble()) progress.toLong().toString() else progress.toString()
 
 private fun trackerStatusKey(value: TrackerStatus): String = when (value) {
     TrackerStatus.WATCHING -> "ui.tracker.status.watching"
