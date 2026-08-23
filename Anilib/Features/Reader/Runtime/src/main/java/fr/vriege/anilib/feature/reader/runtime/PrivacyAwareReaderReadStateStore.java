@@ -4,6 +4,7 @@ import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.reader.ReaderReadStateStore;
 
 import java.util.Objects;
+import java.util.Collection;
 import java.util.Set;
 import java.util.function.BooleanSupplier;
 
@@ -29,6 +30,13 @@ public final class PrivacyAwareReaderReadStateStore implements ReaderReadStateSt
     public void setRead(LibraryItemId libraryItemId, String contentId, boolean read) {
         if (persistenceAllowed.getAsBoolean()) {
             delegate.setRead(libraryItemId, contentId, read);
+        }
+    }
+
+    @Override
+    public void setRead(LibraryItemId libraryItemId, Collection<String> contentIds, boolean read) {
+        if (persistenceAllowed.getAsBoolean()) {
+            delegate.setRead(libraryItemId, contentIds, read);
         }
     }
 }

@@ -19,6 +19,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -68,6 +69,7 @@ public final class MediaHeaderProxy implements AutoCloseable {
     private final JdkHttpCookieJar cookies = new JdkHttpCookieJar();
     private final Map<String, Target> targets = new ConcurrentHashMap<>();
     private final Map<Target, String> routes = new ConcurrentHashMap<>();
+    private final Set<Socket> sockets = ConcurrentHashMap.newKeySet();
     private final AtomicLong nextTarget = new AtomicLong();
     private final String token;
     private final Thread acceptor;
@@ -105,7 +107,16 @@ public final class MediaHeaderProxy implements AutoCloseable {
         while (!closed) {
             try {
                 Socket socket = server.accept();
-                workers.execute(() -> handle(socket));
+                sockets.add(socket);
+                try {
+                    workers.execute(() -> handle(socket));
+                } catch (RuntimeException failure) {
+                    sockets.remove(socket);
+                    closeSocket(socket);
+                    if (!closed) {
+                        throw failure;
+                    }
+                }
             } catch (SocketException exception) {
                 if (!closed) {
                     close();
@@ -137,6 +148,8 @@ public final class MediaHeaderProxy implements AutoCloseable {
             }
         } catch (IOException ignored) {
             // The media client may disconnect while a response is being written.
+        } finally {
+            sockets.remove(socket);
         }
     }
 
@@ -469,6 +482,14 @@ public final class MediaHeaderProxy implements AutoCloseable {
         }
     }
 
+    private static void closeSocket(Socket socket) {
+        try {
+            socket.close();
+        } catch (IOException ignored) {
+            // Closing an already-failed media connection is best effort.
+        }
+    }
+
     private void ensureOpen() {
         if (closed) {
             throw new HttpException("Media header proxy is closed");
@@ -484,7 +505,9 @@ public final class MediaHeaderProxy implements AutoCloseable {
             } catch (IOException ignored) {
                 // Closing an already-failed loopback socket is best effort.
             }
-            ManagedExecutors.shutdown(workers);
+            List.copyOf(sockets).forEach(MediaHeaderProxy::closeSocket);
+            workers.shutdownNow();
+            sockets.clear();
             targets.clear();
             routes.clear();
         }

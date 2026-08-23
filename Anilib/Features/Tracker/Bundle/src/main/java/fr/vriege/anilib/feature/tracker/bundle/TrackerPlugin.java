@@ -2,6 +2,8 @@ package fr.vriege.anilib.feature.tracker.bundle;
 
 import fr.vriege.anilib.feature.library.LibraryCapabilities;
 import fr.vriege.anilib.feature.library.LibraryCatalog;
+import fr.vriege.anilib.feature.player.PlayerCapabilities;
+import fr.vriege.anilib.feature.player.PlayerService;
 import fr.vriege.anilib.feature.tracker.TrackerCapabilities;
 import fr.vriege.anilib.feature.tracker.runtime.DefaultTrackerRegistry;
 import fr.vriege.anilib.feature.tracker.runtime.DefaultTrackerService;
@@ -22,6 +24,7 @@ public final class TrackerPlugin implements AnilibPlugin {
     private static final PluginManifest MANIFEST = PluginManifest.builder(
                     ComponentDescriptor.of("feature.tracker", "Tracking", "0.1.0"))
             .requires(LibraryCapabilities.CATALOG)
+            .requires(PlayerCapabilities.SERVICE)
             .requires(SettingsCapabilities.UNUSED_DATA_REGISTRAR)
             .provides(TrackerCapabilities.REGISTRY)
             .provides(TrackerCapabilities.REGISTRAR)
@@ -45,9 +48,11 @@ public final class TrackerPlugin implements AnilibPlugin {
     @Override
     public void install(PluginInstallationContext context) {
         LibraryCatalog library = context.require(LibraryCapabilities.CATALOG);
+        PlayerService player = context.require(PlayerCapabilities.SERVICE);
         UnusedDataRegistrar cleanup = context.require(SettingsCapabilities.UNUSED_DATA_REGISTRAR);
         DefaultTrackerRegistry registry = context.own(new DefaultTrackerRegistry());
         DefaultTrackerService service = context.own(new DefaultTrackerService(registry, library, stateFile));
+        context.own(new PlaybackTrackerCoordinator(player, service));
         context.own(cleanup.register("tracking", service::cleanUnusedData));
         context.publish(TrackerCapabilities.REGISTRY, registry);
         context.publish(TrackerCapabilities.REGISTRAR, registry);

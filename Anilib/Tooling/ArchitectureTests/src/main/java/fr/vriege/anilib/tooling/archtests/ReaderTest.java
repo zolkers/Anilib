@@ -87,6 +87,12 @@ final class ReaderTest {
             store.setRead(title, "chapter-2", false);
             counter.check(store.readContentIds(title).isEmpty(),
                     "reader chapters must support a durable mark-unread action");
+            store.setRead(title, Set.of("chapter-1", "chapter-2", "chapter-3"), true);
+            counter.check(store.readContentIds(title).equals(Set.of("chapter-1", "chapter-2", "chapter-3")),
+                    "reader catalogues must persist one bulk mark-read action");
+            store.setRead(title, Set.of("chapter-1", "chapter-3"), false);
+            counter.check(store.readContentIds(title).equals(Set.of("chapter-2")),
+                    "reader catalogues must persist one bulk mark-unread action");
         } catch (IOException exception) {
             throw new AssertionError("Unable to test reader read state", exception);
         } finally {

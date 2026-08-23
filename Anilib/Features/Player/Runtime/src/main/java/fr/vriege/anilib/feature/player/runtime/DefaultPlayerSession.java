@@ -177,7 +177,12 @@ final class DefaultPlayerSession implements PlayerSession {
         ensureOpen();
         boolean completed = durationMillis > 0L
                 && (double) positionMillis / durationMillis >= completionThresholdPercent / 100.0d;
-        playback = service.updatePlayback(playback, positionMillis, durationMillis, completed);
+        playback = service.updatePlayback(
+                playback,
+                initial.episode().episodeNumber(),
+                positionMillis,
+                durationMillis,
+                completed);
     }
 
     @Override
@@ -186,7 +191,12 @@ final class DefaultPlayerSession implements PlayerSession {
         long position = playback.durationMillis() < 0
                 ? playback.positionMillis()
                 : playback.durationMillis();
-        playback = service.updatePlayback(playback, position, playback.durationMillis(), true);
+        playback = service.updatePlayback(
+                playback,
+                initial.episode().episodeNumber(),
+                position,
+                playback.durationMillis(),
+                true);
     }
 
     private SourceVideoStream stream(String id) {

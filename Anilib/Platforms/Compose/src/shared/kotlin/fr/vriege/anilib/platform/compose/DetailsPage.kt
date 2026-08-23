@@ -1,6 +1,7 @@
 package fr.vriege.anilib.platform.compose
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,6 +35,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -201,6 +203,38 @@ internal fun DetailsDestination(
                     .onSuccess { unitError = null }
                     .onFailure { unitError = it.message ?: "The episode could not be queued." }
             },
+            markChapters = { contentIds, read ->
+                scope.launch {
+                    runCatching {
+                        withContext(Dispatchers.IO) {
+                            reader.setRead(details.id(), contentIds, read)
+                        }
+                    }.onSuccess {
+                        unitError = null
+                        readChapterIds = if (read) {
+                            readChapterIds + contentIds
+                        } else {
+                            readChapterIds - contentIds
+                        }
+                    }.onFailure {
+                        unitError = it.message ?: "The chapter state could not be updated."
+                    }
+                }
+            },
+            markEpisodes = { episodeIds, completed ->
+                scope.launch {
+                    runCatching {
+                        withContext(Dispatchers.IO) {
+                            player.setEpisodesCompleted(details.id(), episodeIds, completed)
+                        }
+                    }.onSuccess {
+                        unitError = null
+                        episodes = it
+                    }.onFailure {
+                        unitError = it.message ?: "The episode state could not be updated."
+                    }
+                }
+            },
             track = { openTracking(details.id()) },
             refreshing = refreshing,
             refresh = sourceId?.let { refreshSourceId ->
@@ -312,6 +346,8 @@ internal fun DetailsPage(
     download: () -> Unit,
     downloadChapter: (SourceContentUnit) -> Unit,
     downloadEpisode: (EpisodeSnapshot) -> Unit,
+    markChapters: (Set<String>, Boolean) -> Unit,
+    markEpisodes: (Set<SourceEpisodeId>, Boolean) -> Unit,
     track: () -> Unit,
     refreshing: Boolean,
     refresh: (() -> Unit)?,
@@ -329,6 +365,10 @@ internal fun DetailsPage(
 ) {
     var editing by remember(details.id()) { mutableStateOf(false) }
     var editingCategories by remember(details.id()) { mutableStateOf(false) }
+    var selectingChapters by remember(details.id()) { mutableStateOf(false) }
+    var selectedChapterIds by remember(details.id()) { mutableStateOf<Set<String>>(emptySet()) }
+    var selectingEpisodes by remember(details.id()) { mutableStateOf(false) }
+    var selectedEpisodeIds by remember(details.id()) { mutableStateOf<Set<SourceEpisodeId>>(emptySet()) }
     MediaDetailsScreen(
         model = MediaDetailsUiModel(
             title = details.title(),
@@ -372,8 +412,31 @@ internal fun DetailsPage(
     ) {
             if (chapters.isNotEmpty()) {
                 item {
-                    MediaContentHeading(
-                        UiTranslations.format("dynamic.chapters.count", LocalLanguagePack.current, chapters.size),
+                    ContentSelectionHeader(
+                        label = UiTranslations.format(
+                            "dynamic.chapters.count",
+                            LocalLanguagePack.current,
+                            chapters.size,
+                        ),
+                        selecting = selectingChapters,
+                        selectedCount = selectedChapterIds.size,
+                        toggleSelection = {
+                            selectingChapters = !selectingChapters
+                            if (!selectingChapters) selectedChapterIds = emptySet()
+                        },
+                        selectAll = { selectedChapterIds = chapters.map { it.id().value() }.toSet() },
+                        markPositive = {
+                            markChapters(selectedChapterIds, true)
+                            selectedChapterIds = emptySet()
+                            selectingChapters = false
+                        },
+                        markNegative = {
+                            markChapters(selectedChapterIds, false)
+                            selectedChapterIds = emptySet()
+                            selectingChapters = false
+                        },
+                        positiveLabel = "ui.mark.read",
+                        negativeLabel = "ui.mark.unread",
                     )
                 }
                 items(chapters, key = { it.id().value() }) { chapter ->
@@ -400,13 +463,47 @@ internal fun DetailsPage(
                         open = { read(chapter) },
                         download = { downloadChapter(chapter) },
                         muted = chapterRead,
+                        selectionMode = selectingChapters,
+                        selected = chapterId in selectedChapterIds,
+                        select = {
+                            selectedChapterIds = if (chapterId in selectedChapterIds) {
+                                selectedChapterIds - chapterId
+                            } else {
+                                selectedChapterIds + chapterId
+                            }
+                        },
                     )
                 }
             }
             if (episodes.isNotEmpty()) {
                 item {
-                    MediaContentHeading(
-                        UiTranslations.format("dynamic.episodes.count", LocalLanguagePack.current, episodes.size),
+                    ContentSelectionHeader(
+                        label = UiTranslations.format(
+                            "dynamic.episodes.count",
+                            LocalLanguagePack.current,
+                            episodes.size,
+                        ),
+                        selecting = selectingEpisodes,
+                        selectedCount = selectedEpisodeIds.size,
+                        toggleSelection = {
+                            selectingEpisodes = !selectingEpisodes
+                            if (!selectingEpisodes) selectedEpisodeIds = emptySet()
+                        },
+                        selectAll = {
+                            selectedEpisodeIds = episodes.map { it.episode().id() }.toSet()
+                        },
+                        markPositive = {
+                            markEpisodes(selectedEpisodeIds, true)
+                            selectedEpisodeIds = emptySet()
+                            selectingEpisodes = false
+                        },
+                        markNegative = {
+                            markEpisodes(selectedEpisodeIds, false)
+                            selectedEpisodeIds = emptySet()
+                            selectingEpisodes = false
+                        },
+                        positiveLabel = "ui.mark.watched",
+                        negativeLabel = "ui.mark.unwatched",
                     )
                 }
                 items(episodes, key = { it.episode().id().value() }) { episode ->
@@ -432,6 +529,16 @@ internal fun DetailsPage(
                         open = { watchEpisode(episode) },
                         download = { downloadEpisode(episode) },
                         muted = playback?.completed() == true,
+                        selectionMode = selectingEpisodes,
+                        selected = episode.episode().id() in selectedEpisodeIds,
+                        select = {
+                            val episodeId = episode.episode().id()
+                            selectedEpisodeIds = if (episodeId in selectedEpisodeIds) {
+                                selectedEpisodeIds - episodeId
+                            } else {
+                                selectedEpisodeIds + episodeId
+                            }
+                        },
                     )
                 }
             }
@@ -461,6 +568,61 @@ internal fun DetailsPage(
             remove = removeCategory,
             delete = deleteCategory,
         )
+    }
+}
+
+@Composable
+private fun ContentSelectionHeader(
+    label: String,
+    selecting: Boolean,
+    selectedCount: Int,
+    toggleSelection: () -> Unit,
+    selectAll: () -> Unit,
+    markPositive: () -> Unit,
+    markNegative: () -> Unit,
+    positiveLabel: String,
+    negativeLabel: String,
+) {
+    Column(modifier = Modifier.widthIn(max = 900.dp).fillMaxWidth().padding(top = 12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                label,
+                modifier = Modifier.weight(1f).padding(top = 8.dp, bottom = 4.dp),
+                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.titleMedium,
+            )
+            TextButton(onClick = toggleSelection) {
+                Text(UiTranslations.translate(
+                    if (selecting) "ui.clear" else "ui.select",
+                    LocalLanguagePack.current,
+                ))
+            }
+        }
+        if (selecting) {
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    UiTranslations.format(
+                        "dynamic.selected.count",
+                        LocalLanguagePack.current,
+                        selectedCount,
+                    ),
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(horizontal = 8.dp),
+                )
+                TextButton(onClick = selectAll) {
+                    Text(UiTranslations.translate("ui.select.all", LocalLanguagePack.current))
+                }
+                TextButton(onClick = markPositive, enabled = selectedCount > 0) {
+                    Text(UiTranslations.translate(positiveLabel, LocalLanguagePack.current))
+                }
+                TextButton(onClick = markNegative, enabled = selectedCount > 0) {
+                    Text(UiTranslations.translate(negativeLabel, LocalLanguagePack.current))
+                }
+            }
+        }
     }
 }
 

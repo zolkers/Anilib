@@ -102,11 +102,12 @@ final class PlayerTest {
     private static void switchesEpisodeSessionsIndependently(Counter counter) {
         Path directory = temporaryDirectory("anilib-player-episode-switch");
         RecordingBackend backend = new RecordingBackend();
+        TestStreamingSource source = new TestStreamingSource(false);
         try (StartedAnilib application = StandardAnilib.start(
                 directory,
                 new UrlConnectionHttpTransport(),
                 backend,
-                List.of(sourcePlugin(new TestStreamingSource(false))))) {
+                List.of(sourcePlugin(source)))) {
             LibraryItem item = animeItem("player-episode-switch");
             application.capability(LibraryCapabilities.CATALOG).save(item);
             PlayerPresentation presentation = application.capability(PlayerUiCapabilities.PRESENTATION);
@@ -121,6 +122,8 @@ final class PlayerTest {
                 counter.check(second.snapshot().episode().id().equals(SECOND_EPISODE.id())
                                 && second.playback().snapshot().status() == PlayerPlaybackStatus.PLAYING,
                         "the replacement episode must remain playable after the previous session closes");
+                counter.check(source.episodeRequests.get() == 1,
+                        "switching adjacent episodes must reuse the validated episode catalogue");
             } finally {
                 first.close();
                 if (second != null) second.close();
@@ -188,6 +191,9 @@ final class PlayerTest {
             LibraryItem item = animeItem("player-completion-threshold");
             application.capability(LibraryCapabilities.CATALOG).save(item);
             PlayerPresentation presentation = application.capability(PlayerUiCapabilities.PRESENTATION);
+            AtomicInteger completions = new AtomicInteger();
+            AutoCloseable progressObservation = application.capability(PlayerCapabilities.SERVICE)
+                    .observeProgress(event -> completions.incrementAndGet());
             try (PlayerController controller = presentation.open(item.id(), FIRST_EPISODE.id())) {
                 PlayerPreferences defaults = controller.preferences();
                 controller.setPreferences(new PlayerPreferences(
@@ -207,6 +213,9 @@ final class PlayerTest {
                 counter.check(controller.snapshot().playback().completed(),
                         "Player must mark progress at the configured threshold as watched");
             }
+            closeObservation(progressObservation);
+            counter.check(completions.get() == 1,
+                    "Player must publish one progress event when an episode first becomes watched");
             EpisodeSnapshot episode = presentation.episodes(item.id()).stream()
                     .filter(snapshot -> snapshot.episode().id().equals(FIRST_EPISODE.id()))
                     .findFirst()
@@ -219,6 +228,20 @@ final class PlayerTest {
                     .orElseThrow();
             counter.check(sourceEpisode.playback().orElseThrow().completed(),
                     "source episode lists must expose playback from their matching Library title");
+            List<EpisodeSnapshot> watched = presentation.setEpisodesCompleted(
+                    item.id(),
+                    Set.of(FIRST_EPISODE.id(), SECOND_EPISODE.id()),
+                    true);
+            counter.check(watched.stream().allMatch(snapshot -> snapshot.playback()
+                            .map(state -> state.completed()).orElse(false)),
+                    "episode catalogues must support one atomic bulk mark-watched action");
+            List<EpisodeSnapshot> unwatched = presentation.setEpisodesCompleted(
+                    item.id(),
+                    Set.of(FIRST_EPISODE.id(), SECOND_EPISODE.id()),
+                    false);
+            counter.check(unwatched.stream().noneMatch(snapshot -> snapshot.playback()
+                            .map(state -> state.completed()).orElse(false)),
+                    "episode catalogues must support one atomic bulk mark-unwatched action");
         } finally {
             deleteDirectory(directory);
         }
@@ -551,6 +574,14 @@ final class PlayerTest {
         }
     }
 
+    private static void closeObservation(AutoCloseable observation) {
+        try {
+            observation.close();
+        } catch (Exception exception) {
+            throw new AssertionError("Unable to close Player test observation", exception);
+        }
+    }
+
     private static void deleteDirectory(Path directory) {
         if (!Files.exists(directory)) {
             return;
@@ -566,6 +597,7 @@ final class PlayerTest {
 
     private static final class TestStreamingSource implements StreamingSource {
         private final boolean duplicateStreams;
+        private final AtomicInteger episodeRequests = new AtomicInteger();
 
         private TestStreamingSource(boolean duplicateStreams) {
             this.duplicateStreams = duplicateStreams;
@@ -584,6 +616,7 @@ final class PlayerTest {
 
         @Override
         public List<SourceEpisode> episodes(SourceCatalogueItemId itemId) {
+            episodeRequests.incrementAndGet();
             return List.of(SECOND_EPISODE, FIRST_EPISODE);
         }
 

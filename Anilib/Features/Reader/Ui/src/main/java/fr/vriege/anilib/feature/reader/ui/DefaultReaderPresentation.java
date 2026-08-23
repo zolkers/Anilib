@@ -9,6 +9,7 @@ import fr.vriege.anilib.feature.source.SourceContentUnit;
 import fr.vriege.anilib.feature.source.SourceCatalogueItemId;
 import fr.vriege.anilib.feature.source.SourceContentUnitId;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -38,6 +39,11 @@ public final class DefaultReaderPresentation implements ReaderPresentation {
     @Override
     public Set<String> readContentIds(LibraryItemId libraryItemId) {
         return readState.readContentIds(libraryItemId);
+    }
+
+    @Override
+    public void setRead(LibraryItemId libraryItemId, Collection<String> contentIds, boolean read) {
+        readState.setRead(libraryItemId, contentIds, read);
     }
 
     @Override

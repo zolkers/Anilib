@@ -6,6 +6,7 @@ import fr.vriege.anilib.feature.source.SourceEpisodeId;
 import fr.vriege.anilib.feature.source.SourceCatalogueItemId;
 
 import java.util.List;
+import java.util.Collection;
 
 public interface PlayerPresentation {
     boolean canOpen(LibraryItemId libraryItemId);
@@ -13,6 +14,11 @@ public interface PlayerPresentation {
     List<EpisodeSnapshot> episodes(LibraryItemId libraryItemId);
 
     List<EpisodeSnapshot> episodes(SourceCatalogueItemId itemId);
+
+    List<EpisodeSnapshot> setEpisodesCompleted(
+            LibraryItemId libraryItemId,
+            Collection<SourceEpisodeId> episodeIds,
+            boolean completed);
 
     PlayerController open(LibraryItemId libraryItemId, SourceEpisodeId episodeId);
 

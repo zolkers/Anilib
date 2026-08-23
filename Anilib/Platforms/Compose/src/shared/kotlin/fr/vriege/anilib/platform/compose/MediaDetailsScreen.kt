@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
@@ -300,21 +301,28 @@ internal fun MediaUnitRow(
     open: () -> Unit,
     download: () -> Unit,
     muted: Boolean = false,
+    selectionMode: Boolean = false,
+    selected: Boolean = false,
+    select: () -> Unit = {},
 ) {
     Row(
         modifier = Modifier
             .widthIn(max = 900.dp)
             .fillMaxWidth()
-            .clickable(onClick = open)
+            .clickable(onClick = if (selectionMode) select else open)
             .alpha(if (muted) 0.5f else 1f)
             .padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (selectionMode) {
+            Checkbox(checked = selected, onCheckedChange = { select() })
+            Spacer(Modifier.width(8.dp))
+        }
         Column(Modifier.weight(1f)) {
             Text(title, fontWeight = FontWeight.Medium)
             Text(summary, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        IconButton(onClick = download) {
+        IconButton(onClick = download, enabled = !selectionMode) {
             Icon(
                 Icons.Outlined.Download,
                 contentDescription = UiTranslations.format(

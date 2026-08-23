@@ -12,6 +12,7 @@ import fr.vriege.anilib.feature.player.PlaybackState;
 import fr.vriege.anilib.feature.player.PlayerBackend;
 import fr.vriege.anilib.feature.player.PlayerBackends;
 import fr.vriege.anilib.feature.player.PlayerException;
+import fr.vriege.anilib.feature.player.PlayerProgressEvent;
 import fr.vriege.anilib.feature.player.PlayerService;
 import fr.vriege.anilib.feature.player.PlayerSession;
 import fr.vriege.anilib.feature.player.PlayerSessionSnapshot;
@@ -26,17 +27,27 @@ import fr.vriege.anilib.feature.source.StreamingSource;
 
 import java.nio.file.Path;
 import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 public final class DefaultPlayerService implements PlayerService, AutoCloseable {
     private static final int MAXIMUM_EPISODES = 100_000;
     private static final int MAXIMUM_STREAMS = 512;
+    private static final Duration EPISODE_CACHE_TTL = Duration.ofMinutes(10L);
     private final SourceRegistry sources;
     private final LibraryCatalog library;
     private final PlaybackStateStore states;
@@ -45,6 +56,8 @@ public final class DefaultPlayerService implements PlayerService, AutoCloseable 
     private final BooleanSupplier persistenceAllowed;
     private final Set<DefaultPlayerSession> sessions = new HashSet<>();
     private final Set<Runnable> listeners = new HashSet<>();
+    private final Set<Consumer<PlayerProgressEvent>> progressListeners = new HashSet<>();
+    private final Map<SourceCatalogueItemId, CachedEpisodes> episodeCache = new HashMap<>();
     private boolean closed;
 
     public DefaultPlayerService(
@@ -111,11 +124,7 @@ public final class DefaultPlayerService implements PlayerService, AutoCloseable 
     public synchronized List<EpisodeSnapshot> episodes(LibraryItemId libraryItemId) {
         ensureOpen();
         ResolvedTitle resolved = resolve(libraryItemId);
-        return validatedEpisodes(resolved.source(), resolved.sourceItemId()).stream()
-                .map(episode -> new EpisodeSnapshot(
-                        episode,
-                        states.find(libraryItemId, episode.id())))
-                .toList();
+        return episodeSnapshots(libraryItemId, episodes(resolved.source(), resolved.sourceItemId()));
     }
 
     @Override
@@ -129,11 +138,71 @@ public final class DefaultPlayerService implements PlayerService, AutoCloseable 
                         .isPresent())
                 .map(LibraryItem::id)
                 .findFirst();
-        return validatedEpisodes(source, itemId).stream()
+        return episodes(source, itemId).stream()
                 .map(episode -> new EpisodeSnapshot(
                         episode,
                         libraryItemId.flatMap(id -> states.find(id, episode.id()))))
                 .toList();
+    }
+
+    @Override
+    public synchronized List<EpisodeSnapshot> setEpisodesCompleted(
+            LibraryItemId libraryItemId,
+            Collection<SourceEpisodeId> episodeIds,
+            boolean completed) {
+        ensureOpen();
+        LibraryItemId itemId = Objects.requireNonNull(libraryItemId, "libraryItemId must not be null");
+        Set<SourceEpisodeId> selected = Set.copyOf(Objects.requireNonNull(
+                episodeIds,
+                "episodeIds must not be null"));
+        ResolvedTitle resolved = resolve(itemId);
+        List<SourceEpisode> available = episodes(resolved.source(), resolved.sourceItemId());
+        Map<SourceEpisodeId, SourceEpisode> indexed = new LinkedHashMap<>();
+        available.forEach(episode -> indexed.put(episode.id(), episode));
+        if (!indexed.keySet().containsAll(selected)) {
+            throw new PlayerException("One or more episodes no longer belong to this title");
+        }
+        if (selected.isEmpty() || !persistenceAllowed.getAsBoolean()) {
+            return episodeSnapshots(itemId, available);
+        }
+
+        List<PlaybackState> replacement = states.snapshot().stream()
+                .filter(state -> !state.libraryItemId().equals(itemId) || !selected.contains(state.episodeId()))
+                .collect(Collectors.toCollection(ArrayList::new));
+        Instant updatedAt = clock.instant();
+        PlayerProgressEvent highestProgress = null;
+        for (SourceEpisodeId episodeId : selected) {
+            Optional<PlaybackState> previous = states.find(itemId, episodeId);
+            if (!completed && previous.isEmpty()) {
+                continue;
+            }
+            PlaybackState before = previous.orElseGet(() -> new PlaybackState(
+                    itemId,
+                    episodeId,
+                    0L,
+                    PlaybackState.UNKNOWN_DURATION,
+                    false,
+                    updatedAt));
+            replacement.add(new PlaybackState(
+                    itemId,
+                    episodeId,
+                    before.positionMillis(),
+                    before.durationMillis(),
+                    completed,
+                    updatedAt));
+            SourceEpisode episode = indexed.get(episodeId);
+            if (completed && episode.episodeNumber() >= 0.0d
+                    && (highestProgress == null
+                    || episode.episodeNumber() > highestProgress.episodeNumber())) {
+                highestProgress = new PlayerProgressEvent(itemId, episodeId, episode.episodeNumber());
+            }
+        }
+        states.replaceAll(replacement);
+        notifyListeners();
+        if (highestProgress != null) {
+            notifyProgress(highestProgress);
+        }
+        return episodeSnapshots(itemId, available);
     }
 
     @Override
@@ -146,7 +215,7 @@ public final class DefaultPlayerService implements PlayerService, AutoCloseable 
         if (!episodeId.itemId().equals(resolved.sourceItemId())) {
             throw new PlayerException("Episode does not belong to the selected library title");
         }
-        SourceEpisode episode = validatedEpisodes(resolved.source(), resolved.sourceItemId()).stream()
+        SourceEpisode episode = episodes(resolved.source(), resolved.sourceItemId()).stream()
                 .filter(candidate -> candidate.id().equals(episodeId))
                 .findFirst()
                 .orElseThrow(() -> new PlayerException("Episode is no longer available"));
@@ -185,7 +254,7 @@ public final class DefaultPlayerService implements PlayerService, AutoCloseable 
         SourceEpisodeId selectedEpisodeId = Objects.requireNonNull(
                 episodeId, "episodeId must not be null");
         StreamingSource source = streamingSource(selectedEpisodeId.itemId());
-        SourceEpisode episode = validatedEpisodes(source, selectedEpisodeId.itemId()).stream()
+        SourceEpisode episode = episodes(source, selectedEpisodeId.itemId()).stream()
                 .filter(candidate -> candidate.id().equals(selectedEpisodeId))
                 .findFirst()
                 .orElseThrow(() -> new PlayerException("Episode is no longer available"));
@@ -214,8 +283,17 @@ public final class DefaultPlayerService implements PlayerService, AutoCloseable 
         return () -> removeListener(value);
     }
 
+    @Override
+    public synchronized AutoCloseable observeProgress(Consumer<PlayerProgressEvent> listener) {
+        ensureOpen();
+        Consumer<PlayerProgressEvent> value = Objects.requireNonNull(listener, "listener must not be null");
+        progressListeners.add(value);
+        return () -> removeProgressListener(value);
+    }
+
     synchronized PlaybackState updatePlayback(
             PlaybackState previous,
+            double episodeNumber,
             long positionMillis,
             long durationMillis,
             boolean completed) {
@@ -264,6 +342,12 @@ public final class DefaultPlayerService implements PlayerService, AutoCloseable 
             throw new PlayerException("Unable to update playback state", failure);
         }
         notifyListeners();
+        if (!previous.completed() && replacement.completed() && episodeNumber >= 0.0d) {
+            notifyProgress(new PlayerProgressEvent(
+                    replacement.libraryItemId(),
+                    replacement.episodeId(),
+                    episodeNumber));
+        }
         return replacement;
     }
 
@@ -367,6 +451,10 @@ public final class DefaultPlayerService implements PlayerService, AutoCloseable 
         listeners.remove(listener);
     }
 
+    private synchronized void removeProgressListener(Consumer<PlayerProgressEvent> listener) {
+        progressListeners.remove(listener);
+    }
+
     private void notifyListeners() {
         List.copyOf(listeners).forEach(listener -> {
             try {
@@ -375,6 +463,38 @@ public final class DefaultPlayerService implements PlayerService, AutoCloseable 
                 // Observers cannot compromise playback persistence.
             }
         });
+    }
+
+    private void notifyProgress(PlayerProgressEvent event) {
+        List.copyOf(progressListeners).forEach(listener -> {
+            try {
+                listener.accept(event);
+            } catch (RuntimeException ignored) {
+                // Progress observers cannot compromise local playback persistence.
+            }
+        });
+    }
+
+    private List<SourceEpisode> episodes(StreamingSource source, SourceCatalogueItemId sourceItemId) {
+        CachedEpisodes cached = episodeCache.get(sourceItemId);
+        Instant now = clock.instant();
+        if (cached != null && cached.source() == source
+                && now.isBefore(cached.loadedAt().plus(EPISODE_CACHE_TTL))) {
+            return cached.episodes();
+        }
+        List<SourceEpisode> loaded = validatedEpisodes(source, sourceItemId);
+        episodeCache.put(sourceItemId, new CachedEpisodes(source, loaded, now));
+        return loaded;
+    }
+
+    private List<EpisodeSnapshot> episodeSnapshots(
+            LibraryItemId libraryItemId,
+            List<SourceEpisode> episodes) {
+        return episodes.stream()
+                .map(episode -> new EpisodeSnapshot(
+                        episode,
+                        states.find(libraryItemId, episode.id())))
+                .toList();
     }
 
     private void ensureOpen() {
@@ -390,7 +510,15 @@ public final class DefaultPlayerService implements PlayerService, AutoCloseable 
             List.copyOf(sessions).forEach(DefaultPlayerSession::close);
             sessions.clear();
             listeners.clear();
+            progressListeners.clear();
+            episodeCache.clear();
         }
+    }
+
+    private record CachedEpisodes(
+            StreamingSource source,
+            List<SourceEpisode> episodes,
+            Instant loadedAt) {
     }
 
     private record ResolvedTitle(

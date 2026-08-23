@@ -8,6 +8,7 @@ import fr.vriege.anilib.feature.source.SourceEpisodeId;
 import fr.vriege.anilib.feature.source.SourceCatalogueItemId;
 
 import java.util.List;
+import java.util.Collection;
 import java.util.Objects;
 
 public final class DefaultPlayerPresentation implements PlayerPresentation {
@@ -32,6 +33,14 @@ public final class DefaultPlayerPresentation implements PlayerPresentation {
     @Override
     public List<EpisodeSnapshot> episodes(SourceCatalogueItemId itemId) {
         return player.episodes(itemId);
+    }
+
+    @Override
+    public List<EpisodeSnapshot> setEpisodesCompleted(
+            LibraryItemId libraryItemId,
+            Collection<SourceEpisodeId> episodeIds,
+            boolean completed) {
+        return player.setEpisodesCompleted(libraryItemId, episodeIds, completed);
     }
 
     @Override

@@ -11,6 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Base64;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.Objects;
@@ -35,18 +36,31 @@ public final class FileReaderReadStateStore implements ReaderReadStateStore {
 
     @Override
     public synchronized void setRead(LibraryItemId libraryItemId, String contentId, boolean read) {
+        setRead(libraryItemId, Set.of(contentId), read);
+    }
+
+    @Override
+    public synchronized void setRead(
+            LibraryItemId libraryItemId,
+            Collection<String> contentIds,
+            boolean read) {
         Objects.requireNonNull(libraryItemId, "libraryItemId must not be null");
-        if (contentId == null || contentId.isBlank()) {
-            throw new IllegalArgumentException("contentId must not be blank");
+        Set<String> selected = Set.copyOf(Objects.requireNonNull(
+                contentIds,
+                "contentIds must not be null"));
+        if (selected.stream().anyMatch(String::isBlank)) {
+            throw new IllegalArgumentException("contentIds must not contain blank values");
         }
         Set<Entry> entries = entries();
-        Entry entry = new Entry(libraryItemId.value(), contentId);
         if (read) {
-            entries.add(entry);
+            selected.forEach(contentId -> entries.add(new Entry(libraryItemId.value(), contentId)));
         } else {
-            entries.remove(entry);
+            entries.removeIf(entry -> entry.libraryItemId().equals(libraryItemId.value())
+                    && selected.contains(entry.contentId()));
         }
-        write(entries);
+        if (!selected.isEmpty()) {
+            write(entries);
+        }
     }
 
     private Set<Entry> entries() {

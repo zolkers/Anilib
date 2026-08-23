@@ -224,13 +224,14 @@ public final class DefaultTrackerService implements TrackerService, AutoCloseabl
         List<RuntimeException> failures = new ArrayList<>();
         for (TrackerEntry current : entries.forItem(libraryItemId)) {
             try {
-                double bounded = totalUnits >= 0 ? Math.min(progress, totalUnits) : progress;
-                TrackerStatus status = totalUnits >= 0 && bounded == totalUnits
+                long effectiveTotal = totalUnits >= 0 ? totalUnits : current.totalUnits();
+                double bounded = effectiveTotal >= 0 ? Math.min(progress, effectiveTotal) : progress;
+                TrackerStatus status = effectiveTotal >= 0 && bounded == effectiveTotal
                         ? TrackerStatus.COMPLETED
                         : current.status();
                 TrackerEntry replacement = new TrackerEntry(
                         current.libraryItemId(), current.trackerId(), current.remoteId(), current.title(),
-                        bounded, totalUnits, status, current.score(), current.startDate(),
+                        bounded, effectiveTotal, status, current.score(), current.startDate(),
                         status == TrackerStatus.COMPLETED && current.finishDate().isEmpty()
                                 ? Optional.of(LocalDate.now()) : current.finishDate(),
                         current.privateEntry(), current.remoteUri(), Instant.now());

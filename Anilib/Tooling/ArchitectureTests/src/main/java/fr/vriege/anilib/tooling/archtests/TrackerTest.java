@@ -4,7 +4,19 @@ import fr.vriege.anilib.configuration.standard.StandardAnilib;
 import fr.vriege.anilib.feature.library.LibraryCapabilities;
 import fr.vriege.anilib.feature.library.LibraryCatalog;
 import fr.vriege.anilib.feature.library.LibraryItem;
+import fr.vriege.anilib.feature.library.LibraryOrigin;
 import fr.vriege.anilib.feature.library.MediaKind;
+import fr.vriege.anilib.feature.player.PlayerCapabilities;
+import fr.vriege.anilib.feature.source.SourceCatalogueItemId;
+import fr.vriege.anilib.feature.source.SourceContentKind;
+import fr.vriege.anilib.feature.source.SourceDescriptor;
+import fr.vriege.anilib.feature.source.SourceEpisode;
+import fr.vriege.anilib.feature.source.SourceEpisodeId;
+import fr.vriege.anilib.feature.source.SourceExtensionPlugin;
+import fr.vriege.anilib.feature.source.SourceId;
+import fr.vriege.anilib.feature.source.SourceSdk;
+import fr.vriege.anilib.feature.source.SourceVideoStream;
+import fr.vriege.anilib.feature.source.StreamingSource;
 import fr.vriege.anilib.feature.tracker.Tracker;
 import fr.vriege.anilib.feature.tracker.TrackerApiVersion;
 import fr.vriege.anilib.feature.tracker.TrackerAuthentication;
@@ -33,12 +45,24 @@ import java.util.List;
 import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import fr.vriege.anilib.kernel.PluginStartupException;
 import java.util.Comparator;
 import java.util.stream.Stream;
 
 final class TrackerTest {
+    private static final SourceId PLAYBACK_SOURCE_ID = SourceId.of("test.tracker-playback");
+    private static final SourceCatalogueItemId PLAYBACK_ITEM_ID =
+            new SourceCatalogueItemId(PLAYBACK_SOURCE_ID, "tracked-anime");
+    private static final SourceEpisode PLAYBACK_EPISODE = new SourceEpisode(
+            new SourceEpisodeId(PLAYBACK_ITEM_ID, "episode-7"),
+            "Episode 7",
+            7.0d,
+            Optional.empty(),
+            Optional.empty());
+
     private TrackerTest() {
     }
 
@@ -85,6 +109,10 @@ final class TrackerTest {
             TrackerEntry refreshed = service.refresh(item.id(), TestTracker.ID);
             counter.check(refreshed.title().equals("Tracked anime refreshed") && first.refreshes.get() == 1,
                     "refresh must replace the local mirror with validated remote state");
+            service.synchronizeProgress(item.id(), 4.0, TrackerSearchResult.UNKNOWN_TOTAL);
+            counter.check(service.entries(item.id()).getFirst().progress() == 4.0
+                            && service.entries(item.id()).getFirst().totalUnits() == 12,
+                    "activity progress must preserve the tracker total when the Player does not know it");
             service.synchronizeProgress(item.id(), 12.0, 12);
             counter.check(service.entries(item.id()).getFirst().status() == TrackerStatus.COMPLETED
                             && service.entries(item.id()).getFirst().finishDate().isPresent(),
@@ -125,7 +153,53 @@ final class TrackerTest {
         } finally {
             deleteDirectory(incompatibleDirectory);
         }
+        advancesTrackerFromCompletedPlayback(counter);
         return counter.value;
+    }
+
+    private static void advancesTrackerFromCompletedPlayback(Counter counter) {
+        Path directory = temporaryDirectory();
+        TestTracker tracker = new TestTracker();
+        tracker.authenticated = true;
+        tracker.account = "alice";
+        try (StartedAnilib application = StandardAnilib.start(
+                directory,
+                List.of(extension(tracker), playbackSourceExtension()))) {
+            LibraryItem item = LibraryItem.create("Tracked anime", MediaKind.ANIME)
+                    .withOrigin(new LibraryOrigin(
+                            PLAYBACK_SOURCE_ID.toString(),
+                            PLAYBACK_ITEM_ID.value()));
+            application.capability(LibraryCapabilities.CATALOG).save(item);
+            TrackerService service = application.capability(TrackerCapabilities.SERVICE);
+            service.bind(item.id(), service.search(TestTracker.ID, item.title(), item.kind()).getFirst());
+            CountDownLatch progressObserved = new CountDownLatch(1);
+            AutoCloseable observation = service.observe(progressObserved::countDown);
+            try {
+                application.capability(PlayerCapabilities.SERVICE).setEpisodesCompleted(
+                        item.id(),
+                        Set.of(PLAYBACK_EPISODE.id()),
+                        true);
+                counter.check(progressObserved.await(3L, TimeUnit.SECONDS),
+                        "completed playback must asynchronously update the local tracker entry");
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                throw new AssertionError("Interrupted while awaiting playback tracking", exception);
+            } finally {
+                closeObservation(observation);
+            }
+            TrackerEntry tracked = service.entries(item.id()).getFirst();
+            counter.check(tracked.progress() == PLAYBACK_EPISODE.episodeNumber()
+                            && tracked.totalUnits() == 12,
+                    "playback tracking must advance to the episode number without losing the remote total");
+        } finally {
+            deleteDirectory(directory);
+        }
+    }
+
+    private static SourceExtensionPlugin playbackSourceExtension() {
+        return new SourceExtensionPlugin(
+                ComponentDescriptor.of("extension.tracker-playback", "Tracker playback", "1.0.0"),
+                new PlaybackStreamingSource());
     }
 
     private static TrackerExtensionPlugin extension(TestTracker tracker) {
@@ -163,6 +237,37 @@ final class TrackerTest {
             current = current.getCause();
         }
         return false;
+    }
+
+    private static void closeObservation(AutoCloseable observation) {
+        try {
+            observation.close();
+        } catch (Exception exception) {
+            throw new AssertionError("Unable to close tracker progress observation", exception);
+        }
+    }
+
+    private static final class PlaybackStreamingSource implements StreamingSource {
+        @Override
+        public SourceDescriptor descriptor() {
+            return new SourceDescriptor(
+                    PLAYBACK_SOURCE_ID,
+                    "Tracker playback",
+                    "1.0.0",
+                    "en",
+                    Set.of(SourceContentKind.ANIME),
+                    SourceSdk.API_VERSION);
+        }
+
+        @Override
+        public List<SourceEpisode> episodes(SourceCatalogueItemId itemId) {
+            return List.of(PLAYBACK_EPISODE);
+        }
+
+        @Override
+        public List<SourceVideoStream> streams(SourceEpisodeId episodeId) {
+            return List.of();
+        }
     }
 
     private static final class TestTracker implements Tracker {
