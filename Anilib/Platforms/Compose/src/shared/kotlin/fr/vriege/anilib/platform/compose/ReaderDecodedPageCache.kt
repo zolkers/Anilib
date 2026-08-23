@@ -47,6 +47,12 @@ internal class ReaderDecodedPageCache(
     @Synchronized
     fun get(key: String): ImageBitmap? = entries[key]?.image
 
+    // Moves nearby decoded pages to the hot end of the LRU without copying their bitmaps.
+    @Synchronized
+    fun touch(keys: Iterable<String>) {
+        keys.forEach(entries::get)
+    }
+
     suspend fun load(key: String, loader: suspend () -> ImageBitmap): Result<ImageBitmap> {
         get(key)?.let { return Result.success(it) }
         val pending = synchronized(this) {
@@ -70,7 +76,7 @@ internal class ReaderDecodedPageCache(
         return pending.await()
     }
 
-    /**
+    /*
      * Warms a decoded page without blocking the scroll observer. Only a small number of decodes
      * may run together; queued pages outside the latest viewport window can be cancelled with
      * [retainPrefetch]. A visible page still calls [load] and promotes itself by sharing the same
@@ -94,7 +100,7 @@ internal class ReaderDecodedPageCache(
         }
     }
 
-    /** Cancels queued decode work that is no longer close to the viewport. */
+    /* Cancels queued decode work that is no longer close to the viewport. */
     fun retainPrefetch(keys: Set<String>) {
         val obsolete = synchronized(this) {
             prefetchJobs.entries

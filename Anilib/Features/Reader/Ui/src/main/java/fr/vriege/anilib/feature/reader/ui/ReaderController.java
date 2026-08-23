@@ -20,14 +20,14 @@ import java.util.Objects;
 import java.util.Set;
 
 public final class ReaderController implements AutoCloseable {
-    /**
+    /*
      * Sources list content units newest first, so walking towards index 0 reaches newer chapters
      * and walking towards the end reaches older ones.
      */
     private static final int NEWER = -1;
     private static final int OLDER = 1;
 
-    /**
+    /*
      * Chapters kept open at once. Enough to scroll into either neighbour without a reload, while
      * bounding how much a long reading session accumulates.
      */
@@ -42,6 +42,7 @@ public final class ReaderController implements AutoCloseable {
     private final ReaderReadStateStore readState;
     private ReaderSession session;
     private final List<ReaderSession> windowSessions = new ArrayList<>();
+    private List<SourceContentUnit> contentUnitCache;
     private int currentSlot;
 
     ReaderController(
@@ -123,10 +124,13 @@ public final class ReaderController implements AutoCloseable {
         session.setDirection(value);
     }
 
-    public List<SourceContentUnit> contentUnits() {
-        return libraryItemId == null
-                ? reader.contentUnits(sourceItemId)
-                : reader.contentUnits(libraryItemId);
+    public synchronized List<SourceContentUnit> contentUnits() {
+        if (contentUnitCache == null) {
+            contentUnitCache = List.copyOf(libraryItemId == null
+                    ? reader.contentUnits(sourceItemId)
+                    : reader.contentUnits(libraryItemId));
+        }
+        return contentUnitCache;
     }
 
     public synchronized void openContentUnit(SourceContentUnitId contentUnitId) {
@@ -199,7 +203,7 @@ public final class ReaderController implements AutoCloseable {
     }
 
 
-    /**
+    /*
      * The chapters the continuous viewer scrolls through as one uninterrupted sequence, ordered
      * top to bottom. The window only ever grows: dropping a chapter would mutate the item list
      * around the reader's scroll anchor and make the view jump mid-gesture.
@@ -220,7 +224,7 @@ public final class ReaderController implements AutoCloseable {
         return List.copyOf(chapters);
     }
 
-    /** Global index of the current chapter's current page within {@link #window()}. */
+    /* Global index of the current chapter's current page within the window. */
     public synchronized int windowPageIndex() {
         ensureWindowInitialised();
         int offset = 0;
@@ -230,7 +234,7 @@ public final class ReaderController implements AutoCloseable {
         return offset + session.snapshot().currentPageIndex();
     }
 
-    /** Reads a page addressed by its index in the flattened window sequence. */
+    /* Reads a page addressed by its index in the flattened window sequence. */
     public byte[] windowPage(int globalPage) {
         ReaderSession target;
         int local;
@@ -259,7 +263,7 @@ public final class ReaderController implements AutoCloseable {
         return target.page(local);
     }
 
-    /**
+    /*
      * Reports the page the viewer scrolled to. Staying inside the current chapter only records
      * progress; scrolling into an already-loaded chapter promotes it to current without reopening
      * it and without touching the window, so the scroll position is never disturbed.
@@ -289,10 +293,10 @@ public final class ReaderController implements AutoCloseable {
         return false;
     }
 
-    /**
-     * Extends the window with the chapters adjacent to the current one. Costly - it queries the
-     * source and builds a page pipeline per chapter - so callers must invoke it off the UI thread,
-     * and only once the reader is near an edge of the window.
+    /*
+     * Keeps exactly the chapters adjacent to the current one warm. Repeated calls while the reader
+     * stays inside the same chapter are no-ops; this avoids opening a farther chapter only to close
+     * it immediately when the three-chapter window is trimmed.
      */
     public synchronized void prefetchNeighbours() {
         ensureWindowInitialised();
@@ -302,17 +306,19 @@ public final class ReaderController implements AutoCloseable {
         } catch (RuntimeException ignored) {
             return;
         }
-        int topIndex = sourceIndex(units, windowSessions.get(0));
-        int bottomIndex = sourceIndex(units, windowSessions.get(windowSessions.size() - 1));
-        if (topIndex >= 0 && topIndex + OLDER < units.size()) {
-            ReaderSession older = openNeighbour(units.get(topIndex + OLDER).id());
+        int currentIndex = sourceIndex(units, session);
+        if (currentIndex < 0) {
+            return;
+        }
+        if (currentIndex + OLDER < units.size()) {
+            ReaderSession older = openNeighbour(units.get(currentIndex + OLDER).id());
             if (older != null) {
                 windowSessions.add(0, older);
                 currentSlot++;
             }
         }
-        if (bottomIndex >= 0 && bottomIndex + NEWER >= 0) {
-            ReaderSession newer = openNeighbour(units.get(bottomIndex + NEWER).id());
+        if (currentIndex + NEWER >= 0) {
+            ReaderSession newer = openNeighbour(units.get(currentIndex + NEWER).id());
             if (newer != null) {
                 windowSessions.add(newer);
             }
@@ -320,7 +326,7 @@ public final class ReaderController implements AutoCloseable {
         trimWindow();
     }
 
-    /**
+    /*
      * Releases chapters that fell outside the window. Only the far end is trimmed, never a chapter
      * adjacent to the current one, so the item list never changes near the reader's scroll anchor.
      */

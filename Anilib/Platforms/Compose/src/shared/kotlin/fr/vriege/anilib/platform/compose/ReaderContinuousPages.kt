@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.layout.LazyLayoutCacheWindow
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -38,12 +39,17 @@ import fr.vriege.anilib.feature.reader.ui.ReaderWindowChapter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.withContext
+import kotlin.math.abs
 
 private const val CONTINUOUS_SCROLL_STEP_FRACTION = 0.85f
-private const val DECODE_PREFETCH_IN_SCROLL_DIRECTION = 4
-private const val DECODE_PREFETCH_AGAINST_SCROLL_DIRECTION = 2
+private const val DECODE_PREFETCH_FORWARD = 5
+private const val DECODE_PREFETCH_BACKWARD = 3
+private const val DECODE_PREFETCH_FAST_FORWARD = 8
+private const val DECODE_PREFETCH_FAST_BACKWARD = 1
+private const val COMPOSE_CACHE_AHEAD_FRACTION = 1.5f
+private const val COMPOSE_CACHE_BEHIND_FRACTION = 1f
 
-/**
+/*
  * Continuous viewer over the reader's chapter window. Previous, current and next chapter pages
  * live in one scroll sequence, so crossing a chapter never rebuilds the list - it only reports the
  * new position, the way Aniyomi's webtoon viewer does. Item keys are chapter-scoped so the window
@@ -71,7 +77,14 @@ internal fun ReaderContinuousPages(
 ) {
     val current = window.firstOrNull { it.current() }
     val entries = remember(window) { readerWindowEntries(window) }
+    val cacheWindow = remember {
+        LazyLayoutCacheWindow(
+            aheadFraction = COMPOSE_CACHE_AHEAD_FRACTION,
+            behindFraction = COMPOSE_CACHE_BEHIND_FRACTION,
+        )
+    }
     val listState = rememberLazyListState(
+        cacheWindow = cacheWindow,
         initialFirstVisibleItemIndex = entries
             .indexOfFirst { it is ReaderWindowEntry.Page && it.globalPage == initialGlobalPage }
             .coerceAtLeast(0),
@@ -117,29 +130,34 @@ internal fun ReaderContinuousPages(
             .distinctUntilChanged()
             .collect { range ->
                 if (range == null) return@collect
+                val movement = range.first - previousFirstVisible
                 val scrollingForward = range.first >= previousFirstVisible
                 previousFirstVisible = range.first
+                val fastScroll = abs(movement) > 1
                 val forwardDistance = if (scrollingForward) {
-                    DECODE_PREFETCH_IN_SCROLL_DIRECTION
+                    if (fastScroll) DECODE_PREFETCH_FAST_FORWARD else DECODE_PREFETCH_FORWARD
                 } else {
-                    DECODE_PREFETCH_AGAINST_SCROLL_DIRECTION
+                    if (fastScroll) DECODE_PREFETCH_FAST_BACKWARD else DECODE_PREFETCH_BACKWARD
                 }
                 val backwardDistance = if (scrollingForward) {
-                    DECODE_PREFETCH_AGAINST_SCROLL_DIRECTION
+                    if (fastScroll) DECODE_PREFETCH_FAST_BACKWARD else DECODE_PREFETCH_BACKWARD
                 } else {
-                    DECODE_PREFETCH_IN_SCROLL_DIRECTION
+                    if (fastScroll) DECODE_PREFETCH_FAST_FORWARD else DECODE_PREFETCH_FORWARD
                 }
                 val targets = buildList {
                     for (index in (range.second + 1)..(range.second + forwardDistance)) add(index)
                     for (index in (range.first - 1) downTo (range.first - backwardDistance)) add(index)
                 }
                     .mapNotNull { entries.getOrNull(it) as? ReaderWindowEntry.Page }
-                decodedPages.retainPrefetch(targets.mapTo(mutableSetOf(), ReaderWindowEntry.Page::key))
+                val visibleKeys = (range.first..range.second)
+                    .mapNotNull { entries.getOrNull(it) as? ReaderWindowEntry.Page }
+                    .map(ReaderWindowEntry.Page::key)
+                val targetKeys = targets.mapTo(linkedSetOf(), ReaderWindowEntry.Page::key)
+                decodedPages.touch(visibleKeys + targetKeys)
+                decodedPages.retainPrefetch(targetKeys)
                 targets.forEach { page ->
                     decodedPages.prefetch(page.key) {
-                        requireNotNull(pageDecoder(controller.windowPage(page.globalPage))) {
-                            "Unsupported page image format"
-                        }
+                        decodeWindowPage(controller, page.globalPage, pageDecoder)
                     }
                 }
             }
@@ -154,7 +172,16 @@ internal fun ReaderContinuousPages(
         verticalArrangement = Arrangement.spacedBy(spacing),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        items(entries.size, key = { entries[it].key }) { index ->
+        items(
+            count = entries.size,
+            key = { entries[it].key },
+            contentType = {
+                when (entries[it]) {
+                    is ReaderWindowEntry.Page -> "page"
+                    is ReaderWindowEntry.Transition -> "transition"
+                }
+            },
+        ) { index ->
             when (val entry = entries[index]) {
                 is ReaderWindowEntry.Transition -> ReaderChapterTransition(entry.label)
                 is ReaderWindowEntry.Page -> ReaderContinuousPage(
@@ -188,7 +215,7 @@ internal sealed interface ReaderWindowEntry {
     data class Transition(override val key: String, val label: String) : ReaderWindowEntry
 }
 
-/**
+/*
  * Flattens the window into scroll entries. A slim transition sits between adjacent chapters so the
  * hand-off stays legible without ever interrupting the scroll.
  */
@@ -243,9 +270,7 @@ private fun ReaderContinuousPage(
     CrashSafeLaunchedEffect(controller, pageKey, revision, retry) {
         if (decoded != null) return@CrashSafeLaunchedEffect
         val result = decodedPages.load(pageKey) {
-            requireNotNull(pageDecoder(controller.windowPage(globalPage))) {
-                "Unsupported page image format"
-            }
+            decodeWindowPage(controller, globalPage, pageDecoder)
         }
         result.getOrNull()?.let { rememberAspectRatio(it.width.toFloat() / it.height) }
         decoded = result
@@ -295,3 +320,14 @@ private fun stablePageSize(knownAspectRatio: Float?, fallbackHeightDp: Int): Mod
     } else {
         Modifier.fillMaxWidth().aspectRatio(knownAspectRatio)
     }
+
+private suspend fun decodeWindowPage(
+    controller: ReaderController,
+    globalPage: Int,
+    pageDecoder: (ByteArray) -> ImageBitmap?,
+): ImageBitmap {
+    val bytes = controller.windowPage(globalPage)
+    return withContext(Dispatchers.Default) {
+        requireNotNull(pageDecoder(bytes)) { "Unsupported page image format" }
+    }
+}
