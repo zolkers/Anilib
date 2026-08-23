@@ -78,12 +78,12 @@ final class TrackerTest {
             item = LibraryItem.create("Tracked anime", MediaKind.ANIME);
             library.save(item);
             TrackerService service = application.capability(TrackerCapabilities.SERVICE);
-            counter.check(application.capability(TrackerCapabilities.REGISTRY).extensions().size() == 3,
+            counter.check(application.capability(TrackerCapabilities.REGISTRY).extensions().size() == 2,
                     "first-party and additional tracker bundles must register through the SDK registrar");
             var testAccount = service.accounts().stream()
                     .filter(account -> account.descriptor().id().equals(TestTracker.ID))
                     .findFirst().orElseThrow();
-            counter.check(service.accounts().size() == 3 && !testAccount.authenticated(),
+            counter.check(service.accounts().size() == 2 && !testAccount.authenticated(),
                     "tracker accounts must expose their logged-out state");
             service.authenticate(TestTracker.ID, TrackerCredentials.password("alice", "secret"));
             testAccount = service.accounts().stream()

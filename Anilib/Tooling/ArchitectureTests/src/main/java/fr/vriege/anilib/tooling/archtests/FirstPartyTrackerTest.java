@@ -50,6 +50,9 @@ final class FirstPartyTrackerTest {
 
     private static void optInBundles(Counter counter) {
         Path directory = temporaryDirectory();
+        String property = "anilib.tracker.anilist.client-id";
+        String previousClientId = System.getProperty(property);
+        System.setProperty(property, "not-an-anilist-client-id");
         try (StartedAnilib application = StandardAnilib.start(
                 directory,
                 (request, headers) -> {
@@ -61,8 +64,8 @@ final class FirstPartyTrackerTest {
                     .map(account -> account.descriptor().id().value())
                     .sorted()
                     .toList();
-            counter.check(ids.equals(List.of("anilist", "kitsu")),
-                    "the standard product must select both first-party tracker bundles explicitly");
+            counter.check(ids.equals(List.of("anilist")),
+                    "the standard product must select only the AniList tracker bundle");
             TrackerAuthorization authorization = service.beginAuthorization(
                     service.accounts().stream()
                             .filter(account -> account.descriptor().id().value().equals("anilist"))
@@ -70,10 +73,16 @@ final class FirstPartyTrackerTest {
                             .orElseThrow()
                             .descriptor()
                             .id());
-            counter.check(!queryParameter(
-                            authorization.authorizationUri().getRawQuery(), "client_id").isBlank(),
-                    "the standard product must ship a usable public AniList client identifier");
+            String clientId = queryParameter(authorization.authorizationUri().getRawQuery(), "client_id");
+            counter.check(clientId.equals("49321"),
+                    "the standard product must ignore secret-shaped overrides and use its public AniList client id"
+                            + " (was " + clientId + ")");
         } finally {
+            if (previousClientId == null) {
+                System.clearProperty(property);
+            } else {
+                System.setProperty(property, previousClientId);
+            }
             deleteDirectory(directory);
         }
     }

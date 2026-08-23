@@ -349,7 +349,7 @@ private fun SettingsHome(
                         if (tracking) {
                             SettingsRow(
                                 "ui.tracking",
-                                "ui.link.anilist.kitsu.and.synchronize.progress",
+                                "ui.link.anilist.and.synchronize.progress",
                                 openTracking,
                                 Icons.Outlined.Person,
                             )

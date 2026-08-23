@@ -47,9 +47,11 @@ live accounts.
 The Standard product ships the public AniList OAuth client identifier `49321`,
 so release users do not need to configure authentication. Development builds
 can override it with the `anilib.tracker.anilist.client-id` JVM property or the
-`ANILIB_ANILIST_CLIENT_ID` environment variable. The registered provider
-application must use the exact callback URI
-`http://127.0.0.1:43697/oauth/anilist/callback`. Anilib binds that address only
+`ANILIB_ANILIST_CLIENT_ID` environment variable. Overrides must be numeric;
+secret-shaped values are ignored so a client secret can never be sent as the
+public identifier. The registered provider application must use the exact
+callback URI `http://127.0.0.1:43697/oauth/anilist/callback`. Anilib binds that
+address only
 while a login is active, opens the provider in the system browser, validates
 the OAuth state and exact callback port, and stops the local listener after
 completion, cancellation, or timeout. The implicit authorization request lets
@@ -78,7 +80,9 @@ exactly one extension SDK: `feature.tracker.api` for trackers or
 `feature.source.api` for sources. AnilibJava rejects direct network, filesystem,
 reflection, Network feature, and Kernel access from either extension type.
 
-The Standard product selects the Tracker, AniList, and Kitsu Bundles but no
-provider account or credential. External tracker adapters remain explicit
-additions to the product plugin list, so removing one bundle removes its
-registration without changing Tracker Core or another feature.
+The Standard product currently selects the Tracker and AniList Bundles but no
+provider account or credential. Kitsu remains an isolated, tested Bundle that
+can be selected by another product configuration later. External tracker
+adapters remain explicit additions to the product plugin list, so removing one
+bundle removes its registration without changing Tracker Core or another
+feature.

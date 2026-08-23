@@ -110,7 +110,7 @@ public final class ArchitectureTestMain {
             LibraryItem item = LibraryItem.create("A test title", MediaKind.MANGA);
             catalog.save(item);
             check(catalog.find(item.id()).orElseThrow().equals(item), "library must return saved item");
-            check(application.components().size() == 16, "standard product must install sixteen bootstrap bundles");
+            check(application.components().size() == 15, "standard product must install fifteen bootstrap bundles");
             check(application.capability(ExtensionRepositoryCapabilities.SERVICE).repositories().isEmpty(),
                     "standard product must ship without a third-party extension repository");
             check(application.capability(ExtensionRepositoryCapabilities.INSTALLATION).installed().isEmpty(),
@@ -150,8 +150,8 @@ public final class ArchitectureTestMain {
                     "Player Bundle must publish its self-owned backup codec");
             check(application.capability(PlayerUiCapabilities.PRESENTATION) != null,
                     "Player Bundle must publish its shared presentation capability");
-            check(application.capability(TrackerCapabilities.REGISTRY).trackers().size() == 2,
-                    "standard product must explicitly select the AniList and Kitsu tracker Bundles");
+            check(application.capability(TrackerCapabilities.REGISTRY).trackers().size() == 1,
+                    "standard product must explicitly select only the AniList tracker Bundle");
             check(application.capability(TrackerCapabilities.SERVICE) != null,
                     "Tracker Bundle must publish its orchestration capability");
             check(application.capability(TrackerCapabilities.BACKUP_CODEC) != null,

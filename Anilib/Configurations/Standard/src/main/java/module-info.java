@@ -18,7 +18,6 @@ module fr.vriege.anilib.configuration.standard {
     requires transitive fr.vriege.anilib.feature.tracker.api;
     requires fr.vriege.anilib.feature.tracker.bundle;
     requires fr.vriege.anilib.feature.tracker.anilist;
-    requires fr.vriege.anilib.feature.tracker.kitsu;
     requires transitive fr.vriege.anilib.feature.updates.api;
     requires fr.vriege.anilib.feature.updates.bundle;
     requires fr.vriege.anilib.feature.applicationupdate.bundle;

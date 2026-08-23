@@ -20,7 +20,6 @@ import fr.vriege.anilib.feature.tracker.TrackerCapabilities;
 import fr.vriege.anilib.feature.tracker.anilist.AniListTracker;
 import fr.vriege.anilib.feature.tracker.anilist.AniListTrackerBundle;
 import fr.vriege.anilib.feature.tracker.bundle.TrackerPlugin;
-import fr.vriege.anilib.feature.tracker.kitsu.KitsuTrackerBundle;
 import fr.vriege.anilib.feature.updates.LibraryUpdateNotifier;
 import fr.vriege.anilib.feature.updates.LibraryUpdateNotifiers;
 import fr.vriege.anilib.feature.updates.UpdateCapabilities;
@@ -183,7 +182,6 @@ public final class StandardAnilib {
                         "anilib.tracker.anilist.client-id",
                         "ANILIB_ANILIST_CLIENT_ID"),
                 oauthCallbackUri()));
-        plugins.add(new KitsuTrackerBundle());
         plugins.add(new UpdatePlugin(updateState, updateNotifier));
         plugins.add(ApplicationUpdatePlugin.currentRuntime(
                 dataDirectory.toAbsolutePath().normalize().resolve("application-update.channel")));
@@ -200,11 +198,10 @@ public final class StandardAnilib {
 
     private static String oauthClientId(String property, String environment) {
         String configured = System.getProperty(property, "").strip();
-        if (!configured.isEmpty()) {
-            return configured;
+        if (configured.isEmpty()) {
+            configured = Objects.requireNonNullElse(System.getenv(environment), "").strip();
         }
-        configured = Objects.requireNonNullElse(System.getenv(environment), "").strip();
-        return configured.isEmpty() ? DEFAULT_ANILIST_CLIENT_ID : configured;
+        return configured.matches("[1-9][0-9]{0,18}") ? configured : DEFAULT_ANILIST_CLIENT_ID;
     }
 
     private static URI oauthCallbackUri() {
