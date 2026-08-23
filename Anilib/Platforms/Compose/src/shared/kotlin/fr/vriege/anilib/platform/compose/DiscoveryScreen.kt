@@ -131,6 +131,8 @@ internal fun DiscoveryScreen(
     browserRuntimeStatus: BrowserRuntimeStatus,
     openSourceReader: (String, SourceContentUnitId) -> Unit,
     openSourcePlayer: (String, SourceEpisodeId) -> Unit,
+    openLibraryDetails: (LibraryItemId) -> Unit,
+    libraryDetails: @Composable (LibraryItemId, () -> Unit) -> Unit,
     navigationVisibilityChanged: (Boolean) -> Unit,
     manageExtensions: () -> Unit,
 ) {
@@ -213,6 +215,8 @@ internal fun DiscoveryScreen(
             openWebPage = { browserPage = it },
             openSourceReader = openSourceReader,
             openSourcePlayer = openSourcePlayer,
+            openLibraryDetails = openLibraryDetails,
+            libraryDetails = libraryDetails,
             navigateUp = { selectedSource = null },
         )
         return
@@ -599,11 +603,14 @@ private fun SourceCatalogueScreen(
     openWebPage: (SourceWebPage) -> Unit,
     openSourceReader: (String, SourceContentUnitId) -> Unit,
     openSourcePlayer: (String, SourceEpisodeId) -> Unit,
+    openLibraryDetails: (LibraryItemId) -> Unit,
+    libraryDetails: @Composable (LibraryItemId, () -> Unit) -> Unit,
     navigateUp: () -> Unit,
 ) {
     val scope = rememberCrashSafeCoroutineScope()
     var selectedListing by remember(source.id(), listing) { mutableStateOf(listing) }
     var selectedItem by remember(source.id()) { mutableStateOf<SourceCatalogueItem?>(null) }
+    var selectedLibraryItem by remember(source.id()) { mutableStateOf<LibraryItemId?>(null) }
     var query by remember(source.id()) { mutableStateOf("") }
     var searchActive by remember(source.id()) { mutableStateOf(false) }
     var page by remember(source.id(), selectedListing) { mutableIntStateOf(1) }
@@ -627,6 +634,17 @@ private fun SourceCatalogueScreen(
         mutableStateOf<Result<SourcePage>?>(null)
     }
 
+    fun openCanonicalDetails(libraryItemId: LibraryItemId) {
+        openLibraryDetails(libraryItemId)
+        selectedItem = null
+        selectedLibraryItem = libraryItemId
+    }
+
+    selectedLibraryItem?.let { libraryItemId ->
+        libraryDetails(libraryItemId) { selectedLibraryItem = null }
+        return
+    }
+
     selectedItem?.let { item ->
         SourceTitleScreen(
             item = item,
@@ -636,6 +654,7 @@ private fun SourceCatalogueScreen(
             openWebPage = openWebPage,
             openReader = openSourceReader,
             openPlayer = openSourcePlayer,
+            openLibraryDetails = ::openCanonicalDetails,
             navigateUp = { selectedItem = null },
         )
         return
@@ -812,7 +831,16 @@ private fun SourceCatalogueScreen(
                 CatalogueContent(
                     page = sourcePage,
                     grid = grid,
-                    open = { item -> selectedItem = item },
+                    open = { item ->
+                        val libraryItemId = runCatching {
+                            presentation.libraryItem(item.id()).orElse(null)
+                        }.getOrNull()
+                        if (libraryItemId == null) {
+                            selectedItem = item
+                        } else {
+                            openCanonicalDetails(libraryItemId)
+                        }
+                    },
                     add = { item ->
                         scope.launch {
                             withContext(Dispatchers.IO) {
@@ -869,6 +897,7 @@ private fun SourceTitleScreen(
     openWebPage: (SourceWebPage) -> Unit,
     openReader: (String, SourceContentUnitId) -> Unit,
     openPlayer: (String, SourceEpisodeId) -> Unit,
+    openLibraryDetails: (LibraryItemId) -> Unit,
     navigateUp: () -> Unit,
 ) {
     val scope = rememberCrashSafeCoroutineScope()
@@ -941,6 +970,7 @@ private fun SourceTitleScreen(
                 libraryItemId = id
                 favorite = !favorite
                 actionError = null
+                openLibraryDetails(id)
             }.onFailure {
                 actionError = it.message ?: "The library could not be updated"
             }

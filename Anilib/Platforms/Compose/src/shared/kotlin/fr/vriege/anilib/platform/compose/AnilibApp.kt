@@ -35,6 +35,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -711,6 +712,36 @@ internal fun AppDestination(
             browserRuntimeStatus,
             openSourceReader = openSourceReader,
             openSourcePlayer = openSourcePlayer,
+            openLibraryDetails = { libraryItemId ->
+                navigate { it.openDetails(libraryItemId) }
+            },
+            libraryDetails = { libraryItemId, close ->
+                key(libraryItemId) {
+                    DetailsDestination(
+                        presentation,
+                        discovery,
+                        browserCookies,
+                        browserRuntimeStatus,
+                        detailPlatform,
+                        reader,
+                        player,
+                        downloads,
+                        tracking,
+                        destination,
+                        navigate,
+                        openReader,
+                        readerError,
+                        openPlayer,
+                        enqueueDownload,
+                        downloadError,
+                        openTracking,
+                        goBackOverride = {
+                            close()
+                            navigate(LibraryNavigator::back)
+                        },
+                    )
+                }
+            },
             navigationVisibilityChanged = browseDestinationChanged,
             manageExtensions = {
                 openSection(AppSection.MORE)
