@@ -45,10 +45,12 @@ import fr.vriege.anilib.kernel.StartedAnilib;
 
 import java.io.IOException;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalDouble;
@@ -74,6 +76,10 @@ final class TrackerTest {
     private static final SourceContentUnit READING_CHAPTER = new SourceContentUnit(
             new SourceContentUnitId(READING_ITEM_ID, "chapter-7.5"),
             "Vol. 2 Ch. 7,5 - The host must recognize this number",
+            Optional.empty());
+    private static final SourceContentUnit STALE_READING_CHAPTER = new SourceContentUnit(
+            new SourceContentUnitId(READING_ITEM_ID, "chapter-67"),
+            "Vol. 13 Ch. 67 - Previously marked as read",
             Optional.empty());
     private static final double READING_CHAPTER_PROGRESS = 7.5d;
 
@@ -256,13 +262,14 @@ final class TrackerTest {
         TestTracker tracker = new TestTracker();
         tracker.authenticated = true;
         tracker.account = "alice";
+        LibraryItem item = LibraryItem.create("Tracked manga", MediaKind.MANGA)
+                .withOrigin(new LibraryOrigin(
+                        READING_SOURCE_ID.toString(),
+                        READING_ITEM_ID.value()));
+        seedReadState(directory, item, STALE_READING_CHAPTER);
         try (StartedAnilib application = StandardAnilib.start(
                 directory,
                 List.of(extension(tracker), readingSourceExtension()))) {
-            LibraryItem item = LibraryItem.create("Tracked manga", MediaKind.MANGA)
-                    .withOrigin(new LibraryOrigin(
-                            READING_SOURCE_ID.toString(),
-                            READING_ITEM_ID.value()));
             application.capability(LibraryCapabilities.CATALOG).save(item);
             TrackerService service = application.capability(TrackerCapabilities.SERVICE);
             service.bind(item.id(), service.search(TestTracker.ID, item.title(), item.kind()).getFirst());
@@ -280,6 +287,25 @@ final class TrackerTest {
         } finally {
             deleteDirectory(directory);
         }
+    }
+
+    private static void seedReadState(
+            Path directory,
+            LibraryItem item,
+            SourceContentUnit chapter) {
+        try {
+            Files.writeString(
+                    directory.resolve("reader-read-state.properties"),
+                    encoded(item.id().value()) + '=' + encoded(chapter.id().value()) + System.lineSeparator(),
+                    StandardCharsets.UTF_8);
+        } catch (IOException exception) {
+            throw new AssertionError("Unable to prepare stale reading progress", exception);
+        }
+    }
+
+    private static String encoded(String value) {
+        return Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(value.getBytes(StandardCharsets.UTF_8));
     }
 
     private static SourceExtensionPlugin playbackSourceExtension() {
@@ -399,7 +425,7 @@ final class TrackerTest {
 
         @Override
         public List<SourceContentUnit> contentUnits(SourceCatalogueItemId itemId) {
-            return List.of(READING_CHAPTER);
+            return List.of(STALE_READING_CHAPTER, READING_CHAPTER);
         }
 
         @Override

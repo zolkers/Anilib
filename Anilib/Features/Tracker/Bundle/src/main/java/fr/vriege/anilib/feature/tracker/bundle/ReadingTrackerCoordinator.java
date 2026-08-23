@@ -24,7 +24,6 @@ final class ReadingTrackerCoordinator implements AutoCloseable {
     private static final Pattern BARE_CHAPTER_NUMBER = Pattern.compile(
             "^\\s*#?\\s*(\\d+(?:[.,]\\d+)?)(?:\\s|$)");
     private final ReaderService reader;
-    private final ReaderReadStateStore readState;
     private final TrackerService tracker;
     private final ExecutorService synchronizer = ManagedExecutors.single("anilib-reading-tracker");
     private final AutoCloseable observation;
@@ -35,9 +34,9 @@ final class ReadingTrackerCoordinator implements AutoCloseable {
             ReaderReadStateStore readState,
             TrackerService tracker) {
         this.reader = Objects.requireNonNull(reader, "reader must not be null");
-        this.readState = Objects.requireNonNull(readState, "readState must not be null");
+        ReaderReadStateStore state = Objects.requireNonNull(readState, "readState must not be null");
         this.tracker = Objects.requireNonNull(tracker, "tracker must not be null");
-        observation = readState.observe(this::queue);
+        observation = state.observe(this::queue);
     }
 
     private void queue(ReaderReadEvent event) {
@@ -61,7 +60,7 @@ final class ReadingTrackerCoordinator implements AutoCloseable {
     }
 
     private void advance(ReaderReadEvent event) {
-        Set<String> readIds = readState.readContentIds(event.libraryItemId());
+        Set<String> readIds = event.contentIds();
         double highestRead = reader.contentUnits(event.libraryItemId()).stream()
                 .filter(unit -> readIds.contains(unit.id().value()))
                 .mapToDouble(ReadingTrackerCoordinator::progress)
