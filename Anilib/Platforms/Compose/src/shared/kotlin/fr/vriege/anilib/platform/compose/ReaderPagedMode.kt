@@ -7,6 +7,7 @@ package fr.vriege.anilib.platform.compose
 internal data class ReaderPagedMode(override val mirrored: Boolean) : ReaderMode {
 
     override val continuous: Boolean = false
+    override val verticalPager: Boolean = false
     override val twoAxisZoom: Boolean = true
 
     override fun keyCommand(key: ReaderKeyStroke): ReaderKeyCommand? = when (key) {

@@ -129,33 +129,36 @@ internal fun ReaderScreen(
     var readerBusy by remember(controller) { mutableStateOf(false) }
     var continuousScrollTarget by remember(controller) { mutableStateOf<Int?>(null) }
     var continuousScrollStep by remember(controller) { mutableStateOf<Int?>(null) }
+    var verticalScrollTarget by remember(controller) { mutableStateOf<Int?>(null) }
     val focusRequester = remember(controller) { FocusRequester() }
     val snapshot = remember(controller, revision) { controller.snapshot() }
-    var continuousPageIndex by remember(controller, snapshot.contentUnit().id()) {
+    var windowPageIndex by remember(controller, snapshot.contentUnit().id()) {
         mutableIntStateOf(snapshot.currentPageIndex())
     }
     val mode = remember(snapshot.direction()) { ReaderMode.of(snapshot.direction()) }
     val continuous = mode.continuous
-    var continuousWindow by remember(controller) {
+    val verticalPager = mode.verticalPager
+    val windowed = continuous || verticalPager
+    var readerWindow by remember(controller) {
         mutableStateOf<List<ReaderWindowChapter>>(emptyList())
     }
-    var continuousInitialPage by remember(controller) { mutableIntStateOf(0) }
+    var windowInitialPage by remember(controller) { mutableIntStateOf(0) }
     // The window is published as soon as the current chapter is known, so opening a chapter costs
     // one source call. Neighbours are pulled in afterwards, in the background, and only once the
     // reader is close to a chapter edge - the same trade-off Aniyomi makes.
-    CrashSafeLaunchedEffect(controller, continuous, revision) {
-        if (!continuous) return@CrashSafeLaunchedEffect
+    CrashSafeLaunchedEffect(controller, windowed, revision) {
+        if (!windowed) return@CrashSafeLaunchedEffect
         val resolved = withContext(Dispatchers.IO) {
             runCatching { controller.window() to controller.windowPageIndex() }.getOrNull()
         } ?: return@CrashSafeLaunchedEffect
-        if (continuousWindow.isEmpty()) continuousInitialPage = resolved.second
-        continuousWindow = resolved.first
+        if (readerWindow.isEmpty()) windowInitialPage = resolved.second
+        readerWindow = resolved.first
     }
-    CrashSafeLaunchedEffect(controller, continuous, snapshot.contentUnit().id(), continuousPageIndex) {
-        if (!continuous) return@CrashSafeLaunchedEffect
+    CrashSafeLaunchedEffect(controller, windowed, snapshot.contentUnit().id(), windowPageIndex) {
+        if (!windowed) return@CrashSafeLaunchedEffect
         val pageCount = snapshot.pageCount()
-        val nearEdge = continuousPageIndex <= CONTINUOUS_PREFETCH_MARGIN ||
-            continuousPageIndex >= pageCount - 1 - CONTINUOUS_PREFETCH_MARGIN
+        val nearEdge = windowPageIndex <= CONTINUOUS_PREFETCH_MARGIN ||
+            windowPageIndex >= pageCount - 1 - CONTINUOUS_PREFETCH_MARGIN
         if (!nearEdge) return@CrashSafeLaunchedEffect
         val grown = withContext(Dispatchers.IO) {
             runCatching {
@@ -163,7 +166,7 @@ internal fun ReaderScreen(
                 controller.window()
             }.getOrNull()
         } ?: return@CrashSafeLaunchedEffect
-        if (grown.size != continuousWindow.size) continuousWindow = grown
+        if (grown.size != readerWindow.size) readerWindow = grown
     }
     CrashSafeLaunchedEffect(controller, snapshot.contentUnit().id()) {
         contentUnits = null
@@ -176,14 +179,14 @@ internal fun ReaderScreen(
         snapshot.contentUnit().id(),
         snapshot.currentPageIndex(),
         display.dualPage(),
-        continuous,
+        windowed,
         revision,
     ) {
         decodedPage = null
         decodedAdjacentPage = null
         zoomScale = 1f
         zoomOffset = Offset.Zero
-        if (continuous) return@CrashSafeLaunchedEffect
+        if (windowed) return@CrashSafeLaunchedEffect
         val pageIndex = snapshot.currentPageIndex()
         val loadAdjacent = display.dualPage() && pageIndex + 1 < snapshot.pageCount()
         val pages = withContext(Dispatchers.IO) {
@@ -236,6 +239,8 @@ internal fun ReaderScreen(
             }.onSuccess { moved ->
                 if (moved) {
                     splitSecondHalf = false
+                    verticalScrollTarget = null
+                    readerWindow = emptyList()
                     actionMessage = null
                     revision++
                 }
@@ -277,6 +282,15 @@ internal fun ReaderScreen(
         }
     }
 
+    fun moveVertical(previous: Boolean) {
+        val target = snapshot.currentPageIndex() + if (previous) -1 else 1
+        if (target in 0 until snapshot.pageCount()) {
+            verticalScrollTarget = target
+        } else {
+            moveContentUnit(!previous)
+        }
+    }
+
     fun setZoom(scale: Float) {
         zoomScale = scale
         if (scale <= 1.01f) zoomOffset = Offset.Zero
@@ -284,8 +298,8 @@ internal fun ReaderScreen(
 
     fun execute(action: ReaderInteractionAction) {
         when (action) {
-            ReaderInteractionAction.PREVIOUS_PAGE -> move(true)
-            ReaderInteractionAction.NEXT_PAGE -> move(false)
+            ReaderInteractionAction.PREVIOUS_PAGE -> if (verticalPager) moveVertical(true) else move(true)
+            ReaderInteractionAction.NEXT_PAGE -> if (verticalPager) moveVertical(false) else move(false)
             ReaderInteractionAction.TOGGLE_CONTROLS -> controlsVisible = !controlsVisible
             ReaderInteractionAction.TOGGLE_ZOOM -> {
                 setZoom(if (zoomScale > 1.01f) 1f else 2f)
@@ -306,6 +320,7 @@ internal fun ReaderScreen(
             withContext(Dispatchers.IO) { runCatching { controller.openContentUnit(contentUnitId) } }
                 .onSuccess {
                     splitSecondHalf = false
+                    readerWindow = emptyList()
                     actionMessage = null
                     revision++
                 }
@@ -322,19 +337,23 @@ internal fun ReaderScreen(
             ReaderKeyCommand.SCROLL_DOWN -> continuousScrollStep = 1
             ReaderKeyCommand.PREVIOUS_CHAPTER -> moveContentUnit(false)
             ReaderKeyCommand.NEXT_CHAPTER -> moveContentUnit(true)
-            ReaderKeyCommand.FIRST_PAGE -> if (continuous) {
-                continuousScrollTarget = 0
-            } else {
-                controller.goToPage(0)
-                splitSecondHalf = false
-                revision++
+            ReaderKeyCommand.FIRST_PAGE -> when {
+                continuous -> continuousScrollTarget = 0
+                verticalPager -> verticalScrollTarget = 0
+                else -> {
+                    controller.goToPage(0)
+                    splitSecondHalf = false
+                    revision++
+                }
             }
-            ReaderKeyCommand.LAST_PAGE -> if (continuous) {
-                continuousScrollTarget = (snapshot.pageCount() - 1).coerceAtLeast(0)
-            } else {
-                controller.goToPage((snapshot.pageCount() - 1).coerceAtLeast(0))
-                splitSecondHalf = false
-                revision++
+            ReaderKeyCommand.LAST_PAGE -> when {
+                continuous -> continuousScrollTarget = (snapshot.pageCount() - 1).coerceAtLeast(0)
+                verticalPager -> verticalScrollTarget = (snapshot.pageCount() - 1).coerceAtLeast(0)
+                else -> {
+                    controller.goToPage((snapshot.pageCount() - 1).coerceAtLeast(0))
+                    splitSecondHalf = false
+                    revision++
+                }
             }
             ReaderKeyCommand.ZOOM_IN -> execute(ReaderInteractionAction.ZOOM_IN)
             ReaderKeyCommand.ZOOM_OUT -> execute(ReaderInteractionAction.ZOOM_OUT)
@@ -382,7 +401,7 @@ internal fun ReaderScreen(
             detectReaderPinchGestures(::transformZoom)
         }
     Box(
-        modifier = if (continuous && zoomScale <= 1.01f) {
+        modifier = if (windowed && zoomScale <= 1.01f) {
             readerModifier
         } else {
             readerModifier.pointerInput(interactions, snapshot.direction(), zoomScale) {
@@ -433,14 +452,14 @@ internal fun ReaderScreen(
                     )
                 },
             ) {
-                if (continuous) {
+                if (continuous && readerWindow.isNotEmpty()) {
                     // Deliberately not keyed on the chapter: the window spans neighbouring
                     // chapters, so rebuilding here would undo the seamless scroll.
                     ReaderContinuousPages(
                         controller = controller,
                         pageDecoder = pageDecoder,
-                        window = continuousWindow,
-                        initialGlobalPage = continuousInitialPage,
+                        window = readerWindow,
+                        initialGlobalPage = windowInitialPage,
                         direction = snapshot.direction(),
                         display = display,
                         revision = revision,
@@ -449,7 +468,22 @@ internal fun ReaderScreen(
                         consumeScrollTarget = { continuousScrollTarget = null },
                         scrollStep = continuousScrollStep,
                         consumeScrollStep = { continuousScrollStep = null },
-                        pageSelected = { continuousPageIndex = it },
+                        pageSelected = { windowPageIndex = it },
+                        chapterChanged = { revision++ },
+                        toggleControls = { controlsVisible = !controlsVisible },
+                        toggleZoom = { execute(ReaderInteractionAction.TOGGLE_ZOOM) },
+                    )
+                } else if (verticalPager && readerWindow.isNotEmpty()) {
+                    ReaderVerticalPages(
+                        controller = controller,
+                        pageDecoder = pageDecoder,
+                        window = readerWindow,
+                        initialGlobalPage = windowInitialPage,
+                        display = display,
+                        zoomScale = zoomScale,
+                        scrollTarget = verticalScrollTarget,
+                        consumeScrollTarget = { verticalScrollTarget = null },
+                        pageSelected = { windowPageIndex = it },
                         chapterChanged = { revision++ },
                         toggleControls = { controlsVisible = !controlsVisible },
                         toggleZoom = { execute(ReaderInteractionAction.TOGGLE_ZOOM) },
@@ -488,7 +522,7 @@ internal fun ReaderScreen(
             }
         }
 
-        if (!continuous) {
+        if (!windowed) {
             ReaderTapZones(
                 mode = mode,
                 interactions = interactions,
@@ -507,15 +541,17 @@ internal fun ReaderScreen(
                 openMenu = { readerMenu = true },
             )
             ReaderBottomBar(
-                pageIndex = if (continuous) continuousPageIndex else snapshot.currentPageIndex(),
+                pageIndex = if (windowed) windowPageIndex else snapshot.currentPageIndex(),
                 pageCount = snapshot.pageCount(),
                 goToPage = { index ->
-                    if (continuous) {
-                        continuousScrollTarget = index
-                    } else {
-                        controller.goToPage(index)
-                        splitSecondHalf = false
-                        revision++
+                    when {
+                        continuous -> continuousScrollTarget = index
+                        verticalPager -> verticalScrollTarget = index
+                        else -> {
+                            controller.goToPage(index)
+                            splitSecondHalf = false
+                            revision++
+                        }
                     }
                 },
                 splitSecondHalf = splitSecondHalf,
@@ -562,7 +598,9 @@ internal fun ReaderScreen(
                         display = controller.display()
                         controller.setDirection(display.readingDirection())
                         splitSecondHalf = false
+                        readerWindow = emptyList()
                         continuousScrollTarget = null
+                        verticalScrollTarget = null
                         revision++
                     }
                 },
@@ -573,11 +611,13 @@ internal fun ReaderScreen(
             ReaderModeDialog(
                 current = snapshot.direction(),
                 select = {
-                    continuousPageIndex = snapshot.currentPageIndex()
+                    windowPageIndex = snapshot.currentPageIndex()
+                    readerWindow = emptyList()
                     controller.setDirection(it)
                     display = display.withReadingDirection(it)
                     splitSecondHalf = false
                     continuousScrollTarget = null
+                    verticalScrollTarget = null
                     readingModeMenu = false
                     revision++
                 },

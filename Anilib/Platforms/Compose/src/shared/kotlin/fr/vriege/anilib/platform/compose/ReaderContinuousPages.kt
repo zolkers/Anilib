@@ -70,10 +70,10 @@ internal fun ReaderContinuousPages(
     toggleZoom: () -> Unit,
 ) {
     val current = window.firstOrNull { it.current() }
-    val entries = remember(window) { continuousEntries(window) }
+    val entries = remember(window) { readerWindowEntries(window) }
     val listState = rememberLazyListState(
         initialFirstVisibleItemIndex = entries
-            .indexOfFirst { it is ContinuousEntry.Page && it.globalPage == initialGlobalPage }
+            .indexOfFirst { it is ReaderWindowEntry.Page && it.globalPage == initialGlobalPage }
             .coerceAtLeast(0),
     )
     val pageAspectRatios = remember(controller) { mutableStateMapOf<String, Float>() }
@@ -85,7 +85,7 @@ internal fun ReaderContinuousPages(
         snapshotFlow { listState.firstVisibleItemIndex }
             .distinctUntilChanged()
             .collect { index ->
-                val page = entries.getOrNull(index) as? ContinuousEntry.Page ?: return@collect
+                val page = entries.getOrNull(index) as? ReaderWindowEntry.Page ?: return@collect
                 val moved = withContext(Dispatchers.IO) { controller.selectWindowPage(page.globalPage) }
                 pageSelected(page.localPage)
                 if (moved) chapterChanged()
@@ -96,7 +96,7 @@ internal fun ReaderContinuousPages(
         val chapter = current
         if (target != null && chapter != null) {
             val global = chapter.firstGlobalPage() + target.coerceIn(0, chapter.pageCount() - 1)
-            val index = entries.indexOfFirst { it is ContinuousEntry.Page && it.globalPage == global }
+            val index = entries.indexOfFirst { it is ReaderWindowEntry.Page && it.globalPage == global }
             if (index >= 0) listState.animateScrollToItem(index)
             consumeScrollTarget()
         }
@@ -133,8 +133,8 @@ internal fun ReaderContinuousPages(
                     for (index in (range.second + 1)..(range.second + forwardDistance)) add(index)
                     for (index in (range.first - 1) downTo (range.first - backwardDistance)) add(index)
                 }
-                    .mapNotNull { entries.getOrNull(it) as? ContinuousEntry.Page }
-                decodedPages.retainPrefetch(targets.mapTo(mutableSetOf(), ContinuousEntry.Page::key))
+                    .mapNotNull { entries.getOrNull(it) as? ReaderWindowEntry.Page }
+                decodedPages.retainPrefetch(targets.mapTo(mutableSetOf(), ReaderWindowEntry.Page::key))
                 targets.forEach { page ->
                     decodedPages.prefetch(page.key) {
                         requireNotNull(pageDecoder(controller.windowPage(page.globalPage))) {
@@ -156,8 +156,8 @@ internal fun ReaderContinuousPages(
     ) {
         items(entries.size, key = { entries[it].key }) { index ->
             when (val entry = entries[index]) {
-                is ContinuousEntry.Transition -> ReaderChapterTransition(entry.label)
-                is ContinuousEntry.Page -> ReaderContinuousPage(
+                is ReaderWindowEntry.Transition -> ReaderChapterTransition(entry.label)
+                is ReaderWindowEntry.Page -> ReaderContinuousPage(
                     controller = controller,
                     pageDecoder = pageDecoder,
                     globalPage = entry.globalPage,
@@ -176,31 +176,31 @@ internal fun ReaderContinuousPages(
     }
 }
 
-private sealed interface ContinuousEntry {
+internal sealed interface ReaderWindowEntry {
     val key: String
 
     data class Page(
         override val key: String,
         val globalPage: Int,
         val localPage: Int,
-    ) : ContinuousEntry
+    ) : ReaderWindowEntry
 
-    data class Transition(override val key: String, val label: String) : ContinuousEntry
+    data class Transition(override val key: String, val label: String) : ReaderWindowEntry
 }
 
 /**
  * Flattens the window into scroll entries. A slim transition sits between adjacent chapters so the
  * hand-off stays legible without ever interrupting the scroll.
  */
-private fun continuousEntries(window: List<ReaderWindowChapter>): List<ContinuousEntry> {
-    val entries = mutableListOf<ContinuousEntry>()
+internal fun readerWindowEntries(window: List<ReaderWindowChapter>): List<ReaderWindowEntry> {
+    val entries = mutableListOf<ReaderWindowEntry>()
     window.forEachIndexed { chapterIndex, chapter ->
         val chapterId = chapter.contentUnit().id().value()
         if (chapterIndex > 0) {
-            entries += ContinuousEntry.Transition("transition:$chapterId", chapter.contentUnit().title())
+            entries += ReaderWindowEntry.Transition("transition:$chapterId", chapter.contentUnit().title())
         }
         repeat(chapter.pageCount()) { local ->
-            entries += ContinuousEntry.Page(
+            entries += ReaderWindowEntry.Page(
                 key = "$chapterId#$local",
                 globalPage = chapter.firstGlobalPage() + local,
                 localPage = local,
@@ -211,7 +211,7 @@ private fun continuousEntries(window: List<ReaderWindowChapter>): List<Continuou
 }
 
 @Composable
-private fun ReaderChapterTransition(title: String) {
+internal fun ReaderChapterTransition(title: String) {
     Text(
         text = title,
         color = Color.White.copy(alpha = 0.38f),

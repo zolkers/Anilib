@@ -8,6 +8,7 @@ package fr.vriege.anilib.platform.compose
 internal data object ReaderContinuousMode : ReaderMode {
 
     override val continuous: Boolean = true
+    override val verticalPager: Boolean = false
     override val mirrored: Boolean = false
 
     /** Continuous reading scales page width only; height follows from the page aspect ratio. */
