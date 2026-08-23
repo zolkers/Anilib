@@ -36,13 +36,12 @@ import fr.vriege.anilib.feature.reader.ReadingDirection
 import fr.vriege.anilib.feature.reader.ui.ReaderController
 import fr.vriege.anilib.feature.reader.ui.ReaderWindowChapter
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.withContext
 
 private const val CONTINUOUS_SCROLL_STEP_FRACTION = 0.85f
-private const val DECODE_PREFETCH_AHEAD = 3
-private const val DECODE_PREFETCH_BEHIND = 2
+private const val DECODE_PREFETCH_IN_SCROLL_DIRECTION = 4
+private const val DECODE_PREFETCH_AGAINST_SCROLL_DIRECTION = 2
 
 /**
  * Continuous viewer over the reader's chapter window. Previous, current and next chapter pages
@@ -110,20 +109,34 @@ internal fun ReaderContinuousPages(
         }
     }
     CrashSafeLaunchedEffect(listState, controller, entries, revision) {
+        var previousFirstVisible = listState.firstVisibleItemIndex
         snapshotFlow {
             val visible = listState.layoutInfo.visibleItemsInfo
             if (visible.isEmpty()) null else visible.first().index to visible.last().index
         }
             .distinctUntilChanged()
-            .collectLatest { range ->
-                if (range == null) return@collectLatest
-                val targets = buildList {
-                    for (index in (range.second + 1)..(range.second + DECODE_PREFETCH_AHEAD)) add(index)
-                    for (index in (range.first - 1) downTo (range.first - DECODE_PREFETCH_BEHIND)) add(index)
+            .collect { range ->
+                if (range == null) return@collect
+                val scrollingForward = range.first >= previousFirstVisible
+                previousFirstVisible = range.first
+                val forwardDistance = if (scrollingForward) {
+                    DECODE_PREFETCH_IN_SCROLL_DIRECTION
+                } else {
+                    DECODE_PREFETCH_AGAINST_SCROLL_DIRECTION
                 }
-                for (index in targets) {
-                    val page = entries.getOrNull(index) as? ContinuousEntry.Page ?: continue
-                    decodedPages.load(page.key) {
+                val backwardDistance = if (scrollingForward) {
+                    DECODE_PREFETCH_AGAINST_SCROLL_DIRECTION
+                } else {
+                    DECODE_PREFETCH_IN_SCROLL_DIRECTION
+                }
+                val targets = buildList {
+                    for (index in (range.second + 1)..(range.second + forwardDistance)) add(index)
+                    for (index in (range.first - 1) downTo (range.first - backwardDistance)) add(index)
+                }
+                    .mapNotNull { entries.getOrNull(it) as? ContinuousEntry.Page }
+                decodedPages.retainPrefetch(targets.mapTo(mutableSetOf(), ContinuousEntry.Page::key))
+                targets.forEach { page ->
+                    decodedPages.prefetch(page.key) {
                         requireNotNull(pageDecoder(controller.windowPage(page.globalPage))) {
                             "Unsupported page image format"
                         }

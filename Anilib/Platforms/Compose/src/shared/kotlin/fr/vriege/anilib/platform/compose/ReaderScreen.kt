@@ -783,7 +783,7 @@ internal fun ReaderPageImage(
 }
 
 private fun contentScale(mode: ReaderScaleMode, direction: ReadingDirection): ContentScale {
-    if (direction == ReadingDirection.VERTICAL || direction == ReadingDirection.WEBTOON) {
+    if (direction == ReadingDirection.WEBTOON) {
         return ContentScale.FillWidth
     }
     return when (mode) {
