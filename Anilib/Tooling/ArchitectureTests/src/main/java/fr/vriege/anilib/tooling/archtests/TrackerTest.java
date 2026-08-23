@@ -48,8 +48,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.Set;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import fr.vriege.anilib.kernel.PluginStartupException;
 import java.util.Comparator;
@@ -218,25 +216,17 @@ final class TrackerTest {
             application.capability(LibraryCapabilities.CATALOG).save(item);
             TrackerService service = application.capability(TrackerCapabilities.SERVICE);
             service.bind(item.id(), service.search(TestTracker.ID, item.title(), item.kind()).getFirst());
-            CountDownLatch progressObserved = new CountDownLatch(1);
-            AutoCloseable observation = service.observe(progressObserved::countDown);
-            try {
-                application.capability(PlayerCapabilities.SERVICE).setEpisodesCompleted(
-                        item.id(),
-                        Set.of(PLAYBACK_EPISODE.id()),
-                        true);
-                counter.check(progressObserved.await(3L, TimeUnit.SECONDS),
-                        "completed playback must asynchronously update the local tracker entry");
-            } catch (InterruptedException exception) {
-                Thread.currentThread().interrupt();
-                throw new AssertionError("Interrupted while awaiting playback tracking", exception);
-            } finally {
-                closeObservation(observation);
-            }
+            application.capability(PlayerCapabilities.SERVICE).setEpisodesCompleted(
+                    item.id(),
+                    Set.of(PLAYBACK_EPISODE.id()),
+                    true);
+            awaitTrackedProgress(service, item, tracker, PLAYBACK_EPISODE.episodeNumber());
             TrackerEntry tracked = service.entries(item.id()).getFirst();
             counter.check(tracked.progress() == PLAYBACK_EPISODE.episodeNumber()
-                            && tracked.totalUnits() == 12,
-                    "playback tracking must advance to the episode number without losing the remote total");
+                            && tracked.totalUnits() == 12
+                            && tracked.status() == TrackerStatus.WATCHING
+                            && tracker.updates.get() == 1,
+                    "playback tracking must push the episode and watching status without losing the remote total");
         } finally {
             deleteDirectory(directory);
         }
@@ -293,12 +283,26 @@ final class TrackerTest {
         return false;
     }
 
-    private static void closeObservation(AutoCloseable observation) {
-        try {
-            observation.close();
-        } catch (Exception exception) {
-            throw new AssertionError("Unable to close tracker progress observation", exception);
+    private static void awaitTrackedProgress(
+            TrackerService service,
+            LibraryItem item,
+            TestTracker tracker,
+            double expected) {
+        for (int attempt = 0; attempt < 300; attempt++) {
+            TrackerEntry entry = service.entries(item.id()).getFirst();
+            if (entry.progress() == expected
+                    && entry.status() == TrackerStatus.WATCHING
+                    && tracker.updates.get() == 1) {
+                return;
+            }
+            try {
+                Thread.sleep(10L);
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                throw new AssertionError("Interrupted while awaiting playback tracking", exception);
+            }
         }
+        throw new AssertionError("Completed playback did not update the remote tracker");
     }
 
     private static final class PlaybackStreamingSource implements StreamingSource {
@@ -329,6 +333,7 @@ final class TrackerTest {
         private final TrackerDescriptor descriptor;
         private final AtomicInteger refreshes = new AtomicInteger();
         private final AtomicInteger removals = new AtomicInteger();
+        private final AtomicInteger updates = new AtomicInteger();
         private boolean authenticated;
         private String account = "";
 
@@ -404,6 +409,7 @@ final class TrackerTest {
 
         @Override
         public TrackerEntry update(TrackerEntry entry) {
+            updates.incrementAndGet();
             return entry;
         }
 

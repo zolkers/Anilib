@@ -52,6 +52,13 @@ final class TrackerSynchronizationTest {
             item = LibraryItem.create("Synchronized anime", MediaKind.ANIME);
             library.save(item);
             TrackerService service = application.capability(TrackerCapabilities.SERVICE);
+            counter.check(service.syncPreferences().automatic()
+                            && service.syncPreferences().conflictPolicy() == TrackerConflictPolicy.KEEP_LOCAL,
+                    "tracker progress must synchronize automatically and prefer pending local activity by default");
+            service.saveSyncPreferences(new TrackerSyncPreferences(
+                    false,
+                    TrackerSyncDirection.BIDIRECTIONAL,
+                    TrackerConflictPolicy.ASK));
             TrackerSearchResult candidate = service.search(SyncTracker.ID, "Synchronized", MediaKind.ANIME)
                     .getFirst();
             TrackerEntry bound = service.bind(item.id(), candidate);
@@ -97,7 +104,44 @@ final class TrackerSynchronizationTest {
         } finally {
             deleteDirectory(directory);
         }
+        repairsLegacyPendingProgress(counter);
         return counter.value;
+    }
+
+    private static void repairsLegacyPendingProgress(Counter counter) {
+        Path directory = temporaryDirectory();
+        SyncTracker tracker = new SyncTracker();
+        LibraryItem item = LibraryItem.create("Legacy pending anime", MediaKind.ANIME);
+        try {
+            try (StartedAnilib application = StandardAnilib.start(directory, List.of(extension(tracker)))) {
+                application.capability(LibraryCapabilities.CATALOG).save(item);
+                TrackerService service = application.capability(TrackerCapabilities.SERVICE);
+                service.saveSyncPreferences(new TrackerSyncPreferences(
+                        false,
+                        TrackerSyncDirection.BIDIRECTIONAL,
+                        TrackerConflictPolicy.ASK));
+                TrackerSearchResult candidate = service.search(
+                        SyncTracker.ID,
+                        item.title(),
+                        item.kind()).getFirst();
+                service.bind(item.id(), candidate);
+                service.synchronizeProgress(item.id(), 3.0D, 12);
+            }
+            Files.deleteIfExists(directory.resolve("tracking-sync.properties"));
+            try (StartedAnilib restarted = StandardAnilib.start(directory, List.of(extension(tracker)))) {
+                TrackerService service = restarted.capability(TrackerCapabilities.SERVICE);
+                service.accounts();
+                awaitRemoteProgress(tracker, 3.0D);
+                TrackerEntry repaired = service.entries(item.id()).getFirst();
+                counter.check(repaired.status() == TrackerStatus.WATCHING
+                                && tracker.remote.status() == TrackerStatus.WATCHING,
+                        "automatic startup synchronization must repair legacy pending progress and status");
+            }
+        } catch (IOException exception) {
+            throw new AssertionError("Unable to prepare legacy tracker synchronization state", exception);
+        } finally {
+            deleteDirectory(directory);
+        }
     }
 
     private static void awaitProgress(TrackerService service, LibraryItem item, double expected) {
@@ -113,6 +157,21 @@ final class TrackerSynchronizationTest {
             }
         }
         throw new AssertionError("Automatic tracker synchronization did not finish");
+    }
+
+    private static void awaitRemoteProgress(SyncTracker tracker, double expected) {
+        for (int attempt = 0; attempt < 200; attempt++) {
+            if (tracker.remote.progress() == expected) {
+                return;
+            }
+            try {
+                Thread.sleep(10L);
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                throw new AssertionError("Interrupted while awaiting remote tracker synchronization", exception);
+            }
+        }
+        throw new AssertionError("Remote tracker synchronization did not finish");
     }
 
     private static TrackerExtensionPlugin extension(SyncTracker tracker) {

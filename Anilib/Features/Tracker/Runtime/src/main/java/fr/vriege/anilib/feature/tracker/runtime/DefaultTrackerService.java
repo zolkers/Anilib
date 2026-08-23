@@ -55,6 +55,7 @@ public final class DefaultTrackerService implements TrackerService, AutoCloseabl
     private final Set<BindingKey> dirtyEntries = new HashSet<>();
     private final ExecutorService synchronizer = ManagedExecutors.single("anilib-tracker-sync");
     private final AtomicBoolean synchronizationQueued = new AtomicBoolean();
+    private final AtomicBoolean startupSynchronizationRequested = new AtomicBoolean();
     private final AutoCloseable libraryObservation;
     private volatile boolean closed;
 
@@ -74,9 +75,13 @@ public final class DefaultTrackerService implements TrackerService, AutoCloseabl
 
     @Override
     public List<TrackerAccount> accounts() {
-        return registry.trackers().stream()
+        List<TrackerAccount> accounts = registry.trackers().stream()
                 .map(this::account)
                 .toList();
+        if (startupSynchronizationRequested.compareAndSet(false, true)) {
+            queueAutomaticSynchronization();
+        }
+        return accounts;
     }
 
     @Override
@@ -238,6 +243,7 @@ public final class DefaultTrackerService implements TrackerService, AutoCloseabl
                         status == TrackerStatus.COMPLETED && current.finishDate().isEmpty()
                                 ? Optional.of(LocalDate.now()) : current.finishDate(),
                         current.privateEntry(), current.remoteUri(), Instant.now(), current.metadata());
+                replacement = normalizeProgress(tracker(current.trackerId()), current, replacement);
                 if (syncPreferences().automatic()) {
                     update(replacement);
                 } else {
@@ -455,8 +461,9 @@ public final class DefaultTrackerService implements TrackerService, AutoCloseabl
     }
 
     private TrackerEntry push(Tracker tracker, TrackerEntry local) {
-        validateEditable(tracker, local);
-        TrackerEntry pushed = validate(tracker, tracker.update(local), local.libraryItemId());
+        TrackerEntry normalized = normalizeProgress(tracker, local, local);
+        validateEditable(tracker, normalized);
+        TrackerEntry pushed = validate(tracker, tracker.update(normalized), local.libraryItemId());
         entries.save(pushed);
         return pushed;
     }
@@ -588,7 +595,7 @@ public final class DefaultTrackerService implements TrackerService, AutoCloseabl
         TrackerStatus status = requested.status();
         Optional<LocalDate> start = requested.startDate();
         Optional<LocalDate> finish = requested.finishDate();
-        if (requested.progress() > current.progress() && status == TrackerStatus.PLANNING) {
+        if (requested.progress() > 0.0D && status == TrackerStatus.PLANNING) {
             if (tracker.descriptor().statuses().contains(TrackerStatus.WATCHING)) {
                 status = TrackerStatus.WATCHING;
             } else if (tracker.descriptor().statuses().contains(TrackerStatus.READING)) {

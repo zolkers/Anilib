@@ -12,7 +12,7 @@ public record TrackerSyncPreferences(
     }
 
     public static TrackerSyncPreferences defaults() {
-        return new TrackerSyncPreferences(false, TrackerSyncDirection.BIDIRECTIONAL, TrackerConflictPolicy.ASK);
+        return new TrackerSyncPreferences(true, TrackerSyncDirection.BIDIRECTIONAL, TrackerConflictPolicy.KEEP_LOCAL);
     }
 
     public TrackerSyncPreferences withAutomatic(boolean value) {
