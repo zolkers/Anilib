@@ -38,6 +38,8 @@ final class SettingsTest {
         Path directory = temporaryDirectory();
         Path file = directory.resolve("settings.properties");
         try {
+            counter.check(SettingsSnapshot.defaults().applicationWindowMode() == ApplicationWindowMode.BORDERLESS,
+                    "new installations must start in a borderless maximized window");
             FileSettingsService service = new FileSettingsService(file);
             FileDiagnosticService diagnostics = new FileDiagnosticService(directory);
             counter.check(service.snapshot().equals(SettingsSnapshot.defaults()),

@@ -40,7 +40,7 @@ public record SettingsSnapshot(
                 TypographyScale.STANDARD,
                 false,
                 NavigationStyle.ADAPTIVE,
-                ApplicationWindowMode.WINDOWED,
+                ApplicationWindowMode.BORDERLESS,
                 PlayerWindowMode.BORDERLESS,
                 BrowserPolicy.defaults(),
                 StartScreen.LIBRARY,
