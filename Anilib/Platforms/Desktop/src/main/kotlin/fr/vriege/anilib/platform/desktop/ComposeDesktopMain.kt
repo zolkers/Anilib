@@ -110,6 +110,7 @@ fun main(arguments: Array<String>) {
             }
             val applicationWindowMode = remember { mutableStateOf(initialApplicationWindowMode) }
             val applicationFullscreen = remember { mutableStateOf(false) }
+            val f11Pressed = remember { mutableStateOf(false) }
             val applicationPlacementBeforeFullscreen = remember { mutableStateOf(WindowPlacement.Floating) }
             val applicationModeBeforeApplicationFullscreen = remember { mutableStateOf(initialApplicationWindowMode) }
             val playerFullscreen = remember { mutableStateOf(false) }
@@ -123,7 +124,7 @@ fun main(arguments: Array<String>) {
                         if (fullscreen) {
                             applicationPlacementBeforeFullscreen.value = windowState.placement
                             applicationModeBeforeApplicationFullscreen.value = applicationWindowMode.value
-                            intendedWindowPlacement.value = WindowPlacement.Fullscreen
+                            intendedWindowPlacement.value = applicationFullscreenPlacement()
                         } else if (
                             applicationModeBeforeApplicationFullscreen.value == applicationWindowMode.value
                         ) {
@@ -225,14 +226,17 @@ fun main(arguments: Array<String>) {
                         ) {
                             closeApplication()
                             true
-                        } else if (event.type == KeyEventType.KeyDown && event.key == Key.F11) {
-                            if (applicationFullscreen.value) {
-                                setApplicationFullscreen(false)
-                            } else if (playerFullscreen.value || playerActive.value) {
-                                setPlayerFullscreen(!playerFullscreen.value)
-                            } else {
-                                setApplicationFullscreen(true)
+                        } else if (event.key == Key.F11) {
+                            if (event.type == KeyEventType.KeyDown && !f11Pressed.value) {
+                                if (applicationFullscreen.value) {
+                                    setApplicationFullscreen(false)
+                                } else if (playerFullscreen.value || playerActive.value) {
+                                    setPlayerFullscreen(!playerFullscreen.value)
+                                } else {
+                                    setApplicationFullscreen(true)
+                                }
                             }
+                            f11Pressed.value = event.type == KeyEventType.KeyDown
                             true
                         } else if (
                             playerFullscreen.value &&
@@ -290,6 +294,8 @@ private fun ApplicationWindowMode.placement(): WindowPlacement = when (this) {
     ApplicationWindowMode.BORDERLESS,
     -> WindowPlacement.Maximized
 }
+
+internal fun applicationFullscreenPlacement(): WindowPlacement = WindowPlacement.Maximized
 
 internal fun PlayerWindowMode.placement(
     current: WindowPlacement,

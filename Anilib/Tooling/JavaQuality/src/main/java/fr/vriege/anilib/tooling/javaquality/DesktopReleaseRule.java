@@ -13,6 +13,10 @@ public final class DesktopReleaseRule implements AnilibJavaRule {
     private static final Path DESKTOP_BUILD = Path.of("Anilib", "Platforms", "Desktop", "build.gradle");
     private static final Path DESKTOP_HOST_BUILD =
             Path.of("Anilib", "Platforms", "DesktopExtensionHost", "build.gradle");
+    private static final Path WINDOWS_INSTALLER_PATCH = Path.of(
+            "Anilib", "Platforms", "Desktop", "src", "main", "jpackage", "windows", "patch-safe-upgrade.ps1");
+    private static final Path WINDOWS_DATA_MIGRATION = Path.of(
+            "Anilib", "Platforms", "Desktop", "src", "main", "jpackage", "windows", "migrate-legacy-data.vbs");
     private static final Path WORKFLOW = Path.of(".github", "workflows", "desktop-release.yml");
 
     public DesktopReleaseRule() {
@@ -49,7 +53,25 @@ public final class DesktopReleaseRule implements AnilibJavaRule {
                 "includeAllModules = true",
                 "licenseFile.set(rootProject.file('LICENSE'))",
                 "writeDesktopReleaseChecksums",
+                "packageSafeUpgradeMsi",
                 "MessageDigest.getInstance('SHA-256')");
+        requireTokens(
+                repository,
+                WINDOWS_INSTALLER_PATCH,
+                diagnostics,
+                "JpMigrateLegacyData",
+                "AnilibMigrateLegacyData",
+                "'NOT REMOVE',1440",
+                "``Sequence``=1450",
+                "InvokeMember('Commit'");
+        requireTokens(
+                repository,
+                WINDOWS_DATA_MIGRATION,
+                diagnostics,
+                "%LOCALAPPDATA%",
+                "AnilibData",
+                "IsProgramEntry",
+                "AliasAttribute");
         requireTokens(
                 repository,
                 DESKTOP_HOST_BUILD,

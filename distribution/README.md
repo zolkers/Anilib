@@ -18,5 +18,8 @@ record the external store release identifier in the acceptance record.
 On Windows, the per-user MSI installs program files under
 `%LOCALAPPDATA%\AnilibApp`. Persistent library, extension, tracker,
 browser, download, backup, and preference data remains under
-`%LOCALAPPDATA%\Anilib`. The stable upgrade UUID updates only the former;
-install, update, repair, and application uninstall must leave the latter intact.
+`%LOCALAPPDATA%\AnilibData`. Before an old package is removed, the MSI runs the
+embedded migration action to merge user data out of the legacy
+`%LOCALAPPDATA%\Anilib` program tree. The stable upgrade UUID then updates only
+`AnilibApp`; install, update, repair, and application uninstall must leave
+`AnilibData` intact.

@@ -47,6 +47,7 @@ class DesktopWindowModeTest {
     fun `application fullscreen keeps the same window instance`() {
         assertFalse(windowUndecorated(ApplicationWindowMode.WINDOWED))
         assertTrue(windowUndecorated(ApplicationWindowMode.BORDERLESS))
+        assertEquals(WindowPlacement.Maximized, applicationFullscreenPlacement())
     }
 
     @Test

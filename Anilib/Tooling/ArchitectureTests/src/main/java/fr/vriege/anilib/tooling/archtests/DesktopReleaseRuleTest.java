@@ -30,7 +30,14 @@ final class DesktopReleaseRuleTest {
                     upgradeUuid = bundleID = 'fr.vriege.anilib'
                     project(':Anilib:Platforms:DesktopExtensionHost') includeAllModules = true
                     licenseFile.set(rootProject.file('LICENSE'))
-                    writeDesktopReleaseChecksums MessageDigest.getInstance('SHA-256')
+                    writeDesktopReleaseChecksums packageSafeUpgradeMsi MessageDigest.getInstance('SHA-256')
+                    """);
+            write(repository.resolve("Anilib/Platforms/Desktop/src/main/jpackage/windows/patch-safe-upgrade.ps1"), """
+                    JpMigrateLegacyData AnilibMigrateLegacyData 'NOT REMOVE',1440
+                    ``Sequence``=1450 InvokeMember('Commit'
+                    """);
+            write(repository.resolve("Anilib/Platforms/Desktop/src/main/jpackage/windows/migrate-legacy-data.vbs"), """
+                    %LOCALAPPDATA% AnilibData IsProgramEntry AliasAttribute
                     """);
             Path hostBuild = repository.resolve("Anilib/Platforms/DesktopExtensionHost/build.gradle");
             write(hostBuild, """
@@ -54,7 +61,8 @@ final class DesktopReleaseRuleTest {
                             + "upgradeUuid = bundleID = 'fr.vriege.anilib' "
                             + "project(':Anilib:Platforms:DesktopExtensionHost') includeAllModules = true "
                             + "licenseFile.set(rootProject.file('LICENSE')) "
-                            + "writeDesktopReleaseChecksums MessageDigest.getInstance('SHA-256')",
+                            + "writeDesktopReleaseChecksums packageSafeUpgradeMsi "
+                            + "MessageDigest.getInstance('SHA-256')",
                     StandardCharsets.UTF_8);
             check(rule.analyze(snapshot).stream()
                             .anyMatch(diagnostic -> diagnostic.message().contains("AnilibApp")),
@@ -65,7 +73,7 @@ final class DesktopReleaseRuleTest {
                     upgradeUuid = bundleID = 'fr.vriege.anilib'
                     project(':Anilib:Platforms:DesktopExtensionHost') includeAllModules = true
                     licenseFile.set(rootProject.file('LICENSE'))
-                    writeDesktopReleaseChecksums MessageDigest.getInstance('SHA-256')
+                    writeDesktopReleaseChecksums packageSafeUpgradeMsi MessageDigest.getInstance('SHA-256')
                     """);
             Files.writeString(workflow, "windows-2025", StandardCharsets.UTF_8);
             check(rule.analyze(snapshot).stream()

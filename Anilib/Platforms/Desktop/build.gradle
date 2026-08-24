@@ -55,6 +55,7 @@ def packageVersionValue = providers.gradleProperty('anilibPackageVersion').orEls
 if (!(packageVersionValue ==~ /[0-9]+\.[0-9]+\.[0-9]+/)) {
     throw new GradleException('anilibPackageVersion must use MAJOR.MINOR.PATCH numeric form')
 }
+def windowsHost = System.getProperty('os.name', '').toLowerCase(Locale.ROOT).contains('windows')
 
 compose.desktop {
     application {
@@ -98,10 +99,29 @@ compose.desktop {
     }
 }
 
+def safeUpgradeMsi = windowsHost ? tasks.register('packageSafeUpgradeMsi', Exec) {
+    group = 'distribution'
+    description = 'Patches the Windows MSI with pre-upgrade user-data migration.'
+    dependsOn tasks.named('packageMsi')
+    def patchScript = layout.projectDirectory.file('src/main/jpackage/windows/patch-safe-upgrade.ps1')
+    def migrationScript = layout.projectDirectory.file('src/main/jpackage/windows/migrate-legacy-data.vbs')
+    def installer = layout.buildDirectory.file("compose/binaries/main/msi/Anilib-${packageVersionValue}.msi")
+    inputs.file(patchScript)
+    inputs.file(migrationScript)
+    inputs.file(installer)
+    outputs.file(installer)
+    outputs.upToDateWhen { false }
+    executable 'powershell.exe'
+    args '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+            '-File', patchScript.asFile.absolutePath,
+            '-MsiPath', installer.get().asFile.absolutePath,
+            '-MigrationScriptPath', migrationScript.asFile.absolutePath
+} : null
+
 tasks.register('writeDesktopReleaseChecksums') {
     group = 'distribution'
     description = 'Builds the native package for this host and writes deterministic SHA-256 sums.'
-    dependsOn tasks.named('packageDistributionForCurrentOS')
+    dependsOn windowsHost ? safeUpgradeMsi : tasks.named('packageDistributionForCurrentOS')
     def packageDirectory = layout.buildDirectory.dir('compose/binaries/main')
     def checksumFile = layout.buildDirectory.file('release/SHA256SUMS')
     inputs.files(fileTree(packageDirectory) {
