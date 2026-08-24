@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -27,6 +30,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.GridView
@@ -49,6 +53,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -626,6 +631,7 @@ private fun SourceCatalogueScreen(
     var requestRevision by remember(source.id()) { mutableIntStateOf(0) }
     var notice by remember(source.id()) { mutableStateOf<String?>(null) }
     val definitions = remember(source.id()) { presentation.filters(source.id()) }
+    val supportsLatest = remember(source.id()) { presentation.supportsLatest(source.id()) }
     val preferenceDefinitions = remember(source.id(), preferenceRevision) {
         presentation.preferences(source.id())
     }
@@ -675,13 +681,26 @@ private fun SourceCatalogueScreen(
         result = withContext(Dispatchers.IO) {
             runCatching {
                 val filters = filterValues.map { SourceFilterValue(it.key, it.value) }
-                if (query.isBlank()) {
+                if (query.isBlank() && filterValues.isEmpty()) {
                     presentation.browse(source.id(), selectedListing, page, 30, filters)
                 } else {
                     presentation.search(source.id(), query, page, 30, filters)
                 }
             }
         }
+    }
+
+    if (showFilters) {
+        SourceFilterSheet(
+            definitions = definitions,
+            selected = filterValues,
+            dismiss = { showFilters = false },
+            apply = {
+                filterValues = it
+                page = 1
+                showFilters = false
+            },
+        )
     }
 
     Scaffold(
@@ -711,7 +730,11 @@ private fun SourceCatalogueScreen(
                         Column {
                             Text(source.displayName())
                             Text(
-                                if (selectedListing == SourceListing.POPULAR) "Popular" else "Latest",
+                                when {
+                                    filterValues.isNotEmpty() -> "ui.filters"
+                                    selectedListing == SourceListing.POPULAR -> "ui.popular"
+                                    else -> "ui.latest"
+                                },
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 12.sp,
                             )
@@ -762,7 +785,7 @@ private fun SourceCatalogueScreen(
                         )
                     }
                     if (definitions.isNotEmpty()) {
-                        IconButton(onClick = { showFilters = !showFilters }) {
+                        IconButton(onClick = { showFilters = true }) {
                             Icon(Icons.Default.Tune, contentDescription = "ui.filters")
                         }
                     }
@@ -776,35 +799,49 @@ private fun SourceCatalogueScreen(
         },
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                FilterChip(
-                    selected = selectedListing == SourceListing.POPULAR,
-                    onClick = { selectedListing = SourceListing.POPULAR; page = 1 },
-                    label = { Text("ui.popular") },
+            val filterTabIndex = if (supportsLatest) 2 else 1
+            val selectedTabIndex = if (filterValues.isNotEmpty() && definitions.isNotEmpty()) {
+                filterTabIndex
+            } else if (selectedListing == SourceListing.LATEST && supportsLatest) {
+                1
+            } else {
+                0
+            }
+            PrimaryScrollableTabRow(selectedTabIndex = selectedTabIndex, edgePadding = 12.dp) {
+                Tab(
+                    selected = selectedTabIndex == 0,
+                    onClick = {
+                        selectedListing = SourceListing.POPULAR
+                        filterValues = emptyMap()
+                        query = ""
+                        searchActive = false
+                        page = 1
+                    },
+                    text = { Text("ui.popular") },
                 )
-                if (presentation.supportsLatest(source.id())) {
-                    FilterChip(
-                        selected = selectedListing == SourceListing.LATEST,
-                        onClick = { selectedListing = SourceListing.LATEST; page = 1 },
-                        label = { Text("ui.latest") },
+                if (supportsLatest) {
+                    Tab(
+                        selected = selectedTabIndex == 1,
+                        onClick = {
+                            selectedListing = SourceListing.LATEST
+                            filterValues = emptyMap()
+                            query = ""
+                            searchActive = false
+                            page = 1
+                        },
+                        text = { Text("ui.latest") },
                     )
                 }
                 if (definitions.isNotEmpty()) {
-                    FilterChip(
-                        selected = showFilters,
-                        onClick = { showFilters = !showFilters },
-                        label = { Text("ui.filter") },
-                        leadingIcon = { Icon(Icons.Default.Tune, contentDescription = null) },
+                    Tab(
+                        selected = selectedTabIndex == filterTabIndex,
+                        onClick = { showFilters = true },
+                        text = {
+                            val label = UiTranslations.translate("ui.filters", LocalLanguagePack.current)
+                            Text(if (filterValues.isEmpty()) label else "$label (${filterValues.size})")
+                        },
+                        icon = { Icon(Icons.Default.Tune, contentDescription = null) },
                     )
-                }
-            }
-            if (showFilters) {
-                FilterPanel(definitions, filterValues) {
-                    filterValues = it
-                    page = 1
                 }
             }
             if (showPreferences) {
@@ -1212,69 +1249,205 @@ private fun Pagination(page: Int, hasNext: Boolean, select: (Int) -> Unit) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-private fun FilterPanel(
+private fun SourceFilterSheet(
     definitions: List<SourceFilterDefinition>,
-    values: Map<String, String>,
-    update: (Map<String, String>) -> Unit,
+    selected: Map<String, String>,
+    dismiss: () -> Unit,
+    apply: (Map<String, String>) -> Unit,
 ) {
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+    var draft by remember(definitions, selected) { mutableStateOf(selected) }
+    val definitionsById = remember(definitions) { definitions.associateBy(SourceFilterDefinition::id) }
+    fun update(definition: SourceFilterDefinition, value: String) {
+        draft = if (value == definition.defaultValue()) {
+            draft - definition.id()
+        } else {
+            draft + (definition.id() to value)
+        }
+    }
+    ModalBottomSheet(
+        onDismissRequest = dismiss,
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
     ) {
-        Text("ui.filters", fontWeight = FontWeight.SemiBold)
-        definitions.forEach { definition ->
-            val value = values[definition.id()] ?: definition.defaultValue()
-            when (definition.type()) {
-                SourceFilterType.HEADER -> Text(definition.label(), fontWeight = FontWeight.Medium)
-                SourceFilterType.SEPARATOR -> HorizontalDivider()
-                SourceFilterType.TEXT -> OutlinedTextField(
-                    value = value,
-                    onValueChange = { update(values + (definition.id() to it)) },
-                    label = { Text(definition.label()) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                SourceFilterType.CHECKBOX -> SwitchRow(definition.label(), value == "true") {
-                    update(values + (definition.id() to it.toString()))
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("ui.filters", style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        "ui.source.filters.provided.by.extension",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                 }
-                SourceFilterType.TRI_STATE -> OptionChips(
-                    definition,
-                    listOf("ignore", "include", "exclude"),
-                    value,
-                    values,
-                    update,
-                )
-                SourceFilterType.SELECT,
-                SourceFilterType.SORT,
-                -> OptionChips(definition, definition.options(), value, values, update)
+                TextButton(onClick = { draft = emptyMap() }) { Text("ui.reset") }
+            }
+            Spacer(Modifier.height(8.dp))
+            HorizontalDivider()
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth().heightIn(max = 560.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                contentPadding = PaddingValues(vertical = 14.dp),
+            ) {
+                items(definitions, key = SourceFilterDefinition::id) { definition ->
+                    val value = draft[definition.id()] ?: definition.defaultValue()
+                    Box(
+                        modifier = Modifier.padding(
+                            start = (sourceFilterDepth(definition, definitionsById) * 14).dp,
+                        ),
+                    ) {
+                        SourceFilterControl(
+                            definition = definition,
+                            value = value,
+                            update = { update(definition, it) },
+                        )
+                    }
+                }
+            }
+            HorizontalDivider()
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 14.dp),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextButton(onClick = dismiss) { Text("ui.cancel") }
+                Spacer(Modifier.width(8.dp))
+                Button(onClick = { apply(draft) }) { Text("ui.apply") }
             }
         }
-        TextButton(onClick = { update(emptyMap()) }) { Text("ui.reset") }
     }
-    HorizontalDivider()
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SourceFilterControl(
+    definition: SourceFilterDefinition,
+    value: String,
+    update: (String) -> Unit,
+) {
+    when (definition.type()) {
+        SourceFilterType.HEADER -> if (definition.label().isNotBlank()) {
+            Text(
+                definition.label(),
+                modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.titleSmall,
+            )
+        }
+        SourceFilterType.SEPARATOR -> HorizontalDivider()
+        SourceFilterType.TEXT -> OutlinedTextField(
+            value = value,
+            onValueChange = update,
+            label = { Text(definition.label()) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        SourceFilterType.CHECKBOX -> Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .clickable { update((value != "true").toString()) }
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Checkbox(checked = value == "true", onCheckedChange = null)
+            Spacer(Modifier.width(8.dp))
+            Text(definition.label(), modifier = Modifier.weight(1f))
+        }
+        SourceFilterType.TRI_STATE -> Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(definition.label(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf("ignore", "include", "exclude").forEach { option ->
+                    FilterChip(
+                        selected = value == option,
+                        onClick = { update(option) },
+                        label = {
+                            Text(
+                                when (option) {
+                                    "include" -> "ui.filter.include"
+                                    "exclude" -> "ui.filter.exclude"
+                                    else -> "ui.filter.ignore"
+                                },
+                            )
+                        },
+                        leadingIcon = if (value == option) {
+                            { Icon(Icons.Default.Check, contentDescription = null) }
+                        } else {
+                            null
+                        },
+                    )
+                }
+            }
+        }
+        SourceFilterType.SELECT,
+        SourceFilterType.SORT,
+        -> SourceOptionFilter(definition, value, update)
+    }
 }
 
 @Composable
-private fun OptionChips(
+private fun SourceOptionFilter(
     definition: SourceFilterDefinition,
-    options: List<String>,
     value: String,
-    values: Map<String, String>,
-    update: (Map<String, String>) -> Unit,
+    update: (String) -> Unit,
 ) {
-    Column {
-        Text(definition.label(), color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            options.forEach { option ->
-                FilterChip(
-                    selected = value == option,
-                    onClick = { update(values + (definition.id() to option)) },
-                    label = { Text(option) },
+    var expanded by remember(definition.id()) { mutableStateOf(false) }
+    Box(modifier = Modifier.fillMaxWidth()) {
+        OutlinedButton(
+            onClick = { expanded = true },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                horizontalAlignment = Alignment.Start,
+            ) {
+                Text(
+                    definition.label(),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.labelSmall,
+                )
+                Text(value, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.widthIn(min = 280.dp),
+        ) {
+            definition.options().forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(option) },
+                    leadingIcon = if (option == value) {
+                        { Icon(Icons.Default.Check, contentDescription = null) }
+                    } else {
+                        null
+                    },
+                    onClick = {
+                        update(option)
+                        expanded = false
+                    },
                 )
             }
         }
     }
+}
+
+private fun sourceFilterDepth(
+    definition: SourceFilterDefinition,
+    definitions: Map<String, SourceFilterDefinition>,
+): Int {
+    var depth = 0
+    var groupId = definition.groupId()
+    val visited = mutableSetOf<String>()
+    while (groupId.isNotBlank() && visited.add(groupId)) {
+        depth++
+        groupId = definitions[groupId]?.groupId().orEmpty()
+    }
+    return depth.coerceAtMost(3)
 }
 
 @Composable

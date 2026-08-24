@@ -811,7 +811,7 @@ final class ExtensionRepositoryTest {
         SourcePage page = catalogue.latest(new SourceBrowseRequest(1, 20, List.of(), Map.of()));
         var filters = catalogue.filters();
         catalogue.search(new SourceSearchRequest(
-                "example",
+                "",
                 new SourceBrowseRequest(
                         1,
                         20,

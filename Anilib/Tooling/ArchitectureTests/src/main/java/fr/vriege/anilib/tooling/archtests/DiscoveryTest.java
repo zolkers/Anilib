@@ -139,6 +139,14 @@ final class DiscoveryTest {
             counter.check(discovery.search(LOCAL_SOURCE, "beta", 1, 20, List.of())
                             .items().getFirst().title().equals("Beta Tale"),
                     "source search must match titles without platform behavior");
+            counter.check(discovery.search(
+                            LOCAL_SOURCE,
+                            "",
+                            1,
+                            20,
+                            List.of(new SourceFilterValue("sort", "Title descending")))
+                            .items().getFirst().title().equals("Beta Tale"),
+                    "source search must accept extension filters without requiring a text query");
             counter.check(discovery.browse(
                             LOCAL_SOURCE,
                             SourceListing.POPULAR,
