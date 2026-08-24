@@ -53,10 +53,7 @@ import fr.vriege.anilib.platform.compose.ComposePlayerBackend
 import fr.vriege.anilib.platform.compose.DesktopBrowserRuntime
 import fr.vriege.anilib.platform.compose.ShareController
 import java.awt.GraphicsEnvironment
-import java.awt.event.WindowAdapter
-import java.awt.event.WindowEvent
 import java.util.concurrent.atomic.AtomicBoolean
-import javax.swing.Timer
 import org.jetbrains.skia.Image
 
 fun main(arguments: Array<String>) {
@@ -195,11 +192,7 @@ fun main(arguments: Array<String>) {
                     }
                 }
             }
-            val windowUndecorated = windowUndecorated(
-                applicationFullscreen = applicationFullscreen.value,
-                playerFullscreen = playerFullscreen.value,
-                applicationWindowMode = applicationWindowMode.value,
-            )
+            val windowUndecorated = windowUndecorated(applicationWindowMode.value)
             val content = remember {
                 movableContentOf {
                     DesktopAnilibContent(
@@ -256,9 +249,12 @@ fun main(arguments: Array<String>) {
                             setApplicationFullscreen(false)
                             true
                         } else if (
-                            !playerFullscreen.value &&
-                            !applicationFullscreen.value &&
-                            applicationWindowMode.value == ApplicationWindowMode.BORDERLESS &&
+                            shouldExitApplicationBorderless(
+                                playerFullscreen = playerFullscreen.value,
+                                applicationFullscreen = applicationFullscreen.value,
+                                playerActive = playerActive.value,
+                                applicationWindowMode = applicationWindowMode.value,
+                            ) &&
                             event.key == Key.Escape &&
                             event.type == KeyEventType.KeyDown
                         ) {
@@ -271,33 +267,6 @@ fun main(arguments: Array<String>) {
                         }
                     },
                 ) {
-                    DisposableEffect(window) {
-                        var pendingExit: Timer? = null
-                        val listener = object : WindowAdapter() {
-                            override fun windowLostFocus(event: WindowEvent) {
-                                if (!playerFullscreen.value) return
-                                pendingExit?.stop()
-                                pendingExit = Timer(PLAYER_FULLSCREEN_FOCUS_GRACE_MILLIS) {
-                                    if (shouldExitPlayerFullscreen(playerFullscreen.value, window.isFocused)) {
-                                        setPlayerFullscreen(false)
-                                    }
-                                }.apply {
-                                    isRepeats = false
-                                    start()
-                                }
-                            }
-
-                            override fun windowGainedFocus(event: WindowEvent) {
-                                pendingExit?.stop()
-                                pendingExit = null
-                            }
-                        }
-                        window.addWindowFocusListener(listener)
-                        onDispose {
-                            pendingExit?.stop()
-                            window.removeWindowFocusListener(listener)
-                        }
-                    }
                     LaunchedEffect(window) {
                         windowState.placement = intendedWindowPlacement.value
                         window.isVisible = true
@@ -314,13 +283,6 @@ fun main(arguments: Array<String>) {
         crashShield.close()
     }
 }
-
-private const val PLAYER_FULLSCREEN_FOCUS_GRACE_MILLIS = 150
-
-internal fun shouldExitPlayerFullscreen(
-    playerFullscreen: Boolean,
-    windowFocused: Boolean,
-): Boolean = playerFullscreen && !windowFocused
 
 private fun ApplicationWindowMode.placement(): WindowPlacement = when (this) {
     ApplicationWindowMode.WINDOWED -> WindowPlacement.Floating
@@ -342,16 +304,18 @@ internal fun PlayerWindowMode.placement(
     }
 }
 
-internal fun windowUndecorated(
-    applicationFullscreen: Boolean,
-    playerFullscreen: Boolean,
-    applicationWindowMode: ApplicationWindowMode,
-): Boolean = if (playerFullscreen) {
-    // This value keys the Window. Keep it stable while video is active so its native surface survives.
+internal fun windowUndecorated(applicationWindowMode: ApplicationWindowMode): Boolean =
     applicationWindowMode == ApplicationWindowMode.BORDERLESS
-} else {
-    applicationFullscreen || applicationWindowMode == ApplicationWindowMode.BORDERLESS
-}
+
+internal fun shouldExitApplicationBorderless(
+    playerFullscreen: Boolean,
+    applicationFullscreen: Boolean,
+    playerActive: Boolean,
+    applicationWindowMode: ApplicationWindowMode,
+): Boolean = !playerFullscreen &&
+    !applicationFullscreen &&
+    !playerActive &&
+    applicationWindowMode == ApplicationWindowMode.BORDERLESS
 
 @Composable
 internal fun DesktopAnilibContent(

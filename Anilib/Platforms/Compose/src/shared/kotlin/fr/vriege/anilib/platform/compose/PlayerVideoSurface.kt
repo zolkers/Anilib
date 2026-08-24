@@ -41,6 +41,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -96,9 +97,10 @@ internal fun PlayerVideoSurface(
     var rightAction by remember(bridge) { mutableStateOf(PlayerCustomAction.SEEK_FORWARD) }
     var drag by remember(bridge) { mutableStateOf(Offset.Zero) }
     var dragStartX by remember(bridge) { mutableFloatStateOf(0f) }
-    DisposableEffect(bridge, setPlayerActive) {
-        setPlayerActive(true)
-        onDispose { setPlayerActive(false) }
+    val currentSetPlayerActive = rememberUpdatedState(setPlayerActive)
+    DisposableEffect(bridge) {
+        currentSetPlayerActive.value(true)
+        onDispose { currentSetPlayerActive.value(false) }
     }
     DisposableEffect(bridge, player) {
         bridge.attach(player)

@@ -16,25 +16,10 @@ class DesktopWindowModeTest {
     }
 
     @Test
-    fun `player fullscreen exits when the application stays unfocused`() {
-        assertTrue(shouldExitPlayerFullscreen(playerFullscreen = true, windowFocused = false))
-        assertFalse(shouldExitPlayerFullscreen(playerFullscreen = true, windowFocused = true))
-        assertFalse(shouldExitPlayerFullscreen(playerFullscreen = false, windowFocused = false))
-    }
-
-    @Test
     fun `player fullscreen keeps the window decoration stable`() {
         ApplicationWindowMode.entries.forEach { applicationMode ->
-            val before = windowUndecorated(
-                applicationFullscreen = false,
-                playerFullscreen = false,
-                applicationWindowMode = applicationMode,
-            )
-            val during = windowUndecorated(
-                applicationFullscreen = false,
-                playerFullscreen = true,
-                applicationWindowMode = applicationMode,
-            )
+            val before = windowUndecorated(applicationMode)
+            val during = windowUndecorated(applicationMode)
 
             assertEquals(before, during, applicationMode.name)
         }
@@ -59,12 +44,28 @@ class DesktopWindowModeTest {
     }
 
     @Test
-    fun `application fullscreen still controls decoration outside the player`() {
+    fun `application fullscreen keeps the same window instance`() {
+        assertFalse(windowUndecorated(ApplicationWindowMode.WINDOWED))
+        assertTrue(windowUndecorated(ApplicationWindowMode.BORDERLESS))
+    }
+
+    @Test
+    fun `escape never changes the application window while video is active`() {
         assertFalse(
-            windowUndecorated(false, false, ApplicationWindowMode.WINDOWED),
+            shouldExitApplicationBorderless(
+                playerFullscreen = false,
+                applicationFullscreen = false,
+                playerActive = true,
+                applicationWindowMode = ApplicationWindowMode.BORDERLESS,
+            ),
         )
         assertTrue(
-            windowUndecorated(true, false, ApplicationWindowMode.WINDOWED),
+            shouldExitApplicationBorderless(
+                playerFullscreen = false,
+                applicationFullscreen = false,
+                playerActive = false,
+                applicationWindowMode = ApplicationWindowMode.BORDERLESS,
+            ),
         )
     }
 }
