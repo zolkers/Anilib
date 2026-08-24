@@ -3,7 +3,7 @@ package fr.vriege.anilib.platform.desktopextensionhost.compat.injekt.api;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 
-public abstract class FullTypeReference<T> {
+public abstract class FullTypeReference<T> implements TypeReference {
     private final Type type;
 
     protected FullTypeReference() {
@@ -15,6 +15,7 @@ public abstract class FullTypeReference<T> {
         }
     }
 
+    @Override
     public final Type getType() {
         return type;
     }

@@ -1,5 +1,12 @@
 package fr.vriege.anilib.platform.desktopextensionhost;
 
+import fr.vriege.anilib.platform.desktopextensionhost.compat.android.app.Application;
+import fr.vriege.anilib.platform.desktopextensionhost.compat.android.os.Handler;
+import fr.vriege.anilib.platform.desktopextensionhost.compat.android.os.Looper;
+import fr.vriege.anilib.platform.desktopextensionhost.compat.android.webkit.WebResourceRequest;
+import fr.vriege.anilib.platform.desktopextensionhost.compat.android.webkit.WebResourceResponse;
+import fr.vriege.anilib.platform.desktopextensionhost.compat.android.webkit.WebView;
+import fr.vriege.anilib.platform.desktopextensionhost.compat.android.webkit.WebViewClient;
 import fr.vriege.anilib.platform.desktopextensionhost.extension.ExtensionAbiVerifier;
 import fr.vriege.anilib.platform.desktopextensionhost.extension.ExtensionRegistry;
 import fr.vriege.anilib.platform.desktopextensionhost.extension.ExtensionRuntimeCatalog;
@@ -12,6 +19,10 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
 
@@ -36,6 +47,16 @@ final class ExtensionAbiVerifierSmoke {
             "fr/vriege/anilib/platform/desktopextensionhost/compat/aniyomi/source/model/SManga";
     private static final String S_MANGA_UPDATE =
             "fr/vriege/anilib/platform/desktopextensionhost/compat/aniyomi/source/model/SMangaUpdate";
+    private static final String HANDLER =
+            "fr/vriege/anilib/platform/desktopextensionhost/compat/android/os/Handler";
+    private static final String LOOPER =
+            "fr/vriege/anilib/platform/desktopextensionhost/compat/android/os/Looper";
+    private static final String WEB_VIEW =
+            "fr/vriege/anilib/platform/desktopextensionhost/compat/android/webkit/WebView";
+    private static final String WEB_VIEW_CLIENT =
+            "fr/vriege/anilib/platform/desktopextensionhost/compat/android/webkit/WebViewClient";
+    private static final String WEB_SETTINGS =
+            "fr/vriege/anilib/platform/desktopextensionhost/compat/android/webkit/WebSettings";
 
     private ExtensionAbiVerifierSmoke() {
     }
@@ -71,6 +92,22 @@ final class ExtensionAbiVerifierSmoke {
             if (!combinedUpdateReport.compatible()) {
                 throw new IllegalStateException(
                         "Combined manga update ABI surface was rejected: " + combinedUpdateReport);
+            }
+
+            Path animeSamaWebViewSurface = directory.resolve("anime-sama-webview-surface.jar");
+            writeAnimeSamaWebViewSurfaceArchive(animeSamaWebViewSurface);
+            ExtensionAbiVerifier.Report animeSamaReport = verifier.inspect(animeSamaWebViewSurface);
+            if (!animeSamaReport.compatible()) {
+                throw new IllegalStateException("Anime-Sama WebView ABI surface was rejected: " + animeSamaReport);
+            }
+            verifyWebViewSurfaceBehavior();
+
+            String abiArchive = System.getenv("ANILIB_DESKTOP_EXTENSION_ABI_ARCHIVE");
+            if (abiArchive != null && !abiArchive.isBlank()) {
+                ExtensionAbiVerifier.Report localReport = verifier.inspect(Path.of(abiArchive));
+                if (!localReport.compatible()) {
+                    throw new IllegalStateException("Local extension ABI gaps: " + localReport);
+                }
             }
 
             String installed = System.getenv("ANILIB_DESKTOP_EXTENSION_ARCHIVE");
@@ -229,5 +266,87 @@ final class ExtensionAbiVerifierSmoke {
             jar.write(writer.toByteArray());
             jar.closeEntry();
         }
+    }
+
+    private static void writeAnimeSamaWebViewSurfaceArchive(Path archive) throws IOException {
+        ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+        writer.visit(Opcodes.V21, Opcodes.ACC_PUBLIC, "sample/AnimeSamaWebViewAbiConsumer",
+                null, "java/lang/Object", null);
+        MethodVisitor method = writer.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC,
+                "invoke", "()V", null, null);
+        method.visitCode();
+        method.visitMethodInsn(Opcodes.INVOKESTATIC, LOOPER, "getMainLooper", "()L" + LOOPER + ";", false);
+        method.visitTypeInsn(Opcodes.NEW, HANDLER);
+        method.visitInsn(Opcodes.DUP_X1);
+        method.visitInsn(Opcodes.SWAP);
+        method.visitMethodInsn(Opcodes.INVOKESPECIAL, HANDLER, "<init>", "(L" + LOOPER + ";)V", false);
+        method.visitInsn(Opcodes.ACONST_NULL);
+        method.visitMethodInsn(Opcodes.INVOKEVIRTUAL, HANDLER, "post", "(Ljava/lang/Runnable;)Z", false);
+        method.visitInsn(Opcodes.POP);
+        method.visitTypeInsn(Opcodes.NEW, WEB_VIEW);
+        method.visitInsn(Opcodes.DUP);
+        method.visitInsn(Opcodes.ACONST_NULL);
+        method.visitMethodInsn(Opcodes.INVOKESPECIAL, WEB_VIEW, "<init>",
+                "(Lfr/vriege/anilib/platform/desktopextensionhost/compat/android/content/Context;)V", false);
+        method.visitVarInsn(Opcodes.ASTORE, 0);
+        method.visitVarInsn(Opcodes.ALOAD, 0);
+        method.visitMethodInsn(Opcodes.INVOKEVIRTUAL, WEB_VIEW, "getSettings", "()L" + WEB_SETTINGS + ";", false);
+        method.visitVarInsn(Opcodes.ASTORE, 1);
+        for (String setter : List.of("setJavaScriptEnabled", "setDomStorageEnabled", "setDatabaseEnabled",
+                "setUseWideViewPort", "setLoadWithOverviewMode")) {
+            method.visitVarInsn(Opcodes.ALOAD, 1);
+            method.visitInsn(Opcodes.ICONST_1);
+            method.visitMethodInsn(Opcodes.INVOKEVIRTUAL, WEB_SETTINGS, setter, "(Z)V", false);
+        }
+        method.visitVarInsn(Opcodes.ALOAD, 1);
+        method.visitLdcInsn("Anime-Sama");
+        method.visitMethodInsn(Opcodes.INVOKEVIRTUAL, WEB_SETTINGS,
+                "setUserAgentString", "(Ljava/lang/String;)V", false);
+        method.visitVarInsn(Opcodes.ALOAD, 0);
+        method.visitTypeInsn(Opcodes.NEW, WEB_VIEW_CLIENT);
+        method.visitInsn(Opcodes.DUP);
+        method.visitMethodInsn(Opcodes.INVOKESPECIAL, WEB_VIEW_CLIENT, "<init>", "()V", false);
+        method.visitMethodInsn(Opcodes.INVOKEVIRTUAL, WEB_VIEW, "setWebViewClient",
+                "(L" + WEB_VIEW_CLIENT + ";)V", false);
+        method.visitVarInsn(Opcodes.ALOAD, 0);
+        method.visitLdcInsn("https://example.test/video.m3u8");
+        method.visitInsn(Opcodes.ACONST_NULL);
+        method.visitMethodInsn(Opcodes.INVOKEVIRTUAL, WEB_VIEW, "loadUrl",
+                "(Ljava/lang/String;Ljava/util/Map;)V", false);
+        method.visitVarInsn(Opcodes.ALOAD, 0);
+        method.visitMethodInsn(Opcodes.INVOKEVIRTUAL, WEB_VIEW, "stopLoading", "()V", false);
+        method.visitVarInsn(Opcodes.ALOAD, 0);
+        method.visitMethodInsn(Opcodes.INVOKEVIRTUAL, WEB_VIEW, "destroy", "()V", false);
+        method.visitInsn(Opcodes.RETURN);
+        method.visitMaxs(0, 0);
+        method.visitEnd();
+        writer.visitEnd();
+        try (JarOutputStream jar = new JarOutputStream(Files.newOutputStream(archive))) {
+            jar.putNextEntry(new JarEntry("sample/AnimeSamaWebViewAbiConsumer.class"));
+            jar.write(writer.toByteArray());
+            jar.closeEntry();
+        }
+    }
+
+    private static void verifyWebViewSurfaceBehavior() {
+        AtomicBoolean posted = new AtomicBoolean();
+        Handler handler = new Handler(Looper.getMainLooper());
+        if (!handler.post(() -> posted.set(true)) || !posted.get()) {
+            throw new IllegalStateException("Desktop Handler did not execute its posted action");
+        }
+        AtomicReference<String> intercepted = new AtomicReference<>();
+        WebView view = new WebView(Application.create());
+        view.setWebViewClient(new WebViewClient() {
+            @Override
+            public WebResourceResponse shouldInterceptRequest(WebView source, WebResourceRequest request) {
+                intercepted.set(request.getUrl().toString());
+                return null;
+            }
+        });
+        view.loadUrl("https://example.test/video.m3u8", Map.of());
+        if (!"https://example.test/video.m3u8".equals(intercepted.get())) {
+            throw new IllegalStateException("Desktop WebView did not expose the media request");
+        }
+        view.destroy();
     }
 }
