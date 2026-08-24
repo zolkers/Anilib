@@ -67,6 +67,15 @@ internal data class HistoryContentKey(
     val contentId: String,
 )
 
+internal class HistoryRouteState {
+    val query = mutableStateOf("")
+    val searching = mutableStateOf(false)
+    val kind = mutableStateOf(MediaKind.ANIME)
+}
+
+@Composable
+internal fun rememberHistoryRouteState(): HistoryRouteState = remember { HistoryRouteState() }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun HistoryPage(
@@ -78,6 +87,7 @@ internal fun HistoryPage(
     openPlayer: (LibraryItemId, SourceEpisodeId?) -> Unit,
     resumeError: String?,
     goBack: () -> Unit,
+    routeState: HistoryRouteState,
     navigate: (LibraryHistoryRow, (LibraryNavigator) -> Unit) -> Unit,
 ) {
     val scope = rememberCrashSafeCoroutineScope()
@@ -91,10 +101,10 @@ internal fun HistoryPage(
     }
     val history = remember(revision) { presentation.history() }
     val cards = remember(revision) { presentation.library().titles().associateBy { it.id() } }
-    var query by remember { mutableStateOf("") }
-    var searching by remember { mutableStateOf(false) }
+    var query by routeState.query
+    var searching by routeState.searching
     val searchFocus = rememberSearchFocusRequester(searching)
-    var kind by remember { mutableStateOf(MediaKind.ANIME) }
+    var kind by routeState.kind
     var contentLabels by remember(reader, player) {
         mutableStateOf<Map<HistoryContentKey, String>>(emptyMap())
     }

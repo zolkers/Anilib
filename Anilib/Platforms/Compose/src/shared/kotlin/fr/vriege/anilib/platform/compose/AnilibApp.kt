@@ -409,8 +409,10 @@ fun AnilibApp(
                     val showGlobalNavigation = when (section) {
                         AppSection.ANIME, AppSection.MANGA -> destination.page() != LibraryPage.DETAILS
                         AppSection.UPDATES -> true
-                        AppSection.BROWSE -> browseMainDestination
-                        AppSection.MORE -> moreDestination == null
+                        AppSection.BROWSE -> browseMainDestination &&
+                            destination.page() != LibraryPage.DETAILS
+                        AppSection.MORE -> moreDestination == null &&
+                            destination.page() != LibraryPage.DETAILS
                     }
                     val useNavigationRail = when (settings.navigationStyle()) {
                         NavigationStyle.ADAPTIVE -> maxWidth >= 720.dp
@@ -684,38 +686,47 @@ internal fun AppDestination(
     closeMore: () -> Unit,
     browseDestinationChanged: (Boolean) -> Unit,
 ) {
+    val discoveryRouteState = rememberDiscoveryRouteState()
+    val historyRouteState = rememberHistoryRouteState()
+    if (destination.page() == LibraryPage.DETAILS) {
+        val goBackOverride = when {
+            section == AppSection.BROWSE -> ({ navigate(LibraryNavigator::openLibrary) })
+            section == AppSection.MORE && moreDestination == MoreDestination.HISTORY ->
+                ({ navigate(LibraryNavigator::openLibrary) })
+            else -> null
+        }
+        DetailsDestination(
+            presentation,
+            discovery,
+            browserCookies,
+            browserRuntimeStatus,
+            detailPlatform,
+            reader,
+            player,
+            downloads,
+            tracking,
+            destination,
+            navigate,
+            openReader,
+            readerError,
+            openPlayer,
+            enqueueDownload,
+            downloadError,
+            openTracking,
+            goBackOverride = goBackOverride,
+        )
+        return
+    }
     when (section) {
         AppSection.ANIME,
         AppSection.MANGA,
-        -> when (destination.page()) {
-            LibraryPage.DETAILS -> DetailsDestination(
-                presentation,
-                discovery,
-                browserCookies,
-                browserRuntimeStatus,
-                detailPlatform,
-                reader,
-                player,
-                downloads,
-                tracking,
-                destination,
-                navigate,
-                openReader,
-                readerError,
-                openPlayer,
-                enqueueDownload,
-                downloadError,
-                openTracking,
-                goBackOverride = null,
-            )
-            else -> LibraryPageContent(
-                presentation,
-                discovery,
-                downloads,
-                if (section == AppSection.ANIME) MediaKind.ANIME else MediaKind.MANGA,
-                navigate,
-            )
-        }
+        -> LibraryPageContent(
+            presentation,
+            discovery,
+            downloads,
+            if (section == AppSection.ANIME) MediaKind.ANIME else MediaKind.MANGA,
+            navigate,
+        )
         AppSection.UPDATES -> UpdatesScreen(updates, downloads)
         AppSection.BROWSE -> DiscoveryScreen(
             discovery,
@@ -724,21 +735,11 @@ internal fun AppDestination(
             apkExtensionPlatform,
             browserCookies,
             browserRuntimeStatus,
+            routeState = discoveryRouteState,
             openSourceReader = openSourceReader,
             openSourcePlayer = openSourcePlayer,
             openLibraryDetails = { libraryItemId ->
-                val kind = presentation.details(libraryItemId).orElse(null)?.kind()
-                when (kind) {
-                    MediaKind.ANIME -> {
-                        openSection(AppSection.ANIME)
-                        navigate { it.openDetails(libraryItemId) }
-                    }
-                    MediaKind.MANGA, MediaKind.NOVEL, MediaKind.OTHER -> {
-                        openSection(AppSection.MANGA)
-                        navigate { it.openDetails(libraryItemId) }
-                    }
-                    null -> Unit
-                }
+                navigate { it.openDetails(libraryItemId) }
             },
             navigationVisibilityChanged = browseDestinationChanged,
             manageExtensions = {
@@ -756,10 +757,8 @@ internal fun AppDestination(
                 openPlayer,
                 readerError,
                 closeMore,
-            ) { row, transition ->
-                openSection(if (row.kind() == MediaKind.ANIME) AppSection.ANIME else AppSection.MANGA)
-                navigate(transition)
-            }
+                routeState = historyRouteState,
+            ) { _, transition -> navigate(transition) }
             MoreDestination.DOWNLOADS -> DownloadsScreen(downloads, closeMore)
             MoreDestination.BACKUP -> BackupScreen(backup, backupImportPicker, closeMore)
             MoreDestination.TRACKING -> TrackerAccountsScreen(tracking, browserRuntimeStatus, closeMore)

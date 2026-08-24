@@ -119,7 +119,6 @@ internal fun DetailsDestination(
     val scope = rememberCrashSafeCoroutineScope()
     val downloadQueue = rememberDownloadQueueSnapshot(downloads)
     val downloadProgress = rememberDownloadProgressIndex(downloadQueue)
-    var relatedBackStack by remember { mutableStateOf<List<LibraryItemId>>(emptyList()) }
     var revision by remember(id) { mutableStateOf(0) }
     var trackerRevision by remember(id) { mutableStateOf(0) }
     var refreshing by remember(id) { mutableStateOf(false) }
@@ -132,15 +131,7 @@ internal fun DetailsDestination(
     var readChapterIds by remember(id) { mutableStateOf(setOf<String>()) }
     ObserveTracking(tracking) { trackerRevision++ }
     val details = remember(id, revision) { id?.let { presentation.details(it).orElse(null) } }
-    val navigateBack: () -> Unit = {
-        val previous = relatedBackStack.lastOrNull()
-        if (previous != null) {
-            relatedBackStack = relatedBackStack.dropLast(1)
-            navigate { it.openDetails(previous) }
-        } else {
-            (goBackOverride ?: { navigate(LibraryNavigator::back) })()
-        }
-    }
+    val navigateBack: () -> Unit = goBackOverride ?: { navigate(LibraryNavigator::back) }
     if (browserPage != null) {
         BrowserScreen(
             browserPage!!,
@@ -407,7 +398,6 @@ internal fun DetailsDestination(
                 )
             },
             openRelated = { relatedId ->
-                relatedBackStack = relatedBackStack + details.id()
                 navigate { it.openDetails(relatedId) }
             },
             goBack = navigateBack,

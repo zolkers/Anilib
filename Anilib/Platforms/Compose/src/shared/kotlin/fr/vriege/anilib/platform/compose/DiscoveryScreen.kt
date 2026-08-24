@@ -122,7 +122,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.foundation.layout.PaddingValues
 
-private enum class BrowseSection(val label: String, val kind: SourceContentKind?) {
+internal enum class BrowseSection(val label: String, val kind: SourceContentKind?) {
     ANIME_SOURCES("Anime sources", SourceContentKind.ANIME),
     MANGA_SOURCES("Manga sources", SourceContentKind.MANGA),
     ANIME_EXTENSIONS("Anime extensions", SourceContentKind.ANIME),
@@ -130,6 +130,19 @@ private enum class BrowseSection(val label: String, val kind: SourceContentKind?
     MIGRATE_ANIME("Migrate anime", SourceContentKind.ANIME),
     MIGRATE_MANGA("Migrate manga", SourceContentKind.MANGA),
 }
+
+internal class DiscoveryRouteState {
+    val section = mutableStateOf(BrowseSection.ANIME_SOURCES)
+    val selectedSource = mutableStateOf<SourceDescriptor?>(null)
+    val selectedGlobalItem = mutableStateOf<SourceCatalogueItem?>(null)
+    val listing = mutableStateOf(SourceListing.POPULAR)
+    val globalSearch = mutableStateOf(false)
+    val globalQuery = mutableStateOf("")
+    val browserPage = mutableStateOf<SourceWebPage?>(null)
+}
+
+@Composable
+internal fun rememberDiscoveryRouteState(): DiscoveryRouteState = remember { DiscoveryRouteState() }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -140,6 +153,7 @@ internal fun DiscoveryScreen(
     apkExtensionPlatform: ApkExtensionPlatform,
     browserCookies: HttpCookieJar,
     browserRuntimeStatus: BrowserRuntimeStatus,
+    routeState: DiscoveryRouteState,
     openSourceReader: (String, SourceContentUnitId) -> Unit,
     openSourcePlayer: (String, SourceEpisodeId) -> Unit,
     openLibraryDetails: (LibraryItemId) -> Unit,
@@ -147,18 +161,18 @@ internal fun DiscoveryScreen(
     manageExtensions: () -> Unit,
 ) {
     val scope = rememberCrashSafeCoroutineScope()
-    var section by remember { mutableStateOf(BrowseSection.ANIME_SOURCES) }
-    var selectedSource by remember { mutableStateOf<SourceDescriptor?>(null) }
-    var selectedGlobalItem by remember { mutableStateOf<SourceCatalogueItem?>(null) }
-    var listing by remember { mutableStateOf(SourceListing.POPULAR) }
-    var globalSearch by remember { mutableStateOf(false) }
-    var globalQuery by remember { mutableStateOf("") }
+    var section by routeState.section
+    var selectedSource by routeState.selectedSource
+    var selectedGlobalItem by routeState.selectedGlobalItem
+    var listing by routeState.listing
+    var globalSearch by routeState.globalSearch
+    var globalQuery by routeState.globalQuery
     var globalSearchRevision by remember { mutableIntStateOf(0) }
     val globalSearchFocus = rememberSearchFocusRequester(globalSearch)
     var sourceBrowseRevision by remember { mutableIntStateOf(0) }
     var filteringSourceLanguages by remember { mutableStateOf(false) }
     var browseError by remember { mutableStateOf<String?>(null) }
-    var browserPage by remember { mutableStateOf<SourceWebPage?>(null) }
+    var browserPage by routeState.browserPage
     var extensionRevision by remember { mutableIntStateOf(0) }
     var updatingSources by remember { mutableStateOf<Set<SourceId>>(emptySet()) }
     val mainDestination = selectedSource == null && selectedGlobalItem == null && browserPage == null
