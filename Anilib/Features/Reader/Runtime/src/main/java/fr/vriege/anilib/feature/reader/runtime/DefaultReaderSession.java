@@ -1,6 +1,7 @@
 package fr.vriege.anilib.feature.reader.runtime;
 
 import fr.vriege.anilib.feature.library.LibraryCatalog;
+import fr.vriege.anilib.feature.library.LibraryHistoryEntry;
 import fr.vriege.anilib.feature.library.LibraryItem;
 import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.library.LibraryProgress;
@@ -131,11 +132,16 @@ final class DefaultReaderSession implements ReaderSession {
         LibraryItem current = library.find(libraryItemId)
                 .orElseThrow(() -> new ReaderException("Library item disappeared while reading"));
         Instant now = clock.instant();
-        library.save(current.withProgress(new LibraryProgress(
-                contentUnit.id().value(),
-                currentPageIndex,
-                pageCount - 1L,
-                now)));
+        library.save(current
+                .withProgress(new LibraryProgress(
+                        contentUnit.id().value(),
+                        currentPageIndex,
+                        pageCount - 1L,
+                        now))
+                .recordHistory(new LibraryHistoryEntry(
+                        contentUnit.id().value(),
+                        now,
+                        currentPageIndex)));
     }
 
     private void ensureOpen() {

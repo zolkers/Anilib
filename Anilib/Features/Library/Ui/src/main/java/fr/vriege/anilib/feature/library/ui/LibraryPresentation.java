@@ -15,6 +15,8 @@ import java.util.Set;
 import java.util.List;
 
 public interface LibraryPresentation {
+    AutoCloseable observe(Runnable listener);
+
     LibraryOverview library();
 
     Optional<LibraryDetails> details(LibraryItemId id);

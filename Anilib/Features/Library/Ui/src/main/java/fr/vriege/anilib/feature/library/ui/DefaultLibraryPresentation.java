@@ -53,6 +53,11 @@ public final class DefaultLibraryPresentation implements LibraryPresentation {
     }
 
     @Override
+    public AutoCloseable observe(Runnable listener) {
+        return catalog.observe(listener);
+    }
+
+    @Override
     public synchronized LibraryOverview library() {
         List<LibraryItem> items = catalog.snapshot();
         LibraryConfigurationSnapshot configured = configuration.snapshot();

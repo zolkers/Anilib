@@ -243,6 +243,8 @@ final class ReaderTest {
                         "reader progress must retain the chapter extent");
                 counter.check(saved.history().size() == 1,
                         "opening a reader session must append one history entry");
+                counter.check(saved.history().getFirst().position() == 1,
+                        "reader navigation must mirror the latest page into Library history");
                 try (ReaderController controller = product
                         .capability(ReaderUiCapabilities.PRESENTATION)
                         .open(item.id())) {

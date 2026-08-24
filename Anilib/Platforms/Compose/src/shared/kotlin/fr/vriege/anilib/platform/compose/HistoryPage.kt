@@ -32,6 +32,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -77,6 +78,10 @@ internal fun HistoryPage(
     navigate: (LibraryHistoryRow, (LibraryNavigator) -> Unit) -> Unit,
 ) {
     var revision by remember { mutableStateOf(0) }
+    DisposableEffect(presentation) {
+        val observation = presentation.observe { revision++ }
+        onDispose { runCatching { observation.close() } }
+    }
     val history = remember(revision) { presentation.history() }
     val cards = remember(revision) { presentation.library().titles().associateBy { it.id() } }
     var query by remember { mutableStateOf("") }
@@ -85,6 +90,9 @@ internal fun HistoryPage(
     var contentLabels by remember(reader, player) {
         mutableStateOf<Map<HistoryContentKey, String>>(emptyMap())
     }
+    var contentUnitIds by remember(reader) {
+        mutableStateOf<Map<HistoryContentKey, SourceContentUnitId>>(emptyMap())
+    }
     var episodeIds by remember(player) {
         mutableStateOf<Map<HistoryContentKey, SourceEpisodeId>>(emptyMap())
     }
@@ -92,6 +100,7 @@ internal fun HistoryPage(
         val rows = history.entries().filter { it.kind() == kind }
         val content = withContext(Dispatchers.IO) {
             val labels = mutableMapOf<HistoryContentKey, String>()
+            val resolvedContentUnitIds = mutableMapOf<HistoryContentKey, SourceContentUnitId>()
             val resolvedEpisodeIds = mutableMapOf<HistoryContentKey, SourceEpisodeId>()
             rows.groupBy { it.libraryItemId() }.forEach { (libraryItemId, titleRows) ->
                 if (kind == MediaKind.ANIME) {
@@ -109,14 +118,17 @@ internal fun HistoryPage(
                     }
                 } else {
                     runCatching { reader.contentUnits(libraryItemId) }.getOrDefault(emptyList()).forEach { unit ->
-                        labels[HistoryContentKey(libraryItemId, unit.id().value())] = unit.title()
+                        val key = HistoryContentKey(libraryItemId, unit.id().value())
+                        labels[key] = unit.title()
+                        resolvedContentUnitIds[key] = unit.id()
                     }
                 }
             }
-            labels to resolvedEpisodeIds
+            Triple(labels, resolvedContentUnitIds, resolvedEpisodeIds)
         }
         contentLabels = content.first
-        episodeIds = content.second
+        contentUnitIds = content.second
+        episodeIds = content.third
     }
     val entries = history.entries().filter {
         val contentLabel = contentLabels[HistoryContentKey(it.libraryItemId(), it.contentId())]
@@ -165,7 +177,6 @@ internal fun HistoryPage(
                                     row.openedAt(),
                                 )
                             }
-                            revision++
                         },
                     ) {
                         Icon(Icons.Default.DeleteSweep, contentDescription = "ui.clear.history")
@@ -220,13 +231,13 @@ internal fun HistoryPage(
                                 cards[row.libraryItemId()],
                                 contentLabels[HistoryContentKey(row.libraryItemId(), row.contentId())],
                                 resume = {
+                                    val key = HistoryContentKey(row.libraryItemId(), row.contentId())
                                     if (row.kind() == MediaKind.ANIME) {
-                                        openPlayer(
-                                            row.libraryItemId(),
-                                            episodeIds[HistoryContentKey(row.libraryItemId(), row.contentId())],
-                                        )
+                                        episodeIds[key]?.let { openPlayer(row.libraryItemId(), it) }
+                                            ?: navigate(row) { it.openDetails(row.libraryItemId()) }
                                     } else {
-                                        openReader(row.libraryItemId(), null)
+                                        contentUnitIds[key]?.let { openReader(row.libraryItemId(), it) }
+                                            ?: navigate(row) { it.openDetails(row.libraryItemId()) }
                                     }
                                 },
                                 remove = {
@@ -235,12 +246,10 @@ internal fun HistoryPage(
                                         row.contentId(),
                                         row.openedAt(),
                                     )
-                                    revision++
                                 },
                                 toggleFavorite = {
                                     val favorite = cards[row.libraryItemId()]?.favorite() == true
                                     presentation.setFavorite(setOf(row.libraryItemId()), !favorite)
-                                    revision++
                                 },
                                 openDetails = { transition ->
                                     navigate(row, transition)

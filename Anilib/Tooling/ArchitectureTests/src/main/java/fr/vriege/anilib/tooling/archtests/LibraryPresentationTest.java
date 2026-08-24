@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Set;
 import java.net.URI;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 
 final class LibraryPresentationTest {
     private LibraryPresentationTest() {
@@ -39,6 +40,16 @@ final class LibraryPresentationTest {
         LibraryPresentation presentation = new DefaultLibraryPresentation(
                 catalog,
                 new InMemoryLibraryConfiguration());
+        AtomicInteger revisions = new AtomicInteger();
+        AutoCloseable observation = presentation.observe(revisions::incrementAndGet);
+        catalog.save(catalog.find(new LibraryItemId("alpha")).orElseThrow());
+        try {
+            observation.close();
+        } catch (Exception exception) {
+            throw new AssertionError("Unable to close Library presentation observation", exception);
+        }
+        counter.check(revisions.get() == 1,
+                "Library presentation observers must receive catalog history and progress mutations");
 
         LibraryOverview overview = presentation.library();
         counter.check(
