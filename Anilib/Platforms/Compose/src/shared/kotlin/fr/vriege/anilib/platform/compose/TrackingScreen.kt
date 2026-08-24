@@ -24,11 +24,14 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -55,6 +58,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Sync
 import com.multiplatform.webview.web.LoadingState
@@ -421,26 +425,6 @@ private fun TrackerPreferenceRow(
 
 private fun <T> nextValue(values: List<T>, current: T): T =
     values[(values.indexOf(current) + 1).mod(values.size)]
-
-@Composable
-private fun <T> EnumChoiceRow(
-    values: List<T>,
-    selected: T,
-    label: (T) -> String,
-    choose: (T) -> Unit,
-) {
-    Column {
-        values.chunked(2).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                row.forEach { value ->
-                    TextButton(onClick = { choose(value) }) {
-                        Text(if (value == selected) "• ${label(value)}" else label(value))
-                    }
-                }
-            }
-        }
-    }
-}
 
 @Composable
 private fun TrackerConflictCard(
@@ -940,75 +924,134 @@ private fun TrackerEditDialog(
     var validationError by remember(entry) { mutableStateOf<String?>(null) }
     val language = LocalLanguagePack.current
     AlertDialog(
+        modifier = Modifier.widthIn(max = 640.dp),
         onDismissRequest = dismiss,
         title = {
-            Text(UiTranslations.format("dynamic.edit.tracking", LocalLanguagePack.current, descriptor.name()))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TrackerProviderIcon(account)
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        UiTranslations.format("dynamic.edit.tracking", language, descriptor.name()),
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                    Text(
+                        entry.title(),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(entry.title(), fontWeight = FontWeight.SemiBold)
-                Text("ui.status", style = MaterialTheme.typography.labelLarge)
-                EnumChoiceRow(
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                TrackerStatusField(
                     values = descriptor.statuses(),
                     selected = status,
                     label = { UiTranslations.translate(trackerStatusKey(it), language) },
                     choose = { status = it },
                 )
-                OutlinedTextField(
-                    value = progress,
-                    onValueChange = { progress = it },
-                    label = {
-                        Text(
-                            if (entry.totalUnits() >= 0) {
-                                UiTranslations.format(
-                                    "dynamic.progress.total",
-                                    LocalLanguagePack.current,
-                                    entry.totalUnits(),
-                                )
-                            } else {
-                                UiTranslations.translate("ui.progress", LocalLanguagePack.current)
-                            },
-                        )
-                    },
-                    singleLine = true,
-                )
-                if (descriptor.scores().isNotEmpty()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
                     OutlinedTextField(
-                        value = score,
-                        onValueChange = { score = it },
+                        value = progress,
+                        onValueChange = { progress = it },
+                        modifier = Modifier.weight(1f),
                         label = {
                             Text(
-                                UiTranslations.format(
-                                    "dynamic.score.range",
-                                    LocalLanguagePack.current,
-                                    scoreRange(descriptor.scores()),
-                                ),
+                                if (entry.totalUnits() >= 0) {
+                                    UiTranslations.format(
+                                        "dynamic.progress.total",
+                                        language,
+                                        entry.totalUnits(),
+                                    )
+                                } else {
+                                    UiTranslations.translate("ui.progress", language)
+                                },
                             )
                         },
                         singleLine = true,
                     )
-                }
-                if (descriptor.supportsDates()) {
-                    OutlinedTextField(
-                        value = startDate,
-                        onValueChange = { startDate = it },
-                        label = { Text("ui.start.date.yyyy.mm.dd.optional") },
-                        singleLine = true,
-                    )
-                    OutlinedTextField(
-                        value = finishDate,
-                        onValueChange = { finishDate = it },
-                        label = { Text("ui.finish.date.yyyy.mm.dd.optional") },
-                        singleLine = true,
-                    )
-                }
-                if (descriptor.supportsPrivateEntries()) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("ui.private.entry", modifier = Modifier.weight(1f))
-                        Switch(checked = privateEntry, onCheckedChange = { privateEntry = it })
+                    if (descriptor.scores().isNotEmpty()) {
+                        OutlinedTextField(
+                            value = score,
+                            onValueChange = { score = it },
+                            modifier = Modifier.weight(1f),
+                            label = {
+                                Text(
+                                    UiTranslations.format(
+                                        "dynamic.score.range",
+                                        language,
+                                        scoreRange(descriptor.scores()),
+                                    ),
+                                )
+                            },
+                            singleLine = true,
+                        )
                     }
                 }
-                (validationError ?: error)?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                if (descriptor.supportsDates()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        OutlinedTextField(
+                            value = startDate,
+                            onValueChange = { startDate = it },
+                            modifier = Modifier.weight(1f),
+                            label = { Text("ui.start.date") },
+                            placeholder = { Text("ui.date.format") },
+                            singleLine = true,
+                        )
+                        OutlinedTextField(
+                            value = finishDate,
+                            onValueChange = { finishDate = it },
+                            modifier = Modifier.weight(1f),
+                            label = { Text("ui.finish.date") },
+                            placeholder = { Text("ui.date.format") },
+                            singleLine = true,
+                        )
+                    }
+                }
+                if (descriptor.supportsPrivateEntries()) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth().clickable { privateEntry = !privateEntry },
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                        shape = RoundedCornerShape(12.dp),
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text("ui.private.entry", modifier = Modifier.weight(1f))
+                            Switch(checked = privateEntry, onCheckedChange = null)
+                        }
+                    }
+                }
+                (validationError ?: error)?.let {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = MaterialTheme.colorScheme.errorContainer,
+                        shape = RoundedCornerShape(10.dp),
+                    ) {
+                        Text(
+                            it,
+                            modifier = Modifier.padding(12.dp),
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
             }
         },
         confirmButton = {
@@ -1046,6 +1089,52 @@ private fun TrackerEditDialog(
         },
         dismissButton = { TextButton(onClick = dismiss) { Text("ui.cancel") } },
     )
+}
+
+@Composable
+private fun TrackerStatusField(
+    values: List<TrackerStatus>,
+    selected: TrackerStatus,
+    label: (TrackerStatus) -> String,
+    choose: (TrackerStatus) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box(modifier = Modifier.fillMaxWidth()) {
+        OutlinedButton(
+            onClick = { expanded = true },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
+                Text(
+                    "ui.status",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.labelSmall,
+                )
+                Text(label(selected), style = MaterialTheme.typography.bodyLarge)
+            }
+            Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.widthIn(min = 280.dp),
+        ) {
+            values.forEach { value ->
+                DropdownMenuItem(
+                    text = { Text(label(value)) },
+                    leadingIcon = if (value == selected) {
+                        { Icon(Icons.Default.CheckCircle, contentDescription = null) }
+                    } else {
+                        null
+                    },
+                    onClick = {
+                        choose(value)
+                        expanded = false
+                    },
+                )
+            }
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -1555,7 +1644,8 @@ private fun readableEnum(value: Enum<*>): String = value.name
 private fun optionalDate(value: String): Optional<LocalDate> =
     if (value.isBlank()) Optional.empty() else Optional.of(LocalDate.parse(value.trim()))
 
-private fun scoreRange(values: List<Double>): String = "${values.min()}–${values.max()}"
+private fun scoreRange(values: List<Double>): String =
+    "${trackerProgressValue(values.min())}–${trackerProgressValue(values.max())}"
 
 private fun conflictKey(conflict: TrackerSyncConflict): String =
     "${conflict.localEntry().libraryItemId().value()}:${conflict.localEntry().trackerId().value()}"
