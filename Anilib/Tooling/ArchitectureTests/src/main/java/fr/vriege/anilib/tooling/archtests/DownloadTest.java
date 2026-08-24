@@ -279,22 +279,8 @@ final class DownloadTest {
                         counter.check(session.snapshot().streams().size() == 1
                                         && session.snapshot().streams().stream()
                                                 .allMatch(stream -> "file".equals(stream.location().getScheme()))
-                                        && source.streamRequests.get() == streamRequestsBeforePlayer
-                                        && session.onlineStreamsAvailable(),
-                                "downloaded anime must open locally without resolving its online streams");
-                        downloads.setOfflineMode(true);
-                        counter.check(!session.onlineStreamsAvailable(),
-                                "offline mode must hide the online playback choice from an open session");
-                        downloads.setOfflineMode(false);
-                        counter.check(session.onlineStreamsAvailable(),
-                                "leaving offline mode must restore the online playback choice");
-                        session.loadOnlineStreams();
-                        counter.check(session.snapshot().streams().size() == 2
-                                        && source.streamRequests.get() == streamRequestsBeforePlayer + 1,
-                                "online streams must resolve only when the user requests them");
-                        session.selectStream("hls");
-                        counter.check("https".equals(session.playback().media().stream().location().getScheme()),
-                                "the player must be able to switch from its local file to an online stream");
+                                        && source.streamRequests.get() == streamRequestsBeforePlayer,
+                                "downloaded anime must always open locally without resolving online streams");
                     }
                 }
             }

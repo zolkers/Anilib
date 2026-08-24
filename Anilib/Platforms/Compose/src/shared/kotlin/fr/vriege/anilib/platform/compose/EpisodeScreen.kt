@@ -54,9 +54,6 @@ import fr.vriege.anilib.feature.player.PlayerSubtitlePolicy
 import fr.vriege.anilib.feature.player.ui.PlayerController
 import fr.vriege.anilib.feature.source.SourceVideoStream
 import java.util.Optional
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -72,8 +69,6 @@ internal fun PlayerSelectionScreen(
     var revision by remember(controller) { mutableIntStateOf(0) }
     var commandError by remember(controller) { mutableStateOf<String?>(null) }
     var preferenceDialog by remember(controller) { mutableStateOf(false) }
-    var onlineLoading by remember(controller) { mutableStateOf(false) }
-    val commandScope = rememberCrashSafeCoroutineScope()
     DisposableEffect(controller) {
         onDispose { controller.close() }
     }
@@ -87,20 +82,6 @@ internal fun PlayerSelectionScreen(
         return
     }
     val livePlayback = remember(controller) { mutableStateOf(snapshot.playback()) }
-    val offlineStreams = snapshot.streams().filter(::isOfflineStream)
-    val onlineStreams = snapshot.streams().filterNot(::isOfflineStream)
-    val onlinePlaybackAvailable = controller.onlineStreamsAvailable()
-    val canChoosePlaybackSource = offlineStreams.isNotEmpty() && onlinePlaybackAvailable
-    val selectedOffline = isOfflineStream(snapshot.selectedStream())
-    val visibleStreams = if (offlineStreams.isNotEmpty() && !onlinePlaybackAvailable) {
-        offlineStreams
-    } else if (!canChoosePlaybackSource) {
-        snapshot.streams()
-    } else if (selectedOffline) {
-        offlineStreams
-    } else {
-        onlineStreams
-    }
     val command: (() -> Unit) -> Unit = { action ->
         runCatching(action)
             .onSuccess {
@@ -168,64 +149,8 @@ internal fun PlayerSelectionScreen(
                     )
                 }
             }
-            if (canChoosePlaybackSource) {
-                item {
-                    Text("ui.playback.source", fontWeight = FontWeight.SemiBold)
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        item {
-                            FilterChip(
-                                selected = selectedOffline,
-                                enabled = !onlineLoading,
-                                onClick = {
-                                    preferredStream(offlineStreams, snapshot.selectedStream())?.let { stream ->
-                                        command { controller.selectStream(stream.id()) }
-                                    }
-                                },
-                                label = { Text("ui.offline") },
-                            )
-                        }
-                        item {
-                            FilterChip(
-                                selected = !selectedOffline,
-                                enabled = !onlineLoading,
-                                onClick = {
-                                    val loaded = preferredStream(onlineStreams, snapshot.selectedStream())
-                                    if (loaded != null) {
-                                        command { controller.selectStream(loaded.id()) }
-                                    } else {
-                                        onlineLoading = true
-                                        commandScope.launch {
-                                            val outcome = withContext(Dispatchers.IO) {
-                                                runCatching {
-                                                    controller.loadOnlineStreams()
-                                                    val refreshed = controller.snapshot()
-                                                    val selected = preferredStream(
-                                                        refreshed.streams().filterNot(::isOfflineStream),
-                                                        snapshot.selectedStream(),
-                                                    ) ?: error("No online video stream is available")
-                                                    controller.selectStream(selected.id())
-                                                }
-                                            }
-                                            onlineLoading = false
-                                            outcome.onSuccess {
-                                                commandError = null
-                                                livePlayback.value = controller.snapshot().playback()
-                                                revision++
-                                            }.onFailure {
-                                                commandError = it.message
-                                                    ?: "The online stream could not be opened."
-                                            }
-                                        }
-                                    }
-                                },
-                                label = { Text("ui.online") },
-                            )
-                        }
-                    }
-                }
-            }
             item { Text("ui.video.quality", fontWeight = FontWeight.SemiBold) }
-            items(visibleStreams, key = { it.id() }) { stream ->
+            items(snapshot.streams(), key = { it.id() }) { stream ->
                 Card(
                     modifier = Modifier.fillMaxWidth().clickable {
                         command { controller.selectStream(stream.id()) }
@@ -293,13 +218,6 @@ internal fun PlayerSelectionScreen(
 
 private fun isOfflineStream(stream: SourceVideoStream): Boolean =
     stream.location().scheme.equals("file", ignoreCase = true)
-
-private fun preferredStream(
-    candidates: List<SourceVideoStream>,
-    current: SourceVideoStream,
-): SourceVideoStream? = candidates.firstOrNull { candidate ->
-    candidate.quality().equals(current.quality(), ignoreCase = true)
-} ?: candidates.firstOrNull()
 
 @Composable
 private fun LivePlaybackLabel(playback: State<PlaybackState>) {

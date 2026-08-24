@@ -7,10 +7,6 @@ public interface PlayerSession extends AutoCloseable {
 
     PlayerPlayback playback();
 
-    boolean onlineStreamsAvailable();
-
-    void loadOnlineStreams();
-
     void selectStream(String streamId);
 
     void selectSubtitle(Optional<String> subtitleId);

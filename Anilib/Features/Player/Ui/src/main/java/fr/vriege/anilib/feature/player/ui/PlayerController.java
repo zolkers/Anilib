@@ -47,14 +47,6 @@ public final class PlayerController implements AutoCloseable {
         return session.playback();
     }
 
-    public boolean onlineStreamsAvailable() {
-        return session.onlineStreamsAvailable();
-    }
-
-    public void loadOnlineStreams() {
-        session.loadOnlineStreams();
-    }
-
     public void selectStream(String streamId) {
         session.selectStream(streamId);
     }

@@ -11,19 +11,14 @@ import fr.vriege.anilib.feature.player.PlayerSessionSnapshot;
 import fr.vriege.anilib.feature.source.SourceSubtitleTrack;
 import fr.vriege.anilib.feature.source.SourceVideoStream;
 
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.function.Supplier;
 
 final class DefaultPlayerSession implements PlayerSession {
     private final DefaultPlayerService service;
     private final PlayerSessionSnapshot initial;
     private final PlayerBackend backend;
-    private List<SourceVideoStream> streams;
-    private Supplier<List<SourceVideoStream>> onlineStreamLoader;
     private String selectedStreamId;
     private Optional<String> selectedSubtitleId;
     private PlaybackState playback;
@@ -36,13 +31,10 @@ final class DefaultPlayerSession implements PlayerSession {
     DefaultPlayerSession(
             DefaultPlayerService service,
             PlayerBackend backend,
-            PlayerSessionSnapshot initial,
-            Supplier<List<SourceVideoStream>> onlineStreamLoader) {
+            PlayerSessionSnapshot initial) {
         this.service = Objects.requireNonNull(service, "service must not be null");
         this.backend = Objects.requireNonNull(backend, "backend must not be null");
         this.initial = Objects.requireNonNull(initial, "initial must not be null");
-        this.streams = initial.streams();
-        this.onlineStreamLoader = onlineStreamLoader;
         selectedStreamId = initial.selectedStreamId();
         selectedSubtitleId = initial.selectedSubtitleId();
         playback = initial.playback();
@@ -62,47 +54,10 @@ final class DefaultPlayerSession implements PlayerSession {
                 initial.libraryItemId(),
                 initial.title(),
                 initial.episode(),
-                streams,
+                initial.streams(),
                 selectedStreamId,
                 selectedSubtitleId,
                 playback);
-    }
-
-    @Override
-    public boolean onlineStreamsAvailable() {
-        boolean available;
-        synchronized (this) {
-            ensureOpen();
-            available = onlineStreamLoader != null || streams.stream()
-                    .anyMatch(stream -> !"file".equalsIgnoreCase(stream.location().getScheme()));
-        }
-        return available && service.onlineFallbackAllowed();
-    }
-
-    @Override
-    public void loadOnlineStreams() {
-        Supplier<List<SourceVideoStream>> loader;
-        synchronized (this) {
-            ensureOpen();
-            loader = onlineStreamLoader;
-            if (loader == null) {
-                return;
-            }
-        }
-        List<SourceVideoStream> loaded = List.copyOf(Objects.requireNonNull(
-                loader.get(),
-                "online stream loader returned null"));
-        synchronized (this) {
-            ensureOpen();
-            if (onlineStreamLoader != loader) {
-                return;
-            }
-            Map<String, SourceVideoStream> combined = new LinkedHashMap<>();
-            streams.forEach(stream -> combined.put(stream.id(), stream));
-            loaded.forEach(stream -> combined.putIfAbsent(stream.id(), stream));
-            streams = List.copyOf(combined.values());
-            onlineStreamLoader = null;
-        }
     }
 
     @Override
@@ -246,7 +201,7 @@ final class DefaultPlayerSession implements PlayerSession {
 
     private SourceVideoStream stream(String id) {
         String value = Objects.requireNonNull(id, "streamId must not be null");
-        return streams.stream()
+        return initial.streams().stream()
                 .filter(stream -> stream.id().equals(value))
                 .findFirst()
                 .orElseThrow(() -> new PlayerException("Unknown video stream: " + value));
