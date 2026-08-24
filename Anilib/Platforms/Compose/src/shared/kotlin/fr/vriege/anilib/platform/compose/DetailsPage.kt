@@ -114,6 +114,7 @@ internal fun DetailsDestination(
     downloadError: String?,
     openTracking: (LibraryItemId) -> Unit,
     goBackOverride: (() -> Unit)?,
+    removedFromLibrary: (() -> Unit)? = null,
 ) {
     val id = destination.selectedTitle().orElse(null)
     val scope = rememberCrashSafeCoroutineScope()
@@ -343,7 +344,11 @@ internal fun DetailsDestination(
                         }
                     }.onSuccess {
                         unitError = null
-                        navigateBack()
+                        if (removedFromLibrary == null) {
+                            navigateBack()
+                        } else {
+                            removedFromLibrary()
+                        }
                     }.onFailure {
                         unitError = it.message ?: "The title could not be removed from the library."
                     }

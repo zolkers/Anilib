@@ -90,8 +90,14 @@ import fr.vriege.anilib.feature.library.LibraryItemId
 import fr.vriege.anilib.feature.library.PublicationStatus
 import fr.vriege.anilib.feature.library.ui.LibraryCard
 import fr.vriege.anilib.feature.library.ui.LibraryDetails
+import fr.vriege.anilib.feature.library.ui.LibraryNavigationState
+import fr.vriege.anilib.feature.library.ui.LibraryNavigator
+import fr.vriege.anilib.feature.library.ui.LibraryPage
 import fr.vriege.anilib.feature.library.ui.LibraryPresentation
+import fr.vriege.anilib.feature.downloads.ui.DownloadPresentation
 import fr.vriege.anilib.feature.player.EpisodeSnapshot
+import fr.vriege.anilib.feature.player.ui.PlayerPresentation
+import fr.vriege.anilib.feature.reader.ui.ReaderPresentation
 import fr.vriege.anilib.feature.source.SourceCatalogueItem
 import fr.vriege.anilib.feature.source.SourceContentUnit
 import fr.vriege.anilib.feature.source.SourceContentUnitId
@@ -111,6 +117,7 @@ import fr.vriege.anilib.feature.source.SourcePublicationStatus
 import fr.vriege.anilib.feature.source.SourceId
 import fr.vriege.anilib.feature.source.SourceWebPage
 import fr.vriege.anilib.feature.source.SourceTitleDetails
+import fr.vriege.anilib.feature.tracker.ui.TrackerPresentation
 import fr.vriege.anilib.framework.http.HttpCookieJar
 import java.time.Instant
 import java.util.Locale
@@ -154,8 +161,19 @@ internal fun DiscoveryScreen(
     browserCookies: HttpCookieJar,
     browserRuntimeStatus: BrowserRuntimeStatus,
     routeState: DiscoveryRouteState,
+    detailPlatform: DetailPlatform,
+    reader: ReaderPresentation,
+    player: PlayerPresentation,
+    downloads: DownloadPresentation,
+    tracking: TrackerPresentation,
+    openReader: (LibraryItemId, SourceContentUnitId?) -> Unit,
     openSourceReader: (String, SourceContentUnitId) -> Unit,
+    readerError: String?,
+    openPlayer: (LibraryItemId, SourceEpisodeId?) -> Unit,
     openSourcePlayer: (String, SourceEpisodeId) -> Unit,
+    enqueueDownload: (LibraryItemId) -> Unit,
+    downloadError: String?,
+    openTracking: (LibraryItemId) -> Unit,
     openLibraryDetails: (LibraryItemId) -> Unit,
     navigationVisibilityChanged: (Boolean) -> Unit,
     manageExtensions: () -> Unit,
@@ -240,8 +258,21 @@ internal fun DiscoveryScreen(
             presentation = presentation,
             library = library,
             openWebPage = { browserPage = it },
+            browserCookies = browserCookies,
+            browserRuntimeStatus = browserRuntimeStatus,
+            detailPlatform = detailPlatform,
+            reader = reader,
+            player = player,
+            downloads = downloads,
+            tracking = tracking,
+            openLibraryReader = openReader,
             openSourceReader = openSourceReader,
+            readerError = readerError,
+            openLibraryPlayer = openPlayer,
             openSourcePlayer = openSourcePlayer,
+            enqueueDownload = enqueueDownload,
+            downloadError = downloadError,
+            openTracking = openTracking,
             openLibraryDetails = openLibraryDetails,
             navigateUp = { selectedSource = null },
         )
@@ -260,10 +291,22 @@ internal fun DiscoveryScreen(
                 presentation = presentation,
                 library = library,
                 openWebPage = { browserPage = it },
+                browserCookies = browserCookies,
+                browserRuntimeStatus = browserRuntimeStatus,
+                detailPlatform = detailPlatform,
+                reader = reader,
+                player = player,
+                downloads = downloads,
+                tracking = tracking,
+                openLibraryReader = openReader,
                 openReader = openSourceReader,
+                readerError = readerError,
+                openLibraryPlayer = openPlayer,
                 openPlayer = openSourcePlayer,
+                enqueueDownload = enqueueDownload,
+                downloadError = downloadError,
+                openTracking = openTracking,
                 openLibraryDetails = { libraryItemId ->
-                    selectedGlobalItem = null
                     openLibraryDetails(libraryItemId)
                 },
                 navigateUp = { selectedGlobalItem = null },
@@ -407,14 +450,7 @@ internal fun DiscoveryScreen(
                     section.kind!!,
                     globalQuery,
                     globalSearchRevision,
-                    open = { item ->
-                        val libraryItemId = presentation.libraryItem(item.id()).orElse(null)
-                        if (libraryItemId == null) {
-                            selectedGlobalItem = item
-                        } else {
-                            openLibraryDetails(libraryItemId)
-                        }
-                    },
+                    open = { item -> selectedGlobalItem = item },
                 )
             } else {
                 when (section) {
@@ -669,8 +705,21 @@ private fun SourceCatalogueScreen(
     presentation: DiscoveryPresentation,
     library: LibraryPresentation,
     openWebPage: (SourceWebPage) -> Unit,
+    browserCookies: HttpCookieJar,
+    browserRuntimeStatus: BrowserRuntimeStatus,
+    detailPlatform: DetailPlatform,
+    reader: ReaderPresentation,
+    player: PlayerPresentation,
+    downloads: DownloadPresentation,
+    tracking: TrackerPresentation,
+    openLibraryReader: (LibraryItemId, SourceContentUnitId?) -> Unit,
     openSourceReader: (String, SourceContentUnitId) -> Unit,
+    readerError: String?,
+    openLibraryPlayer: (LibraryItemId, SourceEpisodeId?) -> Unit,
     openSourcePlayer: (String, SourceEpisodeId) -> Unit,
+    enqueueDownload: (LibraryItemId) -> Unit,
+    downloadError: String?,
+    openTracking: (LibraryItemId) -> Unit,
     openLibraryDetails: (LibraryItemId) -> Unit,
     navigateUp: () -> Unit,
 ) {
@@ -722,8 +771,21 @@ private fun SourceCatalogueScreen(
             presentation = presentation,
             library = library,
             openWebPage = openWebPage,
+            browserCookies = browserCookies,
+            browserRuntimeStatus = browserRuntimeStatus,
+            detailPlatform = detailPlatform,
+            reader = reader,
+            player = player,
+            downloads = downloads,
+            tracking = tracking,
+            openLibraryReader = openLibraryReader,
             openReader = openSourceReader,
+            readerError = readerError,
+            openLibraryPlayer = openLibraryPlayer,
             openPlayer = openSourcePlayer,
+            enqueueDownload = enqueueDownload,
+            downloadError = downloadError,
+            openTracking = openTracking,
             openLibraryDetails = ::openCanonicalDetails,
             navigateUp = { selectedItem = null },
         )
@@ -941,14 +1003,7 @@ private fun SourceCatalogueScreen(
                     page = sourcePage,
                     grid = grid,
                     open = { item ->
-                        val libraryItemId = runCatching {
-                            presentation.libraryItem(item.id()).orElse(null)
-                        }.getOrNull()
-                        if (libraryItemId == null) {
-                            selectedItem = item
-                        } else {
-                            openCanonicalDetails(libraryItemId)
-                        }
+                        selectedItem = item
                     },
                     libraryItem = { item -> memberships[item.id()] },
                     toggleLibraryMembership = { item, existingId ->
@@ -1016,8 +1071,21 @@ private fun SourceTitleScreen(
     presentation: DiscoveryPresentation,
     library: LibraryPresentation,
     openWebPage: (SourceWebPage) -> Unit,
+    browserCookies: HttpCookieJar,
+    browserRuntimeStatus: BrowserRuntimeStatus,
+    detailPlatform: DetailPlatform,
+    reader: ReaderPresentation,
+    player: PlayerPresentation,
+    downloads: DownloadPresentation,
+    tracking: TrackerPresentation,
+    openLibraryReader: (LibraryItemId, SourceContentUnitId?) -> Unit,
     openReader: (String, SourceContentUnitId) -> Unit,
+    readerError: String?,
+    openLibraryPlayer: (LibraryItemId, SourceEpisodeId?) -> Unit,
     openPlayer: (String, SourceEpisodeId) -> Unit,
+    enqueueDownload: (LibraryItemId) -> Unit,
+    downloadError: String?,
+    openTracking: (LibraryItemId) -> Unit,
     openLibraryDetails: (LibraryItemId) -> Unit,
     navigateUp: () -> Unit,
 ) {
@@ -1035,6 +1103,36 @@ private fun SourceTitleScreen(
             libraryItemId = presentation.libraryItem(item.id()).orElse(null)
         }
         onDispose { observation.close() }
+    }
+
+    val canonicalId = libraryItemId
+    if (canonicalId != null) {
+        DetailsDestination(
+            presentation = library,
+            discovery = presentation,
+            browserCookies = browserCookies,
+            browserRuntimeStatus = browserRuntimeStatus,
+            detailPlatform = detailPlatform,
+            reader = reader,
+            player = player,
+            downloads = downloads,
+            tracking = tracking,
+            destination = LibraryNavigationState(LibraryPage.DETAILS, Optional.of(canonicalId)),
+            navigate = { transition ->
+                val navigator = LibraryNavigator()
+                transition(navigator)
+                navigator.state().selectedTitle().ifPresent(openLibraryDetails)
+            },
+            openReader = openLibraryReader,
+            readerError = readerError,
+            openPlayer = openLibraryPlayer,
+            enqueueDownload = enqueueDownload,
+            downloadError = downloadError,
+            openTracking = openTracking,
+            goBackOverride = navigateUp,
+            removedFromLibrary = { libraryItemId = null },
+        )
+        return
     }
 
     CrashSafeLaunchedEffect(item.id()) {
@@ -1096,7 +1194,6 @@ private fun SourceTitleScreen(
             }.onSuccess { nextId ->
                 libraryItemId = nextId
                 actionError = null
-                nextId?.let(openLibraryDetails)
             }.onFailure {
                 actionError = it.message ?: "The library could not be updated"
             }

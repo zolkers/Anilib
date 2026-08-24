@@ -42,6 +42,14 @@ public final class CatalogueNavigationMutationRule implements AnilibJavaRule {
                         "Opening a source catalogue title must not mutate Library; "
                                 + "open transient source details and reserve writes for an explicit add action"));
             }
+            if (line.contains("openLibraryDetails(")) {
+                diagnostics.add(new Diagnostic(
+                        nameValue(),
+                        source.path(),
+                        index + 1,
+                        "Opening a source catalogue title must preserve the source route; "
+                                + "library membership may enrich that route but must not replace it"));
+            }
             braceDepth += braces(line);
             if (braceDepth <= 0) {
                 catalogueOpen = false;
