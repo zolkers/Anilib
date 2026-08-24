@@ -14,6 +14,8 @@ import fr.vriege.anilib.framework.http.runtime.MediaHeaderProxy
 import io.github.kdroidfilter.composemediaplayer.InitialPlayerState
 import io.github.kdroidfilter.composemediaplayer.SubtitleTrack
 import io.github.kdroidfilter.composemediaplayer.VideoPlayerState
+import java.net.URI
+import java.nio.file.Path
 import java.util.Optional
 import kotlin.math.roundToLong
 
@@ -36,13 +38,13 @@ internal class ComposePlayerPlayback(
         null
     }
     private val mediaLocation = if (media.stream().headers().isEmpty()) {
-        media.stream().location().toString()
+        media.stream().location().playerLocation()
     } else {
         headerProxy!!.route(media.stream().location(), media.stream().headers()).toString()
     }
     private val subtitleLocations = media.stream().subtitles().associate { subtitle ->
         subtitle.id() to if (subtitle.headers().isEmpty()) {
-            subtitle.location().toString()
+            subtitle.location().playerLocation()
         } else {
             headerProxy!!.route(subtitle.location(), subtitle.headers()).toString()
         }
@@ -231,4 +233,10 @@ internal class ComposePlayerPlayback(
             closed = true
         }
     }
+}
+
+private fun URI.playerLocation(): String = if (scheme.equals("file", ignoreCase = true)) {
+    Path.of(this).toString()
+} else {
+    toString()
 }
