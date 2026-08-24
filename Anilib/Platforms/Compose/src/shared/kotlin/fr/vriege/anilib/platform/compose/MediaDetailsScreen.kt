@@ -372,6 +372,33 @@ internal fun <T> LazyListScope.mediaUnitsSection(
     }
 }
 
+internal fun LazyListScope.mediaUnitsStatusSection(
+    message: String,
+    loading: Boolean = false,
+    retry: (() -> Unit)? = null,
+) {
+    item(key = "media-units-status:$loading:$message") {
+        Column(
+            modifier = Modifier
+                .widthIn(max = 900.dp)
+                .fillMaxWidth()
+                .padding(vertical = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            if (loading) {
+                CircularProgressIndicator(modifier = Modifier.size(28.dp), strokeWidth = 3.dp)
+            }
+            Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            retry?.let {
+                TextButton(onClick = it) {
+                    Text(UiTranslations.translate("ui.retry", LocalLanguagePack.current))
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun MediaContentSectionHeader(
     label: String,

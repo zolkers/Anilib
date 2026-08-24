@@ -70,9 +70,35 @@ import fr.vriege.anilib.feature.player.EpisodeSnapshot
 import java.net.URI
 import java.time.Instant
 import java.util.Optional
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+
+private const val CONTENT_RESOLUTION_ATTEMPTS = 3
+private const val CONTENT_RESOLUTION_RETRY_DELAY_MILLIS = 250L
+
+private suspend fun <T> resolveMediaUnits(load: suspend () -> List<T>): List<T> {
+    repeat(CONTENT_RESOLUTION_ATTEMPTS) { attempt ->
+        try {
+            val units = load()
+            if (units.isNotEmpty() || attempt == CONTENT_RESOLUTION_ATTEMPTS - 1) {
+                return units
+            }
+        } catch (exception: CancellationException) {
+            throw exception
+        } catch (exception: Exception) {
+            if (attempt == CONTENT_RESOLUTION_ATTEMPTS - 1) {
+                throw exception
+            }
+        }
+        delay(CONTENT_RESOLUTION_RETRY_DELAY_MILLIS * (attempt + 1L))
+    }
+    return emptyList()
+}
 
 internal fun firstUnreadContentUnit(
     units: List<SourceContentUnit>,
@@ -128,8 +154,10 @@ internal fun DetailsDestination(
     }
     var chapters by remember(id) { mutableStateOf(listOf<SourceContentUnit>()) }
     var episodes by remember(id) { mutableStateOf(listOf<EpisodeSnapshot>()) }
+    var contentLoading by remember(id) { mutableStateOf(true) }
     var unitError by remember(id) { mutableStateOf<String?>(null) }
     var readChapterIds by remember(id) { mutableStateOf(setOf<String>()) }
+    val contentResolutionMutex = remember(id) { Mutex() }
     ObserveTracking(tracking) { trackerRevision++ }
     val details = remember(id, revision) { id?.let { presentation.details(it).orElse(null) } }
     val navigateBack: () -> Unit = goBackOverride ?: { navigate(LibraryNavigator::back) }
@@ -174,17 +202,32 @@ internal fun DetailsDestination(
             }
         }
         val reloadContent: suspend () -> Unit = {
-            unitError = null
-            if (details.kind() == MediaKind.ANIME) {
-                runCatching { withContext(Dispatchers.IO) { player.episodes(details.id()) } }
-                    .onSuccess { episodes = it }
-                    .onFailure { unitError = it.message ?: "Unable to load episodes." }
-            } else {
-                runCatching { withContext(Dispatchers.IO) { reader.contentUnits(details.id()) } }
-                    .onSuccess { chapters = it }
-                    .onFailure { unitError = it.message ?: "Unable to load chapters." }
-                readChapterIds = withContext(Dispatchers.IO) {
-                    runCatching { reader.readContentIds(details.id()) }.getOrDefault(emptySet())
+            contentResolutionMutex.withLock {
+                contentLoading = true
+                unitError = null
+                try {
+                    if (details.kind() == MediaKind.ANIME) {
+                        episodes = resolveMediaUnits {
+                            withContext(Dispatchers.IO) { player.episodes(details.id()) }
+                        }
+                    } else {
+                        chapters = resolveMediaUnits {
+                            withContext(Dispatchers.IO) { reader.contentUnits(details.id()) }
+                        }
+                        readChapterIds = withContext(Dispatchers.IO) {
+                            runCatching { reader.readContentIds(details.id()) }.getOrDefault(emptySet())
+                        }
+                    }
+                } catch (exception: CancellationException) {
+                    throw exception
+                } catch (exception: Exception) {
+                    unitError = exception.message ?: if (details.kind() == MediaKind.ANIME) {
+                        "Unable to load episodes."
+                    } else {
+                        "Unable to load chapters."
+                    }
+                } finally {
+                    contentLoading = false
                 }
             }
         }
@@ -226,6 +269,7 @@ internal fun DetailsDestination(
             readChapterIds = readChapterIds,
             chapterProgress = details.progress().orElse(null),
             episodes = episodes,
+            contentLoading = contentLoading,
             unitError = unitError,
             related = presentation.relatedTitles(details.id()),
             canRead = primaryChapter != null &&
@@ -327,6 +371,7 @@ internal fun DetailsDestination(
                     }
                 }
             },
+            retryContent = { revision++ },
             toggleLibraryMembership = {
                 scope.launch {
                     runCatching {
@@ -420,6 +465,7 @@ internal fun DetailsPage(
     readChapterIds: Set<String>,
     chapterProgress: LibraryProgress?,
     episodes: List<EpisodeSnapshot>,
+    contentLoading: Boolean,
     unitError: String?,
     related: List<LibraryCard>,
     canRead: Boolean,
@@ -446,6 +492,7 @@ internal fun DetailsPage(
     track: () -> Unit,
     refreshing: Boolean,
     refresh: (() -> Unit)?,
+    retryContent: () -> Unit,
     toggleLibraryMembership: () -> Unit,
     edit: (String, LibraryTitleMetadata) -> Unit,
     createCategory: (String) -> Unit,
@@ -487,7 +534,9 @@ internal fun DetailsPage(
         ),
         artwork = artwork,
         inLibrary = inLibrary,
-        contentLabel = when (details.kind()) {
+        contentLabel = if (contentLoading) {
+            UiTranslations.translate("ui.loading", languagePack)
+        } else when (details.kind()) {
             MediaKind.ANIME -> UiTranslations.format(
                 "dynamic.episodes.count",
                 LocalLanguagePack.current,
@@ -520,6 +569,21 @@ internal fun DetailsPage(
         openPrimary = if (canWatch) watch else ({ read(null) }),
         goBack = goBack,
     ) {
+        if (contentLoading) {
+            mediaUnitsStatusSection(
+                message = UiTranslations.translate("ui.loading", languagePack),
+                loading = true,
+            )
+        } else if (chapters.isEmpty() && episodes.isEmpty()) {
+            mediaUnitsStatusSection(
+                message = UiTranslations.translate(
+                    "ui.no.episodes.or.chapters.available",
+                    languagePack,
+                ),
+                retry = retryContent,
+            )
+        } else when (details.kind()) {
+            MediaKind.MANGA, MediaKind.NOVEL, MediaKind.OTHER -> {
             mediaUnitsSection(
                 label = chaptersLabel,
                 units = chapters,
@@ -579,6 +643,8 @@ internal fun DetailsPage(
                 download = if (canDownload) downloadChapter else null,
                 downloadProgress = chapterDownloadProgress,
             )
+            }
+            MediaKind.ANIME -> {
             mediaUnitsSection(
                 label = episodesLabel,
                 units = episodes,
@@ -637,6 +703,8 @@ internal fun DetailsPage(
                 download = if (canDownload) downloadEpisode else null,
                 downloadProgress = episodeDownloadProgress,
             )
+            }
+        }
             if (related.isNotEmpty()) {
                 item {
                     RelatedTitlesSection(related) { card -> openRelated(card.id()) }

@@ -617,7 +617,11 @@ public final class DefaultPlayerService implements PlayerService, PlayerContentR
             return cached.episodes();
         }
         List<SourceEpisode> loaded = validatedEpisodes(source, sourceItemId);
-        episodeCache.put(sourceItemId, new CachedEpisodes(source, loaded, now));
+        if (loaded.isEmpty()) {
+            episodeCache.remove(sourceItemId);
+        } else {
+            episodeCache.put(sourceItemId, new CachedEpisodes(source, loaded, now));
+        }
         return loaded;
     }
 

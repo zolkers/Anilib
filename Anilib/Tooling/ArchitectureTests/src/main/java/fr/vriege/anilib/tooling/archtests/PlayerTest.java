@@ -96,7 +96,28 @@ final class PlayerTest {
         suppressesIncognitoPersistence(counter);
         cleansOrphanedPlaybackState(counter);
         rejectsInvalidSourceResults(counter);
+        doesNotCacheTransientEmptyEpisodes(counter);
         return counter.value;
+    }
+
+    private static void doesNotCacheTransientEmptyEpisodes(Counter counter) {
+        Path directory = temporaryDirectory("anilib-player-transient-empty-episodes");
+        TestStreamingSource source = new TestStreamingSource(false, true);
+        try (StartedAnilib application = StandardAnilib.start(
+                directory,
+                new UrlConnectionHttpTransport(),
+                new RecordingBackend(),
+                List.of(sourcePlugin(source)))) {
+            PlayerService player = application.capability(PlayerCapabilities.SERVICE);
+            counter.check(player.episodes(SOURCE_ITEM_ID).isEmpty(),
+                    "a transient empty episode response must remain observable to the caller");
+            counter.check(player.episodes(SOURCE_ITEM_ID).size() == 2,
+                    "a transient empty episode response must not poison the player cache");
+            counter.check(source.episodeRequests.get() == 2,
+                    "the player must resolve episodes again after a transient empty response");
+        } finally {
+            deleteDirectory(directory);
+        }
     }
 
     private static void switchesEpisodeSessionsIndependently(Counter counter) {
@@ -597,10 +618,16 @@ final class PlayerTest {
 
     private static final class TestStreamingSource implements StreamingSource {
         private final boolean duplicateStreams;
+        private final boolean emptyFirstEpisodeResponse;
         private final AtomicInteger episodeRequests = new AtomicInteger();
 
         private TestStreamingSource(boolean duplicateStreams) {
+            this(duplicateStreams, false);
+        }
+
+        private TestStreamingSource(boolean duplicateStreams, boolean emptyFirstEpisodeResponse) {
             this.duplicateStreams = duplicateStreams;
+            this.emptyFirstEpisodeResponse = emptyFirstEpisodeResponse;
         }
 
         @Override
@@ -616,7 +643,10 @@ final class PlayerTest {
 
         @Override
         public List<SourceEpisode> episodes(SourceCatalogueItemId itemId) {
-            episodeRequests.incrementAndGet();
+            int request = episodeRequests.incrementAndGet();
+            if (emptyFirstEpisodeResponse && request == 1) {
+                return List.of();
+            }
             return List.of(SECOND_EPISODE, FIRST_EPISODE);
         }
 
