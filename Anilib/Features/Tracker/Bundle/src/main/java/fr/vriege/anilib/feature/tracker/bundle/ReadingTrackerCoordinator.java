@@ -11,12 +11,14 @@ import fr.vriege.anilib.framework.concurrent.runtime.ManagedExecutors;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 final class ReadingTrackerCoordinator implements AutoCloseable {
+    private static final long[] RETRY_DELAYS_MILLIS = {250L, 1_000L, 3_000L};
     private static final System.Logger LOGGER = System.getLogger(ReadingTrackerCoordinator.class.getName());
     private static final Pattern LABELED_CHAPTER_NUMBER = Pattern.compile(
             "(?iu)\\b(?:chapter|chapitre|chap|ch|capitulo|capítulo|cap)\\.?\\s*[:#-]?\\s*"
@@ -25,7 +27,7 @@ final class ReadingTrackerCoordinator implements AutoCloseable {
             "^\\s*#?\\s*(\\d+(?:[.,]\\d+)?)(?:\\s|$)");
     private final ReaderService reader;
     private final TrackerService tracker;
-    private final ExecutorService synchronizer = ManagedExecutors.single("anilib-reading-tracker");
+    private final ScheduledExecutorService synchronizer = ManagedExecutors.scheduled("anilib-reading-tracker");
     private final AutoCloseable observation;
     private volatile boolean closed;
 
@@ -44,18 +46,31 @@ final class ReadingTrackerCoordinator implements AutoCloseable {
             return;
         }
         try {
-            synchronizer.execute(() -> {
-                try {
-                    advance(event);
-                } catch (RuntimeException failure) {
-                    LOGGER.log(
-                            System.Logger.Level.ERROR,
-                            "Unable to synchronize reading progress for " + event.libraryItemId(),
-                            failure);
-                }
-            });
+            synchronizer.execute(() -> advance(event, 0));
         } catch (RejectedExecutionException ignored) {
             // Closing the product may race with a final reading persistence callback.
+        }
+    }
+
+    private void advance(ReaderReadEvent event, int attempt) {
+        try {
+            advance(event);
+        } catch (RuntimeException failure) {
+            if (!closed && attempt < RETRY_DELAYS_MILLIS.length) {
+                try {
+                    synchronizer.schedule(
+                            () -> advance(event, attempt + 1),
+                            RETRY_DELAYS_MILLIS[attempt],
+                            TimeUnit.MILLISECONDS);
+                    return;
+                } catch (RejectedExecutionException ignored) {
+                    // Closing the product may race with a scheduled retry.
+                }
+            }
+            LOGGER.log(
+                    System.Logger.Level.ERROR,
+                    "Unable to synchronize reading progress for " + event.libraryItemId(),
+                    failure);
         }
     }
 

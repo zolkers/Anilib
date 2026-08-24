@@ -245,25 +245,25 @@ public final class DefaultTrackerService implements TrackerService, AutoCloseabl
                         current.privateEntry(), current.remoteUri(), Instant.now(), current.metadata());
                 replacement = normalizeProgress(tracker(current.trackerId()), current, replacement);
                 if (syncPreferences().automatic()) {
-                    update(replacement);
-                } else {
-                    entries.save(replacement);
-                    synchronized (this) {
-                        dirtyEntries.add(BindingKey.of(replacement));
-                        persistPending();
+                    try {
+                        update(replacement);
+                    } catch (RuntimeException exception) {
+                        savePending(replacement);
+                        throw exception;
                     }
-                    notifyListeners();
+                } else {
+                    savePending(replacement);
                 }
             } catch (RuntimeException exception) {
                 failures.add(exception);
             }
         }
+        queueAutomaticSynchronization();
         if (!failures.isEmpty()) {
             TrackerException failure = new TrackerException("One or more tracker updates failed");
             failures.forEach(failure::addSuppressed);
             throw failure;
         }
-        queueAutomaticSynchronization();
     }
 
     @Override
@@ -479,6 +479,15 @@ public final class DefaultTrackerService implements TrackerService, AutoCloseabl
         if (changed) {
             persistPending();
         }
+    }
+
+    private void savePending(TrackerEntry entry) {
+        entries.save(entry);
+        synchronized (this) {
+            dirtyEntries.add(BindingKey.of(entry));
+            persistPending();
+        }
+        notifyListeners();
     }
 
     private synchronized void persistPending() {

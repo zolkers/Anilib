@@ -262,6 +262,7 @@ final class TrackerTest {
         TestTracker tracker = new TestTracker();
         tracker.authenticated = true;
         tracker.account = "alice";
+        tracker.updateFailuresRemaining.set(1);
         LibraryItem item = LibraryItem.create("Tracked manga", MediaKind.MANGA)
                 .withOrigin(new LibraryOrigin(
                         READING_SOURCE_ID.toString(),
@@ -269,7 +270,7 @@ final class TrackerTest {
         seedReadState(directory, item, STALE_READING_CHAPTER);
         try (StartedAnilib application = StandardAnilib.start(
                 directory,
-                List.of(extension(tracker), readingSourceExtension()))) {
+                List.of(extension(tracker), readingSourceExtension(new ReadingPagedSource(1))))) {
             application.capability(LibraryCapabilities.CATALOG).save(item);
             TrackerService service = application.capability(TrackerCapabilities.SERVICE);
             service.bind(item.id(), service.search(TestTracker.ID, item.title(), item.kind()).getFirst());
@@ -282,8 +283,9 @@ final class TrackerTest {
             counter.check(tracked.progress() == READING_CHAPTER_PROGRESS
                             && tracked.totalUnits() == 12
                             && tracked.status() == TrackerStatus.READING
-                            && tracker.updates.get() == 1,
-                    "reading tracking must recognize an extension chapter title and push reading progress");
+                            && tracker.updates.get() == 1
+                            && tracker.updateAttempts.get() == 2,
+                    "reading tracking must retry source and provider failures without losing progress");
         } finally {
             deleteDirectory(directory);
         }
@@ -314,10 +316,10 @@ final class TrackerTest {
                 new PlaybackStreamingSource());
     }
 
-    private static SourceExtensionPlugin readingSourceExtension() {
+    private static SourceExtensionPlugin readingSourceExtension(ReadingPagedSource source) {
         return new SourceExtensionPlugin(
                 ComponentDescriptor.of("extension.tracker-reading", "Tracker reading", "1.0.0"),
-                new ReadingPagedSource());
+                source);
     }
 
     private static TrackerExtensionPlugin extension(TestTracker tracker) {
@@ -412,6 +414,12 @@ final class TrackerTest {
     }
 
     private static final class ReadingPagedSource implements PagedSource {
+        private final AtomicInteger failuresRemaining;
+
+        private ReadingPagedSource(int failures) {
+            failuresRemaining = new AtomicInteger(failures);
+        }
+
         @Override
         public SourceDescriptor descriptor() {
             return new SourceDescriptor(
@@ -425,6 +433,9 @@ final class TrackerTest {
 
         @Override
         public List<SourceContentUnit> contentUnits(SourceCatalogueItemId itemId) {
+            if (failuresRemaining.getAndUpdate(value -> Math.max(0, value - 1)) > 0) {
+                throw new IllegalStateException("Transient chapter lookup failure");
+            }
             return List.of(STALE_READING_CHAPTER, READING_CHAPTER);
         }
 
@@ -445,6 +456,8 @@ final class TrackerTest {
         private final AtomicInteger refreshes = new AtomicInteger();
         private final AtomicInteger removals = new AtomicInteger();
         private final AtomicInteger updates = new AtomicInteger();
+        private final AtomicInteger updateAttempts = new AtomicInteger();
+        private final AtomicInteger updateFailuresRemaining = new AtomicInteger();
         private boolean authenticated;
         private String account = "";
 
@@ -520,6 +533,10 @@ final class TrackerTest {
 
         @Override
         public TrackerEntry update(TrackerEntry entry) {
+            updateAttempts.incrementAndGet();
+            if (updateFailuresRemaining.getAndUpdate(value -> Math.max(0, value - 1)) > 0) {
+                throw new TrackerException("Transient tracker update failure");
+            }
             updates.incrementAndGet();
             return entry;
         }
