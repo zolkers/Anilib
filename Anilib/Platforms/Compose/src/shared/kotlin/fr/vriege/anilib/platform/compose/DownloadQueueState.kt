@@ -1,6 +1,7 @@
 package fr.vriege.anilib.platform.compose
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -15,8 +16,13 @@ import kotlinx.coroutines.withContext
 @Composable
 internal fun rememberDownloadQueueSnapshot(
     presentation: DownloadPresentation,
-): DownloadQueueSnapshot? = LocalDownloadQueueState.current?.value
-    ?: rememberDownloadQueueState(presentation).value
+): DownloadQueueSnapshot? {
+    val queue = LocalDownloadQueueState.current?.value
+        ?: rememberDownloadQueueState(presentation).value
+    val preparation = LocalDownloadPreparationState.current
+    SideEffect { preparation?.reconcile(queue) }
+    return queue
+}
 
 internal val LocalDownloadQueueState = staticCompositionLocalOf<State<DownloadQueueSnapshot?>?> { null }
 

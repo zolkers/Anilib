@@ -25,7 +25,10 @@ internal data class DownloadUiProgress(
     val fraction: Float,
 )
 
-internal class DownloadProgressIndex(queue: DownloadQueueSnapshot?) {
+internal class DownloadProgressIndex(
+    queue: DownloadQueueSnapshot?,
+    private val preparing: List<DownloadPreparationKey>,
+) {
     private val jobsByContent = queue?.jobs().orEmpty()
         .asSequence()
         .filter { it.status() != DownloadStatus.CANCELLED }
@@ -35,30 +38,39 @@ internal class DownloadProgressIndex(queue: DownloadQueueSnapshot?) {
 
     fun title(libraryItemId: LibraryItemId): DownloadUiProgress? = progress(
         jobsByTitle[libraryItemId].orEmpty(),
+        preparing.any { it.libraryItemId == libraryItemId },
     )
 
     fun titles(libraryItemIds: Set<LibraryItemId>): DownloadUiProgress? = progress(
         libraryItemIds.flatMap { jobsByTitle[it].orEmpty() },
+        preparing.any { it.libraryItemId in libraryItemIds },
     )
 
     fun content(libraryItemId: LibraryItemId, contentId: String): DownloadUiProgress? = progress(
         listOfNotNull(jobsByContent[libraryItemId to contentId]),
+        preparing.any { it.libraryItemId == libraryItemId && it.contentId == contentId },
     )
 
-    private fun progress(jobs: List<DownloadJobSnapshot>): DownloadUiProgress? {
-        if (jobs.isEmpty()) return null
+    private fun progress(jobs: List<DownloadJobSnapshot>, isPreparing: Boolean): DownloadUiProgress? {
+        if (jobs.isEmpty() && !isPreparing) return null
         val total = jobs.sumOf(DownloadJobSnapshot::totalPages).coerceAtLeast(1)
         val completed = jobs.sumOf(DownloadJobSnapshot::completedPages)
         return DownloadUiProgress(
-            status = aggregateDownloadStatus(jobs),
+            status = when {
+                jobs.any { it.status() == DownloadStatus.DOWNLOADING } -> DownloadStatus.DOWNLOADING
+                isPreparing -> DownloadStatus.QUEUED
+                else -> aggregateDownloadStatus(jobs)
+            },
             fraction = (completed.toFloat() / total).coerceIn(0f, 1f),
         )
     }
 }
 
 @Composable
-internal fun rememberDownloadProgressIndex(queue: DownloadQueueSnapshot?): DownloadProgressIndex =
-    remember(queue) { DownloadProgressIndex(queue) }
+internal fun rememberDownloadProgressIndex(queue: DownloadQueueSnapshot?): DownloadProgressIndex {
+    val pending = LocalDownloadPreparationState.current?.pendingKeys().orEmpty()
+    return remember(queue, pending) { DownloadProgressIndex(queue, pending) }
+}
 
 private fun aggregateDownloadStatus(jobs: List<DownloadJobSnapshot>): DownloadStatus = when {
     jobs.any { it.status() == DownloadStatus.DOWNLOADING } -> DownloadStatus.DOWNLOADING
