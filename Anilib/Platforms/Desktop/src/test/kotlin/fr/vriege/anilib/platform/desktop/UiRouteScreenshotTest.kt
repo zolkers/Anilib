@@ -144,6 +144,12 @@ class UiRouteScreenshotTest {
                 onNodeWithText("History").performClick()
                 onNodeWithText("Manga").performClick()
                 waitForText("Acceptance catalogue manga")
+                waitForContentDescription("Add to Library")
+                onNodeWithContentDescription("Add to Library").performClick()
+                waitForContentDescription("Remove from library")
+                onNodeWithContentDescription("Remove from library").performClick()
+                waitForContentDescription("Add to Library")
+                waitForText("Acceptance catalogue manga")
             }
         } finally {
             Locale.setDefault(previousLocale)

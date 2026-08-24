@@ -267,9 +267,12 @@ internal fun HistoryPage(
                                         row.openedAt(),
                                     )
                                 },
-                                toggleFavorite = {
-                                    val favorite = cards[row.libraryItemId()]?.favorite() == true
-                                    presentation.setFavorite(setOf(row.libraryItemId()), !favorite)
+                                toggleLibraryMembership = {
+                                    if (cards[row.libraryItemId()] == null) {
+                                        presentation.restoreTitle(row.libraryItemId())
+                                    } else {
+                                        presentation.deleteTitles(setOf(row.libraryItemId()))
+                                    }
                                 },
                                 canDownload = runCatching {
                                     downloads.canEnqueue(row.libraryItemId())
@@ -309,7 +312,7 @@ internal fun HistoryCard(
     contentLabel: String?,
     resume: () -> Unit,
     remove: () -> Unit,
-    toggleFavorite: () -> Unit,
+    toggleLibraryMembership: () -> Unit,
     canDownload: Boolean,
     downloadProgress: DownloadUiProgress?,
     download: () -> Unit,
@@ -357,13 +360,13 @@ internal fun HistoryCard(
             action = download,
             contentDescription = "ui.download",
         )
-        IconButton(onClick = toggleFavorite) {
+        IconButton(onClick = toggleLibraryMembership) {
             Icon(
-                if (card?.favorite() == true) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                contentDescription = if (card?.favorite() == true) {
-                    "ui.unfavorite"
+                if (card != null) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                contentDescription = if (card != null) {
+                    "ui.remove.from.library"
                 } else {
-                    "ui.favorite"
+                    "ui.add.to.library"
                 },
             )
         }
