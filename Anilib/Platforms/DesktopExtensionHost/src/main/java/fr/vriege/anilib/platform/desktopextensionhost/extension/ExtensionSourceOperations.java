@@ -34,7 +34,7 @@ public final class ExtensionSourceOperations implements AutoCloseable {
     private static final int MAX_RETAINED_MODELS = 4_096;
     private static final Pattern WEB_HOST = Pattern.compile("https?://([^/\\\\\"']+)", Pattern.CASE_INSENSITIVE);
     private static final System.Logger LOGGER = System.getLogger(ExtensionSourceOperations.class.getName());
-    private static final Duration OPERATION_TIMEOUT = Duration.ofSeconds(25);
+    private static final Duration OPERATION_TIMEOUT = Duration.ofSeconds(60);
     private static final int OPERATION_PARALLELISM = Math.max(
             2,
             Math.min(8, Runtime.getRuntime().availableProcessors()));
