@@ -42,6 +42,7 @@ public final class DesktopReleaseRule implements AnilibJavaRule {
                 "TargetFormat.Msi",
                 "TargetFormat.Deb",
                 "anilibPackageVersion",
+                "installationPath = 'AnilibApp'",
                 "upgradeUuid =",
                 "bundleID = 'fr.vriege.anilib'",
                 "project(':Anilib:Platforms:DesktopExtensionHost')",

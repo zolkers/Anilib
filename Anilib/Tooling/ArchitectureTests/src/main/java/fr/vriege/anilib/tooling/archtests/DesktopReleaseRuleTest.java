@@ -26,6 +26,7 @@ final class DesktopReleaseRuleTest {
                     """);
             write(repository.resolve("Anilib/Platforms/Desktop/build.gradle"), """
                     TargetFormat.Dmg TargetFormat.Msi TargetFormat.Deb anilibPackageVersion
+                    installationPath = 'AnilibApp'
                     upgradeUuid = bundleID = 'fr.vriege.anilib'
                     project(':Anilib:Platforms:DesktopExtensionHost') includeAllModules = true
                     licenseFile.set(rootProject.file('LICENSE'))
@@ -47,6 +48,25 @@ final class DesktopReleaseRuleTest {
             RepositorySnapshot snapshot = snapshot(repository);
             check(rule.analyze(snapshot).isEmpty(),
                     "a complete three-host desktop release contract must pass");
+            Files.writeString(
+                    repository.resolve("Anilib/Platforms/Desktop/build.gradle"),
+                    "TargetFormat.Dmg TargetFormat.Msi TargetFormat.Deb anilibPackageVersion "
+                            + "upgradeUuid = bundleID = 'fr.vriege.anilib' "
+                            + "project(':Anilib:Platforms:DesktopExtensionHost') includeAllModules = true "
+                            + "licenseFile.set(rootProject.file('LICENSE')) "
+                            + "writeDesktopReleaseChecksums MessageDigest.getInstance('SHA-256')",
+                    StandardCharsets.UTF_8);
+            check(rule.analyze(snapshot).stream()
+                            .anyMatch(diagnostic -> diagnostic.message().contains("AnilibApp")),
+                    "a desktop package sharing the user-data tree must be rejected");
+            write(repository.resolve("Anilib/Platforms/Desktop/build.gradle"), """
+                    TargetFormat.Dmg TargetFormat.Msi TargetFormat.Deb anilibPackageVersion
+                    installationPath = 'AnilibApp'
+                    upgradeUuid = bundleID = 'fr.vriege.anilib'
+                    project(':Anilib:Platforms:DesktopExtensionHost') includeAllModules = true
+                    licenseFile.set(rootProject.file('LICENSE'))
+                    writeDesktopReleaseChecksums MessageDigest.getInstance('SHA-256')
+                    """);
             Files.writeString(workflow, "windows-2025", StandardCharsets.UTF_8);
             check(rule.analyze(snapshot).stream()
                             .anyMatch(diagnostic -> diagnostic.message().contains("ubuntu-24.04")),
@@ -56,7 +76,7 @@ final class DesktopReleaseRuleTest {
                             .anyMatch(diagnostic -> diagnostic.message().contains(
                                     "dex-translator:2.4.38")),
                     "desktop APK compatibility must retain its pinned converter");
-            return 3;
+            return 4;
         } catch (IOException exception) {
             throw new AssertionError("Unable to run desktop release rule test", exception);
         } finally {

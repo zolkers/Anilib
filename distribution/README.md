@@ -14,3 +14,9 @@ committed.
 Before any submission, complete `RELEASE_ACCEPTANCE.md`, copy the matching
 signed artifact without rebuilding it, verify its published SHA-256 digest, and
 record the external store release identifier in the acceptance record.
+
+On Windows, the per-user MSI installs program files under
+`%LOCALAPPDATA%\AnilibApp`. Persistent library, extension, tracker,
+browser, download, backup, and preference data remains under
+`%LOCALAPPDATA%\Anilib`. The stable upgrade UUID updates only the former;
+install, update, repair, and application uninstall must leave the latter intact.

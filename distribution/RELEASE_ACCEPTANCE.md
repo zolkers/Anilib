@@ -28,6 +28,7 @@ secret names are documented in the Desktop release guide.
 
 ## Installation acceptance
 
+- [ ] Windows: `%LOCALAPPDATA%\AnilibApp` is updated while `%LOCALAPPDATA%\Anilib` data is retained.
 - [ ] Windows: Authenticode, install, update, launch, uninstall, and data retention verified.
 - [ ] Linux: metadata, install, update, launch, uninstall, and data retention verified.
 - [ ] macOS: signature, notarization, stapling, Gatekeeper, install, update, launch, and data retention verified.

@@ -79,6 +79,7 @@ compose.desktop {
             windows {
                 menuGroup = 'Anilib'
                 perUserInstall = true
+                installationPath = 'AnilibApp'
                 upgradeUuid = '9f7e13a2-70b2-4d51-a105-d99bac900f78'
                 iconFile.set(project.file('src/main/resources/assets/anilib-icon.ico'))
             }
