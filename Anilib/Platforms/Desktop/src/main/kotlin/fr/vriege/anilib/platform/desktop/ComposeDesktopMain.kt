@@ -109,34 +109,11 @@ fun main(arguments: Array<String>) {
                 mutableStateOf(initialApplicationWindowMode.placement())
             }
             val applicationWindowMode = remember { mutableStateOf(initialApplicationWindowMode) }
-            val applicationFullscreen = remember { mutableStateOf(false) }
-            val f11Pressed = remember { mutableStateOf(false) }
-            val applicationPlacementBeforeFullscreen = remember { mutableStateOf(WindowPlacement.Floating) }
-            val applicationModeBeforeApplicationFullscreen = remember { mutableStateOf(initialApplicationWindowMode) }
             val playerFullscreen = remember { mutableStateOf(false) }
             val playerActive = remember { mutableStateOf(false) }
             val playerWindowMode = remember { mutableStateOf(PlayerWindowMode.BORDERLESS) }
             val placementBeforeFullscreen = remember { mutableStateOf(WindowPlacement.Floating) }
             val applicationModeBeforeFullscreen = remember { mutableStateOf(initialApplicationWindowMode) }
-            val setApplicationFullscreen: (Boolean) -> Unit = remember(windowState) {
-                { fullscreen ->
-                    if (fullscreen != applicationFullscreen.value) {
-                        if (fullscreen) {
-                            applicationPlacementBeforeFullscreen.value = windowState.placement
-                            applicationModeBeforeApplicationFullscreen.value = applicationWindowMode.value
-                            intendedWindowPlacement.value = applicationFullscreenPlacement()
-                        } else if (
-                            applicationModeBeforeApplicationFullscreen.value == applicationWindowMode.value
-                        ) {
-                            intendedWindowPlacement.value = applicationPlacementBeforeFullscreen.value
-                        } else {
-                            intendedWindowPlacement.value = applicationWindowMode.value.placement()
-                        }
-                        windowState.placement = intendedWindowPlacement.value
-                        applicationFullscreen.value = fullscreen
-                    }
-                }
-            }
             val setPlayerFullscreen: (Boolean) -> Unit = remember(windowState) {
                 { fullscreen ->
                     if (fullscreen != playerFullscreen.value) {
@@ -162,7 +139,7 @@ fun main(arguments: Array<String>) {
             DisposableEffect(settingsService, windowState) {
                 val observation = settingsService.observe { settings ->
                     applicationWindowMode.value = settings.applicationWindowMode()
-                    if (!playerFullscreen.value && !applicationFullscreen.value) {
+                    if (!playerFullscreen.value) {
                         intendedWindowPlacement.value = settings.applicationWindowMode().placement()
                         windowState.placement = intendedWindowPlacement.value
                     }
@@ -226,18 +203,6 @@ fun main(arguments: Array<String>) {
                         ) {
                             closeApplication()
                             true
-                        } else if (event.key == Key.F11) {
-                            if (event.type == KeyEventType.KeyDown && !f11Pressed.value) {
-                                if (applicationFullscreen.value) {
-                                    setApplicationFullscreen(false)
-                                } else if (playerFullscreen.value || playerActive.value) {
-                                    setPlayerFullscreen(!playerFullscreen.value)
-                                } else {
-                                    setApplicationFullscreen(true)
-                                }
-                            }
-                            f11Pressed.value = event.type == KeyEventType.KeyDown
-                            true
                         } else if (
                             playerFullscreen.value &&
                             event.key == Key.Escape &&
@@ -246,16 +211,8 @@ fun main(arguments: Array<String>) {
                             setPlayerFullscreen(false)
                             true
                         } else if (
-                            applicationFullscreen.value &&
-                            event.key == Key.Escape &&
-                            event.type == KeyEventType.KeyDown
-                        ) {
-                            setApplicationFullscreen(false)
-                            true
-                        } else if (
                             shouldExitApplicationBorderless(
                                 playerFullscreen = playerFullscreen.value,
-                                applicationFullscreen = applicationFullscreen.value,
                                 playerActive = playerActive.value,
                                 applicationWindowMode = applicationWindowMode.value,
                             ) &&
@@ -295,8 +252,6 @@ private fun ApplicationWindowMode.placement(): WindowPlacement = when (this) {
     -> WindowPlacement.Maximized
 }
 
-internal fun applicationFullscreenPlacement(): WindowPlacement = WindowPlacement.Maximized
-
 internal fun PlayerWindowMode.placement(
     current: WindowPlacement,
     applicationUndecorated: Boolean,
@@ -315,11 +270,9 @@ internal fun windowUndecorated(applicationWindowMode: ApplicationWindowMode): Bo
 
 internal fun shouldExitApplicationBorderless(
     playerFullscreen: Boolean,
-    applicationFullscreen: Boolean,
     playerActive: Boolean,
     applicationWindowMode: ApplicationWindowMode,
 ): Boolean = !playerFullscreen &&
-    !applicationFullscreen &&
     !playerActive &&
     applicationWindowMode == ApplicationWindowMode.BORDERLESS
 
