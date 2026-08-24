@@ -62,6 +62,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -86,6 +87,7 @@ final class DownloadTest {
         verifiesAutomaticRules(counter);
         verifiesStorageLimit(counter);
         downloadsHlsEpisodes(counter);
+        keepsQueueResponsiveDuringVideoPreparation(counter);
         finalizesHlsEpisodesAsSingleMedia(counter);
         removesVideosSafelyDuringFinalization(counter);
         enforcesLargeTransferPolicy(counter);
@@ -147,6 +149,44 @@ final class DownloadTest {
         } catch (IOException exception) {
             throw new AssertionError("Unable to prepare anime download test", exception);
         } finally {
+            deleteTree(root);
+        }
+    }
+
+    private static void keepsQueueResponsiveDuringVideoPreparation(Counter counter) {
+        Path root = null;
+        HlsStreamingSource source = new HlsStreamingSource(true);
+        try {
+            root = Files.createTempDirectory("anilib-anime-preparation");
+            MemoryLibraryCatalog library = new MemoryLibraryCatalog();
+            LibraryItem item = LibraryItem.create("Preparing Anime", MediaKind.ANIME)
+                    .withOrigin(new LibraryOrigin("test.streaming", "title"));
+            library.save(item);
+            AnilibHttpClient client = request -> new HttpResponse(
+                    200,
+                    Map.of(),
+                    "#EXTM3U\n#EXTINF:10,\nsegment.ts\n#EXT-X-ENDLIST\n".getBytes(StandardCharsets.UTF_8),
+                    false);
+            DownloadStoragePolicy policy = new DownloadStoragePolicy(4096, 1024, 1, true, true);
+            try (DefaultDownloadService downloads = new DefaultDownloadService(
+                    new SingleSourceRegistry(source), library, root, policy, () -> true, client)) {
+                CompletableFuture<DownloadId> preparation = CompletableFuture.supplyAsync(
+                        () -> downloads.enqueue(item.id(), source.episode.id().value()));
+                counter.check(source.awaitStreamResolution(),
+                        "video preparation must reach the deliberately slow extension call");
+                long started = System.nanoTime();
+                boolean readable = downloads.snapshot().jobs().isEmpty();
+                long elapsed = System.nanoTime() - started;
+                counter.check(readable && elapsed < TimeUnit.MILLISECONDS.toNanos(250L),
+                        "slow video preparation must not lock queue snapshots");
+                source.releaseStreamResolution();
+                DownloadId id = preparation.orTimeout(5L, TimeUnit.SECONDS).join();
+                await(downloads, id, job -> job.status() == DownloadStatus.COMPLETED);
+            }
+        } catch (IOException exception) {
+            throw new AssertionError("Unable to prepare responsive queue test", exception);
+        } finally {
+            source.releaseStreamResolution();
             deleteTree(root);
         }
     }
@@ -868,6 +908,17 @@ final class DownloadTest {
                 1.0D,
                 Optional.of(Instant.EPOCH),
                 Optional.empty());
+        private final boolean blockStreamResolution;
+        private final CountDownLatch streamResolutionStarted = new CountDownLatch(1);
+        private final CountDownLatch streamResolutionReleased = new CountDownLatch(1);
+
+        private HlsStreamingSource() {
+            this(false);
+        }
+
+        private HlsStreamingSource(boolean blockStreamResolution) {
+            this.blockStreamResolution = blockStreamResolution;
+        }
 
         @Override
         public SourceDescriptor descriptor() {
@@ -887,6 +938,17 @@ final class DownloadTest {
 
         @Override
         public List<SourceVideoStream> streams(SourceEpisodeId requested) {
+            if (blockStreamResolution) {
+                streamResolutionStarted.countDown();
+                try {
+                    if (!streamResolutionReleased.await(3L, TimeUnit.SECONDS)) {
+                        throw new DownloadException("Timed out waiting to release video preparation");
+                    }
+                } catch (InterruptedException exception) {
+                    Thread.currentThread().interrupt();
+                    throw new DownloadException("Interrupted video preparation test", exception);
+                }
+            }
             return requested.equals(episode.id())
                     ? List.of(new SourceVideoStream(
                             "hls",
@@ -896,6 +958,19 @@ final class DownloadTest {
                             Map.of("Referer", "https://anime.test/title"),
                             List.of()))
                     : List.of();
+        }
+
+        private boolean awaitStreamResolution() {
+            try {
+                return streamResolutionStarted.await(3L, TimeUnit.SECONDS);
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                throw new AssertionError("Interrupted while awaiting video preparation", exception);
+            }
+        }
+
+        private void releaseStreamResolution() {
+            streamResolutionReleased.countDown();
         }
     }
 

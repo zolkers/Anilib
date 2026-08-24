@@ -130,6 +130,10 @@ fun AnilibApp(
     val detailPlatform = remember(shareController) {
         DetailPlatform(shareController)
     }
+    val downloadPreparation = remember(downloads) { DownloadPreparationState() }
+    val responsiveDownloads = remember(downloads, downloadPreparation) {
+        PreparingDownloadPresentation(downloads, downloadPreparation)
+    }
     val imageEnvironment = remember(httpClient, pageDecoder) {
         ExtensionIconEnvironment(httpClient, pageDecoder)
     }
@@ -195,8 +199,13 @@ fun AnilibApp(
         LocalLanguagePack provides settings.languagePack(),
         LocalUiFailureHandler provides handleUiFailure,
     ) {
-        val scope = rememberCrashSafeCoroutineScope()
-        MaterialTheme(colorScheme = appColorScheme(settings, useDarkTheme)) {
+        val downloadQueueState = rememberDownloadQueueState(responsiveDownloads)
+        CompositionLocalProvider(
+            LocalDownloadQueueState provides downloadQueueState,
+            LocalDownloadPreparationState provides downloadPreparation,
+        ) {
+            val scope = rememberCrashSafeCoroutineScope()
+            MaterialTheme(colorScheme = appColorScheme(settings, useDarkTheme)) {
             Surface(modifier = Modifier.fillMaxSize()) {
             val readerController = activeReader
             val playerController = activePlayer
@@ -217,7 +226,7 @@ fun AnilibApp(
                     readerController,
                     pageDecoder,
                     applyReaderOrientationPolicy,
-                    downloads::enqueue,
+                    responsiveDownloads::enqueue,
                 ) { activeReader = null }
             } else if (playerController != null) {
                 // Sources list episodes newest first, so the neighbour towards index 0 is the
@@ -332,7 +341,7 @@ fun AnilibApp(
                 }
                 val enqueueDownload: (LibraryItemId) -> Unit = { id ->
                     scope.launch {
-                        withContext(Dispatchers.IO) { runCatching { downloads.enqueue(id) } }
+                        withContext(Dispatchers.IO) { runCatching { responsiveDownloads.enqueue(id) } }
                             .onSuccess { downloadError = null }
                             .onFailure { downloadError = it.message ?: "The download could not be queued." }
                     }
@@ -421,7 +430,7 @@ fun AnilibApp(
                         settings,
                         reader,
                         player,
-                        downloads,
+                        responsiveDownloads,
                         backup,
                         backupImportPicker,
                         tracking,
@@ -492,6 +501,7 @@ fun AnilibApp(
             }
             playerError?.let { message ->
                 UiNoticeDialog(UiNoticeKind.ERROR, message, dismiss = { playerError = null })
+            }
             }
         }
     }

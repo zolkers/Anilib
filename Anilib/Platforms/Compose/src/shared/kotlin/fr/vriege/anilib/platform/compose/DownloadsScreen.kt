@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -78,6 +79,7 @@ internal fun DownloadsScreen(presentation: DownloadPresentation, goBack: () -> U
     var confirmRemoveTitle by remember(presentation) {
         mutableStateOf<Pair<LibraryItemId, String>?>(null)
     }
+    val preparing = LocalDownloadPreparationState.current?.pendingCount ?: 0
     val queue = rememberDownloadQueueSnapshot(presentation)
     if (queue == null) {
         DownloadQueueLoading(goBack)
@@ -146,8 +148,13 @@ internal fun DownloadsScreen(presentation: DownloadPresentation, goBack: () -> U
                 }
                 commandError?.let { message -> item { DownloadMessageSurface(message, true) } }
                 repairMessage?.let { message -> item { DownloadMessageSurface(message, false) } }
+                if (preparing > 0) {
+                    item(key = "download-preparation") { DownloadPreparationCard() }
+                }
                 if (queue.jobs().isEmpty()) {
-                    item { EmptyPage("ui.download.queue.empty") }
+                    if (preparing == 0) {
+                        item { EmptyPage("ui.download.queue.empty") }
+                    }
                 } else if (jobs.isEmpty()) {
                     item { EmptyPage("ui.no.downloads.match.filter") }
                 } else {
@@ -281,6 +288,20 @@ internal fun DownloadsScreen(presentation: DownloadPresentation, goBack: () -> U
                 TextButton(onClick = { confirmRemoveTitle = null }) { Text("ui.cancel") }
             },
         )
+    }
+}
+
+@Composable
+private fun DownloadPreparationCard() {
+    AnilibGroup {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.5.dp)
+            Text("ui.download.preparing", fontWeight = FontWeight.Medium)
+        }
     }
 }
 

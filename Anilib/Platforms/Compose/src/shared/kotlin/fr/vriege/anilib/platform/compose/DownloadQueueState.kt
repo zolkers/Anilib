@@ -1,8 +1,9 @@
 package fr.vriege.anilib.platform.compose
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.State
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.staticCompositionLocalOf
 import fr.vriege.anilib.feature.downloads.DownloadQueueSnapshot
 import fr.vriege.anilib.feature.downloads.ui.DownloadPresentation
 import kotlinx.coroutines.CancellationException
@@ -14,9 +15,17 @@ import kotlinx.coroutines.withContext
 @Composable
 internal fun rememberDownloadQueueSnapshot(
     presentation: DownloadPresentation,
-): DownloadQueueSnapshot? {
+): DownloadQueueSnapshot? = LocalDownloadQueueState.current?.value
+    ?: rememberDownloadQueueState(presentation).value
+
+internal val LocalDownloadQueueState = staticCompositionLocalOf<State<DownloadQueueSnapshot?>?> { null }
+
+@Composable
+internal fun rememberDownloadQueueState(
+    presentation: DownloadPresentation,
+): State<DownloadQueueSnapshot?> {
     val report = LocalUiFailureHandler.current
-    val snapshot by produceState<DownloadQueueSnapshot?>(null, presentation) {
+    return produceState<DownloadQueueSnapshot?>(null, presentation) {
         val changes = Channel<Unit>(Channel.CONFLATED)
         val observation = withContext(Dispatchers.IO) {
             presentation.observe { changes.trySend(Unit) }
@@ -36,7 +45,6 @@ internal fun rememberDownloadQueueSnapshot(
             withContext(Dispatchers.IO) { runCatching { observation.close() } }
         }
     }
-    return snapshot
 }
 
 private const val DOWNLOAD_UI_REFRESH_MILLIS = 150L

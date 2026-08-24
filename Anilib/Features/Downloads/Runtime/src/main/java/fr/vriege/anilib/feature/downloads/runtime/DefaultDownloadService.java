@@ -268,7 +268,7 @@ public final class DefaultDownloadService
     }
 
     @Override
-    public synchronized DownloadId enqueue(LibraryItemId libraryItemId) {
+    public DownloadId enqueue(LibraryItemId libraryItemId) {
         LibraryItem item = library.find(Objects.requireNonNull(
                         libraryItemId,
                         "libraryItemId must not be null"))
@@ -279,15 +279,11 @@ public final class DefaultDownloadService
     }
 
     @Override
-    public synchronized DownloadId enqueue(
+    public DownloadId enqueue(
             LibraryItemId libraryItemId,
             SourceContentUnitId contentUnitId) {
         Objects.requireNonNull(libraryItemId, "libraryItemId must not be null");
-        ensureOpen();
-        if (offlineMode) {
-            throw new DownloadException("Downloads cannot be queued while offline mode is enabled");
-        }
-        ensureLargeTransfersAllowed();
+        ensureEnqueueAllowed();
         LibraryItem item = library.find(libraryItemId)
                 .orElseThrow(() -> new DownloadException("Library item was not found"));
         LibraryOrigin origin = item.origin()
@@ -304,47 +300,11 @@ public final class DefaultDownloadService
                         .findFirst()
                         .orElseThrow(() -> new DownloadException("Content unit was not found for this title"));
         List<SourcePageResource> pages = validatedPages(source, unit);
-        records.values().stream()
-                .filter(record -> record.contentUnit.id().equals(unit.id()))
-                .filter(record -> record.status != DownloadStatus.CANCELLED)
-                .findFirst()
-                .ifPresent(record -> {
-                    throw new DownloadException("This content unit is already in the download queue");
-                });
-        long estimatedBytes = pages.stream()
-                .mapToLong(SourcePageResource::estimatedBytes)
-                .filter(size -> size >= 0)
-                .sum();
-        boolean allSizesKnown = pages.stream()
-                .noneMatch(page -> page.estimatedBytes() == SourcePageResource.UNKNOWN_SIZE);
-        if (allSizesKnown && usedStorageBytes + estimatedBytes > policy.maximumStorageBytes()) {
-            throw new DownloadException("The download would exceed the configured storage limit");
-        }
-        Instant now = clock.instant();
-        DownloadRecord record = new DownloadRecord(
-                DownloadId.create(),
-                item.id(),
-                item.title(),
-                itemId,
-                unit,
-                pages,
-                null,
-                DownloadPriority.NORMAL,
-                nextQueueOrder++,
-                DownloadStatus.QUEUED,
-                0,
-                0,
-                null,
-                now);
-        records.put(record.id, record);
-        persist();
-        notifyListeners();
-        schedule(record);
-        return record.id;
+        return registerPreparedDownload(item, itemId, unit, pages, null);
     }
 
     @Override
-    public synchronized DownloadId enqueue(LibraryItemId libraryItemId, String sourceContentId) {
+    public DownloadId enqueue(LibraryItemId libraryItemId, String sourceContentId) {
         Objects.requireNonNull(libraryItemId, "libraryItemId must not be null");
         if (sourceContentId == null || sourceContentId.isBlank()) {
             throw new IllegalArgumentException("sourceContentId must not be blank");
@@ -362,11 +322,7 @@ public final class DefaultDownloadService
     }
 
     private DownloadId enqueueVideo(LibraryItem item, SourceEpisodeId episodeId) {
-        ensureOpen();
-        if (offlineMode) {
-            throw new DownloadException("Downloads cannot be queued while offline mode is enabled");
-        }
-        ensureLargeTransfersAllowed();
+        ensureEnqueueAllowed();
         LibraryOrigin origin = item.origin()
                 .orElseThrow(() -> new DownloadException("Library item has no source origin"));
         SourceCatalogueItemId itemId = new SourceCatalogueItemId(
@@ -391,19 +347,43 @@ public final class DefaultDownloadService
                 episode.title(),
                 episode.episodeNumber(),
                 episode.uploadedAt());
+        VideoDownloadPlan plan = videoPlanner.plan(unitId, stream);
+        return registerPreparedDownload(item, itemId, unit, plan.resources(), plan.metadata());
+    }
+
+    private void ensureEnqueueAllowed() {
+        synchronized (this) {
+            ensureOpen();
+            if (offlineMode) {
+                throw new DownloadException("Downloads cannot be queued while offline mode is enabled");
+            }
+            ensureLargeTransfersAllowed();
+        }
+    }
+
+    private synchronized DownloadId registerPreparedDownload(
+            LibraryItem item,
+            SourceCatalogueItemId itemId,
+            SourceContentUnit unit,
+            List<SourcePageResource> resources,
+            VideoDownloadMetadata video) {
+        ensureOpen();
+        if (offlineMode) {
+            throw new DownloadException("Downloads cannot be queued while offline mode is enabled");
+        }
+        ensureLargeTransfersAllowed();
         records.values().stream()
-                .filter(record -> record.contentUnit.id().equals(unitId))
+                .filter(record -> record.contentUnit.id().equals(unit.id()))
                 .filter(record -> record.status != DownloadStatus.CANCELLED)
                 .findFirst()
                 .ifPresent(record -> {
-                    throw new DownloadException("This episode is already in the download queue");
+                    throw new DownloadException("This content is already in the download queue");
                 });
-        VideoDownloadPlan plan = videoPlanner.plan(unitId, stream);
-        long estimatedBytes = plan.resources().stream()
+        long estimatedBytes = resources.stream()
                 .mapToLong(SourcePageResource::estimatedBytes)
                 .filter(size -> size >= 0L)
                 .sum();
-        boolean allSizesKnown = plan.resources().stream()
+        boolean allSizesKnown = resources.stream()
                 .noneMatch(resource -> resource.estimatedBytes() == SourcePageResource.UNKNOWN_SIZE);
         if (allSizesKnown && usedStorageBytes + estimatedBytes > policy.maximumStorageBytes()) {
             throw new DownloadException("The download would exceed the configured storage limit");
@@ -414,8 +394,8 @@ public final class DefaultDownloadService
                 item.title(),
                 itemId,
                 unit,
-                plan.resources(),
-                plan.metadata(),
+                resources,
+                video,
                 DownloadPriority.NORMAL,
                 nextQueueOrder++,
                 DownloadStatus.QUEUED,
