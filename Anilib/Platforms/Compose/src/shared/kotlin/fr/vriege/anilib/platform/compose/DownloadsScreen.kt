@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.AutoMode
 import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -39,9 +40,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -52,10 +51,12 @@ import androidx.compose.ui.unit.dp
 import fr.vriege.anilib.feature.downloads.AutomaticDownloadCategoryRule
 import fr.vriege.anilib.feature.downloads.AutomaticDownloadPolicy
 import fr.vriege.anilib.feature.downloads.DownloadCleanupPolicy
+import fr.vriege.anilib.feature.downloads.DownloadContentType
 import fr.vriege.anilib.feature.downloads.DownloadJobSnapshot
 import fr.vriege.anilib.feature.downloads.DownloadPriority
 import fr.vriege.anilib.feature.downloads.DownloadRecoveryMode
 import fr.vriege.anilib.feature.downloads.DownloadStatus
+import fr.vriege.anilib.feature.downloads.DownloadStorageSnapshot
 import fr.vriege.anilib.feature.downloads.ui.DownloadPresentation
 import fr.vriege.anilib.feature.library.LibraryItemId
 import java.nio.file.Path
@@ -68,7 +69,6 @@ import kotlinx.coroutines.withContext
 @Composable
 internal fun DownloadsScreen(presentation: DownloadPresentation, goBack: () -> Unit) {
     val scope = rememberCrashSafeCoroutineScope()
-    var revision by remember(presentation) { mutableIntStateOf(0) }
     var commandError by remember(presentation) { mutableStateOf<String?>(null) }
     var filter by remember(presentation) { mutableStateOf(DownloadFilter.ALL) }
     var confirmRemoveAll by remember(presentation) { mutableStateOf(false) }
@@ -78,11 +78,11 @@ internal fun DownloadsScreen(presentation: DownloadPresentation, goBack: () -> U
     var confirmRemoveTitle by remember(presentation) {
         mutableStateOf<Pair<LibraryItemId, String>?>(null)
     }
-    DisposableEffect(presentation) {
-        val registration = presentation.observe { revision++ }
-        onDispose { runCatching { registration.close() } }
+    val queue = rememberDownloadQueueSnapshot(presentation)
+    if (queue == null) {
+        DownloadQueueLoading(goBack)
+        return
     }
-    val queue = remember(presentation, revision) { presentation.queue() }
     val jobs = queue.jobs().filter(filter::accepts)
     val command: (() -> Unit) -> Unit = { action ->
         scope.launch {
@@ -216,9 +216,7 @@ internal fun DownloadsScreen(presentation: DownloadPresentation, goBack: () -> U
     if (storageDialog) {
         DownloadStorageDialog(
             presentation = presentation,
-            migrate = { location ->
-                command { presentation.changeStorageLocation(Path.of(location)) }
-            },
+            maximumStorageBytes = queue.maximumStorageBytes(),
             repair = {
                 scope.launch {
                     runCatching { withContext(Dispatchers.IO) { presentation.repairIndex() } }
@@ -283,6 +281,18 @@ internal fun DownloadsScreen(presentation: DownloadPresentation, goBack: () -> U
                 TextButton(onClick = { confirmRemoveTitle = null }) { Text("ui.cancel") }
             },
         )
+    }
+}
+
+@Composable
+private fun DownloadQueueLoading(goBack: () -> Unit) {
+    AnilibSubScreenScaffold(title = "ui.download.queue", goBack = goBack) { padding ->
+        Box(
+            modifier = Modifier.fillMaxSize().padding(padding),
+            contentAlignment = Alignment.Center,
+        ) {
+            CircularProgressIndicator()
+        }
     }
 }
 
@@ -512,25 +522,52 @@ private fun AutomaticToggleRow(label: String, checked: Boolean, change: (Boolean
 @Composable
 private fun DownloadStorageDialog(
     presentation: DownloadPresentation,
-    migrate: (String) -> Unit,
+    maximumStorageBytes: Long,
     repair: () -> Unit,
     close: () -> Unit,
 ) {
-    val storage = remember(presentation) { presentation.storage() }
-    var location by remember(presentation) { mutableStateOf(storage.location().toString()) }
+    val scope = rememberCrashSafeCoroutineScope()
+    var storage by remember(presentation) {
+        mutableStateOf<DownloadStorageSnapshot?>(null)
+    }
+    var location by remember(presentation) { mutableStateOf("") }
+    var maximumGiB by remember(presentation, maximumStorageBytes) {
+        mutableStateOf((maximumStorageBytes / GIBIBYTE_BYTES).toString())
+    }
+    var saving by remember(presentation) { mutableStateOf(false) }
+    var error by remember(presentation) { mutableStateOf<String?>(null) }
+    CrashSafeLaunchedEffect(presentation) {
+        storage = withContext(Dispatchers.IO) { presentation.storage() }
+        location = storage?.location()?.toString().orEmpty()
+    }
     AlertDialog(
         onDismissRequest = close,
         title = { Text("ui.download.storage") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    if (storage.writable()) "Writable · ${formatBytes(storage.availableBytes())} available"
-                    else "Storage is not writable",
-                )
+                val currentStorage = storage
+                if (currentStorage == null) {
+                    CircularProgressIndicator()
+                } else {
+                    Text(
+                        if (currentStorage.writable()) {
+                            "Writable · ${formatBytes(currentStorage.availableBytes())} available"
+                        } else {
+                            "Storage is not writable"
+                        },
+                    )
+                }
                 OutlinedTextField(
                     value = location,
                     onValueChange = { location = it },
                     label = { Text("ui.storage.directory") },
+                    singleLine = true,
+                )
+                OutlinedTextField(
+                    value = maximumGiB,
+                    onValueChange = { maximumGiB = it.filter(Char::isDigit) },
+                    label = { Text("ui.maximum.download.storage.gib") },
+                    supportingText = { Text("ui.maximum.download.storage.gib.description") },
                     singleLine = true,
                 )
                 Text(
@@ -538,16 +575,39 @@ private fun DownloadStorageDialog(
                         "the.old.managed.copies",
                 )
                 TextButton(onClick = repair) { Text("ui.repair.download.index") }
+                error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }
         },
         confirmButton = {
             TextButton(onClick = {
-                migrate(location)
-                close()
-            }) { Text("ui.migrate") }
+                if (saving) return@TextButton
+                saving = true
+                scope.launch {
+                    val result = withContext(Dispatchers.IO) {
+                        runCatching {
+                            val maximumBytes = parseStorageLimit(maximumGiB)
+                            presentation.configureMaximumStorageBytes(maximumBytes)
+                            val currentLocation = storage?.location()?.toString()
+                            if (location != currentLocation) {
+                                presentation.changeStorageLocation(Path.of(location))
+                            }
+                        }
+                    }
+                    result.onSuccess { close() }
+                        .onFailure { error = it.message ?: "Unable to update download storage." }
+                    saving = false
+                }
+            }, enabled = !saving && storage != null) { Text("ui.save") }
         },
         dismissButton = { TextButton(onClick = close) { Text("ui.cancel") } },
     )
+}
+
+private fun parseStorageLimit(value: String): Long {
+    val gibibytes = value.toLongOrNull()
+        ?: throw IllegalArgumentException("Storage limit must be a whole number of GiB")
+    require(gibibytes > 0L) { "Storage limit must be at least 1 GiB" }
+    return Math.multiplyExact(gibibytes, GIBIBYTE_BYTES)
 }
 
 @Composable
@@ -573,7 +633,11 @@ private fun DownloadJobCard(
             )
             Text(
                 text = UiTranslations.format(
-                    "dynamic.download.progress",
+                    if (job.contentType() == DownloadContentType.VIDEO) {
+                        "dynamic.video.download.progress"
+                    } else {
+                        "dynamic.download.progress"
+                    },
                     LocalLanguagePack.current,
                     formatStatus(job.status()),
                     job.completedPages(),
@@ -644,6 +708,8 @@ private fun DownloadJobCard(
         }
     }
 }
+
+private const val GIBIBYTE_BYTES = 1024L * 1024L * 1024L
 
 private fun nextPriority(priority: DownloadPriority): DownloadPriority {
     val values = DownloadPriority.entries

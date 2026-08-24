@@ -27,11 +27,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -40,6 +36,9 @@ import androidx.compose.ui.unit.dp
 import fr.vriege.anilib.feature.downloads.ui.DownloadPresentation
 import fr.vriege.anilib.feature.downloads.DownloadStatus
 import fr.vriege.anilib.feature.settings.SettingsSnapshot
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,14 +55,11 @@ internal fun MorePage(
     openExtensionRepositories: () -> Unit,
     openSettings: () -> Unit,
 ) {
-    var queue by remember(downloads) { mutableStateOf(downloads.queue()) }
-    DisposableEffect(downloads) {
-        val observation = downloads.observe { queue = downloads.queue() }
-        onDispose { observation.close() }
-    }
-    val pendingDownloads = queue.jobs().count {
+    val scope = rememberCrashSafeCoroutineScope()
+    val queue = rememberDownloadQueueSnapshot(downloads)
+    val pendingDownloads = queue?.jobs()?.count {
         it.status() != DownloadStatus.COMPLETED && it.status() != DownloadStatus.CANCELLED
-    }
+    } ?: 0
     Scaffold(topBar = { TopAppBar(title = { Text("ui.more") }) }) { padding ->
         LazyColumn(modifier = Modifier.fillMaxSize().padding(padding)) {
             item { AnilibSection("ui.quick.filters") }
@@ -72,9 +68,13 @@ internal fun MorePage(
                     MoreSwitchRow(
                         "ui.downloaded.only",
                         "ui.use.downloaded.content.without.the.online.fallback",
-                        queue.offlineMode(),
+                        queue?.offlineMode() == true,
                         Icons.Outlined.Download,
-                        downloads::setOfflineMode,
+                        { enabled ->
+                            scope.launch {
+                                withContext(Dispatchers.IO) { downloads.setOfflineMode(enabled) }
+                            }
+                        },
                     )
                     MoreSwitchRow(
                         "ui.incognito.mode",

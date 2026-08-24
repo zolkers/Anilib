@@ -14,6 +14,7 @@ public record DownloadJobSnapshot(
         String title,
         SourceCatalogueItemId sourceItemId,
         SourceContentUnit contentUnit,
+        DownloadContentType contentType,
         DownloadStatus status,
         DownloadPriority priority,
         int queuePosition,
@@ -30,6 +31,7 @@ public record DownloadJobSnapshot(
         Objects.requireNonNull(title, "title must not be null");
         Objects.requireNonNull(sourceItemId, "sourceItemId must not be null");
         Objects.requireNonNull(contentUnit, "contentUnit must not be null");
+        Objects.requireNonNull(contentType, "contentType must not be null");
         Objects.requireNonNull(status, "status must not be null");
         Objects.requireNonNull(priority, "priority must not be null");
         if (queuePosition < 0) {

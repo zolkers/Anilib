@@ -1,6 +1,7 @@
 package fr.vriege.anilib.feature.downloads.runtime;
 
 import fr.vriege.anilib.feature.downloads.DownloadId;
+import fr.vriege.anilib.feature.downloads.DownloadContentType;
 import fr.vriege.anilib.feature.downloads.DownloadJobSnapshot;
 import fr.vriege.anilib.feature.downloads.DownloadPriority;
 import fr.vriege.anilib.feature.downloads.DownloadStatus;
@@ -31,6 +32,7 @@ final class DownloadRecord {
     long bytesPerSecond;
     long activeStartedNanos;
     long activeStartBytes;
+    long lastProgressNotificationNanos;
 
     DownloadRecord(
             DownloadId id,
@@ -74,6 +76,7 @@ final class DownloadRecord {
                 title,
                 sourceItemId,
                 contentUnit,
+                video() ? DownloadContentType.VIDEO : DownloadContentType.PAGES,
                 status,
                 priority,
                 queuePosition,

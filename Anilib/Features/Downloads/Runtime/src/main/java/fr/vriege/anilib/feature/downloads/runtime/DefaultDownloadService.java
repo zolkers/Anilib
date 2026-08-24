@@ -69,6 +69,7 @@ import java.util.stream.Stream;
 
 public final class DefaultDownloadService
         implements DownloadService, ReaderContentProvider, PlayerContentProvider, AutoCloseable {
+    private static final long PROGRESS_NOTIFICATION_INTERVAL_NANOS = TimeUnit.MILLISECONDS.toNanos(250L);
     private static final Comparator<DownloadRecord> DISPLAY_ORDER =
             Comparator.comparing((DownloadRecord record) -> record.status == DownloadStatus.DOWNLOADING).reversed()
                     .thenComparing((DownloadRecord record) -> record.priority, Comparator.reverseOrder())
@@ -84,10 +85,11 @@ public final class DefaultDownloadService
     private final Path defaultStorageRoot;
     private Path storageRoot;
     private Path contentRoot;
-    private final DownloadStoragePolicy policy;
+    private DownloadStoragePolicy policy;
     private final Clock clock;
     private final FileDownloadQueueStore store;
     private final FileDownloadStorageLocationStore locationStore;
+    private final FileDownloadStoragePolicyStore storagePolicyStore;
     private final FileAutomaticDownloadPolicyStore automaticPolicyStore;
     private final ExecutorService workers;
     private final BooleanSupplier largeTransfersAllowed;
@@ -173,6 +175,8 @@ public final class DefaultDownloadService
                 "httpClient must not be null"));
         this.store = new FileDownloadQueueStore(normalizedRoot.resolve("queue.anilib"));
         this.locationStore = new FileDownloadStorageLocationStore(normalizedRoot.resolve("storage-location.anilib"));
+        this.storagePolicyStore = new FileDownloadStoragePolicyStore(
+                normalizedRoot.resolve("storage-policy.anilib"));
         this.automaticPolicyStore = new FileAutomaticDownloadPolicyStore(
                 normalizedRoot.resolve("automatic-downloads.anilib"));
         load();
@@ -503,6 +507,27 @@ public final class DefaultDownloadService
                     false,
                     0L);
         }
+    }
+
+    @Override
+    public synchronized void configureMaximumStorageBytes(long maximumStorageBytes) {
+        ensureOpen();
+        if (maximumStorageBytes < usedStorageBytes) {
+            throw new DownloadException("The storage limit cannot be lower than downloaded data");
+        }
+        DownloadStoragePolicy requested;
+        try {
+            requested = policy.withMaximumStorageBytes(maximumStorageBytes);
+        } catch (IllegalArgumentException exception) {
+            throw new DownloadException("Invalid download storage limit", exception);
+        }
+        try {
+            storagePolicyStore.save(maximumStorageBytes);
+        } catch (IOException exception) {
+            throw new DownloadException("Unable to persist the download storage limit", exception);
+        }
+        policy = requested;
+        notifyListeners();
     }
 
     @Override
@@ -1011,9 +1036,13 @@ public final class DefaultDownloadService
             if (record.completedPages == record.pages.size()) {
                 record.status = DownloadStatus.COMPLETED;
             }
-            persist();
-            notifyListeners();
-            return record.status == DownloadStatus.DOWNLOADING;
+            if (record.status == DownloadStatus.COMPLETED) {
+                persist();
+                notifyListeners();
+                return false;
+            }
+            publishProgress(record);
+            return true;
         }
     }
 
@@ -1056,8 +1085,7 @@ public final class DefaultDownloadService
             if (record.completedPages == record.pages.size()) {
                 completeVideo(record);
             } else {
-                persist();
-                notifyListeners();
+                publishProgress(record);
             }
             return record.status == DownloadStatus.DOWNLOADING;
         }
@@ -1091,6 +1119,14 @@ public final class DefaultDownloadService
         record.updatedAt = clock.instant();
         persist();
         notifyListeners();
+    }
+
+    private void publishProgress(DownloadRecord record) {
+        long now = System.nanoTime();
+        if (now - record.lastProgressNotificationNanos >= PROGRESS_NOTIFICATION_INTERVAL_NANOS) {
+            record.lastProgressNotificationNanos = now;
+            notifyListeners();
+        }
     }
 
     private void schedule(DownloadRecord record) {
@@ -1240,6 +1276,12 @@ public final class DefaultDownloadService
 
     private void load() {
         try {
+            long maximumStorageBytes = storagePolicyStore.load().orElse(policy.maximumStorageBytes());
+            try {
+                policy = policy.withMaximumStorageBytes(maximumStorageBytes);
+            } catch (IllegalArgumentException exception) {
+                throw new IOException("Invalid persisted download storage limit", exception);
+            }
             automaticPolicy = automaticPolicyStore.load();
             storageRoot = locationStore.load().orElse(defaultStorageRoot);
             storageRoot = validateStorageRoot(storageRoot);

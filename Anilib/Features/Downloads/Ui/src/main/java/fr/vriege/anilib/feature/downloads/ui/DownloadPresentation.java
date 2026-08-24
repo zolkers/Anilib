@@ -42,6 +42,8 @@ public interface DownloadPresentation {
 
     DownloadStorageSnapshot storage();
 
+    void configureMaximumStorageBytes(long maximumStorageBytes);
+
     void changeStorageLocation(Path location);
 
     DownloadIndexRepairResult repairIndex();

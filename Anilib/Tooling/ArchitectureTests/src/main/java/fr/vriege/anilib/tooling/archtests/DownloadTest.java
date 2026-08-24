@@ -2,6 +2,7 @@ package fr.vriege.anilib.tooling.archtests;
 
 import fr.vriege.anilib.configuration.standard.StandardAnilib;
 import fr.vriege.anilib.feature.downloads.DownloadCapabilities;
+import fr.vriege.anilib.feature.downloads.DownloadContentType;
 import fr.vriege.anilib.feature.downloads.AutomaticDownloadCategoryRule;
 import fr.vriege.anilib.feature.downloads.AutomaticDownloadPolicy;
 import fr.vriege.anilib.feature.downloads.DownloadCleanupPolicy;
@@ -125,7 +126,8 @@ final class DownloadTest {
                         id,
                         job -> job.status() == DownloadStatus.COMPLETED);
                 counter.check(completed.completedPages() == 2
-                                && completed.downloadedBytes() == first.length + second.length,
+                                && completed.downloadedBytes() == first.length + second.length
+                                && completed.contentType() == DownloadContentType.VIDEO,
                         "HLS downloads must persist every media segment");
                 Path directory = root.resolve("content").resolve(id.toString());
                 counter.check(Files.isRegularFile(directory.resolve("offline.m3u8"))
@@ -406,14 +408,25 @@ final class DownloadTest {
             LibraryItem item = LibraryItem.create("Limit", MediaKind.MANGA)
                     .withOrigin(new LibraryOrigin("test.download", "title"));
             library.save(item);
+            SourceRegistry registry = new SingleSourceRegistry(new BlockingPagedSource(false));
+            DownloadStoragePolicy initial = new DownloadStoragePolicy(6, 6, 1, true, true);
             try (DefaultDownloadService downloads = new DefaultDownloadService(
-                    new SingleSourceRegistry(new BlockingPagedSource(false)),
-                    library,
-                    root,
-                    new DownloadStoragePolicy(6, 6, 1, true, true))) {
+                    registry, library, root, initial)) {
                 counter.expectDownloadFailure(
                         () -> downloads.enqueue(item.id()),
                         "known page sizes exceeding storage policy must be rejected before queueing");
+                downloads.configureMaximumStorageBytes(12L);
+                counter.check(downloads.snapshot().maximumStorageBytes() == 12L,
+                        "download storage limit changes must apply immediately");
+                DownloadId id = downloads.enqueue(item.id());
+                counter.check(await(downloads, id, job -> job.status() == DownloadStatus.COMPLETED)
+                                .contentType() == DownloadContentType.PAGES,
+                        "manga downloads must remain page content");
+            }
+            try (DefaultDownloadService restarted = new DefaultDownloadService(
+                    registry, library, root, initial)) {
+                counter.check(restarted.snapshot().maximumStorageBytes() == 12L,
+                        "configured download storage limits must survive a restart");
             }
         } catch (IOException exception) {
             throw new AssertionError("Unable to prepare download limit test", exception);

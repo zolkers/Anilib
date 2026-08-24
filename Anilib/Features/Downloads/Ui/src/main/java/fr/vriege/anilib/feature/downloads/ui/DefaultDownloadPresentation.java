@@ -93,6 +93,11 @@ public final class DefaultDownloadPresentation implements DownloadPresentation {
     }
 
     @Override
+    public void configureMaximumStorageBytes(long maximumStorageBytes) {
+        downloads.configureMaximumStorageBytes(maximumStorageBytes);
+    }
+
+    @Override
     public void changeStorageLocation(Path location) {
         downloads.changeStorageLocation(location);
     }

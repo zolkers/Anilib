@@ -21,10 +21,19 @@ public record DownloadStoragePolicy(
 
     public static DownloadStoragePolicy standard() {
         return new DownloadStoragePolicy(
-                4L * 1024L * 1024L * 1024L,
+                20L * 1024L * 1024L * 1024L,
                 64L * 1024L * 1024L,
                 2,
                 true,
                 true);
+    }
+
+    public DownloadStoragePolicy withMaximumStorageBytes(long maximumBytes) {
+        return new DownloadStoragePolicy(
+                maximumBytes,
+                maximumPageBytes,
+                concurrentJobs,
+                resumeOnStart,
+                removePartialOnCancel);
     }
 }
