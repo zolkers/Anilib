@@ -378,6 +378,10 @@ public final class DefaultPlayerService implements PlayerService, PlayerContentR
         return replacement;
     }
 
+    synchronized boolean onlineFallbackAllowed() {
+        return !closed && fallbackAllowed();
+    }
+
     PlaybackStateStore stateStore() {
         return states;
     }

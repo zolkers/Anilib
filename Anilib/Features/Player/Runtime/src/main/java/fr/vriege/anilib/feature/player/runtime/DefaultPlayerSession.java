@@ -69,9 +69,14 @@ final class DefaultPlayerSession implements PlayerSession {
     }
 
     @Override
-    public synchronized boolean onlineStreamsAvailable() {
-        ensureOpen();
-        return onlineStreamLoader != null;
+    public boolean onlineStreamsAvailable() {
+        boolean available;
+        synchronized (this) {
+            ensureOpen();
+            available = onlineStreamLoader != null || streams.stream()
+                    .anyMatch(stream -> !"file".equalsIgnoreCase(stream.location().getScheme()));
+        }
+        return available && service.onlineFallbackAllowed();
     }
 
     @Override

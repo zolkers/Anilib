@@ -282,6 +282,12 @@ final class DownloadTest {
                                         && source.streamRequests.get() == streamRequestsBeforePlayer
                                         && session.onlineStreamsAvailable(),
                                 "downloaded anime must open locally without resolving its online streams");
+                        downloads.setOfflineMode(true);
+                        counter.check(!session.onlineStreamsAvailable(),
+                                "offline mode must hide the online playback choice from an open session");
+                        downloads.setOfflineMode(false);
+                        counter.check(session.onlineStreamsAvailable(),
+                                "leaving offline mode must restore the online playback choice");
                         session.loadOnlineStreams();
                         counter.check(session.snapshot().streams().size() == 2
                                         && source.streamRequests.get() == streamRequestsBeforePlayer + 1,

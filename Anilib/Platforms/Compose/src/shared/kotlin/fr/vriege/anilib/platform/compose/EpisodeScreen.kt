@@ -89,10 +89,12 @@ internal fun PlayerSelectionScreen(
     val livePlayback = remember(controller) { mutableStateOf(snapshot.playback()) }
     val offlineStreams = snapshot.streams().filter(::isOfflineStream)
     val onlineStreams = snapshot.streams().filterNot(::isOfflineStream)
-    val canChoosePlaybackSource = offlineStreams.isNotEmpty() &&
-        (onlineStreams.isNotEmpty() || controller.onlineStreamsAvailable())
+    val onlinePlaybackAvailable = controller.onlineStreamsAvailable()
+    val canChoosePlaybackSource = offlineStreams.isNotEmpty() && onlinePlaybackAvailable
     val selectedOffline = isOfflineStream(snapshot.selectedStream())
-    val visibleStreams = if (!canChoosePlaybackSource) {
+    val visibleStreams = if (offlineStreams.isNotEmpty() && !onlinePlaybackAvailable) {
+        offlineStreams
+    } else if (!canChoosePlaybackSource) {
         snapshot.streams()
     } else if (selectedOffline) {
         offlineStreams
