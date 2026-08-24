@@ -6,9 +6,15 @@ import fr.vriege.anilib.feature.settings.PlayerWindowMode
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class DesktopWindowModeTest {
+    @Test
+    fun `desktop application icon is packaged`() {
+        assertNotNull(javaClass.getResource("/assets/anilib-icon.png"))
+    }
+
     @Test
     fun `player fullscreen exits when the application stays unfocused`() {
         assertTrue(shouldExitPlayerFullscreen(playerFullscreen = true, windowFocused = false))

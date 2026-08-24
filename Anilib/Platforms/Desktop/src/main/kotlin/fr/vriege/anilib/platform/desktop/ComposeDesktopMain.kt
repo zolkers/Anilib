@@ -14,6 +14,8 @@ import androidx.compose.ui.input.key.isAltPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.painter.BitmapPainter
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPlacement
@@ -59,8 +61,15 @@ import org.jetbrains.skia.Image
 
 fun main(arguments: Array<String>) {
     val dataDirectory = DesktopDataDirectory.resolve()
+    val headless = GraphicsEnvironment.isHeadless() || arguments.contains("--headless")
+    val startupSplash = if (headless) null else DesktopStartupSplash.open()
     val transport = JdkHttpTransport()
-    val extensionPlatform = DesktopApkExtensionPlatform.open(dataDirectory, transport)
+    val extensionPlatform = try {
+        DesktopApkExtensionPlatform.open(dataDirectory, transport)
+    } catch (failure: Throwable) {
+        startupSplash?.close()
+        throw failure
+    }
     val plugins = listOf(CoverCachePlugin(dataDirectory.resolve("cache").resolve("covers")))
     val started = try {
         StandardAnilib.start(
@@ -71,11 +80,12 @@ fun main(arguments: Array<String>) {
             plugins,
         )
     } catch (failure: Throwable) {
+        startupSplash?.close()
         extensionPlatform.close()
         throw failure
     }
     extensionPlatform.attach(started)
-    if (GraphicsEnvironment.isHeadless() || arguments.contains("--headless")) {
+    if (headless) {
         printHeadlessSummary(started)
         try {
             started.close()
@@ -92,8 +102,10 @@ fun main(arguments: Array<String>) {
         started.capability(SettingsCapabilities.DIAGNOSTICS),
     )
     val settingsService = started.capability(SettingsCapabilities.SERVICE)
+    startupSplash?.setReducedMotion(settingsService.snapshot().reducedMotion())
     try {
         application {
+            val applicationIcon = remember { loadApplicationIcon() }
             val initialApplicationWindowMode = settingsService.snapshot().applicationWindowMode()
             val windowState = rememberWindowState(placement = initialApplicationWindowMode.placement())
             val intendedWindowPlacement = remember {
@@ -210,6 +222,7 @@ fun main(arguments: Array<String>) {
                     onCloseRequest = closeApplication,
                     title = "Anilib",
                     state = windowState,
+                    icon = applicationIcon,
                     undecorated = windowUndecorated,
                     onPreviewKeyEvent = { event ->
                         if (
@@ -290,12 +303,14 @@ fun main(arguments: Array<String>) {
                         window.isVisible = true
                         window.toFront()
                         window.requestFocus()
+                        startupSplash?.close()
                     }
                     content()
                 }
             }
         }
     } finally {
+        startupSplash?.close()
         crashShield.close()
     }
 }
@@ -394,6 +409,14 @@ internal fun DesktopAnilibContent(
 
 private fun decodePage(bytes: ByteArray): ImageBitmap? =
     runCatching { Image.makeFromEncoded(bytes).toComposeImageBitmap() }.getOrNull()
+
+private fun loadApplicationIcon(): Painter? = runCatching {
+    val loader = Thread.currentThread().contextClassLoader
+    val bytes = requireNotNull(loader.getResourceAsStream("assets/anilib-icon.png")) {
+        "Anilib application icon is missing"
+    }.use { it.readAllBytes() }
+    BitmapPainter(Image.makeFromEncoded(bytes).toComposeImageBitmap())
+}.getOrNull()
 
 private fun printHeadlessSummary(started: StartedAnilib) {
     val count = started.capability(LibraryUiCapabilities.PRESENTATION).library().titles().size

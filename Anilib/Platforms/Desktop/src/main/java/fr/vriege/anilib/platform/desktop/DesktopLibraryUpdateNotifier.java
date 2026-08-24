@@ -5,12 +5,13 @@ import fr.vriege.anilib.feature.updates.LibraryUpdateNotificationType;
 import fr.vriege.anilib.feature.updates.LibraryUpdateNotifier;
 
 import java.awt.AWTException;
-import java.awt.Color;
-import java.awt.Graphics2D;
 import java.awt.GraphicsEnvironment;
+import java.awt.Image;
 import java.awt.SystemTray;
 import java.awt.TrayIcon;
-import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.io.InputStream;
+import javax.imageio.ImageIO;
 
 public final class DesktopLibraryUpdateNotifier implements LibraryUpdateNotifier {
     private final TrayIcon icon;
@@ -52,18 +53,9 @@ public final class DesktopLibraryUpdateNotifier implements LibraryUpdateNotifier
         if (GraphicsEnvironment.isHeadless() || !SystemTray.isSupported()) {
             return null;
         }
-        BufferedImage image = new BufferedImage(32, 32, BufferedImage.TYPE_INT_ARGB);
-        Graphics2D graphics = image.createGraphics();
-        try {
-            graphics.setColor(new Color(103, 80, 164));
-            graphics.fillRoundRect(1, 1, 30, 30, 10, 10);
-            graphics.setColor(Color.WHITE);
-            graphics.fillRect(8, 8, 4, 16);
-            graphics.fillRect(20, 8, 4, 16);
-            graphics.fillRect(12, 8, 8, 4);
-            graphics.fillRect(12, 20, 8, 4);
-        } finally {
-            graphics.dispose();
+        Image image = loadIcon();
+        if (image == null) {
+            return null;
         }
         TrayIcon trayIcon = new TrayIcon(image, "Anilib");
         trayIcon.setImageAutoSize(true);
@@ -71,6 +63,15 @@ public final class DesktopLibraryUpdateNotifier implements LibraryUpdateNotifier
             SystemTray.getSystemTray().add(trayIcon);
             return trayIcon;
         } catch (AWTException | SecurityException exception) {
+            return null;
+        }
+    }
+
+    private static Image loadIcon() {
+        try (InputStream input = DesktopLibraryUpdateNotifier.class
+                .getResourceAsStream("/assets/anilib-icon.png")) {
+            return input == null ? null : ImageIO.read(input);
+        } catch (IOException exception) {
             return null;
         }
     }

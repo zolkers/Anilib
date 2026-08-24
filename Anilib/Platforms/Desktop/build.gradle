@@ -80,15 +80,18 @@ compose.desktop {
                 menuGroup = 'Anilib'
                 perUserInstall = true
                 upgradeUuid = '9f7e13a2-70b2-4d51-a105-d99bac900f78'
+                iconFile.set(project.file('src/main/resources/assets/anilib-icon.ico'))
             }
             linux {
                 packageName = 'anilib'
                 appCategory = 'utils'
                 appRelease = '1'
+                iconFile.set(project.file('src/main/resources/assets/anilib-icon.png'))
             }
             macOS {
                 bundleID = 'fr.vriege.anilib'
                 appCategory = 'public.app-category.entertainment'
+                iconFile.set(project.file('src/main/resources/assets/anilib-icon.icns'))
             }
         }
     }
