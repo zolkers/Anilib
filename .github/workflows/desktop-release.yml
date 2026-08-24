@@ -15,7 +15,7 @@ on:
       version:
         description: Numeric package version (MAJOR.MINOR.PATCH)
         required: true
-        default: 0.1.0
+        default: 1.0.0
       require-signing:
         description: Require production Windows signing and macOS signing/notarization
         required: true
