@@ -140,6 +140,7 @@ final class ExtensionRepositoryTest {
 
             CatalogueSource mangaCatalogue = (CatalogueSource) registry.find(
                     SourceId.of("aniyomi.42")).orElseThrow();
+            var mangaFilters = mangaCatalogue.filters();
             SourcePage mangaPage = mangaCatalogue.popular(new SourceBrowseRequest(1, 20, List.of(), Map.of()));
             SourceTitleDetails mangaDetails = ((DetailedSource) mangaCatalogue)
                     .details(mangaPage.items().getFirst());
@@ -154,21 +155,30 @@ final class ExtensionRepositoryTest {
 
             CatalogueSource animeCatalogue = (CatalogueSource) registry.find(
                     SourceId.of("aniyomi.43")).orElseThrow();
+            var animeFilters = animeCatalogue.filters();
             SourcePage animePage = animeCatalogue.search(new SourceSearchRequest(
-                    "bridge",
-                    new SourceBrowseRequest(1, 20, List.of(), Map.of())));
+                    "",
+                    new SourceBrowseRequest(
+                            1,
+                            20,
+                            List.of(new SourceFilterValue("filter.0", "Newest")),
+                            Map.of())));
             SourceTitleDetails animeDetails = ((DetailedSource) animeCatalogue)
                     .details(animePage.items().getFirst());
             StreamingSource anime = (StreamingSource) animeCatalogue;
             var episodes = anime.episodes(animePage.items().getFirst().id());
             var streams = anime.streams(episodes.getFirst().id());
             counter.check(animeDetails.description().equals("Detailed anime")
+                            && mangaFilters.size() == 1
+                            && mangaFilters.getFirst().type() == SourceFilterType.TEXT
+                            && animeFilters.size() == 1
+                            && animeFilters.getFirst().type() == SourceFilterType.SORT
                             && episodes.getFirst().title().equals("Episode 1")
                             && streams.getFirst().location().equals(URI.create("https://cdn.example/master.m3u8"))
                             && streams.getFirst().format().name().equals("HLS")
                             && streams.getFirst().headers().get("Referer").equals("https://source.example/")
                             && streams.getFirst().subtitles().size() == 1,
-                    "the desktop anime bridge must hand original streams and headers to Anilib's media relay");
+                    "the desktop bridge must preserve filters, streams, and headers across its process boundary");
             WebSource mangaWeb = (WebSource) mangaCatalogue;
             WebSource animeWeb = (WebSource) animeCatalogue;
             counter.check(mangaWeb.titlePage(mangaPage.items().getFirst().id()).orElseThrow()
@@ -1113,6 +1123,10 @@ final class ExtensionRepositoryTest {
                         {"hasNextPage":false,"mangas":[{"url":"/manga/bridge","title":"Bridge Manga",
                         "description":"Description","thumbnail_url":"https://cdn.example/manga.jpg"}]}
                         """;
+                case "/api/v1/manga/42/filters" -> """
+                        {"filters":[{"id":"filter.0","label":"Title","type":"text",
+                        "options":[],"defaultValue":"","groupId":""}]}
+                        """;
                 case "/api/v1/manga/42/chapters" -> """
                         {"chapters":[{"url":"/chapter/1","name":"Chapter 1","date_upload":1700000000000}]}
                         """;
@@ -1133,9 +1147,19 @@ final class ExtensionRepositoryTest {
                 case "/api/v1/manga/42/pages" -> """
                         {"pages":[{"index":0,"number":1,"url":"","imageUrl":"https://cdn.example/page.jpg"}]}
                         """;
-                case "/api/v1/anime/43/search" -> """
-                        {"hasNextPage":false,"animes":[{"url":"/anime/bridge","title":"Bridge Anime",
-                        "description":"Description","thumbnail_url":"https://cdn.example/anime.jpg"}]}
+                case "/api/v1/anime/43/search" -> {
+                    String query = request.uri().getRawQuery();
+                    if (query == null || !query.contains("filter.filter.0=Newest")) {
+                        throw new AssertionError("Anime search lost its extension filters: " + request.uri());
+                    }
+                    yield """
+                            {"hasNextPage":false,"animes":[{"url":"/anime/bridge","title":"Bridge Anime",
+                            "description":"Description","thumbnail_url":"https://cdn.example/anime.jpg"}]}
+                            """;
+                }
+                case "/api/v1/anime/43/filters" -> """
+                        {"filters":[{"id":"filter.0","label":"Sort","type":"sort",
+                        "options":["Popular","Newest"],"defaultValue":"Popular","groupId":""}]}
                         """;
                 case "/api/v1/anime/43/episodes" -> """
                         {"episodes":[{"url":"/episode/1","name":"Episode 1","episode_number":1,

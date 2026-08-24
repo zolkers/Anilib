@@ -15,6 +15,9 @@ import fr.vriege.anilib.feature.source.SourceEpisode;
 import fr.vriege.anilib.feature.source.SourceEpisodeId;
 import fr.vriege.anilib.feature.source.SourceExtensionManifest;
 import fr.vriege.anilib.feature.source.SourceExtensionPlugin;
+import fr.vriege.anilib.feature.source.SourceFilterDefinition;
+import fr.vriege.anilib.feature.source.SourceFilterType;
+import fr.vriege.anilib.feature.source.SourceFilterValue;
 import fr.vriege.anilib.feature.source.SourceId;
 import fr.vriege.anilib.feature.source.SourcePage;
 import fr.vriege.anilib.feature.source.SourcePageResource;
@@ -172,12 +175,18 @@ public final class DesktopExtensionSourceBridge {
         return new RemoteSource(numericId, descriptor, webUri(value.get("baseUrl")), retainedModels());
     }
 
-    private SourcePage catalogue(RemoteSource source, String operation, int page, String query) {
+    private SourcePage catalogue(
+            RemoteSource source,
+            String operation,
+            int page,
+            String query,
+            List<SourceFilterValue> filters) {
         Map<String, String> parameters = new LinkedHashMap<>();
         parameters.put("page", Integer.toString(page));
         if (query != null) {
             parameters.put("query", query);
         }
+        filters.forEach(filter -> parameters.put("filter." + filter.filterId(), filter.value()));
         String kind = source.descriptor.contentKinds().contains(SourceContentKind.MANGA) ? "manga" : "anime";
         Map<String, Object> document = object(get(
                 "/api/v1/" + kind + "/" + encode(source.remoteId) + "/" + operation,
@@ -205,6 +214,37 @@ public final class DesktopExtensionSourceBridge {
             unique.putIfAbsent(id, mapped);
         }
         return new SourcePage(List.copyOf(unique.values()), booleanValue(document.get("hasNextPage")));
+    }
+
+    private List<SourceFilterDefinition> filters(RemoteSource source) {
+        String kind = source.descriptor.contentKinds().contains(SourceContentKind.MANGA) ? "manga" : "anime";
+        Map<String, Object> document = object(get(
+                "/api/v1/" + kind + "/" + encode(source.remoteId) + "/filters",
+                Map.of()));
+        List<SourceFilterDefinition> result = new ArrayList<>();
+        for (Object entry : array(document, "filters")) {
+            Map<String, Object> value = object(entry);
+            List<String> options = array(value, "options").stream().map(option -> {
+                if (!(option instanceof String text)) {
+                    throw new IllegalStateException("Extension filter option must be text");
+                }
+                return text;
+            }).toList();
+            SourceFilterType type;
+            try {
+                type = SourceFilterType.valueOf(text(value, "type").toUpperCase(Locale.ROOT));
+            } catch (IllegalArgumentException exception) {
+                throw new IllegalStateException("Extension engine returned an unknown filter type", exception);
+            }
+            result.add(new SourceFilterDefinition(
+                    text(value, "id"),
+                    optionalText(value, "label").orElse(""),
+                    type,
+                    options,
+                    optionalText(value, "defaultValue").orElse(""),
+                    optionalText(value, "groupId").orElse("")));
+        }
+        return List.copyOf(result);
     }
 
     private List<SourcePreferenceDefinition> preferences(RemoteSource source) {
@@ -632,7 +672,7 @@ public final class DesktopExtensionSourceBridge {
         @Override
         public SourcePage popular(SourceBrowseRequest request) {
             applyPreferences(source, request.preferences());
-            return catalogue(source, "popular", request.page(), null);
+            return catalogue(source, "popular", request.page(), null, List.of());
         }
 
         @Override
@@ -643,13 +683,23 @@ public final class DesktopExtensionSourceBridge {
         @Override
         public SourcePage latest(SourceBrowseRequest request) {
             applyPreferences(source, request.preferences());
-            return catalogue(source, "latest", request.page(), null);
+            return catalogue(source, "latest", request.page(), null, List.of());
         }
 
         @Override
         public SourcePage search(SourceSearchRequest request) {
             applyPreferences(source, request.browseRequest().preferences());
-            return catalogue(source, "search", request.browseRequest().page(), request.query());
+            return catalogue(
+                    source,
+                    "search",
+                    request.browseRequest().page(),
+                    request.query(),
+                    request.browseRequest().filters());
+        }
+
+        @Override
+        public List<SourceFilterDefinition> filters() {
+            return DesktopExtensionSourceBridge.this.filters(source);
         }
 
         @Override
@@ -753,7 +803,7 @@ public final class DesktopExtensionSourceBridge {
         @Override
         public SourcePage popular(SourceBrowseRequest request) {
             applyPreferences(source, request.preferences());
-            return catalogue(source, "popular", request.page(), null);
+            return catalogue(source, "popular", request.page(), null, List.of());
         }
 
         @Override
@@ -764,13 +814,23 @@ public final class DesktopExtensionSourceBridge {
         @Override
         public SourcePage latest(SourceBrowseRequest request) {
             applyPreferences(source, request.preferences());
-            return catalogue(source, "latest", request.page(), null);
+            return catalogue(source, "latest", request.page(), null, List.of());
         }
 
         @Override
         public SourcePage search(SourceSearchRequest request) {
             applyPreferences(source, request.browseRequest().preferences());
-            return catalogue(source, "search", request.browseRequest().page(), request.query());
+            return catalogue(
+                    source,
+                    "search",
+                    request.browseRequest().page(),
+                    request.query(),
+                    request.browseRequest().filters());
+        }
+
+        @Override
+        public List<SourceFilterDefinition> filters() {
+            return DesktopExtensionSourceBridge.this.filters(source);
         }
 
         @Override

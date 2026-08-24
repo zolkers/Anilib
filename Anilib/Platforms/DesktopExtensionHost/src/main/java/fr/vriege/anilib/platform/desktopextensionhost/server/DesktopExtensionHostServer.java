@@ -31,6 +31,7 @@ import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.Objects;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -246,7 +247,8 @@ public final class DesktopExtensionHostServer implements AutoCloseable {
         Map<String, String> query = ExtensionHostHttpExchange.query(exchange);
         String json = switch (route.operation()) {
             case "popular", "latest", "search" -> mangaPageJson(sourceOperations.mangaCatalogue(
-                    route.sourceId(), route.operation(), page(query), query.get("query")));
+                    route.sourceId(), route.operation(), page(query), query.get("query"), filterValues(query)));
+            case "filters" -> filtersJson(sourceOperations.mangaFilters(route.sourceId()));
             case "details" -> mangaJson(sourceOperations.mangaDetails(route.sourceId(), sourceModel(query)));
             case "chapters" -> chaptersJson(sourceOperations.chapters(route.sourceId(), sourceModel(query)));
             case "pages" -> pagesJson(sourceOperations.pages(route.sourceId(), required(query, "url")));
@@ -263,13 +265,24 @@ public final class DesktopExtensionHostServer implements AutoCloseable {
         Map<String, String> query = ExtensionHostHttpExchange.query(exchange);
         String json = switch (route.operation()) {
             case "popular", "latest", "search" -> animePageJson(sourceOperations.animeCatalogue(
-                    route.sourceId(), route.operation(), page(query), query.get("query")));
+                    route.sourceId(), route.operation(), page(query), query.get("query"), filterValues(query)));
+            case "filters" -> filtersJson(sourceOperations.animeFilters(route.sourceId()));
             case "details" -> animeJson(sourceOperations.animeDetails(route.sourceId(), sourceModel(query)));
             case "episodes" -> episodesJson(sourceOperations.episodes(route.sourceId(), sourceModel(query)));
             case "videos" -> videosJson(sourceOperations.videos(route.sourceId(), required(query, "url")));
             default -> throw new IllegalArgumentException("Unknown anime operation");
         };
         ExtensionHostHttpExchange.json(exchange, 200, json);
+    }
+
+    private static Map<String, String> filterValues(Map<String, String> query) {
+        Map<String, String> values = new LinkedHashMap<>();
+        query.forEach((name, value) -> {
+            if (name.startsWith("filter.") && name.length() > "filter.".length()) {
+                values.put(name.substring("filter.".length()), value);
+            }
+        });
+        return Map.copyOf(values);
     }
 
     private static Route sourceRoute(HttpExchange exchange, String prefix) {
@@ -337,6 +350,18 @@ public final class DesktopExtensionHostServer implements AutoCloseable {
         return "{\"animes\":[" + String.join(",", page.getAnimes().stream()
                 .map(DesktopExtensionHostServer::animeValue).toList())
                 + "],\"hasNextPage\":" + page.getHasNextPage() + '}';
+    }
+
+    private static String filtersJson(List<ExtensionSourceOperations.FilterDefinition> filters) {
+        return "{\"filters\":[" + String.join(",", filters.stream().map(filter ->
+                "{\"id\":" + json(filter.id())
+                        + ",\"label\":" + json(filter.label())
+                        + ",\"type\":" + json(filter.type().toLowerCase(Locale.ROOT))
+                        + ",\"options\":[" + String.join(",", filter.options().stream()
+                        .map(DesktopExtensionHostServer::json).toList()) + ']'
+                        + ",\"defaultValue\":" + json(filter.defaultValue())
+                        + ",\"groupId\":" + json(filter.groupId()) + '}'
+        ).toList()) + "]}";
     }
 
     private static String mangaJson(SManga manga) { return "{\"manga\":" + mangaValue(manga) + '}'; }

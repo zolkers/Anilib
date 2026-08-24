@@ -630,7 +630,9 @@ private fun SourceCatalogueScreen(
     var preferenceRevision by remember(source.id()) { mutableIntStateOf(0) }
     var requestRevision by remember(source.id()) { mutableIntStateOf(0) }
     var notice by remember(source.id()) { mutableStateOf<String?>(null) }
-    val definitions = remember(source.id()) { presentation.filters(source.id()) }
+    var definitions by remember(source.id()) {
+        mutableStateOf<List<SourceFilterDefinition>>(emptyList())
+    }
     val supportsLatest = remember(source.id()) { presentation.supportsLatest(source.id()) }
     val preferenceDefinitions = remember(source.id(), preferenceRevision) {
         presentation.preferences(source.id())
@@ -664,6 +666,14 @@ private fun SourceCatalogueScreen(
             navigateUp = { selectedItem = null },
         )
         return
+    }
+    CrashSafeLaunchedEffect(source.id(), preferenceRevision) {
+        val discovered = withContext(Dispatchers.IO) {
+            runCatching { presentation.filters(source.id()) }
+        }
+        discovered
+            .onSuccess { definitions = it }
+            .onFailure { notice = it.message ?: "Source filters could not be loaded" }
     }
     CrashSafeLaunchedEffect(
         source.id(),

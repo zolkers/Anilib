@@ -122,6 +122,7 @@ public final class ExtensionCompatibilitySmoke {
     }
 
     private static void verifyMangaWorkflow(DesktopExtensionHostServer server, String sourceId) throws Exception {
+        verifyFilterSchema(get(server, DesktopExtensionHostProtocol.MANGA_PATH + sourceId + "/filters"));
         String catalogue = get(server, DesktopExtensionHostProtocol.MANGA_PATH
                 + sourceId + "/search?page=1&query=one%20piece");
         verifyCatalogue(catalogue, "mangas");
@@ -173,6 +174,7 @@ public final class ExtensionCompatibilitySmoke {
     }
 
     private static void verifyAnimeWorkflow(DesktopExtensionHostServer server, String sourceId) throws Exception {
+        verifyFilterSchema(get(server, DesktopExtensionHostProtocol.ANIME_PATH + sourceId + "/filters"));
         String catalogue = get(server, DesktopExtensionHostProtocol.ANIME_PATH
                 + sourceId + "/search?page=1&query=one%20piece");
         verifyCatalogue(catalogue, "animes");
@@ -192,6 +194,12 @@ public final class ExtensionCompatibilitySmoke {
         requireObject(get(server, detailsPath), "anime");
         requireArray(get(server, episodesPath), "episodes");
         requireArray(get(server, videosPath), "videos");
+    }
+
+    private static void verifyFilterSchema(String document) {
+        if (!document.contains("\"filters\":[")) {
+            throw new IllegalStateException("Extension filter schema is malformed: " + document);
+        }
     }
 
     private static String requireArray(String document, String field) {

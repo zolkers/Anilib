@@ -2,12 +2,14 @@ package fr.vriege.anilib.platform.desktopextensionhost.extension;
 
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.SAnime;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.SEpisode;
+import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.AnimeFilter;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.AnimeFilterList;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.AnimesPage;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.online.AnimeHttpSource;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.source.model.Page;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.source.online.HttpSource;
 import java.util.List;
+import java.util.Map;
 import kotlin.coroutines.Continuation;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -45,6 +47,38 @@ public final class ExtensionOperationDispatcherSmoke {
                 || !imageRequest.url().toString().equals(page.getImageUrl())
                 || !"https://example.invalid/chapter/page-1".equals(imageRequest.header("Referer"))) {
             throw new IllegalStateException("Lazy manga image URL/request dispatch failed");
+        }
+        verifyFilters();
+    }
+
+    private static void verifyFilters() {
+        AnimeFilter.Text query = new AnimeFilter.Text("Title", "") { };
+        AnimeFilter.CheckBox dubbed = new AnimeFilter.CheckBox("Dubbed", false) { };
+        AnimeFilter.Select<String> genre = new AnimeFilter.Select<>(
+                "Genre", new String[]{"All", "Action"}, 0) { };
+        AnimeFilter.TriState completed = new AnimeFilter.TriState("Completed", 0) { };
+        AnimeFilter.Group<AnimeFilter<?>> status = new AnimeFilter.Group<>("Status", List.of(completed)) { };
+        AnimeFilter.Sort sort = new AnimeFilter.Sort(
+                "Sort",
+                new String[]{"Popular", "Newest"},
+                new AnimeFilter.Sort.Selection(0, true)) { };
+        ExtensionSourceFilterCodec.FilterSet filters = ExtensionSourceFilterCodec.from(
+                new AnimeFilterList(query, dubbed, genre, status, sort));
+        filters.apply(Map.of(
+                "filter.0", "wanted",
+                "filter.1", "true",
+                "filter.2", "Action",
+                "filter.3.0", "include",
+                "filter.4", "↓ Newest"));
+        AnimeFilter.Sort.Selection selection = sort.getState();
+        if (filters.definitions().size() != 6
+                || !query.getState().equals("wanted")
+                || !dubbed.getState()
+                || genre.getState() != 1
+                || completed.getState() != AnimeFilter.TriState.STATE_INCLUDE
+                || selection.getIndex() != 1
+                || selection.getAscending()) {
+            throw new IllegalStateException("Dynamic extension filters did not round-trip through the host codec");
         }
     }
 

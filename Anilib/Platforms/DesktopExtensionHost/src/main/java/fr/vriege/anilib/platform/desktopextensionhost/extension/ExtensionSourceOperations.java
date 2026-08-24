@@ -56,12 +56,21 @@ public final class ExtensionSourceOperations implements AutoCloseable {
         this.catalog = Objects.requireNonNull(catalog, "catalog");
     }
 
-    public MangasPage mangaCatalogue(long sourceId, String operation, int page, String query) {
+    public MangasPage mangaCatalogue(
+            long sourceId,
+            String operation,
+            int page,
+            String query,
+            Map<String, String> filterValues) {
         return execute(sourceId, ExtensionKind.MANGA, "manga." + operation, "", source -> {
-            Object[] arguments = operation.equals("search")
-                    ? new Object[]{page, Objects.requireNonNullElse(query, ""),
-                            ExtensionOperationDispatcher.invokeAny(source, "getFilterList")}
-                    : new Object[]{page};
+            Object[] arguments;
+            if (operation.equals("search")) {
+                ExtensionSourceFilterCodec.FilterSet filters = filters(source);
+                filters.apply(filterValues);
+                arguments = new Object[]{page, Objects.requireNonNullElse(query, ""), filters.abiValue()};
+            } else {
+                arguments = new Object[]{page};
+            }
             String modernName = switch (operation) {
                 case "popular" -> "getPopularManga";
                 case "latest" -> "getLatestUpdates";
@@ -84,12 +93,25 @@ public final class ExtensionSourceOperations implements AutoCloseable {
         });
     }
 
-    public AnimesPage animeCatalogue(long sourceId, String operation, int page, String query) {
+    public MangasPage mangaCatalogue(long sourceId, String operation, int page, String query) {
+        return mangaCatalogue(sourceId, operation, page, query, Map.of());
+    }
+
+    public AnimesPage animeCatalogue(
+            long sourceId,
+            String operation,
+            int page,
+            String query,
+            Map<String, String> filterValues) {
         return execute(sourceId, ExtensionKind.ANIME, "anime." + operation, "", source -> {
-            Object[] arguments = operation.equals("search")
-                    ? new Object[]{page, Objects.requireNonNullElse(query, ""),
-                            ExtensionOperationDispatcher.invokeAny(source, "getFilterList")}
-                    : new Object[]{page};
+            Object[] arguments;
+            if (operation.equals("search")) {
+                ExtensionSourceFilterCodec.FilterSet filters = filters(source);
+                filters.apply(filterValues);
+                arguments = new Object[]{page, Objects.requireNonNullElse(query, ""), filters.abiValue()};
+            } else {
+                arguments = new Object[]{page};
+            }
             String modernName = switch (operation) {
                 case "popular" -> "getPopularAnime";
                 case "latest" -> "getLatestUpdates";
@@ -110,6 +132,34 @@ public final class ExtensionSourceOperations implements AutoCloseable {
             result.getAnimes().forEach(anime -> animeByUrl.put(new ModelKey(sourceId, anime.getUrl()), anime));
             return result;
         });
+    }
+
+    public AnimesPage animeCatalogue(long sourceId, String operation, int page, String query) {
+        return animeCatalogue(sourceId, operation, page, query, Map.of());
+    }
+
+    public List<FilterDefinition> mangaFilters(long sourceId) {
+        return execute(sourceId, ExtensionKind.MANGA, "manga.filters", "", source ->
+                definitions(filters(source)));
+    }
+
+    public List<FilterDefinition> animeFilters(long sourceId) {
+        return execute(sourceId, ExtensionKind.ANIME, "anime.filters", "", source ->
+                definitions(filters(source)));
+    }
+
+    private static ExtensionSourceFilterCodec.FilterSet filters(Object source) {
+        return ExtensionSourceFilterCodec.from(ExtensionOperationDispatcher.invokeAny(source, "getFilterList"));
+    }
+
+    private static List<FilterDefinition> definitions(ExtensionSourceFilterCodec.FilterSet filters) {
+        return filters.definitions().stream().map(definition -> new FilterDefinition(
+                definition.id(),
+                definition.label(),
+                definition.type().name(),
+                definition.options(),
+                definition.defaultValue(),
+                definition.groupId())).toList();
     }
 
     public SManga mangaDetails(long sourceId, SourceModel model) {
@@ -645,6 +695,26 @@ public final class ExtensionSourceOperations implements AutoCloseable {
         @Override
         public byte[] body() {
             return body.clone();
+        }
+    }
+
+    public record FilterDefinition(
+            String id,
+            String label,
+            String type,
+            List<String> options,
+        String defaultValue,
+        String groupId) {
+        public FilterDefinition {
+            id = Objects.requireNonNull(id, "filter id").strip();
+            label = Objects.requireNonNull(label, "filter label");
+            type = Objects.requireNonNull(type, "filter type").strip();
+            options = List.copyOf(Objects.requireNonNull(options, "filter options"));
+            defaultValue = Objects.requireNonNull(defaultValue, "filter default value");
+            groupId = Objects.requireNonNull(groupId, "filter group id");
+            if (id.isEmpty() || type.isEmpty()) {
+                throw new IllegalArgumentException("filter id and type must not be blank");
+            }
         }
     }
 
