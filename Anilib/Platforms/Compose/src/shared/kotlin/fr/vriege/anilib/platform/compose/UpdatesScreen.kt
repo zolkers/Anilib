@@ -25,7 +25,6 @@ import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SelectAll
-import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Movie
@@ -87,6 +86,8 @@ internal fun UpdatesScreen(
     var showSkipped by remember { mutableStateOf(false) }
     var scheduleExpanded by remember { mutableStateOf(false) }
     var selection by remember { mutableStateOf<Set<LibraryUpdateEventId>>(emptySet()) }
+    val downloadQueue = rememberDownloadQueueSnapshot(downloads)
+    val downloadProgress = rememberDownloadProgressIndex(downloadQueue)
     DisposableEffect(presentation) {
         val registration = presentation.observe { revision++ }
         onDispose { runCatching { registration.close() } }
@@ -258,6 +259,10 @@ internal fun UpdatesScreen(
                                     }
                                 },
                                 canDownload = downloads.canEnqueue(event.libraryItemId()),
+                                downloadProgress = downloadProgress.content(
+                                    event.libraryItemId(),
+                                    event.sourceContentId(),
+                                ),
                                 download = {
                                     command {
                                         downloads.enqueue(event.libraryItemId(), event.sourceContentId())
@@ -411,6 +416,7 @@ private fun UpdateEventCard(
     selectionMode: Boolean,
     select: () -> Unit,
     canDownload: Boolean,
+    downloadProgress: DownloadUiProgress?,
     download: () -> Unit,
 ) {
     Surface(
@@ -451,9 +457,12 @@ private fun UpdateEventCard(
                     modifier = Modifier.padding(top = 3.dp),
                 )
             }
-            IconButton(onClick = download, enabled = canDownload && !selectionMode) {
-                Icon(Icons.Outlined.Download, contentDescription = "ui.download")
-            }
+            DownloadActionButton(
+                progress = downloadProgress,
+                enabled = canDownload && !selectionMode,
+                action = download,
+                contentDescription = "ui.download",
+            )
         }
     }
 }

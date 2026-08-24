@@ -46,6 +46,15 @@ public final class CatalogueDetailsRouteRule implements AnilibJavaRule {
                         "Discovery must delegate to the canonical library navigator "
                                 + "instead of owning a details overlay"));
             }
+            if (line.contains("navigate(transition)")
+                    && nextCodeLine(source, index).contains("openSection(")) {
+                diagnostics.add(new Diagnostic(
+                        "catalogue-details-route",
+                        source.path(),
+                        index + 1,
+                        "Open the media section before applying its details transition; "
+                                + "opening the section afterwards resets the canonical route"));
+            }
         }
         if (destinationCount == 0) {
             diagnostics.add(new Diagnostic(
@@ -54,5 +63,15 @@ public final class CatalogueDetailsRouteRule implements AnilibJavaRule {
                     1,
                     "AnilibApp must expose exactly one canonical DetailsDestination"));
         }
+    }
+
+    private static String nextCodeLine(KotlinSource source, int currentIndex) {
+        for (int index = currentIndex + 1; index < source.lines().size(); index++) {
+            String line = source.lines().get(index).strip();
+            if (!line.isEmpty()) {
+                return line;
+            }
+        }
+        return "";
     }
 }

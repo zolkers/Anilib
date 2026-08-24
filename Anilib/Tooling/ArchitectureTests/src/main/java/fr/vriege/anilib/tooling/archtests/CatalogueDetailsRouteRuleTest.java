@@ -42,7 +42,14 @@ final class CatalogueDetailsRouteRuleTest {
                 "    browseDetailsTitle = selectedTitle",
                 "}")))).size() == 1,
                 "a Discovery-owned details overlay must be rejected");
-        return 3;
+        check(rule.analyze(snapshot(root, module, source(root, module, List.of(
+                "fun destination() {",
+                "    DetailsDestination()",
+                "    navigate(transition)",
+                "    openSection(AppSection.ANIME)",
+                "}")))).size() == 1,
+                "a section reset after a details transition must be rejected");
+        return 4;
     }
 
     private static KotlinSource source(

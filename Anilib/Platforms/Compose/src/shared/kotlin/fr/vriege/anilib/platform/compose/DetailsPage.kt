@@ -117,6 +117,8 @@ internal fun DetailsDestination(
 ) {
     val id = destination.selectedTitle().orElse(null)
     val scope = rememberCrashSafeCoroutineScope()
+    val downloadQueue = rememberDownloadQueueSnapshot(downloads)
+    val downloadProgress = rememberDownloadProgressIndex(downloadQueue)
     var relatedBackStack by remember { mutableStateOf<List<LibraryItemId>>(emptyList()) }
     var revision by remember(id) { mutableStateOf(0) }
     var trackerRevision by remember(id) { mutableStateOf(0) }
@@ -239,6 +241,13 @@ internal fun DetailsDestination(
             canWatch = primaryEpisode != null &&
                 runCatching { player.canOpen(details.id()) }.getOrDefault(false),
             canDownload = runCatching { downloads.canEnqueue(details.id()) }.getOrDefault(false),
+            downloadProgress = downloadProgress.title(details.id()),
+            chapterDownloadProgress = { chapter ->
+                downloadProgress.content(details.id(), chapter.id().value())
+            },
+            episodeDownloadProgress = { episode ->
+                downloadProgress.content(details.id(), episode.episode().id().value())
+            },
             canTrack = true,
             trackingCount = trackedEntries.size,
             nextAiring = nextAiring,
@@ -423,6 +432,9 @@ internal fun DetailsPage(
     canRead: Boolean,
     canWatch: Boolean,
     canDownload: Boolean,
+    downloadProgress: DownloadUiProgress?,
+    chapterDownloadProgress: (SourceContentUnit) -> DownloadUiProgress?,
+    episodeDownloadProgress: (EpisodeSnapshot) -> DownloadUiProgress?,
     canTrack: Boolean,
     libraryEditable: Boolean = true,
     canShare: Boolean = true,
@@ -498,6 +510,7 @@ internal fun DetailsPage(
         trackingCount = trackingCount,
         canOpenWeb = openTitleWeb != null || openSourceWeb != null,
         canDownload = canDownload,
+        downloadProgress = downloadProgress,
         canShare = canShare,
         primaryLabel = if (canWatch) "ui.watch" else "ui.read",
         canOpenPrimary = canWatch || canRead,
@@ -571,6 +584,7 @@ internal fun DetailsPage(
                 ) else null,
                 open = read,
                 download = if (canDownload) downloadChapter else null,
+                downloadProgress = chapterDownloadProgress,
             )
             mediaUnitsSection(
                 label = episodesLabel,
@@ -628,6 +642,7 @@ internal fun DetailsPage(
                 ) else null,
                 open = watchEpisode,
                 download = if (canDownload) downloadEpisode else null,
+                downloadProgress = episodeDownloadProgress,
             )
             if (related.isNotEmpty()) {
                 item {

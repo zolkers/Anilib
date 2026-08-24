@@ -44,6 +44,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import fr.vriege.anilib.feature.library.LibraryItemId
 import fr.vriege.anilib.feature.library.MediaKind
+import fr.vriege.anilib.feature.downloads.ui.DownloadPresentation
 import fr.vriege.anilib.feature.library.ui.LibraryCard
 import fr.vriege.anilib.feature.library.ui.LibraryHistoryRow
 import fr.vriege.anilib.feature.library.ui.LibraryNavigator
@@ -58,6 +59,7 @@ import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 internal data class HistoryContentKey(
@@ -71,13 +73,18 @@ internal fun HistoryPage(
     presentation: LibraryPresentation,
     reader: ReaderPresentation,
     player: PlayerPresentation,
+    downloads: DownloadPresentation,
     openReader: (LibraryItemId, SourceContentUnitId?) -> Unit,
     openPlayer: (LibraryItemId, SourceEpisodeId?) -> Unit,
     resumeError: String?,
     goBack: () -> Unit,
     navigate: (LibraryHistoryRow, (LibraryNavigator) -> Unit) -> Unit,
 ) {
+    val scope = rememberCrashSafeCoroutineScope()
+    val downloadQueue = rememberDownloadQueueSnapshot(downloads)
+    val downloadProgress = rememberDownloadProgressIndex(downloadQueue)
     var revision by remember { mutableStateOf(0) }
+    var downloadError by remember { mutableStateOf<String?>(null) }
     DisposableEffect(presentation) {
         val observation = presentation.observe { revision++ }
         onDispose { runCatching { observation.close() } }
@@ -203,7 +210,7 @@ internal fun HistoryPage(
                         text = { Text("ui.manga") },
                 )
             }
-            resumeError?.let {
+            (resumeError ?: downloadError)?.let {
                 Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp))
             }
             if (history.entries().isEmpty()) {
@@ -254,6 +261,25 @@ internal fun HistoryPage(
                                     val favorite = cards[row.libraryItemId()]?.favorite() == true
                                     presentation.setFavorite(setOf(row.libraryItemId()), !favorite)
                                 },
+                                canDownload = runCatching {
+                                    downloads.canEnqueue(row.libraryItemId())
+                                }.getOrDefault(false),
+                                downloadProgress = downloadProgress.content(
+                                    row.libraryItemId(),
+                                    row.contentId(),
+                                ),
+                                download = {
+                                    scope.launch {
+                                        runCatching {
+                                            withContext(Dispatchers.IO) {
+                                                downloads.enqueue(row.libraryItemId(), row.contentId())
+                                            }
+                                        }.onSuccess { downloadError = null }
+                                            .onFailure {
+                                                downloadError = it.message ?: "Unable to enqueue download."
+                                            }
+                                    }
+                                },
                                 openDetails = { transition ->
                                     navigate(row, transition)
                                 },
@@ -274,6 +300,9 @@ internal fun HistoryCard(
     resume: () -> Unit,
     remove: () -> Unit,
     toggleFavorite: () -> Unit,
+    canDownload: Boolean,
+    downloadProgress: DownloadUiProgress?,
+    download: () -> Unit,
     openDetails: ((LibraryNavigator) -> Unit) -> Unit,
 ) {
     Row(
@@ -312,6 +341,12 @@ internal fun HistoryCard(
                 contentDescription = if (row.kind() == MediaKind.ANIME) "Resume" else "Continue",
             )
         }
+        DownloadActionButton(
+            progress = downloadProgress,
+            enabled = canDownload,
+            action = download,
+            contentDescription = "ui.download",
+        )
         IconButton(onClick = toggleFavorite) {
             Icon(
                 if (card?.favorite() == true) Icons.Default.Favorite else Icons.Default.FavoriteBorder,

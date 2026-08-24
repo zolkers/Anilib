@@ -741,13 +741,14 @@ internal fun AppDestination(
                 presentation,
                 reader,
                 player,
+                downloads,
                 openReader,
                 openPlayer,
                 readerError,
                 closeMore,
             ) { row, transition ->
-                navigate(transition)
                 openSection(if (row.kind() == MediaKind.ANIME) AppSection.ANIME else AppSection.MANGA)
+                navigate(transition)
             }
             MoreDestination.DOWNLOADS -> DownloadsScreen(downloads, closeMore)
             MoreDestination.BACKUP -> BackupScreen(backup, backupImportPicker, closeMore)

@@ -47,7 +47,6 @@ import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.SortByAlpha
 import androidx.compose.material.icons.outlined.Category
-import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -109,6 +108,9 @@ internal fun LibraryPageContent(
     kind: MediaKind,
     navigate: ((LibraryNavigator) -> Unit) -> Unit,
 ) {
+    val scope = rememberCrashSafeCoroutineScope()
+    val downloadQueue = rememberDownloadQueueSnapshot(downloads)
+    val downloadProgress = rememberDownloadProgressIndex(downloadQueue)
     var revision by remember(presentation) { mutableStateOf(0) }
     val overview = remember(presentation, revision) { presentation.library() }
     val scopedCategories = remember(overview, kind) {
@@ -163,6 +165,9 @@ internal fun LibraryPageContent(
         overview.titles().filter { it.id() in selected }
     }
     val allSelectedFavorites = selectedCards.isNotEmpty() && selectedCards.all(LibraryCard::favorite)
+    val selectedDownloadProgress = selected.takeIf { ids ->
+        ids.isNotEmpty() && ids.all { downloadProgress.title(it) != null }
+    }?.let(downloadProgress::titles)
     Scaffold(
         topBar = {
             TopAppBar(
@@ -272,20 +277,27 @@ internal fun LibraryPageContent(
                     ) {
                         Icon(Icons.Outlined.Category, contentDescription = "ui.category")
                     }
-                    IconButton(
+                    DownloadActionButton(
+                        progress = selectedDownloadProgress,
                         enabled = selected.isNotEmpty(),
-                        onClick = {
-                            selected.forEach { id ->
-                                runCatching {
-                                    if (downloads.canEnqueue(id)) downloads.enqueue(id)
-                                }.onFailure { failure ->
-                                    error = failure.message ?: "Unable to enqueue a download."
+                        action = {
+                            scope.launch {
+                                val failureMessage = withContext(Dispatchers.IO) {
+                                    selected.forEach { id ->
+                                        runCatching {
+                                            if (downloads.canEnqueue(id)) downloads.enqueue(id)
+                                        }.exceptionOrNull()?.let { failure ->
+                                            return@withContext failure.message
+                                                ?: "Unable to enqueue a download."
+                                        }
+                                    }
+                                    null
                                 }
+                                error = failureMessage
                             }
                         },
-                    ) {
-                        Icon(Icons.Outlined.Download, contentDescription = "ui.download")
-                    }
+                        contentDescription = "ui.download",
+                    )
                     IconButton(
                         enabled = selected.isNotEmpty(),
                         onClick = { migrating = true },

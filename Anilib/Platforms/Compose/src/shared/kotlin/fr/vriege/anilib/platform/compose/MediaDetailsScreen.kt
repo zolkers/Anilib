@@ -36,7 +36,6 @@ import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.outlined.Category
-import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Checkbox
@@ -105,6 +104,7 @@ internal fun MediaDetailsScreen(
     trackingCount: Int,
     canOpenWeb: Boolean,
     canDownload: Boolean,
+    downloadProgress: DownloadUiProgress?,
     canShare: Boolean,
     primaryLabel: String,
     canOpenPrimary: Boolean,
@@ -148,9 +148,12 @@ internal fun MediaDetailsScreen(
                     IconButton(onClick = share, enabled = canShare) {
                         Icon(Icons.Default.Share, contentDescription = "ui.share")
                     }
-                    IconButton(onClick = download, enabled = canDownload) {
-                        Icon(Icons.Outlined.Download, contentDescription = "ui.download")
-                    }
+                    DownloadActionButton(
+                        progress = downloadProgress,
+                        enabled = canDownload,
+                        action = download,
+                        contentDescription = "ui.download",
+                    )
                     refresh?.let { action ->
                         IconButton(onClick = action, enabled = !refreshing) {
                             if (refreshing) {
@@ -344,6 +347,7 @@ internal fun <T> LazyListScope.mediaUnitsSection(
     selection: MediaUnitSelectionUiModel? = null,
     open: (T) -> Unit,
     download: ((T) -> Unit)? = null,
+    downloadProgress: (T) -> DownloadUiProgress? = { null },
 ) {
     if (units.isEmpty()) return
     stickyHeader(key = "media-section:$label") {
@@ -358,6 +362,7 @@ internal fun <T> LazyListScope.mediaUnitsSection(
             download = { download?.invoke(unit) },
             muted = muted(unit),
             canDownload = download != null,
+            downloadProgress = downloadProgress(unit),
             selectionMode = selection?.selecting == true,
             selected = unitKey in selection?.selectedKeys.orEmpty(),
             select = { selection?.select?.invoke(unitKey) },
@@ -440,6 +445,7 @@ internal fun MediaUnitRow(
     download: () -> Unit,
     muted: Boolean = false,
     canDownload: Boolean = true,
+    downloadProgress: DownloadUiProgress? = null,
     selectionMode: Boolean = false,
     selected: Boolean = false,
     select: () -> Unit = {},
@@ -461,16 +467,16 @@ internal fun MediaUnitRow(
             Text(title, fontWeight = FontWeight.Medium)
             Text(summary, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        IconButton(onClick = download, enabled = canDownload && !selectionMode) {
-            Icon(
-                Icons.Outlined.Download,
-                contentDescription = UiTranslations.format(
-                    "dynamic.download.title",
-                    LocalLanguagePack.current,
-                    title,
-                ),
-            )
-        }
+        DownloadActionButton(
+            progress = downloadProgress,
+            enabled = canDownload && !selectionMode,
+            action = download,
+            contentDescription = UiTranslations.format(
+                "dynamic.download.title",
+                LocalLanguagePack.current,
+                title,
+            ),
+        )
     }
     HorizontalDivider(modifier = Modifier.widthIn(max = 900.dp).fillMaxWidth())
 }
