@@ -773,7 +773,6 @@ private fun SourceCatalogueScreen(
                         runCatching { presentation.setCatalogueDisplayMode(source.id(), nextMode) }
                             .onSuccess {
                                 grid = nextMode == DiscoveryCatalogueDisplayMode.GRID
-                                notice = if (grid) "Grid view selected" else "List view selected"
                             }
                             .onFailure {
                                 notice = it.message ?: "Display choice could not be saved"
