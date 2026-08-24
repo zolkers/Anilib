@@ -302,6 +302,11 @@ public final class DefaultDiscoveryPresentation implements DiscoveryPresentation
     }
 
     @Override
+    public boolean removeFromLibrary(SourceCatalogueItemId itemId) {
+        return service.removeFromLibrary(itemId);
+    }
+
+    @Override
     public List<SourceCatalogueItem> migrationCandidates(
             LibraryItemId libraryItemId,
             SourceId targetSourceId,

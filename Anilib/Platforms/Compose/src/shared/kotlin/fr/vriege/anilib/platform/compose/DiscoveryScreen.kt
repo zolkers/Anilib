@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Public
@@ -148,6 +149,7 @@ internal fun DiscoveryScreen(
     val scope = rememberCrashSafeCoroutineScope()
     var section by remember { mutableStateOf(BrowseSection.ANIME_SOURCES) }
     var selectedSource by remember { mutableStateOf<SourceDescriptor?>(null) }
+    var selectedGlobalItem by remember { mutableStateOf<SourceCatalogueItem?>(null) }
     var listing by remember { mutableStateOf(SourceListing.POPULAR) }
     var globalSearch by remember { mutableStateOf(false) }
     var globalQuery by remember { mutableStateOf("") }
@@ -159,7 +161,7 @@ internal fun DiscoveryScreen(
     var browserPage by remember { mutableStateOf<SourceWebPage?>(null) }
     var extensionRevision by remember { mutableIntStateOf(0) }
     var updatingSources by remember { mutableStateOf<Set<SourceId>>(emptySet()) }
-    val mainDestination = selectedSource == null && browserPage == null
+    val mainDestination = selectedSource == null && selectedGlobalItem == null && browserPage == null
     DisposableEffect(mainDestination, navigationVisibilityChanged) {
         navigationVisibilityChanged(mainDestination)
         onDispose { }
@@ -229,6 +231,30 @@ internal fun DiscoveryScreen(
             openLibraryDetails = openLibraryDetails,
             navigateUp = { selectedSource = null },
         )
+        return
+    }
+
+    val globalItem = selectedGlobalItem
+    if (globalItem != null) {
+        val globalSource = presentation.source(globalItem.id().sourceId()).orElse(null)
+        if (globalSource == null) {
+            DiscoveryFailure("This source is no longer installed") { selectedGlobalItem = null }
+        } else {
+            SourceTitleScreen(
+                item = globalItem,
+                source = globalSource,
+                presentation = presentation,
+                library = library,
+                openWebPage = { browserPage = it },
+                openReader = openSourceReader,
+                openPlayer = openSourcePlayer,
+                openLibraryDetails = { libraryItemId ->
+                    selectedGlobalItem = null
+                    openLibraryDetails(libraryItemId)
+                },
+                navigateUp = { selectedGlobalItem = null },
+            )
+        }
         return
     }
 
@@ -361,7 +387,21 @@ internal fun DiscoveryScreen(
                     onSourcePreferenceChanged = { sourceBrowseRevision++ },
                 )
             } else if (globalSearch && globalQuery.isNotBlank() && section.sourceTab()) {
-                GlobalSearchContent(presentation, section.kind!!, globalQuery, globalSearchRevision)
+                GlobalSearchContent(
+                    presentation,
+                    library,
+                    section.kind!!,
+                    globalQuery,
+                    globalSearchRevision,
+                    open = { item ->
+                        val libraryItemId = presentation.libraryItem(item.id()).orElse(null)
+                        if (libraryItemId == null) {
+                            selectedGlobalItem = item
+                        } else {
+                            openLibraryDetails(libraryItemId)
+                        }
+                    },
+                )
             } else {
                 when (section) {
                     BrowseSection.ANIME_SOURCES,
@@ -637,6 +677,7 @@ private fun SourceCatalogueScreen(
     var filterValues by remember(source.id()) { mutableStateOf<Map<String, String>>(emptyMap()) }
     var preferenceRevision by remember(source.id()) { mutableIntStateOf(0) }
     var requestRevision by remember(source.id()) { mutableIntStateOf(0) }
+    var libraryRevision by remember(source.id()) { mutableIntStateOf(0) }
     var notice by remember(source.id()) { mutableStateOf<String?>(null) }
     var definitions by remember(source.id()) {
         mutableStateOf<List<SourceFilterDefinition>>(emptyList())
@@ -648,6 +689,11 @@ private fun SourceCatalogueScreen(
     val sourceWebPage = remember(source.id()) { presentation.sourceWebPage(source.id()).orElse(null) }
     var result by remember(source.id(), selectedListing, query, page, filterValues, preferenceRevision) {
         mutableStateOf<Result<SourcePage>?>(null)
+    }
+
+    DisposableEffect(library, source.id()) {
+        val observation = library.observe { libraryRevision++ }
+        onDispose { observation.close() }
     }
 
     fun openCanonicalDetails(libraryItemId: LibraryItemId) {
@@ -872,6 +918,11 @@ private fun SourceCatalogueScreen(
                     result?.exceptionOrNull()?.message ?: "Unable to load this source",
                 ) { requestRevision++ }
                 else -> {
+                val memberships = remember(sourcePage, libraryRevision) {
+                    sourcePage.items().associate { item ->
+                        item.id() to presentation.libraryItem(item.id()).orElse(null)
+                    }
+                }
                 CatalogueContent(
                     page = sourcePage,
                     grid = grid,
@@ -885,16 +936,28 @@ private fun SourceCatalogueScreen(
                             openCanonicalDetails(libraryItemId)
                         }
                     },
-                    add = { item ->
+                    libraryItem = { item -> memberships[item.id()] },
+                    toggleLibraryMembership = { item, existingId ->
                         scope.launch {
-                            withContext(Dispatchers.IO) {
+                            val changed = withContext(Dispatchers.IO) {
                                 runCatching {
-                                    presentation.addToLibrary(item)
+                                    if (existingId == null) {
+                                        presentation.addToLibrary(item)
+                                        true
+                                    } else {
+                                        presentation.removeFromLibrary(item.id())
+                                        false
+                                    }
                                 }
-                            }.onSuccess {
-                                notice = "${item.title()} added to Library"
+                            }
+                            changed.onSuccess { added ->
+                                notice = if (added) {
+                                    "${item.title()} added to Library"
+                                } else {
+                                    "${item.title()} removed from Library"
+                                }
                             }.onFailure {
-                                notice = it.message ?: "The title could not be added to Library"
+                                notice = it.message ?: "The library could not be updated"
                             }
                         }
                     },
@@ -949,14 +1012,16 @@ private fun SourceTitleScreen(
     var libraryItemId by remember(item.id()) {
         mutableStateOf(presentation.libraryItem(item.id()).orElse(null))
     }
-    var favorite by remember(item.id(), libraryItemId) {
-        mutableStateOf(
-            libraryItemId?.let { library.details(it).orElse(null)?.favorite() } == true,
-        )
-    }
-    var favoritePending by remember(item.id()) { mutableStateOf(false) }
+    var membershipPending by remember(item.id()) { mutableStateOf(false) }
     var actionError by remember(item.id()) { mutableStateOf<String?>(null) }
     val titleWebPage = remember(item.id()) { presentation.titleWebPage(item.id()).orElse(null) }
+
+    DisposableEffect(library, presentation, item.id()) {
+        val observation = library.observe {
+            libraryItemId = presentation.libraryItem(item.id()).orElse(null)
+        }
+        onDispose { observation.close() }
+    }
 
     CrashSafeLaunchedEffect(item.id()) {
         result = withContext(Dispatchers.IO) {
@@ -1000,27 +1065,28 @@ private fun SourceTitleScreen(
         return
     }
 
-    fun toggleFavorite() {
-        if (favoritePending) return
-        favoritePending = true
+    fun toggleLibraryMembership() {
+        if (membershipPending) return
+        membershipPending = true
         scope.launch {
             runCatching {
                 withContext(Dispatchers.IO) {
-                    val existingId = libraryItemId
-                    val id = existingId ?: presentation.addToLibrary(item)
-                    val nextFavorite = if (existingId == null) false else !favorite
-                    if (existingId != null) library.setFavorite(setOf(id), nextFavorite)
-                    id to nextFavorite
+                    val existingId = presentation.libraryItem(item.id()).orElse(libraryItemId)
+                    if (existingId == null) {
+                        presentation.addToLibrary(item)
+                    } else {
+                        presentation.removeFromLibrary(item.id())
+                        null
+                    }
                 }
-            }.onSuccess { (id, nextFavorite) ->
-                libraryItemId = id
-                favorite = nextFavorite
+            }.onSuccess { nextId ->
+                libraryItemId = nextId
                 actionError = null
-                openLibraryDetails(id)
+                nextId?.let(openLibraryDetails)
             }.onFailure {
                 actionError = it.message ?: "The library could not be updated"
             }
-            favoritePending = false
+            membershipPending = false
         }
     }
 
@@ -1034,7 +1100,7 @@ private fun SourceTitleScreen(
         if (item.contentKind() == SourceContentKind.ANIME) MediaKind.ANIME else MediaKind.MANGA,
         Instant.EPOCH,
         emptyList(),
-        favorite,
+        false,
         Optional.empty(),
         details.description(),
         details.authors(),
@@ -1047,6 +1113,7 @@ private fun SourceTitleScreen(
     )
     DetailsPage(
         details = previewDetails,
+        inLibrary = libraryItemId != null,
         categories = emptyList(),
         sourceName = source.displayName(),
         artwork = { modifier -> RemoteArtwork(details.thumbnail().orElse(null), details.title(), modifier) },
@@ -1077,9 +1144,9 @@ private fun SourceTitleScreen(
         markChapters = { _, _ -> },
         markEpisodes = { _, _ -> },
         track = {},
-        refreshing = favoritePending,
+        refreshing = membershipPending,
         refresh = null,
-        favorite = ::toggleFavorite,
+        toggleLibraryMembership = ::toggleLibraryMembership,
         edit = { _, _ -> },
         createCategory = {},
         addCategory = {},
@@ -1106,7 +1173,8 @@ private fun ColumnScope.CatalogueContent(
     page: SourcePage,
     grid: Boolean,
     open: (SourceCatalogueItem) -> Unit,
-    add: (SourceCatalogueItem) -> Unit,
+    libraryItem: (SourceCatalogueItem) -> LibraryItemId?,
+    toggleLibraryMembership: (SourceCatalogueItem, LibraryItemId?) -> Unit,
     webPage: (SourceCatalogueItem) -> SourceWebPage?,
     openWebPage: (SourceWebPage) -> Unit,
 ) {
@@ -1127,13 +1195,27 @@ private fun ColumnScope.CatalogueContent(
                 key = { it.id().toString() },
                 contentType = { "catalogue-cover" },
             ) { item ->
-                CatalogueCard(item, open, add, webPage(item), openWebPage)
+                CatalogueCard(
+                    item,
+                    open,
+                    libraryItem(item),
+                    toggleLibraryMembership,
+                    webPage(item),
+                    openWebPage,
+                )
             }
         }
     } else {
         LazyColumn(modifier = Modifier.weight(1f)) {
             items(page.items(), key = { it.id().toString() }) { item ->
-                CatalogueRow(item, open, add, webPage(item), openWebPage)
+                CatalogueRow(
+                    item,
+                    open,
+                    libraryItem(item),
+                    toggleLibraryMembership,
+                    webPage(item),
+                    openWebPage,
+                )
             }
         }
     }
@@ -1143,7 +1225,8 @@ private fun ColumnScope.CatalogueContent(
 private fun CatalogueCard(
     item: SourceCatalogueItem,
     open: (SourceCatalogueItem) -> Unit,
-    add: (SourceCatalogueItem) -> Unit,
+    libraryItemId: LibraryItemId?,
+    toggleLibraryMembership: (SourceCatalogueItem, LibraryItemId?) -> Unit,
     webPage: SourceWebPage?,
     openWebPage: (SourceWebPage) -> Unit,
 ) {
@@ -1171,7 +1254,7 @@ private fun CatalogueCard(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                CatalogueItemMenu(item, add, webPage, openWebPage)
+                CatalogueItemMenu(item, libraryItemId, toggleLibraryMembership, webPage, openWebPage)
             }
         }
     }
@@ -1181,7 +1264,8 @@ private fun CatalogueCard(
 private fun CatalogueRow(
     item: SourceCatalogueItem,
     open: (SourceCatalogueItem) -> Unit,
-    add: (SourceCatalogueItem) -> Unit,
+    libraryItemId: LibraryItemId?,
+    toggleLibraryMembership: (SourceCatalogueItem, LibraryItemId?) -> Unit,
     webPage: SourceWebPage?,
     openWebPage: (SourceWebPage) -> Unit,
 ) {
@@ -1205,7 +1289,7 @@ private fun CatalogueRow(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        CatalogueItemMenu(item, add, webPage, openWebPage)
+        CatalogueItemMenu(item, libraryItemId, toggleLibraryMembership, webPage, openWebPage)
     }
     HorizontalDivider(modifier = Modifier.padding(start = 20.dp))
 }
@@ -1213,7 +1297,8 @@ private fun CatalogueRow(
 @Composable
 private fun CatalogueItemMenu(
     item: SourceCatalogueItem,
-    add: (SourceCatalogueItem) -> Unit,
+    libraryItemId: LibraryItemId?,
+    toggleLibraryMembership: (SourceCatalogueItem, LibraryItemId?) -> Unit,
     webPage: SourceWebPage?,
     openWebPage: (SourceWebPage) -> Unit,
 ) {
@@ -1231,11 +1316,18 @@ private fun CatalogueItemMenu(
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             DropdownMenuItem(
-                text = { Text("ui.add.to.library") },
-                leadingIcon = { Icon(Icons.Default.Add, contentDescription = null) },
+                text = {
+                    Text(if (libraryItemId == null) "ui.add.to.library" else "ui.remove.from.library")
+                },
+                leadingIcon = {
+                    Icon(
+                        if (libraryItemId == null) Icons.Default.Add else Icons.Default.Delete,
+                        contentDescription = null,
+                    )
+                },
                 onClick = {
                     expanded = false
-                    add(item)
+                    toggleLibraryMembership(item, libraryItemId)
                 },
             )
             webPage?.let { page ->
@@ -1521,11 +1613,16 @@ private fun SwitchRow(label: String, checked: Boolean, update: (Boolean) -> Unit
 @Composable
 private fun GlobalSearchContent(
     presentation: DiscoveryPresentation,
+    library: LibraryPresentation,
     kind: SourceContentKind,
     query: String,
     requestRevision: Int,
+    open: (SourceCatalogueItem) -> Unit,
 ) {
+    val scope = rememberCrashSafeCoroutineScope()
     var revision by remember(kind, query) { mutableIntStateOf(0) }
+    var libraryRevision by remember(kind, query) { mutableIntStateOf(0) }
+    var notice by remember(kind, query) { mutableStateOf<String?>(null) }
     var result by remember(kind, query) {
         mutableStateOf<Result<Map<SourceId, SourcePage>>?>(null)
     }
@@ -1535,6 +1632,10 @@ private fun GlobalSearchContent(
         result = withContext(Dispatchers.IO) {
             runCatching { presentation.globalSearch(kind, query, 10) }
         }
+    }
+    DisposableEffect(library, kind, query) {
+        val observation = library.observe { libraryRevision++ }
+        onDispose { observation.close() }
     }
     val sourceNames = remember(kind) {
         presentation.sourceSections(kind)
@@ -1549,7 +1650,21 @@ private fun GlobalSearchContent(
             revision++
         }
     } else {
+        val memberships = remember(sources, libraryRevision) {
+            sources.values.asSequence()
+                .flatMap { page -> page.items().asSequence() }
+                .associate { item -> item.id() to presentation.libraryItem(item.id()).orElse(null) }
+        }
         LazyColumn(modifier = Modifier.fillMaxSize()) {
+            notice?.let { message ->
+                item {
+                    Text(
+                        message,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                }
+            }
             sources.forEach { (sourceId, page) ->
                 item {
                     Text(
@@ -1561,8 +1676,32 @@ private fun GlobalSearchContent(
                 items(page.items(), key = { it.id().toString() }) { item ->
                     CatalogueRow(
                         item = item,
-                        open = {},
-                        add = { presentation.addToLibrary(it) },
+                        open = open,
+                        libraryItemId = memberships[item.id()],
+                        toggleLibraryMembership = { selected, existingId ->
+                            scope.launch {
+                                val changed = withContext(Dispatchers.IO) {
+                                    runCatching {
+                                        if (existingId == null) {
+                                            presentation.addToLibrary(selected)
+                                            true
+                                        } else {
+                                            presentation.removeFromLibrary(selected.id())
+                                            false
+                                        }
+                                    }
+                                }
+                                changed.onSuccess { added ->
+                                    notice = if (added) {
+                                        "${selected.title()} added to Library"
+                                    } else {
+                                        "${selected.title()} removed from Library"
+                                    }
+                                }.onFailure {
+                                    notice = it.message ?: "The library could not be updated"
+                                }
+                            }
+                        },
                         webPage = null,
                         openWebPage = {},
                     )

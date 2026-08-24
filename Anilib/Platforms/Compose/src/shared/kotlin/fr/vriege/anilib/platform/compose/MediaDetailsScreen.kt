@@ -99,7 +99,7 @@ internal data class MediaUnitSelectionUiModel(
 internal fun MediaDetailsScreen(
     model: MediaDetailsUiModel,
     artwork: @Composable (Modifier) -> Unit,
-    favorite: Boolean,
+    inLibrary: Boolean,
     contentLabel: String,
     canTrack: Boolean,
     trackingCount: Int,
@@ -109,7 +109,7 @@ internal fun MediaDetailsScreen(
     primaryLabel: String,
     canOpenPrimary: Boolean,
     errors: List<String>,
-    toggleFavorite: () -> Unit,
+    toggleLibraryMembership: () -> Unit,
     refreshing: Boolean,
     refresh: (() -> Unit)?,
     track: () -> Unit,
@@ -184,12 +184,12 @@ internal fun MediaDetailsScreen(
             item { MediaDetailsHero(model, artwork) }
             item {
                 MediaDetailsActions(
-                    favorite = favorite,
+                    inLibrary = inLibrary,
                     contentLabel = contentLabel,
                     canTrack = canTrack,
                     trackingCount = trackingCount,
                     canOpenWeb = canOpenWeb,
-                    toggleFavorite = toggleFavorite,
+                    toggleLibraryMembership = toggleLibraryMembership,
                     track = track,
                     openWeb = openWeb,
                 )
@@ -255,12 +255,12 @@ private fun MediaDetailsHero(
 
 @Composable
 private fun MediaDetailsActions(
-    favorite: Boolean,
+    inLibrary: Boolean,
     contentLabel: String,
     canTrack: Boolean,
     trackingCount: Int,
     canOpenWeb: Boolean,
-    toggleFavorite: () -> Unit,
+    toggleLibraryMembership: () -> Unit,
     track: () -> Unit,
     openWeb: () -> Unit,
 ) {
@@ -269,10 +269,10 @@ private fun MediaDetailsActions(
         horizontalArrangement = Arrangement.SpaceEvenly,
     ) {
         MediaDetailAction(
-            icon = if (favorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-            label = if (favorite) "ui.remove.from.library" else "ui.add.to.library",
+            icon = if (inLibrary) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+            label = if (inLibrary) "ui.remove.from.library" else "ui.add.to.library",
             enabled = true,
-            action = toggleFavorite,
+            action = toggleLibraryMembership,
             modifier = Modifier.weight(1f),
         )
         MediaDetailAction(Icons.Default.History, contentLabel, false, {}, Modifier.weight(1f))

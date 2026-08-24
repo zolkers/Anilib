@@ -34,7 +34,7 @@ public final class CatalogueNavigationMutationRule implements AnilibJavaRule {
             if (!catalogueOpen) {
                 continue;
             }
-            if (line.contains("addToLibrary(") || line.contains("setFavorite(")) {
+            if (mutatesLibrary(line)) {
                 diagnostics.add(new Diagnostic(
                         nameValue(),
                         source.path(),
@@ -48,6 +48,13 @@ public final class CatalogueNavigationMutationRule implements AnilibJavaRule {
                 braceDepth = 0;
             }
         }
+    }
+
+    private static boolean mutatesLibrary(String line) {
+        return line.contains("addToLibrary(")
+                || line.contains("removeFromLibrary(")
+                || line.contains("deleteTitles(")
+                || line.contains("setFavorite(");
     }
 
     private static int braces(String line) {

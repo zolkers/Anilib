@@ -146,6 +146,7 @@ fun AnilibApp(
     var downloadError by remember { mutableStateOf<String?>(null) }
     var moreDestination by remember { mutableStateOf<MoreDestination?>(null) }
     var browseMainDestination by remember { mutableStateOf(true) }
+    var browseDetailsTitle by remember { mutableStateOf<LibraryItemId?>(null) }
     var settings by remember(settingsPresentation) { mutableStateOf(initialSettings) }
     var recoveredFailure by remember { mutableStateOf<String?>(null) }
     val handleUiFailure: (Throwable) -> Unit = remember(reportUiFailure) {
@@ -172,7 +173,10 @@ fun AnilibApp(
             navigate(LibraryNavigator::openLibrary)
         }
         section = next
-        if (next == AppSection.BROWSE) browseMainDestination = true
+        if (next == AppSection.BROWSE) {
+            browseMainDestination = true
+            browseDetailsTitle = null
+        }
         if (next != AppSection.MORE) moreDestination = null
     }
 
@@ -400,7 +404,7 @@ fun AnilibApp(
                     val showGlobalNavigation = when (section) {
                         AppSection.ANIME, AppSection.MANGA -> destination.page() != LibraryPage.DETAILS
                         AppSection.UPDATES -> true
-                        AppSection.BROWSE -> browseMainDestination
+                        AppSection.BROWSE -> browseMainDestination && browseDetailsTitle == null
                         AppSection.MORE -> moreDestination == null
                     }
                     val useNavigationRail = when (settings.navigationStyle()) {
@@ -433,6 +437,8 @@ fun AnilibApp(
                         showGlobalNavigation,
                         useNavigationRail,
                         { browseMainDestination = it },
+                        browseDetailsTitle,
+                        { browseDetailsTitle = it },
                         componentCount,
                         navigate,
                         openSection,
@@ -523,6 +529,8 @@ internal fun AdaptiveShell(
     showGlobalNavigation: Boolean,
     useNavigationRail: Boolean,
     browseDestinationChanged: (Boolean) -> Unit,
+    browseDetailsTitle: LibraryItemId?,
+    browseDetailsChanged: (LibraryItemId?) -> Unit,
     componentCount: Int,
     navigate: ((LibraryNavigator) -> Unit) -> Unit,
     openSection: (AppSection) -> Unit,
@@ -582,6 +590,8 @@ internal fun AdaptiveShell(
                     openMore,
                     closeMore,
                     browseDestinationChanged,
+                    browseDetailsTitle,
+                    browseDetailsChanged,
                 )
             }
             if (showGlobalNavigation && !useNavigationRail) {
@@ -673,6 +683,8 @@ internal fun AppDestination(
     openMore: (MoreDestination) -> Unit,
     closeMore: () -> Unit,
     browseDestinationChanged: (Boolean) -> Unit,
+    browseDetailsTitle: LibraryItemId?,
+    browseDetailsChanged: (LibraryItemId?) -> Unit,
 ) {
     when (section) {
         AppSection.ANIME,
@@ -707,30 +719,52 @@ internal fun AppDestination(
             )
         }
         AppSection.UPDATES -> UpdatesScreen(updates, downloads)
-        AppSection.BROWSE -> DiscoveryScreen(
-            discovery,
-            presentation,
-            extensionRepositories,
-            apkExtensionPlatform,
-            browserCookies,
-            browserRuntimeStatus,
-            openSourceReader = openSourceReader,
-            openSourcePlayer = openSourcePlayer,
-            openLibraryDetails = { libraryItemId ->
-                val kind = presentation.details(libraryItemId).orElse(null)?.kind()
-                navigate { it.openDetails(libraryItemId) }
-                when (kind) {
-                    MediaKind.ANIME -> openSection(AppSection.ANIME)
-                    MediaKind.MANGA, MediaKind.NOVEL, MediaKind.OTHER -> openSection(AppSection.MANGA)
-                    null -> Unit
+        AppSection.BROWSE -> Box(modifier = Modifier.fillMaxSize()) {
+            DiscoveryScreen(
+                discovery,
+                presentation,
+                extensionRepositories,
+                apkExtensionPlatform,
+                browserCookies,
+                browserRuntimeStatus,
+                openSourceReader = openSourceReader,
+                openSourcePlayer = openSourcePlayer,
+                openLibraryDetails = { browseDetailsChanged(it) },
+                navigationVisibilityChanged = browseDestinationChanged,
+                manageExtensions = {
+                    openSection(AppSection.MORE)
+                    openMore(MoreDestination.EXTENSION_REPOSITORIES)
+                },
+            )
+            browseDetailsTitle?.let { libraryItemId ->
+                Surface(modifier = Modifier.fillMaxSize()) {
+                    DetailsDestination(
+                        presentation,
+                        discovery,
+                        browserCookies,
+                        browserRuntimeStatus,
+                        detailPlatform,
+                        reader,
+                        player,
+                        downloads,
+                        tracking,
+                        LibraryNavigator().apply { openDetails(libraryItemId) }.state(),
+                        { transition ->
+                            val overlayNavigator = LibraryNavigator().apply { openDetails(libraryItemId) }
+                            transition(overlayNavigator)
+                            browseDetailsChanged(overlayNavigator.state().selectedTitle().orElse(null))
+                        },
+                        openReader,
+                        readerError,
+                        openPlayer,
+                        enqueueDownload,
+                        downloadError,
+                        openTracking,
+                        goBackOverride = { browseDetailsChanged(null) },
+                    )
                 }
-            },
-            navigationVisibilityChanged = browseDestinationChanged,
-            manageExtensions = {
-                openSection(AppSection.MORE)
-                openMore(MoreDestination.EXTENSION_REPOSITORIES)
-            },
-        )
+            }
+        }
         AppSection.MORE -> when (moreDestination) {
             MoreDestination.HISTORY -> HistoryPage(
                 presentation,

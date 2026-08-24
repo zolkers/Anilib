@@ -260,9 +260,9 @@ internal fun LibraryPageContent(
                         Icon(
                             if (allSelectedFavorites) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                             contentDescription = if (allSelectedFavorites) {
-                                "ui.remove.from.library"
+                                "ui.unfavorite"
                             } else {
-                                "ui.add.to.library"
+                                "ui.favorite"
                             },
                         )
                     }
@@ -960,7 +960,7 @@ internal fun LibraryTitleCard(
             if (card.favorite()) {
                 Icon(
                     imageVector = Icons.Default.Favorite,
-                    contentDescription = "ui.in.library",
+                    contentDescription = "ui.favorite",
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(horizontal = 8.dp).size(22.dp),
                 )

@@ -12,6 +12,7 @@ import fr.vriege.anilib.feature.library.LibraryCatalog;
 import fr.vriege.anilib.feature.library.LibraryHistoryEntry;
 import fr.vriege.anilib.feature.library.LibraryItem;
 import fr.vriege.anilib.feature.library.LibraryItemId;
+import fr.vriege.anilib.feature.library.LibraryOrigin;
 import fr.vriege.anilib.feature.library.LibraryProgress;
 import fr.vriege.anilib.feature.library.MediaKind;
 import fr.vriege.anilib.feature.source.CatalogueSource;
@@ -173,11 +174,22 @@ final class DiscoveryTest {
 
             SourceCatalogueItem localItem = discovery.search(LOCAL_SOURCE, "alpha", 1, 20, List.of())
                     .items().getFirst();
-            LibraryItemId libraryItemId = discovery.addToLibrary(localItem);
-            counter.check(discovery.addToLibrary(localItem).equals(libraryItemId)
+            LibraryItemId firstLibraryItemId = discovery.addToLibrary(localItem);
+            counter.check(discovery.addToLibrary(localItem).equals(firstLibraryItemId)
                             && library.snapshot().size() == 1
-                            && !library.find(libraryItemId).orElseThrow().favorite(),
+                            && !library.find(firstLibraryItemId).orElseThrow().favorite(),
                     "adding a source title must be idempotent and must not make it a favorite");
+            LibraryItem duplicate = LibraryItem.create(localItem.title(), MediaKind.MANGA)
+                    .withOrigin(new LibraryOrigin(
+                            localItem.id().sourceId().toString(),
+                            localItem.id().value()));
+            library.save(duplicate);
+            counter.check(library.snapshot().size() == 2
+                            && discovery.removeFromLibrary(localItem.id())
+                            && library.snapshot().isEmpty()
+                            && !discovery.removeFromLibrary(localItem.id()),
+                    "removing a source title must clear every duplicate origin and be safely repeatable");
+            LibraryItemId libraryItemId = discovery.addToLibrary(localItem);
             LibraryItem enriched = library.find(libraryItemId).orElseThrow()
                     .withCategories(Set.of("Reading"))
                     .withFavorite(true)

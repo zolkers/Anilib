@@ -256,7 +256,7 @@ public final class DefaultDiscoveryService implements DiscoveryService {
     }
 
     @Override
-    public LibraryItemId addToLibrary(SourceCatalogueItem item) {
+    public synchronized LibraryItemId addToLibrary(SourceCatalogueItem item) {
         Objects.requireNonNull(item, "item must not be null");
         catalogue(item.id().sourceId());
         LibraryOrigin origin = origin(item);
@@ -273,6 +273,18 @@ public final class DefaultDiscoveryService implements DiscoveryService {
                 .withOrigin(origin);
         library.save(created);
         return created.id();
+    }
+
+    @Override
+    public synchronized boolean removeFromLibrary(SourceCatalogueItemId itemId) {
+        Objects.requireNonNull(itemId, "itemId must not be null");
+        LibraryOrigin selected = new LibraryOrigin(itemId.sourceId().toString(), itemId.value());
+        List<LibraryItemId> matches = library.snapshot().stream()
+                .filter(item -> item.origin().filter(selected::equals).isPresent())
+                .map(LibraryItem::id)
+                .toList();
+        matches.forEach(library::remove);
+        return !matches.isEmpty();
     }
 
     @Override

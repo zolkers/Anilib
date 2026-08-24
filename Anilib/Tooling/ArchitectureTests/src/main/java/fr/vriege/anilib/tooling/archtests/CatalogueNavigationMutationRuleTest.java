@@ -36,6 +36,16 @@ final class CatalogueNavigationMutationRuleTest {
                 "}"));
         check(rule.analyze(snapshot(root, module, unsafe)).size() == 1,
                 "catalogue navigation must reject implicit Library writes while retaining explicit add actions");
+        KotlinSource unsafeRemoval = source(root, module, List.of(
+                "package fr.vriege.anilib.platform.compose",
+                "fun catalogue() {",
+                "    CatalogueContent(",
+                "        open = { item -> presentation.removeFromLibrary(item.id()) },",
+                "        add = { item -> presentation.addToLibrary(item) },",
+                "    )",
+                "}"));
+        check(rule.analyze(snapshot(root, module, unsafeRemoval)).size() == 1,
+                "catalogue navigation must reject implicit Library removals");
 
         KotlinSource safe = source(root, module, List.of(
                 "package fr.vriege.anilib.platform.compose",
@@ -47,7 +57,7 @@ final class CatalogueNavigationMutationRuleTest {
                 "}"));
         check(rule.analyze(snapshot(root, module, safe)).isEmpty(),
                 "transient catalogue details must pass the navigation mutation rule");
-        return 2;
+        return 3;
     }
 
     private static KotlinSource source(

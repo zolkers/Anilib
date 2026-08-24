@@ -316,9 +316,9 @@ internal fun HistoryCard(
             Icon(
                 if (card?.favorite() == true) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                 contentDescription = if (card?.favorite() == true) {
-                    "ui.remove.from.library"
+                    "ui.unfavorite"
                 } else {
-                    "ui.add.to.library"
+                    "ui.favorite"
                 },
             )
         }

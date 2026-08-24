@@ -224,6 +224,7 @@ internal fun DetailsDestination(
         val primaryEpisode = firstUnwatchedEpisode(episodes)
         DetailsPage(
             details = details,
+            inLibrary = true,
             categories = categories,
             sourceName = sourceName,
             artwork = { modifier -> RemoteArtwork(details.artwork().orElse(null), details.title(), modifier) },
@@ -324,9 +325,29 @@ internal fun DetailsDestination(
                     }
                 }
             },
-            favorite = {
-                presentation.setFavorite(setOf(details.id()), !details.favorite())
-                revision++
+            toggleLibraryMembership = {
+                scope.launch {
+                    runCatching {
+                        withContext(Dispatchers.IO) {
+                            val origin = details.origin().orElse(null)
+                            if (origin == null) {
+                                presentation.deleteTitles(setOf(details.id()))
+                            } else {
+                                discovery.removeFromLibrary(
+                                    SourceCatalogueItemId(
+                                        SourceId.of(origin.sourceId()),
+                                        origin.sourceItemKey(),
+                                    ),
+                                )
+                            }
+                        }
+                    }.onSuccess {
+                        unitError = null
+                        navigateBack()
+                    }.onFailure {
+                        unitError = it.message ?: "The title could not be removed from the library."
+                    }
+                }
             },
             edit = { title, metadata ->
                 presentation.editTitle(details.id(), title, metadata)
@@ -389,6 +410,7 @@ internal fun DetailsDestination(
 @Composable
 internal fun DetailsPage(
     details: LibraryDetails,
+    inLibrary: Boolean,
     categories: List<LibraryCategory>,
     sourceName: String,
     artwork: @Composable (Modifier) -> Unit,
@@ -419,7 +441,7 @@ internal fun DetailsPage(
     track: () -> Unit,
     refreshing: Boolean,
     refresh: (() -> Unit)?,
-    favorite: () -> Unit,
+    toggleLibraryMembership: () -> Unit,
     edit: (String, LibraryTitleMetadata) -> Unit,
     createCategory: (String) -> Unit,
     addCategory: (String) -> Unit,
@@ -459,7 +481,7 @@ internal fun DetailsPage(
             nextAiring = nextAiring,
         ),
         artwork = artwork,
-        favorite = details.favorite(),
+        inLibrary = inLibrary,
         contentLabel = when (details.kind()) {
             MediaKind.ANIME -> UiTranslations.format(
                 "dynamic.episodes.count",
@@ -480,7 +502,7 @@ internal fun DetailsPage(
         primaryLabel = if (canWatch) "ui.watch" else "ui.read",
         canOpenPrimary = canWatch || canRead,
         errors = listOfNotNull(readerError, downloadError, unitError),
-        toggleFavorite = favorite,
+        toggleLibraryMembership = toggleLibraryMembership,
         refreshing = refreshing,
         refresh = refresh,
         track = track,

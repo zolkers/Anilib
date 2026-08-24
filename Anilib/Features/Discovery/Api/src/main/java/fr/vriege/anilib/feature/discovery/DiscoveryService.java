@@ -69,6 +69,8 @@ public interface DiscoveryService {
 
     LibraryItemId addToLibrary(SourceCatalogueItem item);
 
+    boolean removeFromLibrary(SourceCatalogueItemId itemId);
+
     List<SourceCatalogueItem> migrationCandidates(
             LibraryItemId libraryItemId,
             SourceId targetSourceId,
