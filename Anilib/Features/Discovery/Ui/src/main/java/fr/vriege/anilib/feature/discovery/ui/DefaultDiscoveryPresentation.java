@@ -33,10 +33,16 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Supplier;
 
 public final class DefaultDiscoveryPresentation implements DiscoveryPresentation {
+    private static final int MAXIMUM_CACHED_CATALOGUE_PAGES = 24;
+
     private final DiscoveryService service;
     private final DiscoveryBrowsePreferenceStore browsePreferences;
+    private final Object catalogueCacheLock = new Object();
+    private final LinkedHashMap<CatalogueCacheKey, SourcePage> cataloguePages =
+            new LinkedHashMap<>(MAXIMUM_CACHED_CATALOGUE_PAGES, 0.75f, true);
 
     public DefaultDiscoveryPresentation(
             DiscoveryService service,
@@ -216,6 +222,16 @@ public final class DefaultDiscoveryPresentation implements DiscoveryPresentation
     @Override
     public void refresh(SourceId sourceId) {
         service.refresh(sourceId);
+        invalidateCatalogue(sourceId);
+    }
+
+    @Override
+    public void reloadCatalogue(SourceId sourceId) {
+        SourceId id = Objects.requireNonNull(sourceId, "sourceId must not be null");
+        if (service.supportsRefresh(id)) {
+            service.refresh(id);
+        }
+        invalidateCatalogue(id);
     }
 
     @Override
@@ -235,7 +251,8 @@ public final class DefaultDiscoveryPresentation implements DiscoveryPresentation
             int page,
             int pageSize,
             List<SourceFilterValue> filters) {
-        return service.browse(sourceId, listing, page, pageSize, filters);
+        CatalogueCacheKey key = CatalogueCacheKey.browse(sourceId, listing, page, pageSize, filters);
+        return cachedCataloguePage(key, () -> service.browse(sourceId, listing, page, pageSize, filters));
     }
 
     @Override
@@ -245,7 +262,8 @@ public final class DefaultDiscoveryPresentation implements DiscoveryPresentation
             int page,
             int pageSize,
             List<SourceFilterValue> filters) {
-        return service.search(sourceId, query, page, pageSize, filters);
+        CatalogueCacheKey key = CatalogueCacheKey.search(sourceId, query, page, pageSize, filters);
+        return cachedCataloguePage(key, () -> service.search(sourceId, query, page, pageSize, filters));
     }
 
     @Override
@@ -274,6 +292,7 @@ public final class DefaultDiscoveryPresentation implements DiscoveryPresentation
     @Override
     public void setPreference(SourceId sourceId, String preferenceId, String value) {
         service.setPreference(sourceId, preferenceId, value);
+        invalidateCatalogue(sourceId);
     }
 
     @Override
@@ -357,6 +376,79 @@ public final class DefaultDiscoveryPresentation implements DiscoveryPresentation
         Set<String> retained = new LinkedHashSet<>(configured);
         retained.retainAll(available);
         return retained.isEmpty() ? defaultLanguages(available) : Set.copyOf(retained);
+    }
+
+    private SourcePage cachedCataloguePage(CatalogueCacheKey key, Supplier<SourcePage> loader) {
+        synchronized (catalogueCacheLock) {
+            SourcePage cached = cataloguePages.get(key);
+            if (cached != null) {
+                return cached;
+            }
+        }
+        SourcePage loaded = Objects.requireNonNull(loader.get(), "catalogue loader returned null");
+        if (!loaded.items().isEmpty()) {
+            synchronized (catalogueCacheLock) {
+                cataloguePages.put(key, loaded);
+                while (cataloguePages.size() > MAXIMUM_CACHED_CATALOGUE_PAGES) {
+                    cataloguePages.remove(cataloguePages.keySet().iterator().next());
+                }
+            }
+        }
+        return loaded;
+    }
+
+    private void invalidateCatalogue(SourceId sourceId) {
+        SourceId id = Objects.requireNonNull(sourceId, "sourceId must not be null");
+        synchronized (catalogueCacheLock) {
+            cataloguePages.keySet().removeIf(key -> key.sourceId().equals(id));
+        }
+    }
+
+    private enum CatalogueRequestKind {
+        POPULAR,
+        LATEST,
+        SEARCH
+    }
+
+    private record CatalogueCacheKey(
+            SourceId sourceId,
+            CatalogueRequestKind kind,
+            String query,
+            int page,
+            int pageSize,
+            List<SourceFilterValue> filters) {
+
+        private CatalogueCacheKey {
+            sourceId = Objects.requireNonNull(sourceId, "sourceId must not be null");
+            kind = Objects.requireNonNull(kind, "kind must not be null");
+            query = Objects.requireNonNull(query, "query must not be null");
+            filters = Objects.requireNonNull(filters, "filters must not be null").stream()
+                    .sorted(Comparator.comparing(SourceFilterValue::filterId)
+                            .thenComparing(SourceFilterValue::value))
+                    .toList();
+        }
+
+        private static CatalogueCacheKey browse(
+                SourceId sourceId,
+                SourceListing listing,
+                int page,
+                int pageSize,
+                List<SourceFilterValue> filters) {
+            CatalogueRequestKind kind = switch (Objects.requireNonNull(listing, "listing must not be null")) {
+                case POPULAR -> CatalogueRequestKind.POPULAR;
+                case LATEST -> CatalogueRequestKind.LATEST;
+            };
+            return new CatalogueCacheKey(sourceId, kind, "", page, pageSize, filters);
+        }
+
+        private static CatalogueCacheKey search(
+                SourceId sourceId,
+                String query,
+                int page,
+                int pageSize,
+                List<SourceFilterValue> filters) {
+            return new CatalogueCacheKey(sourceId, CatalogueRequestKind.SEARCH, query, page, pageSize, filters);
+        }
     }
 
     private static Set<String> defaultLanguages(List<String> available) {

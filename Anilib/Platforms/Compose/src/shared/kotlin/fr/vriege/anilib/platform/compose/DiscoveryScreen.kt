@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Extension
@@ -727,6 +728,7 @@ private fun SourceCatalogueScreen(
     var filterValues by remember(source.id()) { mutableStateOf<Map<String, String>>(emptyMap()) }
     var preferenceRevision by remember(source.id()) { mutableIntStateOf(0) }
     var requestRevision by remember(source.id()) { mutableIntStateOf(0) }
+    var catalogueReloading by remember(source.id()) { mutableStateOf(false) }
     var libraryRevision by remember(source.id()) { mutableIntStateOf(0) }
     var notice by remember(source.id()) { mutableStateOf<String?>(null) }
     var definitions by remember(source.id()) {
@@ -739,6 +741,23 @@ private fun SourceCatalogueScreen(
     val sourceWebPage = remember(source.id()) { presentation.sourceWebPage(source.id()).orElse(null) }
     var result by remember(source.id(), selectedListing, query, page, filterValues, preferenceRevision) {
         mutableStateOf<Result<SourcePage>?>(null)
+    }
+
+    fun reloadCatalogue() {
+        if (catalogueReloading) return
+        catalogueReloading = true
+        scope.launch {
+            val failure = withContext(Dispatchers.IO) {
+                runCatching { presentation.reloadCatalogue(source.id()) }.exceptionOrNull()
+            }
+            if (failure == null) {
+                result = null
+                requestRevision++
+            } else {
+                notice = failure.message ?: "Source catalogue could not be reloaded"
+                catalogueReloading = false
+            }
+        }
     }
 
     DisposableEffect(library, source.id()) {
@@ -799,6 +818,7 @@ private fun SourceCatalogueScreen(
                 }
             }
         }
+        catalogueReloading = false
     }
 
     if (showFilters) {
@@ -875,6 +895,16 @@ private fun SourceCatalogueScreen(
                     if (!searchActive) {
                         IconButton(onClick = { searchActive = true }) {
                             Icon(Icons.Default.Search, contentDescription = "ui.search")
+                        }
+                    }
+                    IconButton(
+                        onClick = ::reloadCatalogue,
+                        enabled = result != null && !catalogueReloading,
+                    ) {
+                        if (catalogueReloading) {
+                            CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Default.Refresh, contentDescription = "ui.reload")
                         }
                     }
                     IconButton(onClick = {

@@ -55,6 +55,8 @@ public interface DiscoveryPresentation {
 
     void refresh(SourceId sourceId);
 
+    void reloadCatalogue(SourceId sourceId);
+
     Optional<SourceWebPage> sourceWebPage(SourceId sourceId);
 
     Optional<SourceWebPage> titleWebPage(SourceCatalogueItemId itemId);

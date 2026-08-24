@@ -28,6 +28,7 @@ import fr.vriege.anilib.feature.source.SourceFilterValue;
 import fr.vriege.anilib.feature.source.SourceId;
 import fr.vriege.anilib.feature.source.SourceListing;
 import fr.vriege.anilib.feature.source.SourcePage;
+import fr.vriege.anilib.feature.source.RefreshableSource;
 import fr.vriege.anilib.feature.source.SourceSdk;
 import fr.vriege.anilib.feature.source.SourceSearchRequest;
 import fr.vriege.anilib.feature.source.SourceWebPage;
@@ -46,6 +47,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
 final class DiscoveryTest {
@@ -88,9 +90,10 @@ final class DiscoveryTest {
     }
 
     private static void verifiesDiscoveryProduct(Counter counter, Path directory) {
+        TestCatalogueSource remoteSource = new TestCatalogueSource();
         SourceExtensionPlugin remotePlugin = new SourceExtensionPlugin(
                 ComponentDescriptor.of("test.remote-source", "Remote source", "1.0.0"),
-                new TestCatalogueSource());
+                remoteSource);
         try (StartedAnilib product = StandardAnilib.start(directory, List.of(remotePlugin))) {
             DiscoveryService discovery = product.capability(DiscoveryCapabilities.SERVICE);
             DiscoveryPresentation presentation = product.capability(DiscoveryUiCapabilities.PRESENTATION);
@@ -132,6 +135,16 @@ final class DiscoveryTest {
                     "the shared presentation must expose optional title browser entry points");
             counter.check(presentation.sourceWebPage(LOCAL_SOURCE).isEmpty(),
                     "sources without a web contract must not expose a browser action");
+
+            presentation.browse(REMOTE_SOURCE, SourceListing.POPULAR, 1, 20, List.of());
+            presentation.browse(REMOTE_SOURCE, SourceListing.POPULAR, 1, 20, List.of());
+            counter.check(remoteSource.popularRequests.get() == 1,
+                    "source catalogue pages must be reused while navigating the shared UI");
+            presentation.reloadCatalogue(REMOTE_SOURCE);
+            presentation.browse(REMOTE_SOURCE, SourceListing.POPULAR, 1, 20, List.of());
+            counter.check(remoteSource.refreshRequests.get() == 1
+                            && remoteSource.popularRequests.get() == 2,
+                    "catalogue reload must refresh the source and invalidate its cached pages");
 
             SourcePage firstPage = discovery.browse(
                     LOCAL_SOURCE,
@@ -313,7 +326,7 @@ final class DiscoveryTest {
         }
     }
 
-    private static final class TestCatalogueSource implements CatalogueSource, WebSource {
+    private static final class TestCatalogueSource implements CatalogueSource, WebSource, RefreshableSource {
         private static final SourceDescriptor DESCRIPTOR = new SourceDescriptor(
                 REMOTE_SOURCE,
                 "Remote catalogue",
@@ -321,6 +334,8 @@ final class DiscoveryTest {
                 "en",
                 Set.of(SourceContentKind.ANIME, SourceContentKind.MANGA),
                 SourceSdk.API_VERSION);
+        private final AtomicInteger popularRequests = new AtomicInteger();
+        private final AtomicInteger refreshRequests = new AtomicInteger();
 
         @Override
         public SourceDescriptor descriptor() {
@@ -329,7 +344,13 @@ final class DiscoveryTest {
 
         @Override
         public SourcePage popular(SourceBrowseRequest request) {
+            popularRequests.incrementAndGet();
             return new SourcePage(List.of(REMOTE_ITEM, REMOTE_ANIME_ITEM), false);
+        }
+
+        @Override
+        public void refresh() {
+            refreshRequests.incrementAndGet();
         }
 
         @Override
