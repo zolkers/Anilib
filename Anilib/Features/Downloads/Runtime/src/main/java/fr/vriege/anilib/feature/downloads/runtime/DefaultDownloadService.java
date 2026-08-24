@@ -970,15 +970,14 @@ public final class DefaultDownloadService
                 .filter(record -> record.contentUnit.id().value().equals(episodeId.value()))
                 .max(Comparator.comparing(record -> record.updatedAt))
                 .map(record -> {
-                    Path finalized = finalizedVideoFile(record);
-                    boolean hasFinalizedVideo = Files.isRegularFile(finalized);
+                    Optional<Path> finalized = existingFinalizedVideoFile(record);
                     return List.of(new SourceVideoStream(
                             "offline-" + record.id,
                             "Offline",
-                            (hasFinalizedVideo
-                                    ? finalized
+                            (finalized.isPresent()
+                                    ? finalized.orElseThrow()
                                     : record.video.hls() ? playlistFile(record) : videoFile(record)).toUri(),
-                            hasFinalizedVideo ? SourceStreamFormat.PROGRESSIVE : record.video.format(),
+                            finalized.isPresent() ? SourceStreamFormat.PROGRESSIVE : record.video.format(),
                             Map.of(),
                             List.of()));
                 })
@@ -1449,15 +1448,16 @@ public final class DefaultDownloadService
         if (record.queueOrder < 0) {
             throw new IOException("Download queue position must not be negative");
         }
+        Optional<Path> finalized = record.video() ? existingFinalizedVideoFile(record) : Optional.empty();
         if (record.video()
                 && record.status != DownloadStatus.CANCELLED
-                && Files.isRegularFile(finalizedVideoFile(record))
-                && Files.size(finalizedVideoFile(record)) > 0L) {
-            reconcileFinalizedVideo(record);
+                && finalized.isPresent()
+                && Files.size(finalized.orElseThrow()) > 0L) {
+            reconcileFinalizedVideo(record, finalized.orElseThrow());
             return;
         }
-        if (record.video() && Files.isRegularFile(finalizedVideoFile(record))) {
-            Files.deleteIfExists(finalizedVideoFile(record));
+        if (finalized.isPresent()) {
+            Files.deleteIfExists(finalized.orElseThrow());
         }
         if (record.video() && !record.video.hls()) {
             reconcileProgressiveVideo(record);
@@ -1492,10 +1492,13 @@ public final class DefaultDownloadService
         }
     }
 
-    private void reconcileFinalizedVideo(DownloadRecord record) throws IOException {
-        Path finalized = finalizedVideoFile(record);
+    private void reconcileFinalizedVideo(DownloadRecord record, Path finalized) throws IOException {
         long bytes = Files.size(finalized);
         deleteVideoIntermediates(record);
+        Path legacy = legacyFinalizedVideoFile(record);
+        if (!finalized.equals(legacy)) {
+            Files.deleteIfExists(legacy);
+        }
         record.completedPages = record.pages.size();
         record.downloadedBytes = bytes;
         record.status = DownloadStatus.COMPLETED;
@@ -1654,6 +1657,7 @@ public final class DefaultDownloadService
                 if (accountStorage && Files.isRegularFile(path)
                         && (path.getFileName().toString().endsWith(".page")
                         || path.getFileName().toString().endsWith(".media")
+                        || path.getFileName().toString().endsWith(".mp4")
                         || path.getFileName().toString().endsWith(".mkv"))) {
                     usedStorageBytes -= Files.size(path);
                 }
@@ -1678,7 +1682,20 @@ public final class DefaultDownloadService
     }
 
     private Path finalizedVideoFile(DownloadRecord record) {
+        return recordDirectory(record).resolve("offline.mp4");
+    }
+
+    private Path legacyFinalizedVideoFile(DownloadRecord record) {
         return recordDirectory(record).resolve("offline.mkv");
+    }
+
+    private Optional<Path> existingFinalizedVideoFile(DownloadRecord record) {
+        Path current = finalizedVideoFile(record);
+        if (Files.isRegularFile(current)) {
+            return Optional.of(current);
+        }
+        Path legacy = legacyFinalizedVideoFile(record);
+        return Files.isRegularFile(legacy) ? Optional.of(legacy) : Optional.empty();
     }
 
     private void deleteVideoIntermediates(DownloadRecord record) {
@@ -1826,6 +1843,7 @@ public final class DefaultDownloadService
         return name.endsWith(".page")
                 || name.equals("offline.media")
                 || name.equals("offline.m3u8")
+                || name.equals("offline.mp4")
                 || name.equals("offline.mkv");
     }
 

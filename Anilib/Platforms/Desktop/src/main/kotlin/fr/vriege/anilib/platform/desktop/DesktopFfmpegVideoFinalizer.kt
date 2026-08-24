@@ -30,7 +30,7 @@ internal class DesktopFfmpegVideoFinalizer private constructor(
             throw DownloadException("Downloaded video input is missing")
         }
         val output = request.output()
-        val temporary = output.resolveSibling("${output.fileName}.partial.mkv")
+        val temporary = output.resolveSibling("${output.fileName}.partial.mp4")
         val log = output.resolveSibling("${output.fileName}.ffmpeg.log")
         try {
             Files.createDirectories(output.parent)
@@ -59,10 +59,16 @@ internal class DesktopFfmpegVideoFinalizer private constructor(
                     "0",
                     "-map_chapters",
                     "0",
-                    "-c",
+                    "-c:v",
                     "copy",
+                    "-c:a",
+                    "copy",
+                    "-c:s",
+                    "mov_text",
+                    "-movflags",
+                    "+faststart",
                     "-f",
-                    "matroska",
+                    "mp4",
                     temporary.toString(),
                 ),
                 output.parent,

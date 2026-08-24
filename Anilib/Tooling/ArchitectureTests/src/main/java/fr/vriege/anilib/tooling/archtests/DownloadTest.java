@@ -179,7 +179,7 @@ final class DownloadTest {
                 @Override
                 public void finalizeVideo(VideoFinalizationRequest request, BooleanSupplier cancelled) {
                     counter.check(request.input().getFileName().toString().equals("offline.m3u8")
-                                    && request.output().getFileName().toString().equals("offline.mkv")
+                                    && request.output().getFileName().toString().equals("offline.mp4")
                                     && !cancelled.getAsBoolean(),
                             "video finalization must receive local managed sibling paths");
                     try {
@@ -209,13 +209,13 @@ final class DownloadTest {
                                 && completed.downloadedBytes() == 4L
                                 && downloads.snapshot().usedStorageBytes() == 4L,
                         "completed finalized videos must account only for their final media file");
-                counter.check(Files.isRegularFile(directory.resolve("offline.mkv"))
+                counter.check(Files.isRegularFile(directory.resolve("offline.mp4"))
                                 && !Files.exists(directory.resolve("offline.m3u8"))
                                 && !Files.exists(directory.resolve("00000000.page"))
                                 && !Files.exists(directory.resolve("00000001.page")),
                         "video fragments must be removed only after finalization succeeds");
                 SourceVideoStream offline = downloads.streams(source.episode.id()).getFirst();
-                counter.check(offline.location().getPath().endsWith("offline.mkv")
+                counter.check(offline.location().getPath().endsWith("offline.mp4")
                                 && offline.format() == SourceStreamFormat.PROGRESSIVE,
                         "the offline player must receive the finalized MKV instead of HLS fragments");
             }
