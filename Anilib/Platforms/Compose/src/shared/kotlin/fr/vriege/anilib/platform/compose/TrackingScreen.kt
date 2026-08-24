@@ -1026,7 +1026,7 @@ private fun TrackerEditDialog(
                     val scoreValue = if (score.isBlank()) {
                         OptionalDouble.empty()
                     } else {
-                        OptionalDouble.of(score.toDouble())
+                        OptionalDouble.of(score.trim().replace(',', '.').toDouble())
                     }
                     require(!scoreValue.isPresent || descriptor.scores().contains(scoreValue.orElse(0.0))) {
                         "Choose a score supported by ${descriptor.name()}."

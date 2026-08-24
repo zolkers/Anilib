@@ -92,8 +92,8 @@ final class FirstPartyTrackerTest {
                 json("{\"data\":{\"Viewer\":{\"id\":1,\"name\":\"alice\"}}}"),
                 json("{\"data\":{\"Page\":{\"media\":[" + aniListMedia() + "]}}}"),
                 json("{\"data\":{\"SaveMediaListEntry\":" + aniListEntry("PLANNING", 0, 0) + "}}"),
-                json("{\"data\":{\"SaveMediaListEntry\":" + aniListEntry("CURRENT", 3, 8) + "}}"),
-                json("{\"data\":{\"MediaList\":" + aniListEntry("CURRENT", 3, 8) + "}}"),
+                json("{\"data\":{\"SaveMediaListEntry\":" + aniListEntry("CURRENT", 3, 9.4D) + "}}"),
+                json("{\"data\":{\"MediaList\":" + aniListEntry("CURRENT", 3, 9.4D) + "}}"),
                 json("{\"data\":{\"DeleteMediaListEntry\":{\"deleted\":true}}}"));
         AniListTracker tracker = new AniListTracker(client, "1234");
         TrackerAuthorization authorization = tracker.beginAuthorization().orElseThrow();
@@ -132,13 +132,18 @@ final class FirstPartyTrackerTest {
                 "AniList search results must bind rich media and airing metadata through SaveMediaListEntry");
         TrackerEntry edited = bound.withStatus(TrackerStatus.WATCHING)
                 .withProgress(3.0D)
-                .withScore(OptionalDouble.of(8.0D))
+                .withScore(OptionalDouble.of(9.4D))
                 .withDates(Optional.of(LocalDate.of(2026, 8, 18)), Optional.empty());
         TrackerEntry updated = tracker.update(edited);
         TrackerEntry refreshed = tracker.refresh(updated);
         tracker.remove(refreshed);
-        counter.check(refreshed.progress() == 3.0D && client.methods().stream().allMatch(HttpMethod.POST::equals),
-                "AniList edits, refreshes, and removals must use authenticated GraphQL requests");
+        counter.check(tracker.descriptor().scores().contains(9.4D)
+                        && refreshed.progress() == 3.0D
+                        && refreshed.score().orElseThrow() == 9.4D
+                        && new String(client.requests().get(3).body(), StandardCharsets.UTF_8)
+                                .contains("\"score\":9.4")
+                        && client.methods().stream().allMatch(HttpMethod.POST::equals),
+                "AniList edits must preserve decimal scores and use authenticated GraphQL requests");
         counter.check(client.requests().stream().allMatch(request -> request.headers()
                         .getOrDefault("authorization", List.of()).equals(List.of("Bearer token-value"))),
                 "AniList requests must carry the personal token only in the authorization header");
@@ -190,7 +195,7 @@ final class FirstPartyTrackerTest {
                 + "\"title\":{\"userPreferred\":\"Fixture anime\"}}";
     }
 
-    private static String aniListEntry(String status, int progress, int score) {
+    private static String aniListEntry(String status, int progress, double score) {
         return "{\"id\":99,\"status\":\"" + status + "\",\"progress\":" + progress
                 + ",\"repeat\":0,\"score\":" + score + ",\"private\":false,\"updatedAt\":1787000000,"
                 + "\"startedAt\":{\"year\":2026,\"month\":8,\"day\":18},"

@@ -490,8 +490,8 @@ public final class AniListTracker implements Tracker {
 
     private static List<Double> scores() {
         List<Double> values = new ArrayList<>();
-        for (int value = 0; value <= 20; value++) {
-            values.add(value / 2.0D);
+        for (int value = 0; value <= 100; value++) {
+            values.add(value / 10.0D);
         }
         return List.copyOf(values);
     }
