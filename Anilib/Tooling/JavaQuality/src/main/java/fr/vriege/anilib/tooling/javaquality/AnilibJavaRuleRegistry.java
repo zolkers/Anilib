@@ -18,6 +18,7 @@ public final class AnilibJavaRuleRegistry {
                 new ApplicationReleaseRule(),
                 new SecurityBoundaryRule(),
                 new CatalogueNavigationMutationRule(),
+                new CatalogueDetailsRouteRule(),
                 new LocalizationRule(),
                 new ExtensionIsolationRule(),
                 new ThreadOwnershipRule(),

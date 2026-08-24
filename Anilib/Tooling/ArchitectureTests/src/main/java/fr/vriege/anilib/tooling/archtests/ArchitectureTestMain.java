@@ -73,6 +73,7 @@ public final class ArchitectureTestMain {
         assertions += ApplicationReleaseRuleTest.run();
         assertions += SecurityBoundaryRuleTest.run();
         assertions += CatalogueNavigationMutationRuleTest.run();
+        assertions += CatalogueDetailsRouteRuleTest.run();
         assertions += LocalizationRuleTest.run();
         assertions += DirectTypeQualifierRuleTest.run();
         assertions += LocalizationTest.run();
