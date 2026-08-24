@@ -86,6 +86,72 @@ class UiRouteScreenshotTest {
     @Test
     fun auditedNavigationRoutesAreStableOnExpandedLayout() = verifyAuditedRoutes(1000, 720)
 
+    @Test
+    fun sourceReadingUsesCanonicalDetailsAndHistory() = runComposeUiTest {
+        val directory = Files.createTempDirectory("anilib-source-route-acceptance")
+        val previousLocale = Locale.getDefault()
+        Locale.setDefault(Locale.US)
+        System.setProperty("anilib.theme", "light")
+        try {
+            prepareLocalContent(directory)
+            StandardAnilib.start(directory).use { started ->
+                val settings = started.capability(SettingsCapabilities.SERVICE)
+                val library = started.capability(LibraryCapabilities.CATALOG)
+                settings.replace(settings.snapshot().withReducedMotion(true))
+                setContent {
+                    Box(Modifier.requiredSize(1000.dp, 720.dp)) {
+                        DesktopAnilibContent(
+                            started = started,
+                            browserRuntimeStatus = BrowserRuntimeStatus.unavailable("Acceptance fixture"),
+                            browserDataController = BrowserDataController {
+                                BrowserDataClearResult(true, "Acceptance fixture cleared")
+                            },
+                            browserPlatformController = acceptanceBrowserController(),
+                            backupImportPicker = acceptanceBackupPicker(),
+                            applicationUpdatePlatformController = acceptanceUpdateController(),
+                            shareController = object : ShareController {
+                                override fun share(title: String, text: String) = Unit
+                            },
+                        )
+                    }
+                }
+
+                onNodeWithText("Explore").performClick()
+                onNodeWithText("Manga sources").performClick()
+                onNodeWithText("Local library").performClick()
+                waitForText("Acceptance catalogue manga")
+                onNodeWithText("Acceptance catalogue manga").performClick()
+                waitForContentDescription("Read")
+                waitForContentDescription("Add to Library")
+                onNodeWithContentDescription("Read").performClick()
+                waitForContentDescription("Close reader")
+                onNodeWithContentDescription("Close reader").performClick()
+                waitUntil(timeoutMillis = 5_000) {
+                    library.snapshot().any { item ->
+                        item.title() == "Acceptance catalogue manga" && item.history().isNotEmpty()
+                    }
+                }
+                waitForContentDescription("Add to Library")
+                onNodeWithContentDescription("Add to Library").performClick()
+                waitForContentDescription("Remove from library")
+                onNodeWithContentDescription("Remove from library").performClick()
+                waitForContentDescription("Add to Library")
+                goBack()
+                waitForText("Acceptance catalogue manga")
+                goBack()
+                onNodeWithText("More").performClick()
+                scrollToText("History")
+                onNodeWithText("History").performClick()
+                onNodeWithText("Manga").performClick()
+                waitForText("Acceptance catalogue manga")
+            }
+        } finally {
+            Locale.setDefault(previousLocale)
+            System.clearProperty("anilib.theme")
+            deleteTree(directory)
+        }
+    }
+
     private fun verifyAuditedRoutes(width: Int, height: Int) = runComposeUiTest {
         val directory = Files.createTempDirectory("anilib-ui-acceptance")
         val previousLocale = Locale.getDefault()
@@ -223,6 +289,9 @@ class UiRouteScreenshotTest {
                         onNodeWithText("Acceptance catalogue manga").performClick()
                         waitForContentDescription("Read")
                         waitForContentDescription("Refresh")
+                        waitForContentDescription("Categories")
+                        waitForContentDescription("Edit")
+                        waitForContentDescription("Share")
                         waitForContentDescription("Add to Library")
                         onNodeWithContentDescription("Refresh").performClick()
                         waitForContentDescription("Refresh")

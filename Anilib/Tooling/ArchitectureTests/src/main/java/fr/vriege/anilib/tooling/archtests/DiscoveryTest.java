@@ -15,6 +15,8 @@ import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.library.LibraryOrigin;
 import fr.vriege.anilib.feature.library.LibraryProgress;
 import fr.vriege.anilib.feature.library.MediaKind;
+import fr.vriege.anilib.feature.library.ui.LibraryPresentation;
+import fr.vriege.anilib.feature.library.ui.LibraryUiCapabilities;
 import fr.vriege.anilib.feature.source.CatalogueSource;
 import fr.vriege.anilib.feature.source.SourceBrowseRequest;
 import fr.vriege.anilib.feature.source.SourceCatalogueItem;
@@ -93,6 +95,8 @@ final class DiscoveryTest {
             DiscoveryService discovery = product.capability(DiscoveryCapabilities.SERVICE);
             DiscoveryPresentation presentation = product.capability(DiscoveryUiCapabilities.PRESENTATION);
             LibraryCatalog library = product.capability(LibraryCapabilities.CATALOG);
+            LibraryPresentation libraryPresentation = product.capability(
+                    LibraryUiCapabilities.PRESENTATION);
 
             counter.check(discovery.sources(SourceContentKind.MANGA).stream()
                             .map(SourceDescriptor::id)
@@ -174,9 +178,17 @@ final class DiscoveryTest {
 
             SourceCatalogueItem localItem = discovery.search(LOCAL_SOURCE, "alpha", 1, 20, List.of())
                     .items().getFirst();
+            LibraryItemId indexedItemId = presentation.index(localItem);
+            counter.check(presentation.index(localItem).equals(indexedItemId)
+                            && presentation.indexedItem(localItem.id()).orElseThrow().equals(indexedItemId)
+                            && !libraryPresentation.details(indexedItemId).orElseThrow().inLibrary()
+                            && libraryPresentation.library().titles().isEmpty(),
+                    "opening a source title must index one canonical hidden detail without adding it");
             LibraryItemId firstLibraryItemId = discovery.addToLibrary(localItem);
-            counter.check(discovery.addToLibrary(localItem).equals(firstLibraryItemId)
+            counter.check(firstLibraryItemId.equals(indexedItemId)
+                            && discovery.addToLibrary(localItem).equals(firstLibraryItemId)
                             && library.snapshot().size() == 1
+                            && libraryPresentation.library().titles().size() == 1
                             && !library.find(firstLibraryItemId).orElseThrow().favorite(),
                     "adding a source title must be idempotent and must not make it a favorite");
             LibraryItem duplicate = LibraryItem.create(localItem.title(), MediaKind.MANGA)
@@ -186,9 +198,11 @@ final class DiscoveryTest {
             library.save(duplicate);
             counter.check(library.snapshot().size() == 2
                             && discovery.removeFromLibrary(localItem.id())
-                            && library.snapshot().isEmpty()
+                            && library.snapshot().stream().noneMatch(LibraryItem::inLibrary)
+                            && discovery.libraryItem(localItem.id()).isEmpty()
+                            && discovery.indexedItem(localItem.id()).isPresent()
                             && !discovery.removeFromLibrary(localItem.id()),
-                    "removing a source title must clear every duplicate origin and be safely repeatable");
+                    "removing a source title must hide every duplicate while retaining source identity");
             LibraryItemId libraryItemId = discovery.addToLibrary(localItem);
             LibraryItem enriched = library.find(libraryItemId).orElseThrow()
                     .withCategories(Set.of("Reading"))

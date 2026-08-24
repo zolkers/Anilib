@@ -247,11 +247,42 @@ public final class DefaultDiscoveryService implements DiscoveryService {
 
     @Override
     public Optional<LibraryItemId> libraryItem(SourceCatalogueItemId itemId) {
+        return indexedLibraryItem(itemId)
+                .filter(LibraryItem::inLibrary)
+                .map(LibraryItem::id);
+    }
+
+    @Override
+    public Optional<LibraryItemId> indexedItem(SourceCatalogueItemId itemId) {
+        return indexedLibraryItem(itemId).map(LibraryItem::id);
+    }
+
+    @Override
+    public synchronized LibraryItemId index(SourceCatalogueItem item) {
+        Objects.requireNonNull(item, "item must not be null");
+        catalogue(item.id().sourceId());
+        LibraryOrigin origin = origin(item);
+        LibraryItem existing = library.snapshot().stream()
+                .filter(candidate -> candidate.origin().filter(origin::equals).isPresent())
+                .findFirst()
+                .orElse(null);
+        if (existing != null) {
+            return existing.id();
+        }
+        SourceTitleDetails details = titleDetails(item);
+        LibraryItem created = LibraryItem.create(details.title(), mediaKind(details.contentKind()))
+                .withMetadata(metadata(details))
+                .withOrigin(origin)
+                .withLibraryMembership(false);
+        library.save(created);
+        return created.id();
+    }
+
+    private Optional<LibraryItem> indexedLibraryItem(SourceCatalogueItemId itemId) {
         Objects.requireNonNull(itemId, "itemId must not be null");
         LibraryOrigin selected = new LibraryOrigin(itemId.sourceId().toString(), itemId.value());
         return library.snapshot().stream()
                 .filter(item -> item.origin().filter(selected::equals).isPresent())
-                .map(LibraryItem::id)
                 .findFirst();
     }
 
@@ -265,6 +296,9 @@ public final class DefaultDiscoveryService implements DiscoveryService {
                 .findFirst()
                 .orElse(null);
         if (existing != null) {
+            if (!existing.inLibrary()) {
+                library.save(existing.withLibraryMembership(true));
+            }
             return existing.id();
         }
         SourceTitleDetails details = titleDetails(item);
@@ -279,12 +313,14 @@ public final class DefaultDiscoveryService implements DiscoveryService {
     public synchronized boolean removeFromLibrary(SourceCatalogueItemId itemId) {
         Objects.requireNonNull(itemId, "itemId must not be null");
         LibraryOrigin selected = new LibraryOrigin(itemId.sourceId().toString(), itemId.value());
-        List<LibraryItemId> matches = library.snapshot().stream()
+        List<LibraryItem> matches = library.snapshot().stream()
                 .filter(item -> item.origin().filter(selected::equals).isPresent())
-                .map(LibraryItem::id)
                 .toList();
-        matches.forEach(library::remove);
-        return !matches.isEmpty();
+        boolean changed = matches.stream().anyMatch(LibraryItem::inLibrary);
+        matches.stream()
+                .filter(LibraryItem::inLibrary)
+                .forEach(item -> library.save(item.withLibraryMembership(false)));
+        return changed;
     }
 
     @Override

@@ -152,6 +152,8 @@ fun AnilibApp(
     var browseMainDestination by remember { mutableStateOf(true) }
     var settings by remember(settingsPresentation) { mutableStateOf(initialSettings) }
     var recoveredFailure by remember { mutableStateOf<String?>(null) }
+    val discoveryRouteState = rememberDiscoveryRouteState()
+    val historyRouteState = rememberHistoryRouteState()
     val handleUiFailure: (Throwable) -> Unit = remember(reportUiFailure) {
         { failure ->
             reportRecoverable(failure) { recoverable ->
@@ -327,18 +329,6 @@ fun AnilibApp(
                             .onFailure { readerError = it.message ?: "The reader could not be opened." }
                     }
                 }
-                val openSourceReader: (String, SourceContentUnitId) -> Unit = { title, contentUnitId ->
-                    scope.launch {
-                        withContext(Dispatchers.IO) {
-                            runCatching { reader.open(title, contentUnitId) }
-                        }
-                            .onSuccess {
-                                readerError = null
-                                activeReader = it
-                            }
-                            .onFailure { readerError = it.message ?: "The reader could not be opened." }
-                    }
-                }
                 val enqueueDownload: (LibraryItemId) -> Unit = { id ->
                     scope.launch {
                         withContext(Dispatchers.IO) { runCatching { responsiveDownloads.enqueue(id) } }
@@ -363,30 +353,6 @@ fun AnilibApp(
                                     ?: error("No episodes are available from this source.")
                                 player.open(id, selectedEpisode)
                             }
-                        }
-                            .onSuccess {
-                                if (pendingPlayer?.token === request.token) {
-                                    playerError = null
-                                    activePlayer = it
-                                    pendingPlayer = null
-                                } else {
-                                    it.close()
-                                }
-                            }
-                            .onFailure {
-                                if (pendingPlayer?.token === request.token) {
-                                    pendingPlayer = null
-                                    playerError = it.message ?: "The episode could not be opened."
-                                }
-                            }
-                    }
-                }
-                val openSourcePlayer: (String, SourceEpisodeId) -> Unit = { title, episodeId ->
-                    val request = PendingPlayerRequest(token = Any(), title = title)
-                    pendingPlayer = request
-                    scope.launch {
-                        withContext(Dispatchers.IO) {
-                            runCatching { player.open(title, episodeId) }
                         }
                             .onSuccess {
                                 if (pendingPlayer?.token === request.token) {
@@ -439,6 +405,8 @@ fun AnilibApp(
                         updates,
                         applicationUpdates,
                         detailPlatform,
+                        discoveryRouteState,
+                        historyRouteState,
                         destination,
                         section,
                         showGlobalNavigation,
@@ -448,10 +416,8 @@ fun AnilibApp(
                         navigate,
                         openSection,
                         openReader,
-                        openSourceReader,
                         readerError,
                         openPlayer,
-                        openSourcePlayer,
                         enqueueDownload,
                         downloadError,
                         { activeTrackingTitle = it },
@@ -530,6 +496,8 @@ internal fun AdaptiveShell(
     updates: UpdatePresentation,
     applicationUpdates: ApplicationUpdatePresentation,
     detailPlatform: DetailPlatform,
+    discoveryRouteState: DiscoveryRouteState,
+    historyRouteState: HistoryRouteState,
     destination: LibraryNavigationState,
     section: AppSection,
     showGlobalNavigation: Boolean,
@@ -539,10 +507,8 @@ internal fun AdaptiveShell(
     navigate: ((LibraryNavigator) -> Unit) -> Unit,
     openSection: (AppSection) -> Unit,
     openReader: (LibraryItemId, SourceContentUnitId?) -> Unit,
-    openSourceReader: (String, SourceContentUnitId) -> Unit,
     readerError: String?,
     openPlayer: (LibraryItemId, SourceEpisodeId?) -> Unit,
-    openSourcePlayer: (String, SourceEpisodeId) -> Unit,
     enqueueDownload: (LibraryItemId) -> Unit,
     downloadError: String?,
     openTracking: (LibraryItemId) -> Unit,
@@ -577,16 +543,16 @@ internal fun AdaptiveShell(
                     updates,
                     applicationUpdates,
                     detailPlatform,
+                    discoveryRouteState,
+                    historyRouteState,
                     destination,
                     section,
                     componentCount,
                     navigate,
                     openSection,
                     openReader,
-                    openSourceReader,
                     readerError,
                     openPlayer,
-                    openSourcePlayer,
                     enqueueDownload,
                     downloadError,
                     openTracking,
@@ -668,16 +634,16 @@ internal fun AppDestination(
     updates: UpdatePresentation,
     applicationUpdates: ApplicationUpdatePresentation,
     detailPlatform: DetailPlatform,
+    discoveryRouteState: DiscoveryRouteState,
+    historyRouteState: HistoryRouteState,
     destination: LibraryNavigationState,
     section: AppSection,
     componentCount: Int,
     navigate: ((LibraryNavigator) -> Unit) -> Unit,
     openSection: (AppSection) -> Unit,
     openReader: (LibraryItemId, SourceContentUnitId?) -> Unit,
-    openSourceReader: (String, SourceContentUnitId) -> Unit,
     readerError: String?,
     openPlayer: (LibraryItemId, SourceEpisodeId?) -> Unit,
-    openSourcePlayer: (String, SourceEpisodeId) -> Unit,
     enqueueDownload: (LibraryItemId) -> Unit,
     downloadError: String?,
     openTracking: (LibraryItemId) -> Unit,
@@ -686,8 +652,6 @@ internal fun AppDestination(
     closeMore: () -> Unit,
     browseDestinationChanged: (Boolean) -> Unit,
 ) {
-    val discoveryRouteState = rememberDiscoveryRouteState()
-    val historyRouteState = rememberHistoryRouteState()
     if (destination.page() == LibraryPage.DETAILS) {
         val goBackOverride = when {
             section == AppSection.BROWSE -> ({ navigate(LibraryNavigator::openLibrary) })
@@ -742,16 +706,11 @@ internal fun AppDestination(
             downloads = downloads,
             tracking = tracking,
             openReader = openReader,
-            openSourceReader = openSourceReader,
             readerError = readerError,
             openPlayer = openPlayer,
-            openSourcePlayer = openSourcePlayer,
             enqueueDownload = enqueueDownload,
             downloadError = downloadError,
             openTracking = openTracking,
-            openLibraryDetails = { libraryItemId ->
-                navigate { it.openDetails(libraryItemId) }
-            },
             navigationVisibilityChanged = browseDestinationChanged,
             manageExtensions = {
                 openSection(AppSection.MORE)

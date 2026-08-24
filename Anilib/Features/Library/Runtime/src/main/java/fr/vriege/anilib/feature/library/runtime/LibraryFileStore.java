@@ -39,7 +39,7 @@ import java.net.URI;
 
 final class LibraryFileStore {
     static final int MAGIC = 0x414E494C;
-    static final int CURRENT_VERSION = 4;
+    static final int CURRENT_VERSION = 5;
 
     private static final int MAX_ITEMS = 1_000_000;
     private static final int MAX_CATEGORIES_PER_ITEM = 1_000;
@@ -82,7 +82,8 @@ final class LibraryFileStore {
                 case 1 -> readVersionOne(input);
                 case 2 -> readVersionTwo(input);
                 case 3 -> readVersionThree(input);
-                case CURRENT_VERSION -> readVersionFour(input);
+                case 4 -> readVersionFour(input);
+                case CURRENT_VERSION -> readVersionFive(input);
                 default -> throw new IOException("Unsupported Anilib library version: " + version);
             };
             if (input.read() != -1) {
@@ -134,7 +135,7 @@ final class LibraryFileStore {
         output.writeInt(CURRENT_VERSION);
         output.writeInt(ordered.size());
         for (LibraryItem item : ordered) {
-            writeVersionFourItem(output, item);
+            writeVersionFiveItem(output, item);
         }
     }
 
@@ -295,6 +296,49 @@ final class LibraryFileStore {
         return List.copyOf(items);
     }
 
+    private static List<LibraryItem> readVersionFive(DataInputStream input) throws IOException {
+        int itemCount = readCount(input, MAX_ITEMS, "item");
+        List<LibraryItem> items = new ArrayList<>(itemCount);
+        Set<LibraryItemId> identifiers = new HashSet<>();
+        for (int index = 0; index < itemCount; index++) {
+            LibraryItemId id = new LibraryItemId(input.readUTF());
+            String title = input.readUTF();
+            MediaKind kind = MediaKind.valueOf(input.readUTF());
+            Instant addedAt = readInstant(input);
+            Set<String> categories = readUniqueStrings(input, MAX_CATEGORIES_PER_ITEM, "category");
+            boolean favorite = input.readBoolean();
+            Optional<LibraryProgress> progress = readProgress(input);
+            List<LibraryHistoryEntry> history = readHistory(input);
+            LibraryTitleMetadata legacyMetadata = readMetadata(input);
+            Optional<LibraryOrigin> origin = readOrigin(input);
+            Optional<URI> artwork = input.readBoolean()
+                    ? Optional.of(URI.create(input.readUTF()))
+                    : Optional.empty();
+            List<String> genres = readStrings(input, MAX_PEOPLE_PER_ITEM, "genre");
+            boolean inLibrary = input.readBoolean();
+            LibraryTitleMetadata metadata = new LibraryTitleMetadata(
+                    legacyMetadata.description(),
+                    legacyMetadata.authors(),
+                    legacyMetadata.artists(),
+                    legacyMetadata.publicationStatus(),
+                    artwork,
+                    genres);
+            addUnique(items, identifiers, new LibraryItem(
+                    id,
+                    title,
+                    kind,
+                    addedAt,
+                    categories,
+                    favorite,
+                    progress,
+                    history,
+                    metadata,
+                    origin,
+                    inLibrary));
+        }
+        return List.copyOf(items);
+    }
+
     private static void addUnique(
             List<LibraryItem> items,
             Set<LibraryItemId> identifiers,
@@ -346,6 +390,11 @@ final class LibraryFileStore {
             output.writeUTF(item.metadata().artwork().orElseThrow().toASCIIString());
         }
         writeStrings(output, item.metadata().genres(), MAX_PEOPLE_PER_ITEM, "genre");
+    }
+
+    private static void writeVersionFiveItem(DataOutputStream output, LibraryItem item) throws IOException {
+        writeVersionFourItem(output, item);
+        output.writeBoolean(item.inLibrary());
     }
 
     private static Optional<LibraryOrigin> readOrigin(DataInputStream input) throws IOException {

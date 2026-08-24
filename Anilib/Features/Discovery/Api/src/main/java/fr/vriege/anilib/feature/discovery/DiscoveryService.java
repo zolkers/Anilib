@@ -67,6 +67,10 @@ public interface DiscoveryService {
 
     Optional<LibraryItemId> libraryItem(SourceCatalogueItemId itemId);
 
+    Optional<LibraryItemId> indexedItem(SourceCatalogueItemId itemId);
+
+    LibraryItemId index(SourceCatalogueItem item);
+
     LibraryItemId addToLibrary(SourceCatalogueItem item);
 
     boolean removeFromLibrary(SourceCatalogueItemId itemId);

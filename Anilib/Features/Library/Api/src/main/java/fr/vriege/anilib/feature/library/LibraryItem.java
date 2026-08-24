@@ -19,7 +19,8 @@ public record LibraryItem(
         Optional<LibraryProgress> progress,
         List<LibraryHistoryEntry> history,
         LibraryTitleMetadata metadata,
-        Optional<LibraryOrigin> origin) {
+        Optional<LibraryOrigin> origin,
+        boolean inLibrary) {
 
     public LibraryItem {
         Preconditions.requireNonNull(id, "id");
@@ -46,7 +47,21 @@ public record LibraryItem(
             Optional<LibraryProgress> progress,
             List<LibraryHistoryEntry> history,
             LibraryTitleMetadata metadata) {
-        this(id, title, kind, addedAt, categories, favorite, progress, history, metadata, Optional.empty());
+        this(id, title, kind, addedAt, categories, favorite, progress, history, metadata, Optional.empty(), true);
+    }
+
+    public LibraryItem(
+            LibraryItemId id,
+            String title,
+            MediaKind kind,
+            Instant addedAt,
+            Set<String> categories,
+            boolean favorite,
+            Optional<LibraryProgress> progress,
+            List<LibraryHistoryEntry> history,
+            LibraryTitleMetadata metadata,
+            Optional<LibraryOrigin> origin) {
+        this(id, title, kind, addedAt, categories, favorite, progress, history, metadata, origin, true);
     }
 
     public LibraryItem(
@@ -124,7 +139,8 @@ public record LibraryItem(
                 progress,
                 history,
                 Preconditions.requireNonNull(nextMetadata, "nextMetadata"),
-                origin);
+                origin,
+                inLibrary);
     }
 
     public LibraryItem migratedTo(
@@ -141,7 +157,8 @@ public record LibraryItem(
                 progress,
                 history,
                 Preconditions.requireNonNull(nextMetadata, "nextMetadata"),
-                Optional.of(Preconditions.requireNonNull(nextOrigin, "nextOrigin")));
+                Optional.of(Preconditions.requireNonNull(nextOrigin, "nextOrigin")),
+                inLibrary);
     }
 
     public LibraryItem withOrigin(LibraryOrigin nextOrigin) {
@@ -155,7 +172,23 @@ public record LibraryItem(
                 progress,
                 history,
                 metadata,
-                Optional.of(Preconditions.requireNonNull(nextOrigin, "nextOrigin")));
+                Optional.of(Preconditions.requireNonNull(nextOrigin, "nextOrigin")),
+                inLibrary);
+    }
+
+    public LibraryItem withLibraryMembership(boolean nextMembership) {
+        return new LibraryItem(
+                id,
+                title,
+                kind,
+                addedAt,
+                nextMembership ? categories : Set.of(),
+                nextMembership && favorite,
+                progress,
+                history,
+                metadata,
+                origin,
+                nextMembership);
     }
 
     private LibraryItem copy(
@@ -174,6 +207,7 @@ public record LibraryItem(
                 nextProgress,
                 nextHistory,
                 nextMetadata,
-                origin);
+                origin,
+                inLibrary);
     }
 }

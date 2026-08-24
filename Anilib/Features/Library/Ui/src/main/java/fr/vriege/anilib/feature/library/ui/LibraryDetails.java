@@ -27,7 +27,8 @@ public record LibraryDetails(
         Optional<URI> artwork,
         List<String> genres,
         Optional<LibraryOrigin> origin,
-        int historyEntryCount) {
+        int historyEntryCount,
+        boolean inLibrary) {
     public LibraryDetails {
         Objects.requireNonNull(id, "id must not be null");
         Objects.requireNonNull(title, "title must not be null");

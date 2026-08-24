@@ -34,7 +34,7 @@ import java.util.stream.Stream;
 
 final class LibraryPersistenceTest {
     private static final int MAGIC = 0x414E494C;
-    private static final int CURRENT_VERSION = 4;
+    private static final int CURRENT_VERSION = 5;
     private static final int CONFIGURATION_MAGIC = 0x414E4C43;
     private static final int CURRENT_CONFIGURATION_VERSION = 2;
 
@@ -131,12 +131,24 @@ final class LibraryPersistenceTest {
                     "source origin must be expressible");
             FileLibraryCatalog catalog = new FileLibraryCatalog(file);
             catalog.save(item);
+            LibraryItem hidden = LibraryItem.create("History only", MediaKind.MANGA)
+                    .withOrigin(new LibraryOrigin("test.source", "history-only"))
+                    .recordHistory(new LibraryHistoryEntry(
+                            "chapter-2",
+                            Instant.parse("2026-08-17T14:00:00Z"),
+                            2L))
+                    .withLibraryMembership(false);
+            catalog.save(hidden);
 
             FileLibraryCatalog reloaded = new FileLibraryCatalog(file);
             counter.check(reloaded.find(item.id()).orElseThrow().equals(item),
                     "current file format must preserve every library field");
+            counter.check(!reloaded.find(hidden.id()).orElseThrow().inLibrary()
+                            && reloaded.find(hidden.id()).orElseThrow().history().size() == 1,
+                    "current file format must preserve history-only indexed titles");
             counter.check(noTemporaryFiles(directory), "atomic save must not leave temporary files");
             counter.check(reloaded.remove(item.id()), "durable catalog must remove existing items");
+            counter.check(reloaded.remove(hidden.id()), "hidden catalog items must remain removable");
             counter.check(new FileLibraryCatalog(file).snapshot().isEmpty(),
                     "removal must survive a catalog restart");
         } finally {

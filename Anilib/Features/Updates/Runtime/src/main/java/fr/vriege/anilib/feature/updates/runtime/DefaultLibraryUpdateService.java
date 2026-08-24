@@ -296,6 +296,7 @@ public final class DefaultLibraryUpdateService implements LibraryUpdateService, 
             throw new LibraryUpdateException("Unused update data cannot be cleaned during a library update");
         }
         Set<LibraryItemId> retainedIds = library.snapshot().stream()
+                .filter(LibraryItem::inLibrary)
                 .map(LibraryItem::id)
                 .collect(Collectors.toUnmodifiableSet());
         LibraryUpdateStore.State current = store.snapshot();
@@ -350,7 +351,9 @@ public final class DefaultLibraryUpdateService implements LibraryUpdateService, 
     private LibraryUpdateSnapshot execute() {
         try {
             LibraryUpdateStore.State before = store.snapshot();
-            List<LibraryItem> libraryItems = library.snapshot();
+            List<LibraryItem> libraryItems = library.snapshot().stream()
+                    .filter(LibraryItem::inLibrary)
+                    .toList();
             Set<LibraryItemId> existingIds = libraryItems.stream()
                     .map(LibraryItem::id)
                     .collect(Collectors.toUnmodifiableSet());
@@ -561,6 +564,7 @@ public final class DefaultLibraryUpdateService implements LibraryUpdateService, 
     private List<LibraryUpdateSkip> skippedTitles(LibraryUpdatePolicy policy) {
         LibraryConfigurationSnapshot configuration = libraryConfiguration.get();
         return library.snapshot().stream()
+                .filter(LibraryItem::inLibrary)
                 .map(item -> skipReason(item, policy, configuration)
                         .map(reason -> new LibraryUpdateSkip(item.id(), item.title(), reason)))
                 .flatMap(Optional::stream)

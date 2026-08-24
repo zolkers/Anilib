@@ -59,7 +59,9 @@ public final class DefaultLibraryPresentation implements LibraryPresentation {
 
     @Override
     public synchronized LibraryOverview library() {
-        List<LibraryItem> items = catalog.snapshot();
+        List<LibraryItem> items = catalog.snapshot().stream()
+                .filter(LibraryItem::inLibrary)
+                .toList();
         LibraryConfigurationSnapshot configured = configuration.snapshot();
         List<LibraryCategory> categories = effectiveCategories(items, configured);
         LibraryDisplayPreferences preferences = activePreferences(
@@ -318,9 +320,23 @@ public final class DefaultLibraryPresentation implements LibraryPresentation {
     @Override
     public synchronized void deleteTitles(Set<LibraryItemId> ids) {
         Set<LibraryItemId> selected = validatedSelection(ids);
-        catalog.replaceAll(catalog.snapshot().stream()
-                .filter(item -> !selected.contains(item.id()))
-                .toList());
+        List<LibraryItem> retained = new ArrayList<>();
+        for (LibraryItem item : catalog.snapshot()) {
+            if (!selected.contains(item.id())) {
+                retained.add(item);
+            } else if (shouldRetainAfterRemoval(item)) {
+                retained.add(item.withLibraryMembership(false));
+            }
+        }
+        catalog.replaceAll(retained);
+    }
+
+    @Override
+    public synchronized void restoreTitle(LibraryItemId id) {
+        Objects.requireNonNull(id, "id must not be null");
+        LibraryItem item = catalog.find(id)
+                .orElseThrow(() -> new IllegalArgumentException("Unknown library title: " + id));
+        catalog.save(item.withLibraryMembership(true));
     }
 
     @Override
@@ -342,6 +358,7 @@ public final class DefaultLibraryPresentation implements LibraryPresentation {
                 .orElseThrow(() -> new IllegalArgumentException("Unknown library title: " + id));
         return catalog.snapshot().stream()
                 .filter(item -> !item.id().equals(id))
+                .filter(LibraryItem::inLibrary)
                 .filter(item -> related(selected, item))
                 .map(DefaultLibraryPresentation::card)
                 .sorted(cardOrder(LibrarySort.TITLE_ASCENDING))
@@ -609,7 +626,8 @@ public final class DefaultLibraryPresentation implements LibraryPresentation {
                 metadata.artwork(),
                 metadata.genres(),
                 item.origin(),
-                item.history().size());
+                item.history().size(),
+                item.inLibrary());
     }
 
     private static boolean related(LibraryItem selected, LibraryItem candidate) {
@@ -625,6 +643,12 @@ public final class DefaultLibraryPresentation implements LibraryPresentation {
                 candidate.metadata().genres());
         return selected.kind() == candidate.kind()
                 && (sameSource || sharedCategory || sharedGenre);
+    }
+
+    private static boolean shouldRetainAfterRemoval(LibraryItem item) {
+        return item.origin().isPresent()
+                || item.progress().isPresent()
+                || !item.history().isEmpty();
     }
 
     private static LibraryHistoryRow historyRow(

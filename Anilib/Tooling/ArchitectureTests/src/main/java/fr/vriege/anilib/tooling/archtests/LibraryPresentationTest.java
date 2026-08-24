@@ -151,6 +151,19 @@ final class LibraryPresentationTest {
                         .categories().contains("Archive"),
                 "bulk category removal and deletion must be atomic catalog mutations");
 
+        presentation.deleteTitles(Set.of(new LibraryItemId("alpha")));
+        counter.check(!catalog.find(new LibraryItemId("alpha")).orElseThrow().inLibrary()
+                        && presentation.library().titles().stream()
+                        .noneMatch(card -> card.id().equals(new LibraryItemId("alpha")))
+                        && presentation.history().entries().stream()
+                        .anyMatch(row -> row.libraryItemId().equals(new LibraryItemId("alpha"))),
+                "removing a read title must preserve its history outside the visible library");
+        presentation.restoreTitle(new LibraryItemId("alpha"));
+        counter.check(presentation.library().titles().stream()
+                        .anyMatch(card -> card.id().equals(new LibraryItemId("alpha"))),
+                "a history-only title must be restorable to the visible library");
+        presentation.deleteTitles(Set.of(new LibraryItemId("alpha")));
+
         LibraryItemId zuluId = overview.titles().getFirst().id();
         LibraryDetails details = presentation.details(zuluId).orElseThrow();
         counter.check(details.description().equals("A complete presentation title."),

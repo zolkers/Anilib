@@ -132,18 +132,20 @@ internal fun MediaDetailsScreen(
                     }
                 },
                 actions = {
-                    manageCategories?.let { action ->
-                        IconButton(onClick = action) {
-                            Icon(
-                                Icons.Outlined.Category,
-                                contentDescription = "ui.categories",
-                            )
-                        }
+                    IconButton(
+                        onClick = { manageCategories?.invoke() },
+                        enabled = manageCategories != null,
+                    ) {
+                        Icon(
+                            Icons.Outlined.Category,
+                            contentDescription = "ui.categories",
+                        )
                     }
-                    edit?.let { action ->
-                        IconButton(onClick = action) {
-                            Icon(Icons.Default.Edit, contentDescription = "ui.edit")
-                        }
+                    IconButton(
+                        onClick = { edit?.invoke() },
+                        enabled = edit != null,
+                    ) {
+                        Icon(Icons.Default.Edit, contentDescription = "ui.edit")
                     }
                     IconButton(onClick = share, enabled = canShare) {
                         Icon(Icons.Default.Share, contentDescription = "ui.share")

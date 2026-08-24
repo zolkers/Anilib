@@ -61,6 +61,8 @@ public interface LibraryPresentation {
 
     void deleteTitles(Set<LibraryItemId> ids);
 
+    void restoreTitle(LibraryItemId id);
+
     void editTitle(LibraryItemId id, String title, LibraryTitleMetadata metadata);
 
     List<LibraryCard> relatedTitles(LibraryItemId id);

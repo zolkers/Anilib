@@ -297,6 +297,16 @@ public final class DefaultDiscoveryPresentation implements DiscoveryPresentation
     }
 
     @Override
+    public Optional<LibraryItemId> indexedItem(SourceCatalogueItemId itemId) {
+        return service.indexedItem(itemId);
+    }
+
+    @Override
+    public LibraryItemId index(SourceCatalogueItem item) {
+        return service.index(item);
+    }
+
+    @Override
     public LibraryItemId addToLibrary(SourceCatalogueItem item) {
         return service.addToLibrary(item);
     }

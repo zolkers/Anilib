@@ -87,9 +87,7 @@ import fr.vriege.anilib.feature.extensionrepository.ui.ExtensionRepositoryPresen
 import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionPlatform
 import fr.vriege.anilib.feature.library.MediaKind
 import fr.vriege.anilib.feature.library.LibraryItemId
-import fr.vriege.anilib.feature.library.PublicationStatus
 import fr.vriege.anilib.feature.library.ui.LibraryCard
-import fr.vriege.anilib.feature.library.ui.LibraryDetails
 import fr.vriege.anilib.feature.library.ui.LibraryNavigationState
 import fr.vriege.anilib.feature.library.ui.LibraryNavigator
 import fr.vriege.anilib.feature.library.ui.LibraryPage
@@ -113,13 +111,10 @@ import fr.vriege.anilib.feature.source.SourceListing
 import fr.vriege.anilib.feature.source.SourcePage
 import fr.vriege.anilib.feature.source.SourcePermission
 import fr.vriege.anilib.feature.source.SourcePreferenceType
-import fr.vriege.anilib.feature.source.SourcePublicationStatus
 import fr.vriege.anilib.feature.source.SourceId
 import fr.vriege.anilib.feature.source.SourceWebPage
-import fr.vriege.anilib.feature.source.SourceTitleDetails
 import fr.vriege.anilib.feature.tracker.ui.TrackerPresentation
 import fr.vriege.anilib.framework.http.HttpCookieJar
-import java.time.Instant
 import java.util.Locale
 import java.util.Optional
 import java.util.concurrent.atomic.AtomicBoolean
@@ -141,6 +136,7 @@ internal enum class BrowseSection(val label: String, val kind: SourceContentKind
 internal class DiscoveryRouteState {
     val section = mutableStateOf(BrowseSection.ANIME_SOURCES)
     val selectedSource = mutableStateOf<SourceDescriptor?>(null)
+    val selectedSourceItem = mutableStateOf<SourceCatalogueItem?>(null)
     val selectedGlobalItem = mutableStateOf<SourceCatalogueItem?>(null)
     val listing = mutableStateOf(SourceListing.POPULAR)
     val globalSearch = mutableStateOf(false)
@@ -167,20 +163,18 @@ internal fun DiscoveryScreen(
     downloads: DownloadPresentation,
     tracking: TrackerPresentation,
     openReader: (LibraryItemId, SourceContentUnitId?) -> Unit,
-    openSourceReader: (String, SourceContentUnitId) -> Unit,
     readerError: String?,
     openPlayer: (LibraryItemId, SourceEpisodeId?) -> Unit,
-    openSourcePlayer: (String, SourceEpisodeId) -> Unit,
     enqueueDownload: (LibraryItemId) -> Unit,
     downloadError: String?,
     openTracking: (LibraryItemId) -> Unit,
-    openLibraryDetails: (LibraryItemId) -> Unit,
     navigationVisibilityChanged: (Boolean) -> Unit,
     manageExtensions: () -> Unit,
 ) {
     val scope = rememberCrashSafeCoroutineScope()
     var section by routeState.section
     var selectedSource by routeState.selectedSource
+    var selectedSourceItem by routeState.selectedSourceItem
     var selectedGlobalItem by routeState.selectedGlobalItem
     var listing by routeState.listing
     var globalSearch by routeState.globalSearch
@@ -255,6 +249,8 @@ internal fun DiscoveryScreen(
         SourceCatalogueScreen(
             source = source,
             listing = listing,
+            selectedItem = selectedSourceItem,
+            selectedItemChanged = { selectedSourceItem = it },
             presentation = presentation,
             library = library,
             openWebPage = { browserPage = it },
@@ -266,15 +262,15 @@ internal fun DiscoveryScreen(
             downloads = downloads,
             tracking = tracking,
             openLibraryReader = openReader,
-            openSourceReader = openSourceReader,
             readerError = readerError,
             openLibraryPlayer = openPlayer,
-            openSourcePlayer = openSourcePlayer,
             enqueueDownload = enqueueDownload,
             downloadError = downloadError,
             openTracking = openTracking,
-            openLibraryDetails = openLibraryDetails,
-            navigateUp = { selectedSource = null },
+            navigateUp = {
+                selectedSourceItem = null
+                selectedSource = null
+            },
         )
         return
     }
@@ -287,10 +283,8 @@ internal fun DiscoveryScreen(
         } else {
             SourceTitleScreen(
                 item = globalItem,
-                source = globalSource,
                 presentation = presentation,
                 library = library,
-                openWebPage = { browserPage = it },
                 browserCookies = browserCookies,
                 browserRuntimeStatus = browserRuntimeStatus,
                 detailPlatform = detailPlatform,
@@ -299,16 +293,11 @@ internal fun DiscoveryScreen(
                 downloads = downloads,
                 tracking = tracking,
                 openLibraryReader = openReader,
-                openReader = openSourceReader,
                 readerError = readerError,
                 openLibraryPlayer = openPlayer,
-                openPlayer = openSourcePlayer,
                 enqueueDownload = enqueueDownload,
                 downloadError = downloadError,
                 openTracking = openTracking,
-                openLibraryDetails = { libraryItemId ->
-                    openLibraryDetails(libraryItemId)
-                },
                 navigateUp = { selectedGlobalItem = null },
             )
         }
@@ -702,6 +691,8 @@ private fun SourceBadge(source: SourceDescriptor) {
 private fun SourceCatalogueScreen(
     source: SourceDescriptor,
     listing: SourceListing,
+    selectedItem: SourceCatalogueItem?,
+    selectedItemChanged: (SourceCatalogueItem?) -> Unit,
     presentation: DiscoveryPresentation,
     library: LibraryPresentation,
     openWebPage: (SourceWebPage) -> Unit,
@@ -713,19 +704,15 @@ private fun SourceCatalogueScreen(
     downloads: DownloadPresentation,
     tracking: TrackerPresentation,
     openLibraryReader: (LibraryItemId, SourceContentUnitId?) -> Unit,
-    openSourceReader: (String, SourceContentUnitId) -> Unit,
     readerError: String?,
     openLibraryPlayer: (LibraryItemId, SourceEpisodeId?) -> Unit,
-    openSourcePlayer: (String, SourceEpisodeId) -> Unit,
     enqueueDownload: (LibraryItemId) -> Unit,
     downloadError: String?,
     openTracking: (LibraryItemId) -> Unit,
-    openLibraryDetails: (LibraryItemId) -> Unit,
     navigateUp: () -> Unit,
 ) {
     val scope = rememberCrashSafeCoroutineScope()
     var selectedListing by remember(source.id(), listing) { mutableStateOf(listing) }
-    var selectedItem by remember(source.id()) { mutableStateOf<SourceCatalogueItem?>(null) }
     var query by remember(source.id()) { mutableStateOf("") }
     var searchActive by remember(source.id()) { mutableStateOf(false) }
     val searchFocus = rememberSearchFocusRequester(searchActive)
@@ -759,18 +746,11 @@ private fun SourceCatalogueScreen(
         onDispose { observation.close() }
     }
 
-    fun openCanonicalDetails(libraryItemId: LibraryItemId) {
-        selectedItem = null
-        openLibraryDetails(libraryItemId)
-    }
-
     selectedItem?.let { item ->
         SourceTitleScreen(
             item = item,
-            source = source,
             presentation = presentation,
             library = library,
-            openWebPage = openWebPage,
             browserCookies = browserCookies,
             browserRuntimeStatus = browserRuntimeStatus,
             detailPlatform = detailPlatform,
@@ -779,15 +759,12 @@ private fun SourceCatalogueScreen(
             downloads = downloads,
             tracking = tracking,
             openLibraryReader = openLibraryReader,
-            openReader = openSourceReader,
             readerError = readerError,
             openLibraryPlayer = openLibraryPlayer,
-            openPlayer = openSourcePlayer,
             enqueueDownload = enqueueDownload,
             downloadError = downloadError,
             openTracking = openTracking,
-            openLibraryDetails = ::openCanonicalDetails,
-            navigateUp = { selectedItem = null },
+            navigateUp = { selectedItemChanged(null) },
         )
         return
     }
@@ -1003,7 +980,7 @@ private fun SourceCatalogueScreen(
                     page = sourcePage,
                     grid = grid,
                     open = { item ->
-                        selectedItem = item
+                        selectedItemChanged(item)
                     },
                     libraryItem = { item -> memberships[item.id()] },
                     toggleLibraryMembership = { item, existingId ->
@@ -1040,37 +1017,12 @@ private fun SourceCatalogueScreen(
     }
 }
 
-private data class SourceTitleContent(
-    val details: SourceTitleDetails,
-    val chapters: List<SourceContentUnit>,
-    val episodes: List<SourceEpisode>,
-)
-
-private fun loadSourceTitleContent(
-    presentation: DiscoveryPresentation,
-    item: SourceCatalogueItem,
-): SourceTitleContent = SourceTitleContent(
-    details = presentation.titleDetails(item),
-    chapters = if (item.contentKind() == SourceContentKind.ANIME) {
-        emptyList()
-    } else {
-        presentation.contentUnits(item.id())
-    },
-    episodes = if (item.contentKind() == SourceContentKind.ANIME) {
-        presentation.episodes(item.id())
-    } else {
-        emptyList()
-    },
-)
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SourceTitleScreen(
     item: SourceCatalogueItem,
-    source: SourceDescriptor,
     presentation: DiscoveryPresentation,
     library: LibraryPresentation,
-    openWebPage: (SourceWebPage) -> Unit,
     browserCookies: HttpCookieJar,
     browserRuntimeStatus: BrowserRuntimeStatus,
     detailPlatform: DetailPlatform,
@@ -1079,70 +1031,34 @@ private fun SourceTitleScreen(
     downloads: DownloadPresentation,
     tracking: TrackerPresentation,
     openLibraryReader: (LibraryItemId, SourceContentUnitId?) -> Unit,
-    openReader: (String, SourceContentUnitId) -> Unit,
     readerError: String?,
     openLibraryPlayer: (LibraryItemId, SourceEpisodeId?) -> Unit,
-    openPlayer: (String, SourceEpisodeId) -> Unit,
     enqueueDownload: (LibraryItemId) -> Unit,
     downloadError: String?,
     openTracking: (LibraryItemId) -> Unit,
-    openLibraryDetails: (LibraryItemId) -> Unit,
     navigateUp: () -> Unit,
 ) {
-    val scope = rememberCrashSafeCoroutineScope()
-    var result by remember(item.id()) { mutableStateOf<Result<SourceTitleContent>?>(null) }
-    var libraryItemId by remember(item.id()) {
-        mutableStateOf(presentation.libraryItem(item.id()).orElse(null))
+    var indexedItemId by remember(item.id()) {
+        mutableStateOf(presentation.indexedItem(item.id()).orElse(null))
     }
-    var membershipPending by remember(item.id()) { mutableStateOf(false) }
-    var actionError by remember(item.id()) { mutableStateOf<String?>(null) }
-    val titleWebPage = remember(item.id()) { presentation.titleWebPage(item.id()).orElse(null) }
+    var indexFailure by remember(item.id()) { mutableStateOf<String?>(null) }
+    var indexRevision by remember(item.id()) { mutableIntStateOf(0) }
 
-    DisposableEffect(library, presentation, item.id()) {
-        val observation = library.observe {
-            libraryItemId = presentation.libraryItem(item.id()).orElse(null)
-        }
-        onDispose { observation.close() }
-    }
-
-    val canonicalId = libraryItemId
-    if (canonicalId != null) {
-        DetailsDestination(
-            presentation = library,
-            discovery = presentation,
-            browserCookies = browserCookies,
-            browserRuntimeStatus = browserRuntimeStatus,
-            detailPlatform = detailPlatform,
-            reader = reader,
-            player = player,
-            downloads = downloads,
-            tracking = tracking,
-            destination = LibraryNavigationState(LibraryPage.DETAILS, Optional.of(canonicalId)),
-            navigate = { transition ->
-                val navigator = LibraryNavigator()
-                transition(navigator)
-                navigator.state().selectedTitle().ifPresent(openLibraryDetails)
-            },
-            openReader = openLibraryReader,
-            readerError = readerError,
-            openPlayer = openLibraryPlayer,
-            enqueueDownload = enqueueDownload,
-            downloadError = downloadError,
-            openTracking = openTracking,
-            goBackOverride = navigateUp,
-            removedFromLibrary = { libraryItemId = null },
-        )
-        return
-    }
-
-    CrashSafeLaunchedEffect(item.id()) {
-        result = withContext(Dispatchers.IO) {
-            runCatching { loadSourceTitleContent(presentation, item) }
+    CrashSafeLaunchedEffect(item.id(), indexedItemId, indexRevision) {
+        if (indexedItemId == null) {
+            runCatching {
+                withContext(Dispatchers.IO) { presentation.index(item) }
+            }.onSuccess {
+                indexedItemId = it
+                indexFailure = null
+            }.onFailure {
+                indexFailure = it.message ?: "The source title could not be indexed"
+            }
         }
     }
 
-    val content = result?.getOrNull()
-    if (content == null) {
+    val canonicalId = indexedItemId
+    if (canonicalId == null) {
         Scaffold(
             topBar = {
                 TopAppBar(
@@ -1156,19 +1072,14 @@ private fun SourceTitleScreen(
             },
         ) { padding ->
             Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                val failure = result?.exceptionOrNull()
-                if (failure == null) {
+                if (indexFailure == null) {
                     CircularProgressIndicator()
                 } else {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(failure.message ?: "The title could not be loaded")
+                        Text(indexFailure!!)
                         TextButton(onClick = {
-                            result = null
-                            scope.launch {
-                                result = withContext(Dispatchers.IO) {
-                                    runCatching { loadSourceTitleContent(presentation, item) }
-                                }
-                            }
+                            indexFailure = null
+                            indexRevision++
                         }) { Text("ui.retry") }
                     }
                 }
@@ -1177,109 +1088,31 @@ private fun SourceTitleScreen(
         return
     }
 
-    fun toggleLibraryMembership() {
-        if (membershipPending) return
-        membershipPending = true
-        scope.launch {
-            runCatching {
-                withContext(Dispatchers.IO) {
-                    val existingId = presentation.libraryItem(item.id()).orElse(libraryItemId)
-                    if (existingId == null) {
-                        presentation.addToLibrary(item)
-                    } else {
-                        presentation.removeFromLibrary(item.id())
-                        null
-                    }
-                }
-            }.onSuccess { nextId ->
-                libraryItemId = nextId
-                actionError = null
-            }.onFailure {
-                actionError = it.message ?: "The library could not be updated"
-            }
-            membershipPending = false
-        }
-    }
-
-    val details = content.details
-    val primaryChapter = firstUnreadContentUnit(content.chapters, emptySet())
-    val episodes = content.episodes.map { EpisodeSnapshot(it, Optional.empty()) }
-    val primaryEpisode = firstUnwatchedEpisode(episodes)
-    val previewDetails = LibraryDetails(
-        libraryItemId ?: LibraryItemId("source-preview:${item.id()}"),
-        details.title(),
-        if (item.contentKind() == SourceContentKind.ANIME) MediaKind.ANIME else MediaKind.MANGA,
-        Instant.EPOCH,
-        emptyList(),
-        false,
-        Optional.empty(),
-        details.description(),
-        details.authors(),
-        details.artists(),
-        details.status().toLibraryStatus(),
-        details.thumbnail(),
-        details.genres(),
-        Optional.empty(),
-        0,
-    )
-    DetailsPage(
-        details = previewDetails,
-        inLibrary = libraryItemId != null,
-        categories = emptyList(),
-        sourceName = source.displayName(),
-        artwork = { modifier -> RemoteArtwork(details.thumbnail().orElse(null), details.title(), modifier) },
-        chapters = content.chapters,
-        readChapterIds = emptySet(),
-        chapterProgress = null,
-        episodes = episodes,
-        unitError = actionError,
-        related = emptyList(),
-        canRead = primaryChapter != null,
-        canWatch = primaryEpisode != null,
-        canDownload = false,
-        downloadProgress = null,
-        chapterDownloadProgress = { null },
-        episodeDownloadProgress = { null },
-        canTrack = false,
-        libraryEditable = false,
-        canShare = false,
-        trackingCount = 0,
-        nextAiring = null,
-        readerError = null,
-        downloadError = null,
-        read = { chapter ->
-            (chapter ?: primaryChapter)?.let { openReader(details.title(), it.id()) }
+    DetailsDestination(
+        presentation = library,
+        discovery = presentation,
+        browserCookies = browserCookies,
+        browserRuntimeStatus = browserRuntimeStatus,
+        detailPlatform = detailPlatform,
+        reader = reader,
+        player = player,
+        downloads = downloads,
+        tracking = tracking,
+        destination = LibraryNavigationState(LibraryPage.DETAILS, Optional.of(canonicalId)),
+        navigate = { transition ->
+            val navigator = LibraryNavigator()
+            transition(navigator)
+            navigator.state().selectedTitle().ifPresent { indexedItemId = it }
         },
-        watch = { primaryEpisode?.let { openPlayer(details.title(), it.episode().id()) } },
-        watchEpisode = { openPlayer(details.title(), it.episode().id()) },
-        download = {},
-        downloadChapter = {},
-        downloadEpisode = {},
-        markChapters = { _, _ -> },
-        markEpisodes = { _, _ -> },
-        track = {},
-        refreshing = membershipPending,
-        refresh = null,
-        toggleLibraryMembership = ::toggleLibraryMembership,
-        edit = { _, _ -> },
-        createCategory = {},
-        addCategory = {},
-        removeCategory = {},
-        deleteCategory = {},
-        openTitleWeb = titleWebPage?.let { page -> ({ openWebPage(page) }) },
-        openSourceWeb = null,
-        share = {},
-        openRelated = {},
-        goBack = navigateUp,
+        openReader = openLibraryReader,
+        readerError = readerError,
+        openPlayer = openLibraryPlayer,
+        enqueueDownload = enqueueDownload,
+        downloadError = downloadError,
+        openTracking = openTracking,
+        goBackOverride = navigateUp,
+        removedFromLibrary = {},
     )
-}
-
-private fun SourcePublicationStatus.toLibraryStatus(): PublicationStatus = when (this) {
-    SourcePublicationStatus.ONGOING -> PublicationStatus.ONGOING
-    SourcePublicationStatus.COMPLETED, SourcePublicationStatus.FINISHED -> PublicationStatus.COMPLETED
-    SourcePublicationStatus.CANCELLED -> PublicationStatus.CANCELLED
-    SourcePublicationStatus.ON_HIATUS -> PublicationStatus.HIATUS
-    SourcePublicationStatus.UNKNOWN, SourcePublicationStatus.LICENSED -> PublicationStatus.UNKNOWN
 }
 
 @Composable

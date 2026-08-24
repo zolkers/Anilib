@@ -218,7 +218,7 @@ internal fun DetailsDestination(
         val primaryEpisode = firstUnwatchedEpisode(episodes)
         DetailsPage(
             details = details,
-            inLibrary = true,
+            inLibrary = details.inLibrary(),
             categories = categories,
             sourceName = sourceName,
             artwork = { modifier -> RemoteArtwork(details.artwork().orElse(null), details.title(), modifier) },
@@ -241,6 +241,7 @@ internal fun DetailsDestination(
                 downloadProgress.content(details.id(), episode.episode().id().value())
             },
             canTrack = true,
+            libraryEditable = details.inLibrary(),
             trackingCount = trackedEntries.size,
             nextAiring = nextAiring,
             readerError = readerError,
@@ -330,24 +331,21 @@ internal fun DetailsDestination(
                 scope.launch {
                     runCatching {
                         withContext(Dispatchers.IO) {
-                            val origin = details.origin().orElse(null)
-                            if (origin == null) {
+                            if (details.inLibrary()) {
                                 presentation.deleteTitles(setOf(details.id()))
                             } else {
-                                discovery.removeFromLibrary(
-                                    SourceCatalogueItemId(
-                                        SourceId.of(origin.sourceId()),
-                                        origin.sourceItemKey(),
-                                    ),
-                                )
+                                presentation.restoreTitle(details.id())
                             }
                         }
                     }.onSuccess {
                         unitError = null
-                        if (removedFromLibrary == null) {
-                            navigateBack()
-                        } else {
-                            removedFromLibrary()
+                        revision++
+                        if (details.inLibrary()) {
+                            if (removedFromLibrary == null) {
+                                navigateBack()
+                            } else {
+                                removedFromLibrary()
+                            }
                         }
                     }.onFailure {
                         unitError = it.message ?: "The title could not be removed from the library."
