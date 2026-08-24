@@ -27,8 +27,6 @@ import fr.vriege.anilib.framework.http.HttpCachePolicy
 import fr.vriege.anilib.framework.http.HttpRequest
 import java.net.URI
 import java.time.Duration
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 internal data class ExtensionIconEnvironment(
     val httpClient: AnilibHttpClient,
@@ -49,28 +47,32 @@ internal fun ExtensionIcon(
     val description = "$displayName · ${UiTranslations.translate("ui.extension.icon", LocalLanguagePack.current)}"
     val unavailableDescription =
         "$displayName · ${UiTranslations.translate("ui.extension.icon.unavailable", LocalLanguagePack.current)}"
-    var image by remember(iconUri, environment) { mutableStateOf<ImageBitmap?>(null) }
-    var failed by remember(iconUri, environment) { mutableStateOf(false) }
+    val cacheKey = remember(iconUri, environment) {
+        if (iconUri == null || environment == null) null else {
+            remoteImageCacheKey("extension-icon", iconUri, environment)
+        }
+    }
+    var image by remember(cacheKey) { mutableStateOf(cacheKey?.let(RemoteImageCache::get)) }
+    var failed by remember(cacheKey) { mutableStateOf(false) }
 
-    CrashSafeLaunchedEffect(iconUri, environment) {
-        image = null
+    CrashSafeLaunchedEffect(cacheKey) {
         failed = false
-        if (iconUri == null || environment == null) return@CrashSafeLaunchedEffect
-        runCatching {
-            withContext(Dispatchers.IO) {
-                val response = environment.httpClient.execute(
-                    HttpRequest.builder(iconUri)
-                        .cache(HttpCachePolicy.preferCache(Duration.ofDays(7)))
-                        .build(),
-                )
-                check(response.statusCode() in 200..299) {
-                    "Extension icon request failed with HTTP ${response.statusCode()}"
-                }
-                check(response.body().size <= MAX_EXTENSION_ICON_BYTES) {
-                    "Extension icon exceeds the 2 MiB limit"
-                }
-                environment.decode(response.body()) ?: error("Unsupported extension icon format")
+        if (cacheKey == null || iconUri == null || environment == null || image != null) {
+            return@CrashSafeLaunchedEffect
+        }
+        RemoteImageCache.load(cacheKey) {
+            val response = environment.httpClient.execute(
+                HttpRequest.builder(iconUri)
+                    .cache(HttpCachePolicy.preferCache(Duration.ofDays(7)))
+                    .build(),
+            )
+            check(response.statusCode() in 200..299) {
+                "Extension icon request failed with HTTP ${response.statusCode()}"
             }
+            check(response.body().size <= MAX_EXTENSION_ICON_BYTES) {
+                "Extension icon exceeds the 2 MiB limit"
+            }
+            environment.decode(response.body()) ?: error("Unsupported extension icon format")
         }.onSuccess { image = it }.onFailure { failed = true }
     }
 

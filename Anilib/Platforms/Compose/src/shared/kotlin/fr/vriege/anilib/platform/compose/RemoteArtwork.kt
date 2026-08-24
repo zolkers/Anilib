@@ -20,8 +20,6 @@ import fr.vriege.anilib.framework.http.HttpCachePolicy
 import fr.vriege.anilib.framework.http.HttpRequest
 import java.net.URI
 import java.time.Duration
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 @Composable
 internal fun RemoteArtwork(
@@ -31,23 +29,25 @@ internal fun RemoteArtwork(
     contentScale: ContentScale = ContentScale.Crop,
 ) {
     val environment = LocalExtensionIconEnvironment.current
-    var image by remember(uri, environment) { mutableStateOf<ImageBitmap?>(null) }
-    var failed by remember(uri, environment) { mutableStateOf(false) }
-    CrashSafeLaunchedEffect(uri, environment) {
-        image = null
+    val cacheKey = remember(uri, environment) {
+        if (uri == null || environment == null) null else remoteImageCacheKey("artwork", uri, environment)
+    }
+    var image by remember(cacheKey) { mutableStateOf(cacheKey?.let(RemoteImageCache::get)) }
+    var failed by remember(cacheKey) { mutableStateOf(false) }
+    CrashSafeLaunchedEffect(cacheKey) {
         failed = false
-        if (uri == null || environment == null) return@CrashSafeLaunchedEffect
-        runCatching {
-            withContext(Dispatchers.IO) {
-                val response = environment.httpClient.execute(
-                    HttpRequest.builder(uri)
-                        .cache(HttpCachePolicy.preferCache(Duration.ofDays(7)))
-                        .build(),
-                )
-                check(response.statusCode() in 200..299)
-                check(response.body().size <= MAX_ARTWORK_BYTES)
-                environment.decode(response.body()) ?: error("Unsupported artwork format")
-            }
+        if (cacheKey == null || uri == null || environment == null || image != null) {
+            return@CrashSafeLaunchedEffect
+        }
+        RemoteImageCache.load(cacheKey) {
+            val response = environment.httpClient.execute(
+                HttpRequest.builder(uri)
+                    .cache(HttpCachePolicy.preferCache(Duration.ofDays(7)))
+                    .build(),
+            )
+            check(response.statusCode() in 200..299)
+            check(response.body().size <= MAX_ARTWORK_BYTES)
+            environment.decode(response.body()) ?: error("Unsupported artwork format")
         }.onSuccess { image = it }.onFailure { failed = true }
     }
     Box(

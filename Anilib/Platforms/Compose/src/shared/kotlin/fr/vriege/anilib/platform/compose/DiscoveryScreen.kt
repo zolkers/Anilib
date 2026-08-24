@@ -1116,7 +1116,11 @@ private fun ColumnScope.CatalogueContent(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            items(page.items(), key = { it.id().toString() }) { item ->
+            items(
+                page.items(),
+                key = { it.id().toString() },
+                contentType = { "catalogue-cover" },
+            ) { item ->
                 CatalogueCard(item, open, add, webPage(item), openWebPage)
             }
         }

@@ -111,9 +111,11 @@ internal fun LibraryPageContent(
 ) {
     var revision by remember(presentation) { mutableStateOf(0) }
     val overview = remember(presentation, revision) { presentation.library() }
-    val scopedCategories = overview.categoryConfigurations()
-        .filter { it.scope().supports(kind) }
-        .map { it.name() }
+    val scopedCategories = remember(overview, kind) {
+        overview.categoryConfigurations()
+            .filter { it.scope().supports(kind) }
+            .map { it.name() }
+    }
     var query by remember { mutableStateOf("") }
     var searching by remember { mutableStateOf(false) }
     var favoritesOnly by remember(kind) { mutableStateOf(false) }
@@ -138,20 +140,27 @@ internal fun LibraryPageContent(
             error = failure.message ?: "Unable to update the library display."
         }
     }
-    val titles = overview.titles()
-        .asSequence()
-        .filter { query.isBlank() || it.title().contains(query, ignoreCase = true) }
-        .filter { it.kind() == kind }
-        .filter { !favoritesOnly || it.favorite() }
-        .filter {
-            when (category) {
-                null -> true
-                "" -> it.categories().isEmpty()
-                else -> category in it.categories()
+    val titles = remember(overview, query, kind, favoritesOnly, category) {
+        overview.titles()
+            .asSequence()
+            .filter { query.isBlank() || it.title().contains(query, ignoreCase = true) }
+            .filter { it.kind() == kind }
+            .filter { !favoritesOnly || it.favorite() }
+            .filter {
+                when (category) {
+                    null -> true
+                    "" -> it.categories().isEmpty()
+                    else -> category in it.categories()
+                }
             }
-        }
-        .toList()
-    val selectedCards = overview.titles().filter { it.id() in selected }
+            .toList()
+    }
+    val hasLibraryTitles = remember(overview, kind, favoritesOnly) {
+        overview.titles().any { it.kind() == kind && (!favoritesOnly || it.favorite()) }
+    }
+    val selectedCards = remember(overview, selected) {
+        overview.titles().filter { it.id() in selected }
+    }
     val allSelectedFavorites = selectedCards.isNotEmpty() && selectedCards.all(LibraryCard::favorite)
     Scaffold(
         topBar = {
@@ -332,7 +341,7 @@ internal fun LibraryPageContent(
                 }
             }
             Spacer(Modifier.height(8.dp))
-            if (overview.titles().none { it.kind() == kind && (!favoritesOnly || it.favorite()) }) {
+            if (!hasLibraryTitles) {
                 EmptyPage(
                     UiTranslations.format(
                         "dynamic.empty.library.kind",
@@ -352,7 +361,11 @@ internal fun LibraryPageContent(
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        gridItems(titles, key = { it.id().value() }) { card ->
+                        gridItems(
+                            titles,
+                            key = { it.id().value() },
+                            contentType = { "library-cover" },
+                        ) { card ->
                             LibraryCoverCard(
                                 card,
                                 null,

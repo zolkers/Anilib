@@ -131,6 +131,9 @@ fun AnilibApp(
     val detailPlatform = remember(shareController) {
         DetailPlatform(shareController)
     }
+    val imageEnvironment = remember(httpClient, pageDecoder) {
+        ExtensionIconEnvironment(httpClient, pageDecoder)
+    }
     val navigator = remember { LibraryNavigator() }
     val initialSettings = remember(settingsPresentation) { settingsPresentation.snapshot() }
     var destination by remember { mutableStateOf(navigator.state()) }
@@ -188,7 +191,7 @@ fun AnilibApp(
         LocalBrowserPolicy provides settings.browserPolicy(),
         LocalBrowserPlatformController provides browserPlatformController,
         LocalApplicationUpdatePlatformController provides applicationUpdatePlatformController,
-        LocalExtensionIconEnvironment provides ExtensionIconEnvironment(httpClient, pageDecoder),
+        LocalExtensionIconEnvironment provides imageEnvironment,
         LocalReducedMotion provides settings.reducedMotion(),
         LocalLanguagePack provides settings.languagePack(),
         LocalUiFailureHandler provides handleUiFailure,
