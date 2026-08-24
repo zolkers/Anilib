@@ -16,6 +16,8 @@ import fr.vriege.anilib.feature.downloads.DownloadService;
 import fr.vriege.anilib.feature.downloads.DownloadStatus;
 import fr.vriege.anilib.feature.downloads.DownloadStoragePolicy;
 import fr.vriege.anilib.feature.downloads.DownloadStorageSnapshot;
+import fr.vriege.anilib.feature.downloads.VideoDownloadFinalizer;
+import fr.vriege.anilib.feature.downloads.VideoDownloadFinalizer.VideoFinalizationRequest;
 import fr.vriege.anilib.feature.library.LibraryCatalog;
 import fr.vriege.anilib.feature.library.LibraryItem;
 import fr.vriege.anilib.feature.library.LibraryItemId;
@@ -94,8 +96,11 @@ public final class DefaultDownloadService
     private final ExecutorService workers;
     private final BooleanSupplier largeTransfersAllowed;
     private final VideoDownloadPlanner videoPlanner;
+    private final VideoDownloadFinalizer videoFinalizer;
     private final Map<DownloadId, DownloadRecord> records = new LinkedHashMap<>();
     private final Set<DownloadId> scheduled = new HashSet<>();
+    private final Set<DownloadId> deferredDeletions = new HashSet<>();
+    private final Map<DownloadId, DownloadRecord> deferredRemovals = new LinkedHashMap<>();
     private final Set<Runnable> listeners = new HashSet<>();
     private long usedStorageBytes;
     private long nextQueueOrder;
@@ -127,6 +132,17 @@ public final class DefaultDownloadService
             DownloadStoragePolicy policy,
             BooleanSupplier largeTransfersAllowed,
             AnilibHttpClient httpClient) {
+        this(sources, library, root, policy, largeTransfersAllowed, httpClient, VideoDownloadFinalizer.unavailable());
+    }
+
+    public DefaultDownloadService(
+            SourceRegistry sources,
+            LibraryCatalog library,
+            Path root,
+            DownloadStoragePolicy policy,
+            BooleanSupplier largeTransfersAllowed,
+            AnilibHttpClient httpClient,
+            VideoDownloadFinalizer videoFinalizer) {
         this(
                 sources,
                 library,
@@ -135,7 +151,8 @@ public final class DefaultDownloadService
                 Clock.systemUTC(),
                 ManagedExecutors.fixed("anilib-download", policy.concurrentJobs()),
                 largeTransfersAllowed,
-                httpClient);
+                httpClient,
+                videoFinalizer);
     }
 
     DefaultDownloadService(
@@ -146,7 +163,16 @@ public final class DefaultDownloadService
             Clock clock,
             ExecutorService workers,
             BooleanSupplier largeTransfersAllowed) {
-        this(sources, library, root, policy, clock, workers, largeTransfersAllowed, unavailableHttpClient());
+        this(
+                sources,
+                library,
+                root,
+                policy,
+                clock,
+                workers,
+                largeTransfersAllowed,
+                unavailableHttpClient(),
+                VideoDownloadFinalizer.unavailable());
     }
 
     DefaultDownloadService(
@@ -158,6 +184,28 @@ public final class DefaultDownloadService
             ExecutorService workers,
             BooleanSupplier largeTransfersAllowed,
             AnilibHttpClient httpClient) {
+        this(
+                sources,
+                library,
+                root,
+                policy,
+                clock,
+                workers,
+                largeTransfersAllowed,
+                httpClient,
+                VideoDownloadFinalizer.unavailable());
+    }
+
+    DefaultDownloadService(
+            SourceRegistry sources,
+            LibraryCatalog library,
+            Path root,
+            DownloadStoragePolicy policy,
+            Clock clock,
+            ExecutorService workers,
+            BooleanSupplier largeTransfersAllowed,
+            AnilibHttpClient httpClient,
+            VideoDownloadFinalizer videoFinalizer) {
         this.sources = Objects.requireNonNull(sources, "sources must not be null");
         this.library = Objects.requireNonNull(library, "library must not be null");
         Path normalizedRoot = Objects.requireNonNull(root, "root must not be null").toAbsolutePath().normalize();
@@ -173,6 +221,7 @@ public final class DefaultDownloadService
         this.videoPlanner = new VideoDownloadPlanner(Objects.requireNonNull(
                 httpClient,
                 "httpClient must not be null"));
+        this.videoFinalizer = Objects.requireNonNull(videoFinalizer, "videoFinalizer must not be null");
         this.store = new FileDownloadQueueStore(normalizedRoot.resolve("queue.anilib"));
         this.locationStore = new FileDownloadStorageLocationStore(normalizedRoot.resolve("storage-location.anilib"));
         this.storagePolicyStore = new FileDownloadStoragePolicyStore(
@@ -407,9 +456,12 @@ public final class DefaultDownloadService
             record.error = null;
             record.updatedAt = clock.instant();
             if (policy.removePartialOnCancel()) {
-                deleteFiles(record);
-                record.completedPages = 0;
-                record.downloadedBytes = 0;
+                if (scheduled.contains(record.id)) {
+                    deferredDeletions.add(record.id);
+                } else {
+                    deleteFiles(record);
+                    resetDownloadedProgress(record);
+                }
             }
             persist();
             notifyListeners();
@@ -420,8 +472,9 @@ public final class DefaultDownloadService
     public synchronized void remove(DownloadId id) {
         DownloadRecord record = record(id);
         record.status = DownloadStatus.CANCELLED;
-        deleteFiles(record);
-        records.remove(record.id);
+        record.error = null;
+        record.updatedAt = clock.instant();
+        removeRecordSafely(record);
         persist();
         notifyListeners();
     }
@@ -434,9 +487,7 @@ public final class DefaultDownloadService
         }
         List<DownloadRecord> removed = List.copyOf(records.values());
         removed.forEach(record -> record.status = DownloadStatus.CANCELLED);
-        removed.forEach(this::deleteFiles);
-        records.clear();
-        scheduled.clear();
+        removed.forEach(this::removeRecordSafely);
         persist();
         notifyListeners();
     }
@@ -781,8 +832,7 @@ public final class DefaultDownloadService
                 .filter(record -> record.libraryItemId.equals(libraryItemId))
                 .toList();
         removed.forEach(record -> record.status = DownloadStatus.CANCELLED);
-        removed.forEach(this::deleteFiles);
-        removed.forEach(record -> records.remove(record.id));
+        removed.forEach(this::removeRecordSafely);
         finishBulkChange(!removed.isEmpty());
     }
 
@@ -851,9 +901,8 @@ public final class DefaultDownloadService
             return 0;
         }
         orphaned.forEach(record -> {
-            deleteFiles(record);
-            records.remove(record.id);
-            scheduled.remove(record.id);
+            record.status = DownloadStatus.CANCELLED;
+            removeRecordSafely(record);
         });
         persist();
         notifyListeners();
@@ -920,13 +969,19 @@ public final class DefaultDownloadService
                 .filter(record -> record.sourceItemId.equals(episodeId.itemId()))
                 .filter(record -> record.contentUnit.id().value().equals(episodeId.value()))
                 .max(Comparator.comparing(record -> record.updatedAt))
-                .map(record -> List.of(new SourceVideoStream(
-                        "offline-" + record.id,
-                        "Offline",
-                        (record.video.hls() ? playlistFile(record) : videoFile(record)).toUri(),
-                        record.video.format(),
-                        Map.of(),
-                        List.of())))
+                .map(record -> {
+                    Path finalized = finalizedVideoFile(record);
+                    boolean hasFinalizedVideo = Files.isRegularFile(finalized);
+                    return List.of(new SourceVideoStream(
+                            "offline-" + record.id,
+                            "Offline",
+                            (hasFinalizedVideo
+                                    ? finalized
+                                    : record.video.hls() ? playlistFile(record) : videoFile(record)).toUri(),
+                            hasFinalizedVideo ? SourceStreamFormat.PROGRESSIVE : record.video.format(),
+                            Map.of(),
+                            List.of()));
+                })
                 .orElseGet(List::of);
     }
 
@@ -971,6 +1026,9 @@ public final class DefaultDownloadService
             while (record.video() ? downloadNextVideoResource(record) : downloadNextPage(record, source)) {
                 // Continue until paused, failed, cancelled, or complete.
             }
+            if (record.video()) {
+                finalizeVideo(record);
+            }
         } catch (RuntimeException exception) {
             synchronized (this) {
                 DownloadRecord record = records.get(id);
@@ -984,7 +1042,11 @@ public final class DefaultDownloadService
         } finally {
             synchronized (this) {
                 scheduled.remove(id);
-                scheduleAvailable();
+                try {
+                    completeDeferredCleanup(id);
+                } finally {
+                    scheduleAvailable();
+                }
             }
         }
     }
@@ -1087,7 +1149,8 @@ public final class DefaultDownloadService
             } else {
                 publishProgress(record);
             }
-            return record.status == DownloadStatus.DOWNLOADING;
+            return record.status == DownloadStatus.DOWNLOADING
+                    && record.completedPages < record.pages.size();
         }
     }
 
@@ -1114,11 +1177,88 @@ public final class DefaultDownloadService
         if (record.video.hls()) {
             writeOfflinePlaylist(record);
         }
+        if (videoFinalizer.available()) {
+            record.bytesPerSecond = 0L;
+            record.error = null;
+            record.updatedAt = clock.instant();
+            persist();
+            notifyListeners();
+            return;
+        }
         record.status = DownloadStatus.COMPLETED;
         record.error = null;
         record.updatedAt = clock.instant();
         persist();
         notifyListeners();
+    }
+
+    private void finalizeVideo(DownloadRecord record) {
+        VideoFinalizationRequest request;
+        synchronized (this) {
+            if (!videoFinalizer.available()
+                    || !readyToFinalize(record)) {
+                return;
+            }
+            request = new VideoFinalizationRequest(
+                    record.video.hls() ? playlistFile(record) : videoFile(record),
+                    finalizedVideoFile(record));
+        }
+        videoFinalizer.finalizeVideo(request, () -> finalizationCancelled(record));
+        synchronized (this) {
+            if (!readyToFinalize(record)) {
+                deleteFinalizedVideo(request.output());
+                return;
+            }
+            long finalizedBytes = finalizedVideoBytes(request.output());
+            long retainedStorage = Math.max(0L, usedStorageBytes - record.downloadedBytes);
+            if (retainedStorage > policy.maximumStorageBytes() - finalizedBytes) {
+                deleteFinalizedVideo(request.output());
+                throw new DownloadException("Finalized video exceeds the configured storage limit");
+            }
+            deleteVideoIntermediates(record);
+            usedStorageBytes = retainedStorage + finalizedBytes;
+            record.downloadedBytes = finalizedBytes;
+            record.status = DownloadStatus.COMPLETED;
+            record.error = null;
+            record.updatedAt = clock.instant();
+            persist();
+            notifyListeners();
+        }
+    }
+
+    private synchronized boolean finalizationCancelled(DownloadRecord record) {
+        return !readyToFinalize(record);
+    }
+
+    private boolean readyToFinalize(DownloadRecord record) {
+        return !closed
+                && !offlineMode
+                && records.get(record.id) == record
+                && record.status == DownloadStatus.DOWNLOADING
+                && record.completedPages == record.pages.size();
+    }
+
+    private static long finalizedVideoBytes(Path output) {
+        try {
+            if (!Files.isRegularFile(output)) {
+                throw new DownloadException("Video finalization did not produce a media file");
+            }
+            long bytes = Files.size(output);
+            if (bytes < 1L) {
+                throw new DownloadException("Video finalization produced an empty media file");
+            }
+            return bytes;
+        } catch (IOException exception) {
+            throw new DownloadException("Unable to inspect finalized video", exception);
+        }
+    }
+
+    private static void deleteFinalizedVideo(Path output) {
+        try {
+            Files.deleteIfExists(output);
+        } catch (IOException exception) {
+            throw new DownloadException("Unable to remove incomplete finalized video", exception);
+        }
     }
 
     private void publishProgress(DownloadRecord record) {
@@ -1309,6 +1449,16 @@ public final class DefaultDownloadService
         if (record.queueOrder < 0) {
             throw new IOException("Download queue position must not be negative");
         }
+        if (record.video()
+                && record.status != DownloadStatus.CANCELLED
+                && Files.isRegularFile(finalizedVideoFile(record))
+                && Files.size(finalizedVideoFile(record)) > 0L) {
+            reconcileFinalizedVideo(record);
+            return;
+        }
+        if (record.video() && Files.isRegularFile(finalizedVideoFile(record))) {
+            Files.deleteIfExists(finalizedVideoFile(record));
+        }
         if (record.video() && !record.video.hls()) {
             reconcileProgressiveVideo(record);
             return;
@@ -1340,6 +1490,18 @@ public final class DefaultDownloadService
         if (record.video() && record.status == DownloadStatus.COMPLETED && !Files.isRegularFile(playlistFile(record))) {
             writeOfflinePlaylist(record);
         }
+    }
+
+    private void reconcileFinalizedVideo(DownloadRecord record) throws IOException {
+        Path finalized = finalizedVideoFile(record);
+        long bytes = Files.size(finalized);
+        deleteVideoIntermediates(record);
+        record.completedPages = record.pages.size();
+        record.downloadedBytes = bytes;
+        record.status = DownloadStatus.COMPLETED;
+        record.error = null;
+        record.bytesPerSecond = 0L;
+        usedStorageBytes += bytes;
     }
 
     private void reconcileProgressiveVideo(DownloadRecord record) throws IOException {
@@ -1435,6 +1597,54 @@ public final class DefaultDownloadService
         deleteDirectory(recordDirectory(record), true);
     }
 
+    private void removeRecordSafely(DownloadRecord record) {
+        records.remove(record.id);
+        deferredDeletions.remove(record.id);
+        if (scheduled.contains(record.id)) {
+            deferredRemovals.put(record.id, record);
+        } else {
+            deleteFiles(record);
+        }
+    }
+
+    private void completeDeferredCleanup(DownloadId id) {
+        DownloadRecord removed = deferredRemovals.remove(id);
+        if (removed != null) {
+            try {
+                deleteFiles(removed);
+            } catch (RuntimeException exception) {
+                removed.error = "Unable to remove downloaded files: " + message(exception);
+                removed.updatedAt = clock.instant();
+                records.put(removed.id, removed);
+                persist();
+                notifyListeners();
+            }
+            return;
+        }
+        if (!deferredDeletions.remove(id)) {
+            return;
+        }
+        DownloadRecord record = records.get(id);
+        if (record == null) {
+            return;
+        }
+        try {
+            deleteFiles(record);
+            resetDownloadedProgress(record);
+        } catch (RuntimeException exception) {
+            record.error = "Unable to remove partial download: " + message(exception);
+            record.updatedAt = clock.instant();
+        }
+        persist();
+        notifyListeners();
+    }
+
+    private static void resetDownloadedProgress(DownloadRecord record) {
+        record.completedPages = 0;
+        record.downloadedBytes = 0L;
+        record.bytesPerSecond = 0L;
+    }
+
     private void deleteDirectory(Path directory, boolean accountStorage) {
         if (!Files.exists(directory)) {
             return;
@@ -1443,7 +1653,8 @@ public final class DefaultDownloadService
             for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) {
                 if (accountStorage && Files.isRegularFile(path)
                         && (path.getFileName().toString().endsWith(".page")
-                        || path.getFileName().toString().endsWith(".media"))) {
+                        || path.getFileName().toString().endsWith(".media")
+                        || path.getFileName().toString().endsWith(".mkv"))) {
                     usedStorageBytes -= Files.size(path);
                 }
                 Files.deleteIfExists(path);
@@ -1464,6 +1675,22 @@ public final class DefaultDownloadService
 
     private Path playlistFile(DownloadRecord record) {
         return recordDirectory(record).resolve("offline.m3u8");
+    }
+
+    private Path finalizedVideoFile(DownloadRecord record) {
+        return recordDirectory(record).resolve("offline.mkv");
+    }
+
+    private void deleteVideoIntermediates(DownloadRecord record) {
+        try {
+            for (int index = 0; index < record.pages.size(); index++) {
+                Files.deleteIfExists(pageFile(record, index));
+            }
+            Files.deleteIfExists(videoFile(record));
+            Files.deleteIfExists(playlistFile(record));
+        } catch (IOException exception) {
+            throw new DownloadException("Unable to remove finalized video fragments", exception);
+        }
     }
 
     private Path recordDirectory(DownloadRecord record) {
@@ -1596,7 +1823,10 @@ public final class DefaultDownloadService
 
     private static boolean isManagedContentFile(Path path) {
         String name = path.getFileName().toString();
-        return name.endsWith(".page") || name.equals("offline.media") || name.equals("offline.m3u8");
+        return name.endsWith(".page")
+                || name.equals("offline.media")
+                || name.equals("offline.m3u8")
+                || name.equals("offline.mkv");
     }
 
     private void restoreMigratedStatuses(Map<DownloadId, DownloadStatus> previousStatuses) {

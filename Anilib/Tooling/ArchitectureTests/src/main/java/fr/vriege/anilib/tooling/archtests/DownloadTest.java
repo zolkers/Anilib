@@ -15,6 +15,7 @@ import fr.vriege.anilib.feature.downloads.DownloadRecoveryMode;
 import fr.vriege.anilib.feature.downloads.DownloadService;
 import fr.vriege.anilib.feature.downloads.DownloadStatus;
 import fr.vriege.anilib.feature.downloads.DownloadStoragePolicy;
+import fr.vriege.anilib.feature.downloads.VideoDownloadFinalizer;
 import fr.vriege.anilib.feature.downloads.runtime.DefaultDownloadService;
 import fr.vriege.anilib.feature.library.LibraryCapabilities;
 import fr.vriege.anilib.feature.library.LibraryCatalog;
@@ -64,6 +65,7 @@ import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BooleanSupplier;
 import java.util.function.Predicate;
 import java.util.Collection;
 import java.util.stream.Collectors;
@@ -84,6 +86,8 @@ final class DownloadTest {
         verifiesAutomaticRules(counter);
         verifiesStorageLimit(counter);
         downloadsHlsEpisodes(counter);
+        finalizesHlsEpisodesAsSingleMedia(counter);
+        removesVideosSafelyDuringFinalization(counter);
         enforcesLargeTransferPolicy(counter);
         cleansOrphanedDownloads(counter);
         return counter.value;
@@ -142,6 +146,155 @@ final class DownloadTest {
             }
         } catch (IOException exception) {
             throw new AssertionError("Unable to prepare anime download test", exception);
+        } finally {
+            deleteTree(root);
+        }
+    }
+
+    private static void finalizesHlsEpisodesAsSingleMedia(Counter counter) {
+        Path root = null;
+        try {
+            root = Files.createTempDirectory("anilib-anime-finalization");
+            MemoryLibraryCatalog library = new MemoryLibraryCatalog();
+            LibraryItem item = LibraryItem.create("Finalized Anime", MediaKind.ANIME)
+                    .withOrigin(new LibraryOrigin("test.streaming", "title"));
+            library.save(item);
+            HlsStreamingSource source = new HlsStreamingSource();
+            AnilibHttpClient client = request -> {
+                String location = request.uri().toString();
+                if (location.endsWith("playlist.m3u8")) {
+                    String playlist = "#EXTM3U\n#EXT-X-TARGETDURATION:10\n"
+                            + "#EXTINF:10,\nfirst.ts\n#EXTINF:10,\nsecond.ts\n#EXT-X-ENDLIST\n";
+                    return new HttpResponse(200, Map.of(), playlist.getBytes(StandardCharsets.UTF_8), false);
+                }
+                return new HttpResponse(200, Map.of(), new byte[] {1, 2, 3}, false);
+            };
+            AtomicBoolean invoked = new AtomicBoolean();
+            VideoDownloadFinalizer finalizer = new VideoDownloadFinalizer() {
+                @Override
+                public boolean available() {
+                    return true;
+                }
+
+                @Override
+                public void finalizeVideo(VideoFinalizationRequest request, BooleanSupplier cancelled) {
+                    counter.check(request.input().getFileName().toString().equals("offline.m3u8")
+                                    && request.output().getFileName().toString().equals("offline.mkv")
+                                    && !cancelled.getAsBoolean(),
+                            "video finalization must receive local managed sibling paths");
+                    try {
+                        Files.write(request.output(), new byte[] {9, 8, 7, 6});
+                        invoked.set(true);
+                    } catch (IOException exception) {
+                        throw new DownloadException("Unable to emulate video finalization", exception);
+                    }
+                }
+            };
+            DownloadStoragePolicy policy = new DownloadStoragePolicy(4096, 1024, 1, true, true);
+            try (DefaultDownloadService downloads = new DefaultDownloadService(
+                    new SingleSourceRegistry(source),
+                    library,
+                    root,
+                    policy,
+                    () -> true,
+                    client,
+                    finalizer)) {
+                DownloadId id = downloads.enqueue(item.id(), source.episode.id().value());
+                DownloadJobSnapshot completed = await(
+                        downloads,
+                        id,
+                        job -> job.status() == DownloadStatus.COMPLETED);
+                Path directory = root.resolve("content").resolve(id.toString());
+                counter.check(invoked.get()
+                                && completed.downloadedBytes() == 4L
+                                && downloads.snapshot().usedStorageBytes() == 4L,
+                        "completed finalized videos must account only for their final media file");
+                counter.check(Files.isRegularFile(directory.resolve("offline.mkv"))
+                                && !Files.exists(directory.resolve("offline.m3u8"))
+                                && !Files.exists(directory.resolve("00000000.page"))
+                                && !Files.exists(directory.resolve("00000001.page")),
+                        "video fragments must be removed only after finalization succeeds");
+                SourceVideoStream offline = downloads.streams(source.episode.id()).getFirst();
+                counter.check(offline.location().getPath().endsWith("offline.mkv")
+                                && offline.format() == SourceStreamFormat.PROGRESSIVE,
+                        "the offline player must receive the finalized MKV instead of HLS fragments");
+            }
+        } catch (IOException exception) {
+            throw new AssertionError("Unable to prepare finalized anime download test", exception);
+        } finally {
+            deleteTree(root);
+        }
+    }
+
+    private static void removesVideosSafelyDuringFinalization(Counter counter) {
+        Path root = null;
+        try {
+            root = Files.createTempDirectory("anilib-anime-finalization-removal");
+            MemoryLibraryCatalog library = new MemoryLibraryCatalog();
+            LibraryItem item = LibraryItem.create("Removed Anime", MediaKind.ANIME)
+                    .withOrigin(new LibraryOrigin("test.streaming", "title"));
+            library.save(item);
+            HlsStreamingSource source = new HlsStreamingSource();
+            AnilibHttpClient client = request -> {
+                if (request.uri().getPath().endsWith("playlist.m3u8")) {
+                    String playlist = "#EXTM3U\n#EXTINF:10,\nsegment-one.ts\n#EXT-X-ENDLIST\n";
+                    return new HttpResponse(200, Map.of(), playlist.getBytes(StandardCharsets.UTF_8), false);
+                }
+                return new HttpResponse(200, Map.of(), new byte[] {1, 2, 3}, false);
+            };
+            CountDownLatch finalizationStarted = new CountDownLatch(1);
+            CountDownLatch finalizationStopped = new CountDownLatch(1);
+            VideoDownloadFinalizer finalizer = new VideoDownloadFinalizer() {
+                @Override
+                public boolean available() {
+                    return true;
+                }
+
+                @Override
+                public void finalizeVideo(VideoFinalizationRequest request, BooleanSupplier cancelled) {
+                    finalizationStarted.countDown();
+                    try {
+                        while (!cancelled.getAsBoolean()) {
+                            TimeUnit.MILLISECONDS.sleep(10L);
+                        }
+                    } catch (InterruptedException exception) {
+                        Thread.currentThread().interrupt();
+                        throw new DownloadException("Interrupted finalization test", exception);
+                    } finally {
+                        finalizationStopped.countDown();
+                    }
+                }
+            };
+            DownloadStoragePolicy policy = new DownloadStoragePolicy(4096, 1024, 1, true, true);
+            try (DefaultDownloadService downloads = new DefaultDownloadService(
+                    new SingleSourceRegistry(source),
+                    library,
+                    root,
+                    policy,
+                    () -> true,
+                    client,
+                    finalizer)) {
+                DownloadId id = downloads.enqueue(item.id(), source.episode.id().value());
+                counter.check(finalizationStarted.await(5L, TimeUnit.SECONDS),
+                        "video finalization must start before removal is exercised");
+                downloads.remove(id);
+                counter.check(downloads.snapshot().jobs().stream().noneMatch(job -> job.id().equals(id)),
+                        "removing a finalizing video must hide it from the queue immediately");
+                counter.check(finalizationStopped.await(5L, TimeUnit.SECONDS),
+                        "removing a finalizing video must cancel its finalizer");
+                Path directory = root.resolve("content").resolve(id.toString());
+                long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5L);
+                while (Files.exists(directory) && System.nanoTime() < deadline) {
+                    TimeUnit.MILLISECONDS.sleep(10L);
+                }
+                counter.check(!Files.exists(directory),
+                        "video files must be deleted after the finalizer releases them");
+            }
+        } catch (IOException exception) {
+            throw new AssertionError("Unable to prepare video removal test", exception);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError("Interrupted while testing video removal", exception);
         } finally {
             deleteTree(root);
         }

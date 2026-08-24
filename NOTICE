@@ -10,3 +10,8 @@ project is not endorsed by or affiliated with either project.
 
 The Desktop platform uses Kotlin and Compose Multiplatform, copyright JetBrains
 and their respective contributors, under the Apache License, Version 2.0.
+
+Windows desktop installers include FFmpeg shared libraries from the LGPL build
+published by BtbN/FFmpeg-Builds. FFmpeg is copyright the FFmpeg developers and
+licensed under the GNU Lesser General Public License, version 2.1 or later. The
+corresponding license text is installed beside the FFmpeg binaries.

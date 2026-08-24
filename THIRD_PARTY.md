@@ -12,6 +12,7 @@ adapters and are enforced by `AnilibJava`.
 | Compose Multiplatform                   | 1.11.1  | Desktop runtime, Material 3, and icons           | Apache-2.0 |
 | ComposeMediaPlayer                      | 0.11.4  | Desktop video surface over native media engines  | Apache-2.0 |
 | Compose WebView Multiplatform           | 2.0.3   | Desktop KCEF browser surface                     | Apache-2.0 |
+| FFmpeg                                   | 9.0.1   | Finalize resumable video downloads as local MKV  | LGPL-2.1+  |
 
 ## Optional desktop compatibility runtime
 
@@ -46,6 +47,8 @@ Primary projects:
 - <https://github.com/JetBrains/compose-multiplatform>
 - <https://github.com/kdroidFilter/ComposeMediaPlayer>
 - <https://github.com/KevinnZou/compose-webview-multiplatform>
+- <https://ffmpeg.org/>
+- <https://github.com/BtbN/FFmpeg-Builds>
 - <https://github.com/miwayomi/miwayomi>
 
 Adding or upgrading an entry requires updating the exact allowlist in

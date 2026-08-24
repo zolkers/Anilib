@@ -12,6 +12,8 @@ import fr.vriege.anilib.feature.network.NetworkStatuses;
 import fr.vriege.anilib.feature.settings.bundle.SettingsPlugin;
 import fr.vriege.anilib.feature.reader.bundle.ReaderPlugin;
 import fr.vriege.anilib.feature.downloads.bundle.DownloadPlugin;
+import fr.vriege.anilib.feature.downloads.DownloadStoragePolicy;
+import fr.vriege.anilib.feature.downloads.VideoDownloadFinalizer;
 import fr.vriege.anilib.feature.player.PlayerCapabilities;
 import fr.vriege.anilib.feature.player.PlayerBackend;
 import fr.vriege.anilib.feature.player.PlayerBackends;
@@ -119,6 +121,24 @@ public final class StandardAnilib {
             HttpTransport httpTransport,
             PlayerBackend playerBackend,
             LibraryUpdateNotifier updateNotifier,
+            VideoDownloadFinalizer videoFinalizer,
+            Collection<? extends AnilibPlugin> additionalPlugins) {
+        return start(
+                dataDirectory,
+                httpTransport,
+                playerBackend,
+                updateNotifier,
+                NetworkStatuses.unmetered(),
+                PortableBundleLoading.ENABLED,
+                videoFinalizer,
+                additionalPlugins);
+    }
+
+    public static StartedAnilib start(
+            Path dataDirectory,
+            HttpTransport httpTransport,
+            PlayerBackend playerBackend,
+            LibraryUpdateNotifier updateNotifier,
             NetworkStatus networkStatus,
             Collection<? extends AnilibPlugin> additionalPlugins) {
         return start(
@@ -139,12 +159,33 @@ public final class StandardAnilib {
             NetworkStatus networkStatus,
             PortableBundleLoading portableBundleLoading,
             Collection<? extends AnilibPlugin> additionalPlugins) {
+        return start(
+                dataDirectory,
+                httpTransport,
+                playerBackend,
+                updateNotifier,
+                networkStatus,
+                portableBundleLoading,
+                VideoDownloadFinalizer.unavailable(),
+                additionalPlugins);
+    }
+
+    public static StartedAnilib start(
+            Path dataDirectory,
+            HttpTransport httpTransport,
+            PlayerBackend playerBackend,
+            LibraryUpdateNotifier updateNotifier,
+            NetworkStatus networkStatus,
+            PortableBundleLoading portableBundleLoading,
+            VideoDownloadFinalizer videoFinalizer,
+            Collection<? extends AnilibPlugin> additionalPlugins) {
         Objects.requireNonNull(dataDirectory, "dataDirectory must not be null");
         Objects.requireNonNull(httpTransport, "httpTransport must not be null");
         Objects.requireNonNull(playerBackend, "playerBackend must not be null");
         Objects.requireNonNull(updateNotifier, "updateNotifier must not be null");
         Objects.requireNonNull(networkStatus, "networkStatus must not be null");
         Objects.requireNonNull(portableBundleLoading, "portableBundleLoading must not be null");
+        Objects.requireNonNull(videoFinalizer, "videoFinalizer must not be null");
         Objects.requireNonNull(additionalPlugins, "additionalPlugins must not be null");
         Path libraryFile = dataDirectory.toAbsolutePath().normalize().resolve("library.anilib");
         Path localContent = dataDirectory.toAbsolutePath().normalize().resolve("local-content");
@@ -174,7 +215,7 @@ public final class StandardAnilib {
         plugins.add(new DiscoveryPlugin(sourcePreferences));
         plugins.add(new ExtensionRepositoryPlugin(extensionRepositories, extensionSelection.failures()));
         plugins.add(new ReaderPlugin(readerInteractions, readerDisplay, readerReadState));
-        plugins.add(new DownloadPlugin(downloads));
+        plugins.add(new DownloadPlugin(downloads, DownloadStoragePolicy.standard(), videoFinalizer));
         plugins.add(new PlayerPlugin(playbackState, playerPreferences, playerBackend));
         plugins.add(new TrackerPlugin(trackingState));
         plugins.add(new AniListTrackerBundle(

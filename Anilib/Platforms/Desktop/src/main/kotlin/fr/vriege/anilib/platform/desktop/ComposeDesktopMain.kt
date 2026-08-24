@@ -74,6 +74,7 @@ fun main(arguments: Array<String>) {
             transport,
             ComposePlayerBackend(),
             DesktopLibraryUpdateNotifier(),
+            DesktopFfmpegVideoFinalizer.resolve(),
             plugins,
         )
     } catch (failure: Throwable) {

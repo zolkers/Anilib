@@ -2,6 +2,7 @@ package fr.vriege.anilib.feature.downloads.bundle;
 
 import fr.vriege.anilib.feature.downloads.DownloadCapabilities;
 import fr.vriege.anilib.feature.downloads.DownloadStoragePolicy;
+import fr.vriege.anilib.feature.downloads.VideoDownloadFinalizer;
 import fr.vriege.anilib.feature.downloads.runtime.DefaultDownloadService;
 import fr.vriege.anilib.feature.downloads.runtime.AutomaticDownloadUpdateCoordinator;
 import fr.vriege.anilib.feature.downloads.ui.DefaultDownloadPresentation;
@@ -47,16 +48,25 @@ public final class DownloadPlugin implements AnilibPlugin {
 
     private final Path storageDirectory;
     private final DownloadStoragePolicy policy;
+    private final VideoDownloadFinalizer videoFinalizer;
 
     public DownloadPlugin(Path storageDirectory) {
-        this(storageDirectory, DownloadStoragePolicy.standard());
+        this(storageDirectory, DownloadStoragePolicy.standard(), VideoDownloadFinalizer.unavailable());
     }
 
     public DownloadPlugin(Path storageDirectory, DownloadStoragePolicy policy) {
+        this(storageDirectory, policy, VideoDownloadFinalizer.unavailable());
+    }
+
+    public DownloadPlugin(
+            Path storageDirectory,
+            DownloadStoragePolicy policy,
+            VideoDownloadFinalizer videoFinalizer) {
         this.storageDirectory = Objects.requireNonNull(
                 storageDirectory,
                 "storageDirectory must not be null").toAbsolutePath().normalize();
         this.policy = Objects.requireNonNull(policy, "policy must not be null");
+        this.videoFinalizer = Objects.requireNonNull(videoFinalizer, "videoFinalizer must not be null");
     }
 
     @Override
@@ -81,7 +91,8 @@ public final class DownloadPlugin implements AnilibPlugin {
                 storageDirectory,
                 policy,
                 () -> !settings.snapshot().downloadOnlyOnWifi() || network.allowsLargeTransfers(),
-                httpClient));
+                httpClient,
+                videoFinalizer));
         context.own(new AutomaticDownloadUpdateCoordinator(service, updates));
         context.own(registrar.register(service));
         context.own(playerRegistrar.register(service));

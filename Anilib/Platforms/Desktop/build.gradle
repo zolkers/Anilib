@@ -32,6 +32,7 @@ dependencies {
     implementation project(':Anilib:Features:Player:Ui')
     implementation project(':Anilib:Features:Source:Api')
     implementation project(':Anilib:Features:Downloads:Ui')
+    implementation project(':Anilib:Features:Downloads:Api')
     implementation project(':Anilib:Features:Backup:Ui')
     implementation project(':Anilib:Features:Tracker:Ui')
     implementation project(':Anilib:Features:Updates:Api')
@@ -56,6 +57,78 @@ if (!(packageVersionValue ==~ /[0-9]+\.[0-9]+\.[0-9]+/)) {
     throw new GradleException('anilibPackageVersion must use MAJOR.MINOR.PATCH numeric form')
 }
 def windowsHost = System.getProperty('os.name', '').toLowerCase(Locale.ROOT).contains('windows')
+def ffmpegVersion = 'n9.0.1-6-g9d4ca21220'
+def ffmpegRelease = 'autobuild-2026-08-20-13-45'
+def ffmpegArchiveName = "ffmpeg-${ffmpegVersion}-win64-lgpl-shared-9.0.zip"
+def ffmpegArchiveSha256 = '138fe84aa6e4836920f615704115d7ecf4cfbfc20f9a3d5c60f27c1e604fc12b'
+def ffmpegArchive = rootProject.layout.projectDirectory.file(".gradle/ffmpeg/${ffmpegArchiveName}")
+def ffmpegAppResources = layout.buildDirectory.dir('generated/app-resources')
+def ffmpegArchiveFiles = zipTree(ffmpegArchive).matching {
+    include '**/bin/*.exe', '**/bin/*.dll', '**/LICENSE.txt'
+}
+
+def prepareBundledFfmpeg = windowsHost ? tasks.register('prepareBundledFfmpeg') {
+    group = 'distribution'
+    description = 'Downloads, verifies, and stages the pinned LGPL FFmpeg runtime for Windows packaging.'
+    inputs.property('version', ffmpegVersion)
+    inputs.property('sha256', ffmpegArchiveSha256)
+    outputs.dir(ffmpegAppResources)
+    doLast {
+        File archive = ffmpegArchive.asFile
+        if (!archive.isFile()) {
+            archive.parentFile.mkdirs()
+            File temporary = new File(archive.parentFile, "${archive.name}.tmp")
+            temporary.delete()
+            new URL("https://github.com/BtbN/FFmpeg-Builds/releases/download/${ffmpegRelease}/${ffmpegArchiveName}")
+                    .withInputStream { input -> temporary.withOutputStream { output -> output << input } }
+            temporary.renameTo(archive)
+        }
+        MessageDigest digest = MessageDigest.getInstance('SHA-256')
+        archive.withInputStream { input ->
+            byte[] buffer = new byte[8192]
+            int count
+            while ((count = input.read(buffer)) >= 0) {
+                digest.update(buffer, 0, count)
+            }
+        }
+        String actual = digest.digest().collect { value -> String.format('%02x', value & 0xff) }.join()
+        if (actual != ffmpegArchiveSha256) {
+            archive.delete()
+            throw new GradleException("Bundled FFmpeg checksum mismatch: ${actual}")
+        }
+        File destination = ffmpegAppResources.get().asFile
+        if (destination.exists()) {
+            java.nio.file.Files.walk(destination.toPath()).withCloseable { paths ->
+                paths.sorted(Comparator.reverseOrder()).forEach { entry -> java.nio.file.Files.delete(entry) }
+            }
+        }
+        File binaryDirectory = new File(destination, 'common/ffmpeg/bin')
+        binaryDirectory.mkdirs()
+        Set<String> required = ['ffmpeg.exe', 'ffprobe.exe'] as Set
+        Set<String> copied = [] as Set
+        ffmpegArchiveFiles.files.each { source ->
+            if (source.parentFile.name == 'bin') {
+                if (source.name.endsWith('.dll') || required.contains(source.name)) {
+                    java.nio.file.Files.copy(
+                            source.toPath(),
+                            new File(binaryDirectory, source.name).toPath(),
+                            java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+                    copied.add(source.name)
+                }
+            } else if (source.name == 'LICENSE.txt') {
+                File license = new File(destination, 'common/ffmpeg/LICENSE.txt')
+                license.parentFile.mkdirs()
+                java.nio.file.Files.copy(
+                        source.toPath(),
+                        license.toPath(),
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+            }
+        }
+        if (!copied.containsAll(required)) {
+            throw new GradleException("Bundled FFmpeg archive does not contain ffmpeg.exe and ffprobe.exe")
+        }
+    }
+} : null
 
 compose.desktop {
     application {
@@ -66,6 +139,9 @@ compose.desktop {
                 "-Danilib.version=${rootProject.version}"
         ])
         nativeDistributions {
+            if (windowsHost) {
+                appResourcesRootDir.set(ffmpegAppResources)
+            }
             packageName = 'Anilib'
             packageVersion = packageVersionValue
             description = 'Desktop anime and manga library, reader, and player'
@@ -96,6 +172,12 @@ compose.desktop {
                 iconFile.set(project.file('src/main/resources/assets/anilib-icon.icns'))
             }
         }
+    }
+}
+
+if (windowsHost) {
+    tasks.matching { task -> task.name == 'prepareAppResources' }.configureEach {
+        dependsOn prepareBundledFfmpeg
     }
 }
 
