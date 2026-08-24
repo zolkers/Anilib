@@ -36,41 +36,7 @@ internal class DesktopFfmpegVideoFinalizer private constructor(
             Files.createDirectories(output.parent)
             Files.deleteIfExists(temporary)
             runProcess(
-                listOf(
-                    ffmpegExecutable.toString(),
-                    "-nostdin",
-                    "-hide_banner",
-                    "-loglevel",
-                    "error",
-                    "-y",
-                    "-protocol_whitelist",
-                    "file,crypto,data",
-                    "-allowed_extensions",
-                    "ALL",
-                    "-i",
-                    request.input().toString(),
-                    "-map",
-                    "0:v?",
-                    "-map",
-                    "0:a?",
-                    "-map",
-                    "0:s?",
-                    "-map_metadata",
-                    "0",
-                    "-map_chapters",
-                    "0",
-                    "-c:v",
-                    "copy",
-                    "-c:a",
-                    "copy",
-                    "-c:s",
-                    "mov_text",
-                    "-movflags",
-                    "+faststart",
-                    "-f",
-                    "mp4",
-                    temporary.toString(),
-                ),
+                finalizationCommand(ffmpegExecutable, request.input(), temporary),
                 output.parent,
                 log,
                 cancelled,
@@ -191,6 +157,52 @@ internal class DesktopFfmpegVideoFinalizer private constructor(
         private const val PROCESS_POLL_MILLIS = 250L
         private const val PROCESS_STOP_GRACE_MILLIS = 2_000L
         private const val MAXIMUM_LOG_BYTES = 32 * 1024
+
+        internal fun finalizationCommand(
+            executable: Path,
+            input: Path,
+            output: Path,
+        ): List<String> = buildList {
+            add(executable.toString())
+            addAll(listOf("-nostdin", "-hide_banner", "-loglevel", "error", "-y"))
+            if (input.fileName.toString().lowercase(Locale.ROOT).endsWith(".m3u8")) {
+                addAll(
+                    listOf(
+                        "-protocol_whitelist",
+                        "file,crypto,data",
+                        "-allowed_extensions",
+                        "ALL",
+                    ),
+                )
+            }
+            addAll(
+                listOf(
+                    "-i",
+                    input.toString(),
+                    "-map",
+                    "0:v?",
+                    "-map",
+                    "0:a?",
+                    "-map",
+                    "0:s?",
+                    "-map_metadata",
+                    "0",
+                    "-map_chapters",
+                    "0",
+                    "-c:v",
+                    "copy",
+                    "-c:a",
+                    "copy",
+                    "-c:s",
+                    "mov_text",
+                    "-movflags",
+                    "+faststart",
+                    "-f",
+                    "mp4",
+                    output.toString(),
+                ),
+            )
+        }
 
         fun resolve(): DesktopFfmpegVideoFinalizer {
             val executableSuffix = if (isWindows()) ".exe" else ""

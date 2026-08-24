@@ -754,8 +754,20 @@ private fun DownloadJobCard(
                     else -> Unit
                 }
                 if (job.status() == DownloadStatus.FAILED && job.hasPartialData()) {
-                    TextButton(onClick = { retry(DownloadRecoveryMode.RESTART) }) {
-                        Text("ui.restart")
+                    val downloadedVideoNeedsFinalization = job.contentType() == DownloadContentType.VIDEO &&
+                        job.completedPages() == job.totalPages()
+                    TextButton(
+                        onClick = {
+                            retry(
+                                if (downloadedVideoNeedsFinalization) {
+                                    DownloadRecoveryMode.RESUME_PARTIAL
+                                } else {
+                                    DownloadRecoveryMode.RESTART
+                                },
+                            )
+                        },
+                    ) {
+                        Text(if (downloadedVideoNeedsFinalization) "ui.retry" else "ui.restart")
                     }
                 }
                 if (job.status() != DownloadStatus.COMPLETED &&
