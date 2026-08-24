@@ -33,6 +33,7 @@ public final class PlayerPlugin implements AnilibPlugin {
             .provides(PlayerCapabilities.SERVICE)
             .provides(PlayerCapabilities.BACKEND)
             .provides(PlayerCapabilities.BACKUP_CODEC)
+            .provides(PlayerCapabilities.CONTENT_REGISTRAR)
             .provides(PlayerUiCapabilities.PRESENTATION)
             .build();
     private final Path stateFile;
@@ -78,6 +79,7 @@ public final class PlayerPlugin implements AnilibPlugin {
         context.publish(PlayerCapabilities.SERVICE, service);
         context.publish(PlayerCapabilities.BACKEND, backend);
         context.publish(PlayerCapabilities.BACKUP_CODEC, new PlayerBackupCodec(service));
+        context.publish(PlayerCapabilities.CONTENT_REGISTRAR, service);
         context.publish(PlayerUiCapabilities.PRESENTATION, new DefaultPlayerPresentation(
                 service,
                 new FilePlayerPreferenceStore(preferenceFile)));

@@ -36,9 +36,18 @@ import fr.vriege.anilib.feature.source.SourceId;
 import fr.vriege.anilib.feature.source.SourcePageResource;
 import fr.vriege.anilib.feature.source.SourceRegistry;
 import fr.vriege.anilib.feature.source.SourceSdk;
+import fr.vriege.anilib.feature.source.SourceEpisode;
+import fr.vriege.anilib.feature.source.SourceEpisodeId;
+import fr.vriege.anilib.feature.source.SourceStreamFormat;
+import fr.vriege.anilib.feature.source.SourceVideoStream;
+import fr.vriege.anilib.feature.source.StreamingSource;
+import fr.vriege.anilib.framework.http.AnilibHttpClient;
+import fr.vriege.anilib.framework.http.HttpResponse;
 import fr.vriege.anilib.kernel.StartedAnilib;
 
 import java.io.IOException;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -73,9 +82,67 @@ final class DownloadTest {
         verifiesPriorityMetricsAndRecovery(counter);
         verifiesAutomaticRules(counter);
         verifiesStorageLimit(counter);
+        downloadsHlsEpisodes(counter);
         enforcesLargeTransferPolicy(counter);
         cleansOrphanedDownloads(counter);
         return counter.value;
+    }
+
+    private static void downloadsHlsEpisodes(Counter counter) {
+        Path root = null;
+        try {
+            root = Files.createTempDirectory("anilib-anime-download");
+            MemoryLibraryCatalog library = new MemoryLibraryCatalog();
+            LibraryItem item = LibraryItem.create("Anime", MediaKind.ANIME)
+                    .withOrigin(new LibraryOrigin("test.streaming", "title"));
+            library.save(item);
+            HlsStreamingSource source = new HlsStreamingSource();
+            byte[] first = {1, 2, 3};
+            byte[] second = {4, 5, 6, 7};
+            AnilibHttpClient client = request -> {
+                String location = request.uri().toString();
+                if (location.endsWith("playlist.m3u8")) {
+                    String playlist = "#EXTM3U\n#EXT-X-TARGETDURATION:10\n"
+                            + "#EXTINF:10,\nfirst.ts\n#EXTINF:10,\nsecond.ts\n#EXT-X-ENDLIST\n";
+                    return new HttpResponse(200, Map.of(), playlist.getBytes(StandardCharsets.UTF_8), false);
+                }
+                if (location.endsWith("first.ts")) {
+                    return new HttpResponse(200, Map.of(), first, false);
+                }
+                if (location.endsWith("second.ts")) {
+                    return new HttpResponse(200, Map.of(), second, false);
+                }
+                return new HttpResponse(404, Map.of(), new byte[0], false);
+            };
+            DownloadStoragePolicy policy = new DownloadStoragePolicy(4096, 1024, 1, true, true);
+            try (DefaultDownloadService downloads = new DefaultDownloadService(
+                    new SingleSourceRegistry(source), library, root, policy, () -> true, client)) {
+                counter.check(downloads.canEnqueue(item.id()),
+                        "streaming titles must expose episode downloads");
+                DownloadId id = downloads.enqueue(item.id(), source.episode.id().value());
+                DownloadJobSnapshot completed = await(
+                        downloads,
+                        id,
+                        job -> job.status() == DownloadStatus.COMPLETED);
+                counter.check(completed.completedPages() == 2
+                                && completed.downloadedBytes() == first.length + second.length,
+                        "HLS downloads must persist every media segment");
+                Path directory = root.resolve("content").resolve(id.toString());
+                counter.check(Files.isRegularFile(directory.resolve("offline.m3u8"))
+                                && Files.isRegularFile(directory.resolve("00000000.page"))
+                                && Files.isRegularFile(directory.resolve("00000001.page")),
+                        "HLS downloads must create a self-contained offline playlist");
+                counter.check(downloads.episodes(source.itemId).equals(List.of(source.episode))
+                                && downloads.streams(source.episode.id()).stream()
+                                        .map(SourceVideoStream::location)
+                                        .allMatch(location -> location.getScheme().equals("file")),
+                        "completed anime downloads must become local Player content");
+            }
+        } catch (IOException exception) {
+            throw new AssertionError("Unable to prepare anime download test", exception);
+        } finally {
+            deleteTree(root);
+        }
     }
 
     private static void verifiesAutomaticRules(Counter counter) {
@@ -622,6 +689,47 @@ final class DownloadTest {
                     new SourceContentUnitId(itemId, id),
                     "Chapter " + id,
                     Optional.of(Instant.EPOCH));
+        }
+    }
+
+    private static final class HlsStreamingSource implements StreamingSource {
+        private final SourceCatalogueItemId itemId = new SourceCatalogueItemId(
+                SourceId.of("test.streaming"),
+                "title");
+        private final SourceEpisode episode = new SourceEpisode(
+                new SourceEpisodeId(itemId, "episode-1"),
+                "Episode 1",
+                1.0D,
+                Optional.of(Instant.EPOCH),
+                Optional.empty());
+
+        @Override
+        public SourceDescriptor descriptor() {
+            return new SourceDescriptor(
+                    itemId.sourceId(),
+                    "Streaming test",
+                    "1.0.0",
+                    "und",
+                    Set.of(SourceContentKind.ANIME),
+                    SourceSdk.API_VERSION);
+        }
+
+        @Override
+        public List<SourceEpisode> episodes(SourceCatalogueItemId requested) {
+            return requested.equals(itemId) ? List.of(episode) : List.of();
+        }
+
+        @Override
+        public List<SourceVideoStream> streams(SourceEpisodeId requested) {
+            return requested.equals(episode.id())
+                    ? List.of(new SourceVideoStream(
+                            "hls",
+                            "1080p",
+                            URI.create("https://video.test/playlist.m3u8"),
+                            SourceStreamFormat.HLS,
+                            Map.of("Referer", "https://anime.test/title"),
+                            List.of()))
+                    : List.of();
         }
     }
 

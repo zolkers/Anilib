@@ -20,6 +20,7 @@ final class DownloadRecord {
     final SourceCatalogueItemId sourceItemId;
     final SourceContentUnit contentUnit;
     final List<SourcePageResource> pages;
+    final VideoDownloadMetadata video;
     DownloadPriority priority;
     long queueOrder;
     DownloadStatus status;
@@ -38,6 +39,7 @@ final class DownloadRecord {
             SourceCatalogueItemId sourceItemId,
             SourceContentUnit contentUnit,
             List<SourcePageResource> pages,
+            VideoDownloadMetadata video,
             DownloadPriority priority,
             long queueOrder,
             DownloadStatus status,
@@ -51,6 +53,7 @@ final class DownloadRecord {
         this.sourceItemId = sourceItemId;
         this.contentUnit = contentUnit;
         this.pages = List.copyOf(pages);
+        this.video = video;
         this.priority = priority;
         this.queueOrder = queueOrder;
         this.status = status;
@@ -58,6 +61,10 @@ final class DownloadRecord {
         this.downloadedBytes = downloadedBytes;
         this.error = error;
         this.updatedAt = updatedAt;
+    }
+
+    boolean video() {
+        return video != null;
     }
 
     DownloadJobSnapshot snapshot(int queuePosition) {

@@ -4,6 +4,7 @@ dependencies {
     implementation project(':Anilib:Foundation')
     implementation project(':Anilib:Features:Library:Api')
     implementation project(':Anilib:Features:Network:Api')
+    implementation project(':Anilib:Features:Player:Api')
     implementation project(':Anilib:Features:Reader:Api')
     implementation project(':Anilib:Features:Settings:Api')
     implementation project(':Anilib:Features:Source:Api')

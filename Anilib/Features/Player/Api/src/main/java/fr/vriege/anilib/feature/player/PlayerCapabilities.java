@@ -10,6 +10,8 @@ public final class PlayerCapabilities {
             CapabilityKey.of("feature.player.backend", PlayerBackend.class);
     public static final CapabilityKey<BackupSectionCodec> BACKUP_CODEC =
             CapabilityKey.of("feature.player.backup-codec", BackupSectionCodec.class);
+    public static final CapabilityKey<PlayerContentRegistrar> CONTENT_REGISTRAR =
+            CapabilityKey.of("feature.player.content-registrar", PlayerContentRegistrar.class);
 
     private PlayerCapabilities() {
     }

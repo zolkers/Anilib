@@ -13,6 +13,8 @@ import fr.vriege.anilib.feature.player.PlayerBackend;
 import fr.vriege.anilib.feature.player.PlayerBackends;
 import fr.vriege.anilib.feature.player.PlayerException;
 import fr.vriege.anilib.feature.player.PlayerProgressEvent;
+import fr.vriege.anilib.feature.player.PlayerContentProvider;
+import fr.vriege.anilib.feature.player.PlayerContentRegistrar;
 import fr.vriege.anilib.feature.player.PlayerService;
 import fr.vriege.anilib.feature.player.PlayerSession;
 import fr.vriege.anilib.feature.player.PlayerSessionSnapshot;
@@ -44,7 +46,7 @@ import java.util.function.Consumer;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-public final class DefaultPlayerService implements PlayerService, AutoCloseable {
+public final class DefaultPlayerService implements PlayerService, PlayerContentRegistrar, AutoCloseable {
     private static final int MAXIMUM_EPISODES = 100_000;
     private static final int MAXIMUM_STREAMS = 512;
     private static final Duration EPISODE_CACHE_TTL = Duration.ofMinutes(10L);
@@ -58,6 +60,7 @@ public final class DefaultPlayerService implements PlayerService, AutoCloseable 
     private final Set<Runnable> listeners = new HashSet<>();
     private final Set<Consumer<PlayerProgressEvent>> progressListeners = new HashSet<>();
     private final Map<SourceCatalogueItemId, CachedEpisodes> episodeCache = new HashMap<>();
+    private PlayerContentProvider contentProvider;
     private boolean closed;
 
     public DefaultPlayerService(
@@ -112,19 +115,29 @@ public final class DefaultPlayerService implements PlayerService, AutoCloseable 
         Objects.requireNonNull(libraryItemId, "libraryItemId must not be null");
         ensureOpen();
         Optional<LibraryItem> item = library.find(libraryItemId);
-        return item.filter(value -> value.kind() == MediaKind.ANIME)
-                .flatMap(LibraryItem::origin)
-                .map(DefaultPlayerService::sourceItemId)
-                .flatMap(id -> sources.find(id.sourceId()))
-                .filter(StreamingSource.class::isInstance)
-                .isPresent();
+        if (item.filter(value -> value.kind() == MediaKind.ANIME).isEmpty()) {
+            return false;
+        }
+        Optional<SourceCatalogueItemId> sourceItemId = item.orElseThrow().origin()
+                .map(DefaultPlayerService::sourceItemId);
+        if (sourceItemId.isEmpty()) {
+            return false;
+        }
+        PlayerContentProvider provider = contentProvider;
+        if (provider != null && !provider.episodes(sourceItemId.orElseThrow()).isEmpty()) {
+            return true;
+        }
+        return fallbackAllowed()
+                && sources.find(sourceItemId.orElseThrow().sourceId())
+                        .filter(StreamingSource.class::isInstance)
+                        .isPresent();
     }
 
     @Override
     public synchronized List<EpisodeSnapshot> episodes(LibraryItemId libraryItemId) {
         ensureOpen();
-        ResolvedTitle resolved = resolve(libraryItemId);
-        return episodeSnapshots(libraryItemId, episodes(resolved.source(), resolved.sourceItemId()));
+        ResolvedLibrary resolved = resolveLibrary(libraryItemId);
+        return episodeSnapshots(libraryItemId, availableEpisodes(resolved));
     }
 
     @Override
@@ -155,8 +168,8 @@ public final class DefaultPlayerService implements PlayerService, AutoCloseable 
         Set<SourceEpisodeId> selected = Set.copyOf(Objects.requireNonNull(
                 episodeIds,
                 "episodeIds must not be null"));
-        ResolvedTitle resolved = resolve(itemId);
-        List<SourceEpisode> available = episodes(resolved.source(), resolved.sourceItemId());
+        ResolvedLibrary resolved = resolveLibrary(itemId);
+        List<SourceEpisode> available = availableEpisodes(resolved);
         Map<SourceEpisodeId, SourceEpisode> indexed = new LinkedHashMap<>();
         available.forEach(episode -> indexed.put(episode.id(), episode));
         if (!indexed.keySet().containsAll(selected)) {
@@ -211,15 +224,15 @@ public final class DefaultPlayerService implements PlayerService, AutoCloseable 
             SourceEpisodeId episodeId) {
         ensureOpen();
         Objects.requireNonNull(episodeId, "episodeId must not be null");
-        ResolvedTitle resolved = resolve(libraryItemId);
+        ResolvedLibrary resolved = resolveLibrary(libraryItemId);
         if (!episodeId.itemId().equals(resolved.sourceItemId())) {
             throw new PlayerException("Episode does not belong to the selected library title");
         }
-        SourceEpisode episode = episodes(resolved.source(), resolved.sourceItemId()).stream()
+        SourceEpisode episode = availableEpisodes(resolved).stream()
                 .filter(candidate -> candidate.id().equals(episodeId))
                 .findFirst()
                 .orElseThrow(() -> new PlayerException("Episode is no longer available"));
-        List<SourceVideoStream> streams = validatedStreams(resolved.source(), episodeId);
+        List<SourceVideoStream> streams = availableStreams(resolved, episodeId);
         PlaybackState playback = states.find(libraryItemId, episodeId).orElseGet(() -> new PlaybackState(
                 libraryItemId,
                 episodeId,
@@ -289,6 +302,17 @@ public final class DefaultPlayerService implements PlayerService, AutoCloseable 
         Consumer<PlayerProgressEvent> value = Objects.requireNonNull(listener, "listener must not be null");
         progressListeners.add(value);
         return () -> removeProgressListener(value);
+    }
+
+    @Override
+    public synchronized AutoCloseable register(PlayerContentProvider provider) {
+        Objects.requireNonNull(provider, "provider must not be null");
+        ensureOpen();
+        if (contentProvider != null) {
+            throw new PlayerException("A Player content provider is already registered");
+        }
+        contentProvider = provider;
+        return () -> unregister(provider);
     }
 
     synchronized PlaybackState updatePlayback(
@@ -373,7 +397,7 @@ public final class DefaultPlayerService implements PlayerService, AutoCloseable 
         sessions.remove(session);
     }
 
-    private ResolvedTitle resolve(LibraryItemId libraryItemId) {
+    private ResolvedLibrary resolveLibrary(LibraryItemId libraryItemId) {
         Objects.requireNonNull(libraryItemId, "libraryItemId must not be null");
         LibraryItem item = library.find(libraryItemId)
                 .orElseThrow(() -> new PlayerException("Library item was not found"));
@@ -383,12 +407,99 @@ public final class DefaultPlayerService implements PlayerService, AutoCloseable 
         LibraryOrigin origin = item.origin()
                 .orElseThrow(() -> new PlayerException("Library item has no source origin"));
         SourceCatalogueItemId sourceItemId = sourceItemId(origin);
-        Source source = sources.find(sourceItemId.sourceId())
+        return new ResolvedLibrary(item, sourceItemId);
+    }
+
+    private List<SourceEpisode> availableEpisodes(ResolvedLibrary resolved) {
+        PlayerContentProvider provider = contentProvider;
+        List<SourceEpisode> offline = provider == null
+                ? List.of()
+                : validatedProviderEpisodes(provider.episodes(resolved.sourceItemId()), resolved.sourceItemId());
+        if (!fallbackAllowed()) {
+            if (offline.isEmpty()) {
+                throw new PlayerException("This title is not available while offline mode is enabled");
+            }
+            return offline;
+        }
+        Optional<Source> source = sources.find(resolved.sourceItemId().sourceId());
+        if (source.orElse(null) instanceof StreamingSource streamingSource) {
+            try {
+                List<SourceEpisode> online = episodes(streamingSource, resolved.sourceItemId());
+                if (offline.isEmpty()) {
+                    return online;
+                }
+                Map<SourceEpisodeId, SourceEpisode> combined = new LinkedHashMap<>();
+                online.forEach(episode -> combined.put(episode.id(), episode));
+                offline.forEach(episode -> combined.putIfAbsent(episode.id(), episode));
+                return List.copyOf(combined.values());
+            } catch (RuntimeException failure) {
+                if (offline.isEmpty()) {
+                    throw failure;
+                }
+            }
+        }
+        if (!offline.isEmpty()) {
+            return offline;
+        }
+        throw new PlayerException("Library source is not installed");
+    }
+
+    private List<SourceVideoStream> availableStreams(
+            ResolvedLibrary resolved,
+            SourceEpisodeId episodeId) {
+        PlayerContentProvider provider = contentProvider;
+        List<SourceVideoStream> offline = provider == null
+                ? List.of()
+                : validatedProviderStreams(provider.streams(episodeId));
+        if (!offline.isEmpty()) {
+            return offline;
+        }
+        if (!fallbackAllowed()) {
+            throw new PlayerException("This episode is not available while offline mode is enabled");
+        }
+        Source source = sources.find(resolved.sourceItemId().sourceId())
                 .orElseThrow(() -> new PlayerException("Library source is not installed"));
         if (!(source instanceof StreamingSource streamingSource)) {
             throw new PlayerException("Library source does not provide streaming content");
         }
-        return new ResolvedTitle(item, sourceItemId, streamingSource);
+        return validatedStreams(streamingSource, episodeId);
+    }
+
+    private static List<SourceEpisode> validatedProviderEpisodes(
+            List<SourceEpisode> supplied,
+            SourceCatalogueItemId itemId) {
+        List<SourceEpisode> episodes = List.copyOf(Objects.requireNonNull(
+                supplied,
+                "player content provider returned null episodes"));
+        if (episodes.size() > MAXIMUM_EPISODES
+                || episodes.stream().anyMatch(episode -> !episode.id().itemId().equals(itemId))) {
+            throw new PlayerException("Player content provider returned invalid episodes");
+        }
+        return episodes;
+    }
+
+    private static List<SourceVideoStream> validatedProviderStreams(List<SourceVideoStream> supplied) {
+        List<SourceVideoStream> streams = List.copyOf(Objects.requireNonNull(
+                supplied,
+                "player content provider returned null streams"));
+        if (streams.size() > MAXIMUM_STREAMS) {
+            throw new PlayerException("Player content provider returned too many streams");
+        }
+        Set<String> identities = new HashSet<>();
+        if (streams.stream().anyMatch(stream -> !identities.add(stream.id()))) {
+            throw new PlayerException("Player content provider returned duplicate streams");
+        }
+        return streams;
+    }
+
+    private boolean fallbackAllowed() {
+        return contentProvider == null || contentProvider.sourceFallbackAllowed();
+    }
+
+    private synchronized void unregister(PlayerContentProvider provider) {
+        if (contentProvider == provider) {
+            contentProvider = null;
+        }
     }
 
     private StreamingSource streamingSource(SourceCatalogueItemId itemId) {
@@ -512,6 +623,7 @@ public final class DefaultPlayerService implements PlayerService, AutoCloseable 
             listeners.clear();
             progressListeners.clear();
             episodeCache.clear();
+            contentProvider = null;
         }
     }
 
@@ -521,9 +633,8 @@ public final class DefaultPlayerService implements PlayerService, AutoCloseable 
             Instant loadedAt) {
     }
 
-    private record ResolvedTitle(
+    private record ResolvedLibrary(
             LibraryItem item,
-            SourceCatalogueItemId sourceItemId,
-            StreamingSource source) {
+            SourceCatalogueItemId sourceItemId) {
     }
 }

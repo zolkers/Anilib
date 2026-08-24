@@ -12,6 +12,8 @@ import fr.vriege.anilib.feature.network.NetworkCapabilities;
 import fr.vriege.anilib.feature.network.NetworkStatus;
 import fr.vriege.anilib.feature.reader.ReaderCapabilities;
 import fr.vriege.anilib.feature.reader.ReaderContentRegistrar;
+import fr.vriege.anilib.feature.player.PlayerCapabilities;
+import fr.vriege.anilib.feature.player.PlayerContentRegistrar;
 import fr.vriege.anilib.feature.source.SourceCapabilities;
 import fr.vriege.anilib.feature.source.SourceRegistry;
 import fr.vriege.anilib.feature.settings.SettingsCapabilities;
@@ -33,7 +35,9 @@ public final class DownloadPlugin implements AnilibPlugin {
             .requires(SourceCapabilities.REGISTRY)
             .requires(LibraryCapabilities.CATALOG)
             .requires(ReaderCapabilities.CONTENT_REGISTRAR)
+            .requires(PlayerCapabilities.CONTENT_REGISTRAR)
             .requires(NetworkCapabilities.STATUS)
+            .requires(NetworkCapabilities.HTTP_CLIENT)
             .requires(SettingsCapabilities.SERVICE)
             .requires(SettingsCapabilities.UNUSED_DATA_REGISTRAR)
             .requires(UpdateCapabilities.SERVICE)
@@ -65,7 +69,9 @@ public final class DownloadPlugin implements AnilibPlugin {
         SourceRegistry sources = context.require(SourceCapabilities.REGISTRY);
         LibraryCatalog library = context.require(LibraryCapabilities.CATALOG);
         ReaderContentRegistrar registrar = context.require(ReaderCapabilities.CONTENT_REGISTRAR);
+        PlayerContentRegistrar playerRegistrar = context.require(PlayerCapabilities.CONTENT_REGISTRAR);
         NetworkStatus network = context.require(NetworkCapabilities.STATUS);
+        var httpClient = context.require(NetworkCapabilities.HTTP_CLIENT);
         SettingsService settings = context.require(SettingsCapabilities.SERVICE);
         UnusedDataRegistrar cleanup = context.require(SettingsCapabilities.UNUSED_DATA_REGISTRAR);
         LibraryUpdateService updates = context.require(UpdateCapabilities.SERVICE);
@@ -74,9 +80,11 @@ public final class DownloadPlugin implements AnilibPlugin {
                 library,
                 storageDirectory,
                 policy,
-                () -> !settings.snapshot().downloadOnlyOnWifi() || network.allowsLargeTransfers()));
+                () -> !settings.snapshot().downloadOnlyOnWifi() || network.allowsLargeTransfers(),
+                httpClient));
         context.own(new AutomaticDownloadUpdateCoordinator(service, updates));
         context.own(registrar.register(service));
+        context.own(playerRegistrar.register(service));
         context.own(cleanup.register("downloads", service::cleanUnusedData));
         context.publish(DownloadCapabilities.SERVICE, service);
         context.publish(DownloadUiCapabilities.PRESENTATION, new DefaultDownloadPresentation(service));

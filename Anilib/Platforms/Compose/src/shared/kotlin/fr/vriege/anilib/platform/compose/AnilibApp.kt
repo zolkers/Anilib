@@ -331,9 +331,11 @@ fun AnilibApp(
                     }
                 }
                 val enqueueDownload: (LibraryItemId) -> Unit = { id ->
-                    runCatching { downloads.enqueue(id) }
-                        .onSuccess { downloadError = null }
-                        .onFailure { downloadError = it.message ?: "The download could not be queued." }
+                    scope.launch {
+                        withContext(Dispatchers.IO) { runCatching { downloads.enqueue(id) } }
+                            .onSuccess { downloadError = null }
+                            .onFailure { downloadError = it.message ?: "The download could not be queued." }
+                    }
                 }
                 val openPlayer: (LibraryItemId, SourceEpisodeId?) -> Unit = { id, episodeId ->
                     val request = PendingPlayerRequest(

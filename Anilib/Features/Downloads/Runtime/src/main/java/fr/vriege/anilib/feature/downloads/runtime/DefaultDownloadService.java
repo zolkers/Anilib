@@ -23,6 +23,7 @@ import fr.vriege.anilib.feature.library.LibraryOrigin;
 import fr.vriege.anilib.feature.library.MediaKind;
 import fr.vriege.anilib.feature.reader.ReaderContent;
 import fr.vriege.anilib.feature.reader.ReaderContentProvider;
+import fr.vriege.anilib.feature.player.PlayerContentProvider;
 import fr.vriege.anilib.feature.source.PagedSource;
 import fr.vriege.anilib.feature.source.Source;
 import fr.vriege.anilib.feature.source.SourceCatalogueItemId;
@@ -31,11 +32,21 @@ import fr.vriege.anilib.feature.source.SourceContentUnitId;
 import fr.vriege.anilib.feature.source.SourceId;
 import fr.vriege.anilib.feature.source.SourcePageResource;
 import fr.vriege.anilib.feature.source.SourceRegistry;
+import fr.vriege.anilib.feature.source.SourceEpisode;
+import fr.vriege.anilib.feature.source.SourceEpisodeId;
+import fr.vriege.anilib.feature.source.SourceVideoStream;
+import fr.vriege.anilib.feature.source.StreamingSource;
+import fr.vriege.anilib.feature.source.SourceStreamFormat;
+import fr.vriege.anilib.framework.http.AnilibHttpClient;
+import fr.vriege.anilib.framework.http.HttpException;
 
 import java.io.IOException;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.StandardOpenOption;
 import java.nio.file.StandardCopyOption;
 import java.time.Clock;
 import java.time.Instant;
@@ -57,7 +68,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public final class DefaultDownloadService
-        implements DownloadService, ReaderContentProvider, AutoCloseable {
+        implements DownloadService, ReaderContentProvider, PlayerContentProvider, AutoCloseable {
     private static final Comparator<DownloadRecord> DISPLAY_ORDER =
             Comparator.comparing((DownloadRecord record) -> record.status == DownloadStatus.DOWNLOADING).reversed()
                     .thenComparing((DownloadRecord record) -> record.priority, Comparator.reverseOrder())
@@ -80,6 +91,7 @@ public final class DefaultDownloadService
     private final FileAutomaticDownloadPolicyStore automaticPolicyStore;
     private final ExecutorService workers;
     private final BooleanSupplier largeTransfersAllowed;
+    private final VideoDownloadPlanner videoPlanner;
     private final Map<DownloadId, DownloadRecord> records = new LinkedHashMap<>();
     private final Set<DownloadId> scheduled = new HashSet<>();
     private final Set<Runnable> listeners = new HashSet<>();
@@ -94,7 +106,7 @@ public final class DefaultDownloadService
             LibraryCatalog library,
             Path root,
             DownloadStoragePolicy policy) {
-        this(sources, library, root, policy, () -> true);
+        this(sources, library, root, policy, () -> true, unavailableHttpClient());
     }
 
     public DefaultDownloadService(
@@ -103,6 +115,16 @@ public final class DefaultDownloadService
             Path root,
             DownloadStoragePolicy policy,
             BooleanSupplier largeTransfersAllowed) {
+        this(sources, library, root, policy, largeTransfersAllowed, unavailableHttpClient());
+    }
+
+    public DefaultDownloadService(
+            SourceRegistry sources,
+            LibraryCatalog library,
+            Path root,
+            DownloadStoragePolicy policy,
+            BooleanSupplier largeTransfersAllowed,
+            AnilibHttpClient httpClient) {
         this(
                 sources,
                 library,
@@ -110,7 +132,8 @@ public final class DefaultDownloadService
                 policy,
                 Clock.systemUTC(),
                 ManagedExecutors.fixed("anilib-download", policy.concurrentJobs()),
-                largeTransfersAllowed);
+                largeTransfersAllowed,
+                httpClient);
     }
 
     DefaultDownloadService(
@@ -121,6 +144,18 @@ public final class DefaultDownloadService
             Clock clock,
             ExecutorService workers,
             BooleanSupplier largeTransfersAllowed) {
+        this(sources, library, root, policy, clock, workers, largeTransfersAllowed, unavailableHttpClient());
+    }
+
+    DefaultDownloadService(
+            SourceRegistry sources,
+            LibraryCatalog library,
+            Path root,
+            DownloadStoragePolicy policy,
+            Clock clock,
+            ExecutorService workers,
+            BooleanSupplier largeTransfersAllowed,
+            AnilibHttpClient httpClient) {
         this.sources = Objects.requireNonNull(sources, "sources must not be null");
         this.library = Objects.requireNonNull(library, "library must not be null");
         Path normalizedRoot = Objects.requireNonNull(root, "root must not be null").toAbsolutePath().normalize();
@@ -133,6 +168,9 @@ public final class DefaultDownloadService
         this.largeTransfersAllowed = Objects.requireNonNull(
                 largeTransfersAllowed,
                 "largeTransfersAllowed must not be null");
+        this.videoPlanner = new VideoDownloadPlanner(Objects.requireNonNull(
+                httpClient,
+                "httpClient must not be null"));
         this.store = new FileDownloadQueueStore(normalizedRoot.resolve("queue.anilib"));
         this.locationStore = new FileDownloadStorageLocationStore(normalizedRoot.resolve("storage-location.anilib"));
         this.automaticPolicyStore = new FileAutomaticDownloadPolicyStore(
@@ -168,16 +206,23 @@ public final class DefaultDownloadService
         if (offlineMode || !largeTransfersAllowed.getAsBoolean()) {
             return false;
         }
-        return library.find(libraryItemId)
-                .flatMap(LibraryItem::origin)
-                .flatMap(origin -> sources.find(SourceId.of(origin.sourceId())))
-                .filter(PagedSource.class::isInstance)
+        return library.find(libraryItemId).flatMap(item -> item.origin()
+                        .flatMap(origin -> sources.find(SourceId.of(origin.sourceId())))
+                        .filter(source -> item.kind() == MediaKind.ANIME
+                                ? source instanceof StreamingSource
+                                : source instanceof PagedSource))
                 .isPresent();
     }
 
     @Override
     public synchronized DownloadId enqueue(LibraryItemId libraryItemId) {
-        return enqueue(libraryItemId, (SourceContentUnitId) null);
+        LibraryItem item = library.find(Objects.requireNonNull(
+                        libraryItemId,
+                        "libraryItemId must not be null"))
+                .orElseThrow(() -> new DownloadException("Library item was not found"));
+        return item.kind() == MediaKind.ANIME
+                ? enqueueVideo(item, null)
+                : enqueue(libraryItemId, (SourceContentUnitId) null);
     }
 
     @Override
@@ -230,6 +275,7 @@ public final class DefaultDownloadService
                 itemId,
                 unit,
                 pages,
+                null,
                 DownloadPriority.NORMAL,
                 nextQueueOrder++,
                 DownloadStatus.QUEUED,
@@ -250,13 +296,85 @@ public final class DefaultDownloadService
         if (sourceContentId == null || sourceContentId.isBlank()) {
             throw new IllegalArgumentException("sourceContentId must not be blank");
         }
-        LibraryOrigin origin = library.find(libraryItemId)
-                .flatMap(LibraryItem::origin)
+        LibraryItem item = library.find(libraryItemId)
+                .orElseThrow(() -> new DownloadException("Library item was not found"));
+        LibraryOrigin origin = item.origin()
                 .orElseThrow(() -> new DownloadException("Library item has no source origin"));
         SourceCatalogueItemId itemId = new SourceCatalogueItemId(
                 SourceId.of(origin.sourceId()),
                 origin.sourceItemKey());
-        return enqueue(libraryItemId, new SourceContentUnitId(itemId, sourceContentId));
+        return item.kind() == MediaKind.ANIME
+                ? enqueueVideo(item, new SourceEpisodeId(itemId, sourceContentId))
+                : enqueue(libraryItemId, new SourceContentUnitId(itemId, sourceContentId));
+    }
+
+    private DownloadId enqueueVideo(LibraryItem item, SourceEpisodeId episodeId) {
+        ensureOpen();
+        if (offlineMode) {
+            throw new DownloadException("Downloads cannot be queued while offline mode is enabled");
+        }
+        ensureLargeTransfersAllowed();
+        LibraryOrigin origin = item.origin()
+                .orElseThrow(() -> new DownloadException("Library item has no source origin"));
+        SourceCatalogueItemId itemId = new SourceCatalogueItemId(
+                SourceId.of(origin.sourceId()),
+                origin.sourceItemKey());
+        StreamingSource source = streamingSource(itemId.sourceId());
+        List<SourceEpisode> episodes = validatedEpisodes(source, itemId);
+        SourceEpisode episode = episodeId == null
+                ? selectEpisode(item, episodes)
+                : episodes.stream()
+                        .filter(candidate -> candidate.id().equals(episodeId))
+                        .findFirst()
+                        .orElseThrow(() -> new DownloadException("Episode was not found for this title"));
+        List<SourceVideoStream> streams = validatedStreams(source, episode.id());
+        SourceVideoStream stream = streams.stream()
+                .filter(candidate -> candidate.format() != SourceStreamFormat.DASH)
+                .findFirst()
+                .orElse(streams.getFirst());
+        SourceContentUnitId unitId = new SourceContentUnitId(itemId, episode.id().value());
+        SourceContentUnit unit = new SourceContentUnit(
+                unitId,
+                episode.title(),
+                episode.episodeNumber(),
+                episode.uploadedAt());
+        records.values().stream()
+                .filter(record -> record.contentUnit.id().equals(unitId))
+                .filter(record -> record.status != DownloadStatus.CANCELLED)
+                .findFirst()
+                .ifPresent(record -> {
+                    throw new DownloadException("This episode is already in the download queue");
+                });
+        VideoDownloadPlan plan = videoPlanner.plan(unitId, stream);
+        long estimatedBytes = plan.resources().stream()
+                .mapToLong(SourcePageResource::estimatedBytes)
+                .filter(size -> size >= 0L)
+                .sum();
+        boolean allSizesKnown = plan.resources().stream()
+                .noneMatch(resource -> resource.estimatedBytes() == SourcePageResource.UNKNOWN_SIZE);
+        if (allSizesKnown && usedStorageBytes + estimatedBytes > policy.maximumStorageBytes()) {
+            throw new DownloadException("The download would exceed the configured storage limit");
+        }
+        DownloadRecord record = new DownloadRecord(
+                DownloadId.create(),
+                item.id(),
+                item.title(),
+                itemId,
+                unit,
+                plan.resources(),
+                plan.metadata(),
+                DownloadPriority.NORMAL,
+                nextQueueOrder++,
+                DownloadStatus.QUEUED,
+                0,
+                0L,
+                null,
+                clock.instant());
+        records.put(record.id, record);
+        persist();
+        notifyListeners();
+        schedule(record);
+        return record.id;
     }
 
     @Override
@@ -505,25 +623,58 @@ public final class DefaultDownloadService
                 SourceCatalogueItemId itemId = new SourceCatalogueItemId(
                         SourceId.of(origin.sourceId()),
                         origin.sourceItemKey());
-                PagedSource source = pagedSource(itemId.sourceId());
-                List<SourceContentUnit> units = validatedUnits(source, itemId);
-                int first = Math.max(0, units.size() - limit);
-                for (SourceContentUnit unit : units.subList(first, units.size())) {
-                    if (hasDownload(unit.id())) {
-                        continue;
-                    }
-                    try {
-                        enqueue(item.id(), unit.id());
-                        enqueued++;
-                    } catch (DownloadException exception) {
-                        failures.add(item.title() + " · " + unit.title() + ": " + message(exception));
-                    }
-                }
+                enqueued += item.kind() == MediaKind.ANIME
+                        ? enqueueAutomaticEpisodes(item, itemId, limit, failures)
+                        : enqueueAutomaticChapters(item, itemId, limit, failures);
             } catch (DownloadException exception) {
                 failures.add(item.title() + ": " + message(exception));
             }
         }
         return new AutomaticDownloadResult(enqueued, removed, failures);
+    }
+
+    private int enqueueAutomaticChapters(
+            LibraryItem item,
+            SourceCatalogueItemId itemId,
+            int limit,
+            List<String> failures) {
+        PagedSource source = pagedSource(itemId.sourceId());
+        List<SourceContentUnit> units = validatedUnits(source, itemId);
+        int first = Math.max(0, units.size() - limit);
+        int enqueued = 0;
+        for (SourceContentUnit unit : units.subList(first, units.size())) {
+            if (!hasDownload(unit.id())) {
+                try {
+                    enqueue(item.id(), unit.id());
+                    enqueued++;
+                } catch (DownloadException exception) {
+                    failures.add(item.title() + " · " + unit.title() + ": " + message(exception));
+                }
+            }
+        }
+        return enqueued;
+    }
+
+    private int enqueueAutomaticEpisodes(
+            LibraryItem item,
+            SourceCatalogueItemId itemId,
+            int limit,
+            List<String> failures) {
+        StreamingSource source = streamingSource(itemId.sourceId());
+        List<SourceEpisode> episodes = validatedEpisodes(source, itemId);
+        int enqueued = 0;
+        for (SourceEpisode episode : episodes.subList(0, Math.min(limit, episodes.size()))) {
+            SourceContentUnitId unitId = new SourceContentUnitId(itemId, episode.id().value());
+            if (!hasDownload(unitId)) {
+                try {
+                    enqueue(item.id(), episode.id().value());
+                    enqueued++;
+                } catch (DownloadException exception) {
+                    failures.add(item.title() + " · " + episode.title() + ": " + message(exception));
+                }
+            }
+        }
+        return enqueued;
     }
 
     @Override
@@ -717,6 +868,44 @@ public final class DefaultDownloadService
     }
 
     @Override
+    public synchronized List<SourceEpisode> episodes(SourceCatalogueItemId itemId) {
+        Objects.requireNonNull(itemId, "itemId must not be null");
+        ensureOpen();
+        return records.values().stream()
+                .filter(DownloadRecord::video)
+                .filter(record -> record.status == DownloadStatus.COMPLETED)
+                .filter(record -> record.sourceItemId.equals(itemId))
+                .map(record -> new SourceEpisode(
+                        new SourceEpisodeId(itemId, record.contentUnit.id().value()),
+                        record.contentUnit.title(),
+                        record.contentUnit.number(),
+                        record.contentUnit.publishedAt(),
+                        Optional.empty()))
+                .sorted(Comparator.comparingDouble(SourceEpisode::episodeNumber).reversed())
+                .toList();
+    }
+
+    @Override
+    public synchronized List<SourceVideoStream> streams(SourceEpisodeId episodeId) {
+        Objects.requireNonNull(episodeId, "episodeId must not be null");
+        ensureOpen();
+        return records.values().stream()
+                .filter(DownloadRecord::video)
+                .filter(record -> record.status == DownloadStatus.COMPLETED)
+                .filter(record -> record.sourceItemId.equals(episodeId.itemId()))
+                .filter(record -> record.contentUnit.id().value().equals(episodeId.value()))
+                .max(Comparator.comparing(record -> record.updatedAt))
+                .map(record -> List.of(new SourceVideoStream(
+                        "offline-" + record.id,
+                        "Offline",
+                        (record.video.hls() ? playlistFile(record) : videoFile(record)).toUri(),
+                        record.video.format(),
+                        Map.of(),
+                        List.of())))
+                .orElseGet(List::of);
+    }
+
+    @Override
     public synchronized byte[] readPage(SourcePageResource page) {
         Objects.requireNonNull(page, "page must not be null");
         ensureOpen();
@@ -753,8 +942,8 @@ public final class DefaultDownloadService
                 record.activeStartedNanos = System.nanoTime();
                 record.activeStartBytes = record.downloadedBytes;
             }
-            PagedSource source = pagedSource(record.sourceItemId.sourceId());
-            while (downloadNextPage(record, source)) {
+            PagedSource source = record.video() ? null : pagedSource(record.sourceItemId.sourceId());
+            while (record.video() ? downloadNextVideoResource(record) : downloadNextPage(record, source)) {
                 // Continue until paused, failed, cancelled, or complete.
             }
         } catch (RuntimeException exception) {
@@ -828,6 +1017,82 @@ public final class DefaultDownloadService
         }
     }
 
+    private boolean downloadNextVideoResource(DownloadRecord record) {
+        SourcePageResource resource;
+        synchronized (this) {
+            if (!readyToTransfer(record)) {
+                return false;
+            }
+            if (record.completedPages == record.pages.size()) {
+                completeVideo(record);
+                return false;
+            }
+            resource = record.pages.get(record.completedPages);
+            if (resource.estimatedBytes() > policy.maximumPageBytes()) {
+                throw new DownloadException("Video chunk exceeds the configured transfer limit");
+            }
+        }
+        VideoDownloadResource videoResource = VideoDownloadResource.decode(resource.value());
+        byte[] bytes = videoPlanner.fetch(record.video, videoResource);
+        synchronized (this) {
+            if (!readyToTransfer(record)) {
+                return false;
+            }
+            if (bytes.length > policy.maximumPageBytes()) {
+                throw new DownloadException("Video chunk exceeds the configured transfer limit");
+            }
+            if (usedStorageBytes + bytes.length > policy.maximumStorageBytes()) {
+                throw new DownloadException("Download storage limit reached");
+            }
+            if (record.video.hls()) {
+                writePage(record, resource.index(), bytes);
+            } else {
+                appendVideoChunk(record, videoResource, bytes);
+            }
+            record.completedPages++;
+            record.downloadedBytes += bytes.length;
+            usedStorageBytes += bytes.length;
+            updateTransferRate(record);
+            if (record.completedPages == record.pages.size()) {
+                completeVideo(record);
+            } else {
+                persist();
+                notifyListeners();
+            }
+            return record.status == DownloadStatus.DOWNLOADING;
+        }
+    }
+
+    private boolean readyToTransfer(DownloadRecord record) {
+        if (closed || offlineMode || records.get(record.id) != record
+                || record.status != DownloadStatus.DOWNLOADING) {
+            return false;
+        }
+        if (!largeTransfersAllowed.getAsBoolean()) {
+            transition(record, DownloadStatus.PAUSED, null);
+            return false;
+        }
+        return true;
+    }
+
+    private void updateTransferRate(DownloadRecord record) {
+        long elapsedNanos = Math.max(1L, System.nanoTime() - record.activeStartedNanos);
+        long transferred = record.downloadedBytes - record.activeStartBytes;
+        record.bytesPerSecond = saturatedRate(transferred, elapsedNanos);
+        record.updatedAt = clock.instant();
+    }
+
+    private void completeVideo(DownloadRecord record) {
+        if (record.video.hls()) {
+            writeOfflinePlaylist(record);
+        }
+        record.status = DownloadStatus.COMPLETED;
+        record.error = null;
+        record.updatedAt = clock.instant();
+        persist();
+        notifyListeners();
+    }
+
     private void schedule(DownloadRecord record) {
         if (record.status == DownloadStatus.QUEUED) {
             scheduleAvailable();
@@ -877,6 +1142,56 @@ public final class DefaultDownloadService
             throw new DownloadException("Download source does not provide paged content");
         }
         return pagedSource;
+    }
+
+    private StreamingSource streamingSource(SourceId sourceId) {
+        Source source = sources.find(sourceId)
+                .orElseThrow(() -> new DownloadException("Download source is not installed"));
+        if (!(source instanceof StreamingSource streamingSource)) {
+            throw new DownloadException("Download source does not provide episodes");
+        }
+        return streamingSource;
+    }
+
+    private static List<SourceEpisode> validatedEpisodes(
+            StreamingSource source,
+            SourceCatalogueItemId itemId) {
+        List<SourceEpisode> episodes = List.copyOf(Objects.requireNonNull(
+                source.episodes(itemId),
+                "streaming source returned null episodes"));
+        if (episodes.isEmpty() || episodes.stream().anyMatch(episode -> !episode.id().itemId().equals(itemId))) {
+            throw new DownloadException("Download source returned invalid episodes");
+        }
+        return episodes;
+    }
+
+    private static List<SourceVideoStream> validatedStreams(
+            StreamingSource source,
+            SourceEpisodeId episodeId) {
+        List<SourceVideoStream> streams = List.copyOf(Objects.requireNonNull(
+                source.streams(episodeId),
+                "streaming source returned null streams"));
+        if (streams.isEmpty()) {
+            throw new DownloadException("Episode contains no downloadable video stream");
+        }
+        Set<String> identities = new HashSet<>();
+        if (streams.stream().anyMatch(stream -> !identities.add(stream.id()))) {
+            throw new DownloadException("Download source returned duplicate video streams");
+        }
+        return streams;
+    }
+
+    private static SourceEpisode selectEpisode(LibraryItem item, List<SourceEpisode> episodes) {
+        Optional<String> preferred = item.progress().map(progress -> progress.contentId());
+        if (preferred.isPresent()) {
+            Optional<SourceEpisode> match = episodes.stream()
+                    .filter(episode -> episode.id().value().equals(preferred.orElseThrow()))
+                    .findFirst();
+            if (match.isPresent()) {
+                return match.orElseThrow();
+            }
+        }
+        return episodes.getLast();
     }
 
     private static List<SourceContentUnit> validatedUnits(
@@ -952,6 +1267,10 @@ public final class DefaultDownloadService
         if (record.queueOrder < 0) {
             throw new IOException("Download queue position must not be negative");
         }
+        if (record.video() && !record.video.hls()) {
+            reconcileProgressiveVideo(record);
+            return;
+        }
         int completePages = 0;
         long bytes = 0;
         while (completePages < record.pages.size()) {
@@ -976,6 +1295,45 @@ public final class DefaultDownloadService
                     : DownloadStatus.QUEUED;
             record.error = "Downloaded page set was incomplete and will be resumed";
         }
+        if (record.video() && record.status == DownloadStatus.COMPLETED && !Files.isRegularFile(playlistFile(record))) {
+            writeOfflinePlaylist(record);
+        }
+    }
+
+    private void reconcileProgressiveVideo(DownloadRecord record) throws IOException {
+        Path file = videoFile(record);
+        long available = Files.isRegularFile(file) ? Files.size(file) : 0L;
+        int complete = 0;
+        long expected = 0L;
+        while (complete < record.pages.size()) {
+            long size = record.pages.get(complete).estimatedBytes();
+            if (size < 0L || expected + size > available) {
+                break;
+            }
+            expected += size;
+            complete++;
+        }
+        if (available != expected && Files.isRegularFile(file)) {
+            try (var channel = FileChannel.open(
+                    file,
+                    StandardOpenOption.WRITE)) {
+                channel.truncate(expected);
+            }
+        }
+        record.completedPages = complete;
+        record.downloadedBytes = expected;
+        usedStorageBytes += expected;
+        if (record.status == DownloadStatus.DOWNLOADING || record.status == DownloadStatus.QUEUED) {
+            record.status = offlineMode || !policy.resumeOnStart()
+                    ? DownloadStatus.PAUSED
+                    : DownloadStatus.QUEUED;
+        }
+        if (record.status == DownloadStatus.COMPLETED && complete != record.pages.size()) {
+            record.status = offlineMode || !policy.resumeOnStart()
+                    ? DownloadStatus.PAUSED
+                    : DownloadStatus.QUEUED;
+            record.error = "Downloaded video was incomplete and will be resumed";
+        }
     }
 
     private void writePage(DownloadRecord record, int index, byte[] bytes) {
@@ -994,6 +1352,43 @@ public final class DefaultDownloadService
         }
     }
 
+    private void appendVideoChunk(
+            DownloadRecord record,
+            VideoDownloadResource resource,
+            byte[] bytes) {
+        Path target = videoFile(record);
+        try {
+            Files.createDirectories(target.getParent());
+            long existing = Files.exists(target) ? Files.size(target) : 0L;
+            if (existing != resource.rangeStart()) {
+                throw new DownloadException("Downloaded video chunk order is inconsistent");
+            }
+            Files.write(
+                    target,
+                    bytes,
+                    StandardOpenOption.CREATE,
+                    StandardOpenOption.APPEND);
+        } catch (IOException exception) {
+            throw new DownloadException("Unable to store downloaded video", exception);
+        }
+    }
+
+    private void writeOfflinePlaylist(DownloadRecord record) {
+        Path target = playlistFile(record);
+        Path temporary = target.resolveSibling(target.getFileName() + ".tmp");
+        try {
+            Files.createDirectories(target.getParent());
+            Files.writeString(temporary, record.video.offlinePlaylist(), StandardCharsets.UTF_8);
+            try {
+                Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            } catch (AtomicMoveNotSupportedException exception) {
+                Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } catch (IOException exception) {
+            throw new DownloadException("Unable to store the offline video playlist", exception);
+        }
+    }
+
     private void deleteFiles(DownloadRecord record) {
         deleteDirectory(recordDirectory(record), true);
     }
@@ -1005,7 +1400,8 @@ public final class DefaultDownloadService
         try (Stream<Path> paths = Files.walk(directory)) {
             for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) {
                 if (accountStorage && Files.isRegularFile(path)
-                        && path.getFileName().toString().endsWith(".page")) {
+                        && (path.getFileName().toString().endsWith(".page")
+                        || path.getFileName().toString().endsWith(".media"))) {
                     usedStorageBytes -= Files.size(path);
                 }
                 Files.deleteIfExists(path);
@@ -1018,6 +1414,14 @@ public final class DefaultDownloadService
 
     private Path pageFile(DownloadRecord record, int index) {
         return recordDirectory(record).resolve(pageFileName(index));
+    }
+
+    private Path videoFile(DownloadRecord record) {
+        return recordDirectory(record).resolve("offline.media");
+    }
+
+    private Path playlistFile(DownloadRecord record) {
+        return recordDirectory(record).resolve("offline.m3u8");
     }
 
     private Path recordDirectory(DownloadRecord record) {
@@ -1120,17 +1524,19 @@ public final class DefaultDownloadService
             if (Files.exists(targetDirectory)) {
                 deleteDirectory(targetDirectory, false);
             }
-            for (int index = 0; index < record.pages.size(); index++) {
-                Path source = sourceDirectory.resolve(pageFileName(index));
-                if (!Files.isRegularFile(source)) {
-                    continue;
-                }
+            if (!Files.isDirectory(sourceDirectory)) {
+                continue;
+            }
+            try (Stream<Path> files = Files.list(sourceDirectory)) {
+                for (Path source : files.filter(Files::isRegularFile)
+                        .filter(DefaultDownloadService::isManagedContentFile)
+                        .toList()) {
                 Files.createDirectories(targetDirectory);
-                Path target = targetDirectory.resolve(pageFileName(index));
+                Path target = targetDirectory.resolve(source.getFileName().toString());
                 Path temporary = target.resolveSibling(target.getFileName() + ".tmp");
                 Files.copy(source, temporary, StandardCopyOption.REPLACE_EXISTING);
                 if (Files.size(source) != Files.size(temporary)) {
-                    throw new IOException("Migrated download page size did not match");
+                    throw new IOException("Migrated download content size did not match");
                 }
                 try {
                     Files.move(
@@ -1142,7 +1548,13 @@ public final class DefaultDownloadService
                     Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
                 }
             }
+            }
         }
+    }
+
+    private static boolean isManagedContentFile(Path path) {
+        String name = path.getFileName().toString();
+        return name.endsWith(".page") || name.equals("offline.media") || name.equals("offline.m3u8");
     }
 
     private void restoreMigratedStatuses(Map<DownloadId, DownloadStatus> previousStatuses) {
@@ -1245,6 +1657,12 @@ public final class DefaultDownloadService
                 ? Long.MAX_VALUE
                 : bytes * 1_000_000_000L;
         return Math.max(1L, scaled / elapsedNanos);
+    }
+
+    private static AnilibHttpClient unavailableHttpClient() {
+        return request -> {
+            throw new HttpException("Video download networking is not configured");
+        };
     }
 
     @Override

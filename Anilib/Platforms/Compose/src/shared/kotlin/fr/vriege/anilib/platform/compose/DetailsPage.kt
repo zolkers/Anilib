@@ -252,14 +252,20 @@ internal fun DetailsDestination(
             watchEpisode = { episode -> openPlayer(details.id(), episode.episode().id()) },
             download = { enqueueDownload(details.id()) },
             downloadChapter = { chapter ->
-                runCatching { downloads.enqueue(details.id(), chapter.id()) }
-                    .onSuccess { unitError = null }
-                    .onFailure { unitError = it.message ?: "The chapter could not be queued." }
+                scope.launch {
+                    withContext(Dispatchers.IO) {
+                        runCatching { downloads.enqueue(details.id(), chapter.id()) }
+                    }.onSuccess { unitError = null }
+                        .onFailure { unitError = it.message ?: "The chapter could not be queued." }
+                }
             },
             downloadEpisode = { episode ->
-                runCatching { downloads.enqueue(details.id(), episode.episode().id().value()) }
-                    .onSuccess { unitError = null }
-                    .onFailure { unitError = it.message ?: "The episode could not be queued." }
+                scope.launch {
+                    withContext(Dispatchers.IO) {
+                        runCatching { downloads.enqueue(details.id(), episode.episode().id().value()) }
+                    }.onSuccess { unitError = null }
+                        .onFailure { unitError = it.message ?: "The episode could not be queued." }
+                }
             },
             markChapters = { contentIds, read ->
                 scope.launch {
