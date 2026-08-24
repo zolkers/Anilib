@@ -38,7 +38,6 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -793,11 +792,6 @@ private fun SourceCatalogueScreen(
                             contentDescription = "ui.display.mode",
                         )
                     }
-                    if (definitions.isNotEmpty()) {
-                        IconButton(onClick = { showFilters = true }) {
-                            Icon(Icons.Default.Tune, contentDescription = "ui.filters")
-                        }
-                    }
                     if (preferenceDefinitions.isNotEmpty()) {
                         IconButton(onClick = { showPreferences = !showPreferences }) {
                             Icon(Icons.Default.Settings, contentDescription = "ui.source.settings")
@@ -849,7 +843,6 @@ private fun SourceCatalogueScreen(
                             val label = UiTranslations.translate("ui.filters", LocalLanguagePack.current)
                             Text(if (filterValues.isEmpty()) label else "$label (${filterValues.size})")
                         },
-                        icon = { Icon(Icons.Default.Tune, contentDescription = null) },
                     )
                 }
             }
