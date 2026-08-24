@@ -235,6 +235,7 @@ private fun SettingsHome(
 ) {
     var query by remember { mutableStateOf("") }
     var searching by remember { mutableStateOf(false) }
+    val searchFocus = rememberSearchFocusRequester(searching)
     val general = settingMatches(query, "General", "Language start screen navigation")
     val appearance = settingMatches(query, "Appearance", "Theme colors typography navigation")
     val privacy = settingMatches(query, "Content and privacy", "Adult incognito history")
@@ -254,7 +255,9 @@ private fun SettingsHome(
                         onValueChange = { query = it },
                         placeholder = { Text("ui.search.settings") },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = searchKeyboardOptions(),
+                        keyboardActions = searchKeyboardActions(),
+                        modifier = Modifier.fillMaxWidth().searchFocus(searchFocus),
                     )
                 },
                 navigationIcon = {

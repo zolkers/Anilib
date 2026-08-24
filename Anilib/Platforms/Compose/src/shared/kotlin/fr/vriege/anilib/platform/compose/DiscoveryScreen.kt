@@ -151,6 +151,8 @@ internal fun DiscoveryScreen(
     var listing by remember { mutableStateOf(SourceListing.POPULAR) }
     var globalSearch by remember { mutableStateOf(false) }
     var globalQuery by remember { mutableStateOf("") }
+    var globalSearchRevision by remember { mutableIntStateOf(0) }
+    val globalSearchFocus = rememberSearchFocusRequester(globalSearch)
     var sourceBrowseRevision by remember { mutableIntStateOf(0) }
     var filteringSourceLanguages by remember { mutableStateOf(false) }
     var browseError by remember { mutableStateOf<String?>(null) }
@@ -240,7 +242,9 @@ internal fun DiscoveryScreen(
                             onValueChange = { globalQuery = it },
                             singleLine = true,
                             placeholder = { Text("ui.search.all.sources") },
-                            modifier = Modifier.fillMaxWidth(),
+                            keyboardOptions = searchKeyboardOptions(),
+                            keyboardActions = searchKeyboardActions { globalSearchRevision++ },
+                            modifier = Modifier.fillMaxWidth().searchFocus(globalSearchFocus),
                         )
                     } else {
                         Text("ui.browse")
@@ -321,6 +325,8 @@ internal fun DiscoveryScreen(
                             },
                         )
                     },
+                    keyboardOptions = searchKeyboardOptions(),
+                    keyboardActions = searchKeyboardActions(),
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
                 )
             }
@@ -355,7 +361,7 @@ internal fun DiscoveryScreen(
                     onSourcePreferenceChanged = { sourceBrowseRevision++ },
                 )
             } else if (globalSearch && globalQuery.isNotBlank() && section.sourceTab()) {
-                GlobalSearchContent(presentation, section.kind!!, globalQuery)
+                GlobalSearchContent(presentation, section.kind!!, globalQuery, globalSearchRevision)
             } else {
                 when (section) {
                     BrowseSection.ANIME_SOURCES,
@@ -619,6 +625,7 @@ private fun SourceCatalogueScreen(
     var selectedItem by remember(source.id()) { mutableStateOf<SourceCatalogueItem?>(null) }
     var query by remember(source.id()) { mutableStateOf("") }
     var searchActive by remember(source.id()) { mutableStateOf(false) }
+    val searchFocus = rememberSearchFocusRequester(searchActive)
     var page by remember(source.id(), selectedListing) { mutableIntStateOf(1) }
     var grid by remember(source.id()) {
         mutableStateOf(
@@ -729,7 +736,9 @@ private fun SourceCatalogueScreen(
                                 )
                             },
                             singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
+                            keyboardOptions = searchKeyboardOptions(),
+                            keyboardActions = searchKeyboardActions { requestRevision++ },
+                            modifier = Modifier.fillMaxWidth().searchFocus(searchFocus),
                         )
                     } else {
                         Column {
@@ -1514,12 +1523,13 @@ private fun GlobalSearchContent(
     presentation: DiscoveryPresentation,
     kind: SourceContentKind,
     query: String,
+    requestRevision: Int,
 ) {
     var revision by remember(kind, query) { mutableIntStateOf(0) }
     var result by remember(kind, query) {
         mutableStateOf<Result<Map<SourceId, SourcePage>>?>(null)
     }
-    CrashSafeLaunchedEffect(kind, query, revision) {
+    CrashSafeLaunchedEffect(kind, query, revision, requestRevision) {
         delay(SOURCE_SEARCH_DEBOUNCE_MILLIS)
         result = null
         result = withContext(Dispatchers.IO) {

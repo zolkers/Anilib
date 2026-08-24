@@ -118,6 +118,7 @@ internal fun LibraryPageContent(
     }
     var query by remember { mutableStateOf("") }
     var searching by remember { mutableStateOf(false) }
+    val searchFocus = rememberSearchFocusRequester(searching)
     var favoritesOnly by remember(kind) { mutableStateOf(false) }
     var category by remember(presentation, kind) {
         mutableStateOf(
@@ -174,7 +175,9 @@ internal fun LibraryPageContent(
                                 Text(if (kind == MediaKind.ANIME) "library.search.anime" else "library.search.manga")
                             },
                             singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
+                            keyboardOptions = searchKeyboardOptions(),
+                            keyboardActions = searchKeyboardActions(),
+                            modifier = Modifier.fillMaxWidth().searchFocus(searchFocus),
                         )
                     } else {
                         Text(if (kind == MediaKind.ANIME) "ui.anime" else "ui.manga")

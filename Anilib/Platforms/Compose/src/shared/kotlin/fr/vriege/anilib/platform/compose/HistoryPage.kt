@@ -86,6 +86,7 @@ internal fun HistoryPage(
     val cards = remember(revision) { presentation.library().titles().associateBy { it.id() } }
     var query by remember { mutableStateOf("") }
     var searching by remember { mutableStateOf(false) }
+    val searchFocus = rememberSearchFocusRequester(searching)
     var kind by remember { mutableStateOf(MediaKind.ANIME) }
     var contentLabels by remember(reader, player) {
         mutableStateOf<Map<HistoryContentKey, String>>(emptyMap())
@@ -149,7 +150,9 @@ internal fun HistoryPage(
                             onValueChange = { query = it },
                             placeholder = { Text("ui.search.history") },
                             singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
+                            keyboardOptions = searchKeyboardOptions(),
+                            keyboardActions = searchKeyboardActions(),
+                            modifier = Modifier.fillMaxWidth().searchFocus(searchFocus),
                         )
                     } else {
                         Text("ui.history")

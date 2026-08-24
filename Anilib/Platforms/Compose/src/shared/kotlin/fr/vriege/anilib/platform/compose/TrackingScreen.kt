@@ -1153,6 +1153,7 @@ private fun TrackerSearchScreen(
     var selected by remember { mutableStateOf<TrackerSearchResult?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(true) }
+    val searchFocus = rememberSearchFocusRequester()
     val scope = rememberCrashSafeCoroutineScope()
     val search: (String) -> Unit = { requested ->
         if (requested.isNotBlank()) {
@@ -1234,9 +1235,17 @@ private fun TrackerSearchScreen(
                     onValueChange = { query = it },
                     label = { Text("ui.search.title") },
                     singleLine = true,
-                    modifier = Modifier.weight(1f),
+                    keyboardOptions = searchKeyboardOptions(),
+                    keyboardActions = searchKeyboardActions { search(query) },
+                    modifier = Modifier.weight(1f).searchFocus(searchFocus),
                 )
-                IconButton(enabled = query.isNotBlank() && !loading, onClick = { search(query) }) {
+                IconButton(
+                    enabled = query.isNotBlank() && !loading,
+                    onClick = {
+                        search(query)
+                        runCatching { searchFocus.requestFocus() }
+                    },
+                ) {
                     Icon(Icons.Default.Search, contentDescription = "ui.search")
                 }
             }

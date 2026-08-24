@@ -831,6 +831,8 @@ private fun ExtensionRepositoryCatalogueScreen(
                         singleLine = true,
                         leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                         placeholder = { Text("extensions.search.installed") },
+                        keyboardOptions = searchKeyboardOptions(),
+                        keyboardActions = searchKeyboardActions(),
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
