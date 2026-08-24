@@ -44,10 +44,18 @@ class DesktopWindowModeTest {
     }
 
     @Test
+    fun `application fullscreen keeps the same window instance`() {
+        assertFalse(windowUndecorated(ApplicationWindowMode.WINDOWED))
+        assertTrue(windowUndecorated(ApplicationWindowMode.BORDERLESS))
+        assertEquals(WindowPlacement.Maximized, applicationFullscreenPlacement())
+    }
+
+    @Test
     fun `escape never changes the application window while video is active`() {
         assertFalse(
             shouldExitApplicationBorderless(
                 playerFullscreen = false,
+                applicationFullscreen = false,
                 playerActive = true,
                 applicationWindowMode = ApplicationWindowMode.BORDERLESS,
             ),
@@ -55,6 +63,7 @@ class DesktopWindowModeTest {
         assertTrue(
             shouldExitApplicationBorderless(
                 playerFullscreen = false,
+                applicationFullscreen = false,
                 playerActive = false,
                 applicationWindowMode = ApplicationWindowMode.BORDERLESS,
             ),
