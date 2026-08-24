@@ -61,6 +61,12 @@ public final class DesktopReleaseRule implements AnilibJavaRule {
                 diagnostics,
                 "JpMigrateLegacyData",
                 "AnilibMigrateLegacyData",
+                "NewGuid().ToString('B').ToUpperInvariant()",
+                "JP_UPGRADABLE_FOUND",
+                "-bor 512",
+                "'ProductCode'",
+                "@(6, $record)",
+                "@(1, $record)",
                 "'NOT REMOVE',1440",
                 "``Sequence``=1450",
                 "InvokeMember('Commit'");

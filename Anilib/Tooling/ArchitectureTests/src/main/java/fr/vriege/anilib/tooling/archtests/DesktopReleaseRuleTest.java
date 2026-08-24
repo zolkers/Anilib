@@ -34,6 +34,8 @@ final class DesktopReleaseRuleTest {
                     """);
             write(repository.resolve("Anilib/Platforms/Desktop/src/main/jpackage/windows/patch-safe-upgrade.ps1"), """
                     JpMigrateLegacyData AnilibMigrateLegacyData 'NOT REMOVE',1440
+                    NewGuid().ToString('B').ToUpperInvariant() JP_UPGRADABLE_FOUND -bor 512 'ProductCode'
+                    @(6, $record) @(1, $record)
                     ``Sequence``=1450 InvokeMember('Commit'
                     """);
             write(repository.resolve("Anilib/Platforms/Desktop/src/main/jpackage/windows/migrate-legacy-data.vbs"), """
