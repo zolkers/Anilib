@@ -86,8 +86,11 @@ import fr.vriege.anilib.feature.extensionrepository.ui.ExtensionRepositoryPresen
 import fr.vriege.anilib.feature.extensionrepository.ui.ApkExtensionPlatform
 import fr.vriege.anilib.feature.library.MediaKind
 import fr.vriege.anilib.feature.library.LibraryItemId
+import fr.vriege.anilib.feature.library.PublicationStatus
 import fr.vriege.anilib.feature.library.ui.LibraryCard
+import fr.vriege.anilib.feature.library.ui.LibraryDetails
 import fr.vriege.anilib.feature.library.ui.LibraryPresentation
+import fr.vriege.anilib.feature.player.EpisodeSnapshot
 import fr.vriege.anilib.feature.source.SourceCatalogueItem
 import fr.vriege.anilib.feature.source.SourceContentUnit
 import fr.vriege.anilib.feature.source.SourceContentUnitId
@@ -103,11 +106,14 @@ import fr.vriege.anilib.feature.source.SourceListing
 import fr.vriege.anilib.feature.source.SourcePage
 import fr.vriege.anilib.feature.source.SourcePermission
 import fr.vriege.anilib.feature.source.SourcePreferenceType
+import fr.vriege.anilib.feature.source.SourcePublicationStatus
 import fr.vriege.anilib.feature.source.SourceId
 import fr.vriege.anilib.feature.source.SourceWebPage
 import fr.vriege.anilib.feature.source.SourceTitleDetails
 import fr.vriege.anilib.framework.http.HttpCookieJar
+import java.time.Instant
 import java.util.Locale
+import java.util.Optional
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -136,7 +142,6 @@ internal fun DiscoveryScreen(
     openSourceReader: (String, SourceContentUnitId) -> Unit,
     openSourcePlayer: (String, SourceEpisodeId) -> Unit,
     openLibraryDetails: (LibraryItemId) -> Unit,
-    libraryDetails: @Composable (LibraryItemId, () -> Unit) -> Unit,
     navigationVisibilityChanged: (Boolean) -> Unit,
     manageExtensions: () -> Unit,
 ) {
@@ -220,7 +225,6 @@ internal fun DiscoveryScreen(
             openSourceReader = openSourceReader,
             openSourcePlayer = openSourcePlayer,
             openLibraryDetails = openLibraryDetails,
-            libraryDetails = libraryDetails,
             navigateUp = { selectedSource = null },
         )
         return
@@ -608,13 +612,11 @@ private fun SourceCatalogueScreen(
     openSourceReader: (String, SourceContentUnitId) -> Unit,
     openSourcePlayer: (String, SourceEpisodeId) -> Unit,
     openLibraryDetails: (LibraryItemId) -> Unit,
-    libraryDetails: @Composable (LibraryItemId, () -> Unit) -> Unit,
     navigateUp: () -> Unit,
 ) {
     val scope = rememberCrashSafeCoroutineScope()
     var selectedListing by remember(source.id(), listing) { mutableStateOf(listing) }
     var selectedItem by remember(source.id()) { mutableStateOf<SourceCatalogueItem?>(null) }
-    var selectedLibraryItem by remember(source.id()) { mutableStateOf<LibraryItemId?>(null) }
     var query by remember(source.id()) { mutableStateOf("") }
     var searchActive by remember(source.id()) { mutableStateOf(false) }
     var page by remember(source.id(), selectedListing) { mutableIntStateOf(1) }
@@ -642,14 +644,8 @@ private fun SourceCatalogueScreen(
     }
 
     fun openCanonicalDetails(libraryItemId: LibraryItemId) {
-        openLibraryDetails(libraryItemId)
         selectedItem = null
-        selectedLibraryItem = libraryItemId
-    }
-
-    selectedLibraryItem?.let { libraryItemId ->
-        libraryDetails(libraryItemId) { selectedLibraryItem = null }
-        return
+        openLibraryDetails(libraryItemId)
     }
 
     selectedItem?.let { item ->
@@ -1001,13 +997,15 @@ private fun SourceTitleScreen(
         scope.launch {
             runCatching {
                 withContext(Dispatchers.IO) {
-                    val id = libraryItemId ?: presentation.addToLibrary(item)
-                    library.setFavorite(setOf(id), !favorite)
-                    id
+                    val existingId = libraryItemId
+                    val id = existingId ?: presentation.addToLibrary(item)
+                    val nextFavorite = if (existingId == null) false else !favorite
+                    if (existingId != null) library.setFavorite(setOf(id), nextFavorite)
+                    id to nextFavorite
                 }
-            }.onSuccess { id ->
+            }.onSuccess { (id, nextFavorite) ->
                 libraryItemId = id
-                favorite = !favorite
+                favorite = nextFavorite
                 actionError = null
                 openLibraryDetails(id)
             }.onFailure {
@@ -1018,74 +1016,80 @@ private fun SourceTitleScreen(
     }
 
     val details = content.details
-    val primaryChapter = content.chapters.firstOrNull()
-    val primaryEpisode = content.episodes.firstOrNull()
-    val chaptersLabel = UiTranslations.format(
-        "dynamic.chapters.count",
-        LocalLanguagePack.current,
-        content.chapters.size,
+    val primaryChapter = firstUnreadContentUnit(content.chapters, emptySet())
+    val episodes = content.episodes.map { EpisodeSnapshot(it, Optional.empty()) }
+    val primaryEpisode = firstUnwatchedEpisode(episodes)
+    val previewDetails = LibraryDetails(
+        libraryItemId ?: LibraryItemId("source-preview:${item.id()}"),
+        details.title(),
+        if (item.contentKind() == SourceContentKind.ANIME) MediaKind.ANIME else MediaKind.MANGA,
+        Instant.EPOCH,
+        emptyList(),
+        favorite,
+        Optional.empty(),
+        details.description(),
+        details.authors(),
+        details.artists(),
+        details.status().toLibraryStatus(),
+        details.thumbnail(),
+        details.genres(),
+        Optional.empty(),
+        0,
     )
-    val episodesLabel = UiTranslations.format(
-        "dynamic.episodes.count",
-        LocalLanguagePack.current,
-        content.episodes.size,
-    )
-    MediaDetailsScreen(
-        model = MediaDetailsUiModel(
-            title = details.title(),
-            authors = details.authors(),
-            status = formatEnum(details.status()),
-            sourceName = source.displayName(),
-            description = details.description(),
-            genres = details.genres(),
-        ),
+    DetailsPage(
+        details = previewDetails,
+        categories = emptyList(),
+        sourceName = source.displayName(),
         artwork = { modifier -> RemoteArtwork(details.thumbnail().orElse(null), details.title(), modifier) },
-        favorite = favorite,
-        contentLabel = if (item.contentKind() == SourceContentKind.ANIME) {
-            "${content.episodes.size} episodes"
-        } else {
-            "${content.chapters.size} chapters"
-        },
-        canTrack = false,
-        trackingCount = 0,
-        canOpenWeb = titleWebPage != null,
+        chapters = content.chapters,
+        readChapterIds = emptySet(),
+        chapterProgress = null,
+        episodes = episodes,
+        unitError = actionError,
+        related = emptyList(),
+        canRead = primaryChapter != null,
+        canWatch = primaryEpisode != null,
         canDownload = false,
+        canTrack = false,
+        libraryEditable = false,
         canShare = false,
-        primaryLabel = if (item.contentKind() == SourceContentKind.ANIME) "ui.watch" else "ui.read",
-        canOpenPrimary = primaryEpisode != null || primaryChapter != null,
-        errors = listOfNotNull(actionError),
-        toggleFavorite = ::toggleFavorite,
+        trackingCount = 0,
+        nextAiring = null,
+        readerError = null,
+        downloadError = null,
+        read = { chapter ->
+            (chapter ?: primaryChapter)?.let { openReader(details.title(), it.id()) }
+        },
+        watch = { primaryEpisode?.let { openPlayer(details.title(), it.episode().id()) } },
+        watchEpisode = { openPlayer(details.title(), it.episode().id()) },
+        download = {},
+        downloadChapter = {},
+        downloadEpisode = {},
+        markChapters = { _, _ -> },
+        markEpisodes = { _, _ -> },
+        track = {},
         refreshing = favoritePending,
         refresh = null,
-        track = {},
-        openWeb = { titleWebPage?.let(openWebPage) },
-        download = {},
+        favorite = ::toggleFavorite,
+        edit = { _, _ -> },
+        createCategory = {},
+        addCategory = {},
+        removeCategory = {},
+        deleteCategory = {},
+        openTitleWeb = titleWebPage?.let { page -> ({ openWebPage(page) }) },
+        openSourceWeb = null,
         share = {},
-        manageCategories = null,
-        edit = null,
-        openPrimary = {
-            primaryEpisode?.let { openPlayer(details.title(), it.id()) }
-                ?: primaryChapter?.let { openReader(details.title(), it.id()) }
-        },
+        openRelated = {},
         goBack = navigateUp,
-    ) {
-        mediaUnitsSection(
-            label = chaptersLabel,
-            units = content.chapters,
-            key = { it.id().value() },
-            title = SourceContentUnit::title,
-            summary = { it.publishedAt().map(mediaDateTimeFormatter::format).orElse("Available") },
-            open = { chapter -> openReader(details.title(), chapter.id()) },
-        )
-        mediaUnitsSection(
-            label = episodesLabel,
-            units = content.episodes,
-            key = { it.id().value() },
-            title = SourceEpisode::title,
-            summary = { it.scanlator().orElse("Available") },
-            open = { episode -> openPlayer(details.title(), episode.id()) },
-        )
-    }
+    )
+}
+
+private fun SourcePublicationStatus.toLibraryStatus(): PublicationStatus = when (this) {
+    SourcePublicationStatus.ONGOING -> PublicationStatus.ONGOING
+    SourcePublicationStatus.COMPLETED, SourcePublicationStatus.FINISHED -> PublicationStatus.COMPLETED
+    SourcePublicationStatus.CANCELLED -> PublicationStatus.CANCELLED
+    SourcePublicationStatus.ON_HIATUS -> PublicationStatus.HIATUS
+    SourcePublicationStatus.UNKNOWN, SourcePublicationStatus.LICENSED -> PublicationStatus.UNKNOWN
 }
 
 @Composable

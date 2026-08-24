@@ -74,6 +74,26 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+internal fun firstUnreadContentUnit(
+    units: List<SourceContentUnit>,
+    readContentIds: Set<String>,
+): SourceContentUnit? = firstChronological(
+    units.filterNot { it.id().value() in readContentIds },
+    SourceContentUnit::number,
+) ?: firstChronological(units, SourceContentUnit::number)
+
+internal fun firstUnwatchedEpisode(episodes: List<EpisodeSnapshot>): EpisodeSnapshot? = firstChronological(
+    episodes.filterNot { snapshot ->
+        snapshot.playback().map { state -> state.completed() }.orElse(false)
+    },
+    { it.episode().episodeNumber() },
+) ?: firstChronological(episodes) { it.episode().episodeNumber() }
+
+private fun <T> firstChronological(values: List<T>, number: (T) -> Double): T? {
+    val numbered = values.filter { number(it) >= 0.0 }
+    return if (numbered.isNotEmpty()) numbered.minByOrNull(number) else values.lastOrNull()
+}
+
 @Composable
 internal fun DetailsDestination(
     presentation: LibraryPresentation,
@@ -200,6 +220,8 @@ internal fun DetailsDestination(
             presentation.library().categoryConfigurations()
                 .filter { it.scope().supports(details.kind()) }
         }
+        val primaryChapter = firstUnreadContentUnit(chapters, readChapterIds)
+        val primaryEpisode = firstUnwatchedEpisode(episodes)
         DetailsPage(
             details = details,
             categories = categories,
@@ -211,16 +233,22 @@ internal fun DetailsDestination(
             episodes = episodes,
             unitError = unitError,
             related = presentation.relatedTitles(details.id()),
-            canRead = runCatching { reader.canOpen(details.id()) }.getOrDefault(false),
-            canWatch = runCatching { player.canOpen(details.id()) }.getOrDefault(false),
+            canRead = primaryChapter != null &&
+                runCatching { reader.canOpen(details.id()) }.getOrDefault(false),
+            canWatch = primaryEpisode != null &&
+                runCatching { player.canOpen(details.id()) }.getOrDefault(false),
             canDownload = runCatching { downloads.canEnqueue(details.id()) }.getOrDefault(false),
             canTrack = true,
             trackingCount = trackedEntries.size,
             nextAiring = nextAiring,
             readerError = readerError,
             downloadError = downloadError,
-            read = { chapter -> openReader(details.id(), chapter?.id()) },
-            watch = { openPlayer(details.id(), null) },
+            read = { chapter ->
+                (chapter ?: primaryChapter)?.let { openReader(details.id(), it.id()) }
+            },
+            watch = {
+                primaryEpisode?.let { openPlayer(details.id(), it.episode().id()) }
+            },
             watchEpisode = { episode -> openPlayer(details.id(), episode.episode().id()) },
             download = { enqueueDownload(details.id()) },
             downloadChapter = { chapter ->
@@ -368,6 +396,8 @@ internal fun DetailsPage(
     canWatch: Boolean,
     canDownload: Boolean,
     canTrack: Boolean,
+    libraryEditable: Boolean = true,
+    canShare: Boolean = true,
     trackingCount: Int,
     nextAiring: TrackerAiringSchedule?,
     readerError: String?,
@@ -440,7 +470,7 @@ internal fun DetailsPage(
         trackingCount = trackingCount,
         canOpenWeb = openTitleWeb != null || openSourceWeb != null,
         canDownload = canDownload,
-        canShare = true,
+        canShare = canShare,
         primaryLabel = if (canWatch) "ui.watch" else "ui.read",
         canOpenPrimary = canWatch || canRead,
         errors = listOfNotNull(readerError, downloadError, unitError),
@@ -451,8 +481,8 @@ internal fun DetailsPage(
         openWeb = openTitleWeb ?: openSourceWeb ?: {},
         download = download,
         share = share,
-        manageCategories = { editingCategories = true },
-        edit = { editing = true },
+        manageCategories = if (libraryEditable) ({ editingCategories = true }) else null,
+        edit = if (libraryEditable) ({ editing = true }) else null,
         openPrimary = if (canWatch) watch else ({ read(null) }),
         goBack = goBack,
     ) {
@@ -482,7 +512,7 @@ internal fun DetailsPage(
                     ).ifEmpty { listOf("Available") }.joinToString(" · ")
                 },
                 muted = { it.id().value() in readChapterIds },
-                selection = MediaUnitSelectionUiModel(
+                selection = if (libraryEditable) MediaUnitSelectionUiModel(
                     selecting = selectingChapters,
                     selectedKeys = selectedChapterIds,
                     positiveLabel = "ui.mark.read",
@@ -510,7 +540,7 @@ internal fun DetailsPage(
                         selectedChapterIds = emptySet()
                         selectingChapters = false
                     },
-                ),
+                ) else null,
                 open = read,
                 download = if (canDownload) downloadChapter else null,
             )
@@ -538,7 +568,7 @@ internal fun DetailsPage(
                     ).ifEmpty { listOf("Available") }.joinToString(" · ")
                 },
                 muted = { it.playback().map { state -> state.completed() }.orElse(false) },
-                selection = MediaUnitSelectionUiModel(
+                selection = if (libraryEditable) MediaUnitSelectionUiModel(
                     selecting = selectingEpisodes,
                     selectedKeys = selectedEpisodeIds.map { it.value() }.toSet(),
                     positiveLabel = "ui.mark.watched",
@@ -567,7 +597,7 @@ internal fun DetailsPage(
                         selectedEpisodeIds = emptySet()
                         selectingEpisodes = false
                     },
-                ),
+                ) else null,
                 open = watchEpisode,
                 download = if (canDownload) downloadEpisode else null,
             )
