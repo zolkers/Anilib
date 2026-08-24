@@ -54,6 +54,9 @@ import fr.vriege.anilib.feature.player.PlayerSubtitlePolicy
 import fr.vriege.anilib.feature.player.ui.PlayerController
 import fr.vriege.anilib.feature.source.SourceVideoStream
 import java.util.Optional
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,6 +72,8 @@ internal fun PlayerSelectionScreen(
     var revision by remember(controller) { mutableIntStateOf(0) }
     var commandError by remember(controller) { mutableStateOf<String?>(null) }
     var preferenceDialog by remember(controller) { mutableStateOf(false) }
+    var onlineLoading by remember(controller) { mutableStateOf(false) }
+    val commandScope = rememberCrashSafeCoroutineScope()
     DisposableEffect(controller) {
         onDispose { controller.close() }
     }
@@ -84,7 +89,8 @@ internal fun PlayerSelectionScreen(
     val livePlayback = remember(controller) { mutableStateOf(snapshot.playback()) }
     val offlineStreams = snapshot.streams().filter(::isOfflineStream)
     val onlineStreams = snapshot.streams().filterNot(::isOfflineStream)
-    val canChoosePlaybackSource = offlineStreams.isNotEmpty() && onlineStreams.isNotEmpty()
+    val canChoosePlaybackSource = offlineStreams.isNotEmpty() &&
+        (onlineStreams.isNotEmpty() || controller.onlineStreamsAvailable())
     val selectedOffline = isOfflineStream(snapshot.selectedStream())
     val visibleStreams = if (!canChoosePlaybackSource) {
         snapshot.streams()
@@ -102,15 +108,16 @@ internal fun PlayerSelectionScreen(
             }
             .onFailure { commandError = it.message ?: "The player command failed." }
     }
+    val currentPlayback = controller.playback()
     val currentSetFullscreen by rememberUpdatedState(setFullscreen)
     val currentNextEpisode = rememberUpdatedState(nextEpisode)
     val currentPreviousEpisode = rememberUpdatedState(previousEpisode)
     // Callback identities change while neighbours resolve; the native surface must not.
-    val playerSurface = remember(controller) {
+    val playerSurface = remember(controller, currentPlayback) {
         movableContentOf<Boolean> { expanded ->
             PlayerVideoSurface(
                 controller,
-                controller.playback(),
+                currentPlayback,
                 expanded,
                 currentSetFullscreen,
                 setPlayerActive,
@@ -166,6 +173,7 @@ internal fun PlayerSelectionScreen(
                         item {
                             FilterChip(
                                 selected = selectedOffline,
+                                enabled = !onlineLoading,
                                 onClick = {
                                     preferredStream(offlineStreams, snapshot.selectedStream())?.let { stream ->
                                         command { controller.selectStream(stream.id()) }
@@ -177,9 +185,35 @@ internal fun PlayerSelectionScreen(
                         item {
                             FilterChip(
                                 selected = !selectedOffline,
+                                enabled = !onlineLoading,
                                 onClick = {
-                                    preferredStream(onlineStreams, snapshot.selectedStream())?.let { stream ->
-                                        command { controller.selectStream(stream.id()) }
+                                    val loaded = preferredStream(onlineStreams, snapshot.selectedStream())
+                                    if (loaded != null) {
+                                        command { controller.selectStream(loaded.id()) }
+                                    } else {
+                                        onlineLoading = true
+                                        commandScope.launch {
+                                            val outcome = withContext(Dispatchers.IO) {
+                                                runCatching {
+                                                    controller.loadOnlineStreams()
+                                                    val refreshed = controller.snapshot()
+                                                    val selected = preferredStream(
+                                                        refreshed.streams().filterNot(::isOfflineStream),
+                                                        snapshot.selectedStream(),
+                                                    ) ?: error("No online video stream is available")
+                                                    controller.selectStream(selected.id())
+                                                }
+                                            }
+                                            onlineLoading = false
+                                            outcome.onSuccess {
+                                                commandError = null
+                                                livePlayback.value = controller.snapshot().playback()
+                                                revision++
+                                            }.onFailure {
+                                                commandError = it.message
+                                                    ?: "The online stream could not be opened."
+                                            }
+                                        }
                                     }
                                 },
                                 label = { Text("ui.online") },

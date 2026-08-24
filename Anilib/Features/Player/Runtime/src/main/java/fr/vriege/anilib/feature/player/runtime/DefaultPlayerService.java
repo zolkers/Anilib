@@ -43,6 +43,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -228,11 +229,9 @@ public final class DefaultPlayerService implements PlayerService, PlayerContentR
         if (!episodeId.itemId().equals(resolved.sourceItemId())) {
             throw new PlayerException("Episode does not belong to the selected library title");
         }
-        SourceEpisode episode = availableEpisodes(resolved).stream()
-                .filter(candidate -> candidate.id().equals(episodeId))
-                .findFirst()
-                .orElseThrow(() -> new PlayerException("Episode is no longer available"));
-        List<SourceVideoStream> streams = availableStreams(resolved, episodeId);
+        SourceEpisode episode = episodeForOpen(resolved, episodeId);
+        ResolvedStreams resolvedStreams = availableStreams(resolved, episodeId);
+        List<SourceVideoStream> streams = resolvedStreams.initial();
         PlaybackState playback = states.find(libraryItemId, episodeId).orElseGet(() -> new PlaybackState(
                 libraryItemId,
                 episodeId,
@@ -255,7 +254,11 @@ public final class DefaultPlayerService implements PlayerService, PlayerContentR
                 streams.getFirst().id(),
                 Optional.empty(),
                 playback);
-        DefaultPlayerSession session = new DefaultPlayerSession(this, backend, snapshot);
+        DefaultPlayerSession session = new DefaultPlayerSession(
+                this,
+                backend,
+                snapshot,
+                resolvedStreams.onlineLoader());
         sessions.add(session);
         return session;
     }
@@ -283,7 +286,7 @@ public final class DefaultPlayerService implements PlayerService, PlayerContentR
                 streams.getFirst().id(),
                 Optional.empty(),
                 playback);
-        DefaultPlayerSession session = new DefaultPlayerSession(this, backend, snapshot);
+        DefaultPlayerSession session = new DefaultPlayerSession(this, backend, snapshot, null);
         sessions.add(session);
         return session;
     }
@@ -444,7 +447,27 @@ public final class DefaultPlayerService implements PlayerService, PlayerContentR
         throw new PlayerException("Library source is not installed");
     }
 
-    private List<SourceVideoStream> availableStreams(
+    private SourceEpisode episodeForOpen(
+            ResolvedLibrary resolved,
+            SourceEpisodeId episodeId) {
+        PlayerContentProvider provider = contentProvider;
+        if (provider != null) {
+            Optional<SourceEpisode> offline = validatedProviderEpisodes(
+                    provider.episodes(resolved.sourceItemId()),
+                    resolved.sourceItemId()).stream()
+                    .filter(candidate -> candidate.id().equals(episodeId))
+                    .findFirst();
+            if (offline.isPresent()) {
+                return offline.orElseThrow();
+            }
+        }
+        return availableEpisodes(resolved).stream()
+                .filter(candidate -> candidate.id().equals(episodeId))
+                .findFirst()
+                .orElseThrow(() -> new PlayerException("Episode is no longer available"));
+    }
+
+    private ResolvedStreams availableStreams(
             ResolvedLibrary resolved,
             SourceEpisodeId episodeId) {
         PlayerContentProvider provider = contentProvider;
@@ -455,40 +478,44 @@ public final class DefaultPlayerService implements PlayerService, PlayerContentR
             if (offline.isEmpty()) {
                 throw new PlayerException("This episode is not available while offline mode is enabled");
             }
-            return offline;
+            return new ResolvedStreams(offline, null);
         }
         Optional<Source> installed = sources.find(resolved.sourceItemId().sourceId());
         if (installed.isEmpty()) {
             if (!offline.isEmpty()) {
-                return offline;
+                return new ResolvedStreams(offline, null);
             }
             throw new PlayerException("Library source is not installed");
         }
         Source source = installed.orElseThrow();
         if (!(source instanceof StreamingSource streamingSource)) {
             if (!offline.isEmpty()) {
-                return offline;
+                return new ResolvedStreams(offline, null);
             }
             throw new PlayerException("Library source does not provide streaming content");
         }
-        try {
-            List<SourceVideoStream> online = validatedStreams(streamingSource, episodeId);
-            if (offline.isEmpty()) {
-                return online;
-            }
-            Map<String, SourceVideoStream> combined = new LinkedHashMap<>();
-            offline.forEach(stream -> combined.put(stream.id(), stream));
-            online.forEach(stream -> combined.putIfAbsent(stream.id(), stream));
-            if (combined.size() > MAXIMUM_STREAMS) {
-                throw new PlayerException("Player content providers returned too many streams");
-            }
-            return List.copyOf(combined.values());
-        } catch (RuntimeException failure) {
-            if (!offline.isEmpty()) {
-                return offline;
-            }
-            throw failure;
+        if (!offline.isEmpty()) {
+            Supplier<List<SourceVideoStream>> onlineLoader = () -> loadOnlineStreams(
+                    resolved.sourceItemId(),
+                    episodeId);
+            return new ResolvedStreams(offline, onlineLoader);
         }
+        return new ResolvedStreams(validatedStreams(streamingSource, episodeId), null);
+    }
+
+    private synchronized List<SourceVideoStream> loadOnlineStreams(
+            SourceCatalogueItemId itemId,
+            SourceEpisodeId episodeId) {
+        ensureOpen();
+        if (!fallbackAllowed()) {
+            throw new PlayerException("Online playback is disabled while offline mode is enabled");
+        }
+        Source source = sources.find(itemId.sourceId())
+                .orElseThrow(() -> new PlayerException("Library source is not installed"));
+        if (!(source instanceof StreamingSource streamingSource)) {
+            throw new PlayerException("Library source does not provide streaming content");
+        }
+        return validatedStreams(streamingSource, episodeId);
     }
 
     private static List<SourceEpisode> validatedProviderEpisodes(
@@ -662,5 +689,10 @@ public final class DefaultPlayerService implements PlayerService, PlayerContentR
     private record ResolvedLibrary(
             LibraryItem item,
             SourceCatalogueItemId sourceItemId) {
+    }
+
+    private record ResolvedStreams(
+            List<SourceVideoStream> initial,
+            Supplier<List<SourceVideoStream>> onlineLoader) {
     }
 }

@@ -90,7 +90,9 @@ internal fun PlayerVideoSurface(
     var controlsActivity by remember(bridge) { mutableIntStateOf(0) }
     var locked by remember(bridge) { mutableStateOf(false) }
     var brightness by remember(bridge) { mutableFloatStateOf(1f) }
-    var volume by remember(bridge) { mutableFloatStateOf(bridge.snapshot().volume()) }
+    var volume by remember(bridge) {
+        mutableFloatStateOf(runCatching { bridge.snapshot().volume() }.getOrDefault(1f))
+    }
     var customMenu by remember(bridge) { mutableStateOf(false) }
     var advancedMenu by remember(bridge) { mutableStateOf(false) }
     var leftAction by remember(bridge) { mutableStateOf(PlayerCustomAction.SEEK_BACK) }
@@ -141,7 +143,7 @@ internal fun PlayerVideoSurface(
 
     fun seekBy(deltaMillis: Long) {
         revealControls()
-        val state = bridge.snapshot()
+        val state = runCatching { bridge.snapshot() }.getOrNull() ?: return
         val maximum = if (state.durationMillis() > 0) state.durationMillis() else Long.MAX_VALUE
         controller.seekTo((state.positionMillis() + deltaMillis).coerceIn(0L, maximum))
     }
@@ -154,7 +156,7 @@ internal fun PlayerVideoSurface(
     fun cycleSpeed() {
         revealControls()
         val speeds = floatArrayOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
-        val current = bridge.snapshot().playbackSpeed()
+        val current = runCatching { bridge.snapshot().playbackSpeed() }.getOrNull() ?: return
         val index = speeds.indexOfFirst { it > current + 0.01f }
         controller.setPlaybackSpeed(if (index < 0) speeds.first() else speeds[index])
     }
@@ -349,9 +351,11 @@ internal fun PlayerVideoSurface(
                             color = Color.White,
                             style = MaterialTheme.typography.bodySmall,
                         )
+                        val currentPlaybackState = runCatching { bridge.snapshot() }.getOrNull()
                         if (
                             preferences.introEndMillis() > 0L &&
-                            bridge.snapshot().positionMillis() < preferences.introEndMillis()
+                            currentPlaybackState != null &&
+                            currentPlaybackState.positionMillis() < preferences.introEndMillis()
                         ) {
                             TextButton(onClick = {
                                 revealControls()
@@ -360,9 +364,10 @@ internal fun PlayerVideoSurface(
                                 Text("ui.skip.intro", color = Color.White)
                             }
                         }
-                        val playbackState = bridge.snapshot()
+                        val playbackState = currentPlaybackState
                         if (
                             preferences.outroDurationMillis() > 0L &&
+                            playbackState != null &&
                             playbackState.durationMillis() > 0L &&
                             playbackState.positionMillis() >=
                             playbackState.durationMillis() - preferences.outroDurationMillis()
@@ -396,7 +401,7 @@ internal fun PlayerVideoSurface(
                             )
                         }
                         TextButton(onClick = ::cycleSpeed) {
-                            Text("${bridge.snapshot().playbackSpeed()}×", color = Color.White)
+                            Text("${currentPlaybackState?.playbackSpeed() ?: 1f}×", color = Color.White)
                         }
                         if (controller.advancedCapabilities().isNotEmpty()) {
                             TextButton(onClick = {

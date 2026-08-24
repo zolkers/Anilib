@@ -274,13 +274,18 @@ final class DownloadTest {
                         root.resolve("playback-state.anilib"),
                         new TestPlayerBackend())) {
                     player.register(downloads);
+                    int streamRequestsBeforePlayer = source.streamRequests.get();
                     try (PlayerSession session = player.open(item.id(), source.episode.id())) {
+                        counter.check(session.snapshot().streams().size() == 1
+                                        && session.snapshot().streams().stream()
+                                                .allMatch(stream -> "file".equals(stream.location().getScheme()))
+                                        && source.streamRequests.get() == streamRequestsBeforePlayer
+                                        && session.onlineStreamsAvailable(),
+                                "downloaded anime must open locally without resolving its online streams");
+                        session.loadOnlineStreams();
                         counter.check(session.snapshot().streams().size() == 2
-                                        && session.snapshot().streams().stream()
-                                                .anyMatch(stream -> "file".equals(stream.location().getScheme()))
-                                        && session.snapshot().streams().stream()
-                                                .anyMatch(stream -> "https".equals(stream.location().getScheme())),
-                                "downloaded anime must offer both offline and online playback streams");
+                                        && source.streamRequests.get() == streamRequestsBeforePlayer + 1,
+                                "online streams must resolve only when the user requests them");
                         session.selectStream("hls");
                         counter.check("https".equals(session.playback().media().stream().location().getScheme()),
                                 "the player must be able to switch from its local file to an online stream");
@@ -1055,6 +1060,7 @@ final class DownloadTest {
                 Optional.of(Instant.EPOCH),
                 Optional.empty());
         private final boolean blockStreamResolution;
+        private final AtomicInteger streamRequests = new AtomicInteger();
         private final CountDownLatch streamResolutionStarted = new CountDownLatch(1);
         private final CountDownLatch streamResolutionReleased = new CountDownLatch(1);
 
@@ -1084,6 +1090,7 @@ final class DownloadTest {
 
         @Override
         public List<SourceVideoStream> streams(SourceEpisodeId requested) {
+            streamRequests.incrementAndGet();
             if (blockStreamResolution) {
                 streamResolutionStarted.countDown();
                 try {
