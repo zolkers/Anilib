@@ -11,6 +11,7 @@ import fr.vriege.anilib.feature.downloads.DownloadId;
 import fr.vriege.anilib.feature.downloads.DownloadJobSnapshot;
 import fr.vriege.anilib.feature.downloads.DownloadIndexRepairResult;
 import fr.vriege.anilib.feature.downloads.DownloadPriority;
+import fr.vriege.anilib.feature.downloads.DownloadQueueSnapshot;
 import fr.vriege.anilib.feature.downloads.DownloadRecoveryMode;
 import fr.vriege.anilib.feature.downloads.DownloadService;
 import fr.vriege.anilib.feature.downloads.DownloadStatus;
@@ -66,6 +67,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
 import java.util.function.Predicate;
 import java.util.Collection;
@@ -84,6 +86,7 @@ final class DownloadTest {
         verifiesStandardOfflineReading(counter);
         verifiesResumableQueue(counter);
         verifiesPriorityMetricsAndRecovery(counter);
+        verifiesConfigurableConcurrentQueue(counter);
         verifiesAutomaticRules(counter);
         verifiesStorageLimit(counter);
         downloadsHlsEpisodes(counter);
@@ -628,6 +631,52 @@ final class DownloadTest {
         }
     }
 
+    private static void verifiesConfigurableConcurrentQueue(Counter counter) {
+        Path root = null;
+        ConcurrentPagedSource source = new ConcurrentPagedSource();
+        try {
+            root = Files.createTempDirectory("anilib-download-concurrency");
+            MemoryLibraryCatalog library = new MemoryLibraryCatalog();
+            LibraryItem item = LibraryItem.create("Concurrent queue", MediaKind.MANGA)
+                    .withOrigin(new LibraryOrigin("test.concurrent", "title"));
+            library.save(item);
+            DownloadStoragePolicy initial = new DownloadStoragePolicy(4096, 1024, 1, true, true);
+            try (DefaultDownloadService downloads = new DefaultDownloadService(
+                    new SingleSourceRegistry(source), library, root, initial)) {
+                downloads.configureConcurrentJobs(2);
+                List<DownloadId> ids = source.units.stream()
+                        .map(unit -> downloads.enqueue(item.id(), unit.id()))
+                        .toList();
+                counter.check(source.awaitStarted(2),
+                        "the configured number of downloads must start simultaneously");
+                DownloadQueueSnapshot snapshot = downloads.snapshot();
+                counter.check(snapshot.concurrentJobs() == 2
+                                && snapshot.jobs().stream()
+                                        .filter(job -> job.status() == DownloadStatus.DOWNLOADING)
+                                        .count() == 2L
+                                && snapshot.jobs().stream()
+                                        .filter(job -> job.status() == DownloadStatus.QUEUED)
+                                        .count() == 1L,
+                        "jobs beyond the concurrency limit must remain in the application queue");
+                downloads.configureConcurrentJobs(3);
+                counter.check(source.awaitStarted(3) && source.maximumActive.get() == 3,
+                        "raising the limit must immediately fill the newly available slot");
+                source.release();
+                ids.forEach(id -> await(downloads, id, job -> job.status() == DownloadStatus.COMPLETED));
+            }
+            try (DefaultDownloadService restarted = new DefaultDownloadService(
+                    new SingleSourceRegistry(source), library, root, initial)) {
+                counter.check(restarted.snapshot().concurrentJobs() == 3,
+                        "the simultaneous download limit must survive a restart");
+            }
+        } catch (IOException exception) {
+            throw new AssertionError("Unable to prepare concurrent queue test", exception);
+        } finally {
+            source.release();
+            deleteTree(root);
+        }
+    }
+
     private static void enforcesLargeTransferPolicy(Counter counter) {
         Path root = null;
         try {
@@ -895,6 +944,78 @@ final class DownloadTest {
                     new SourceContentUnitId(itemId, id),
                     "Chapter " + id,
                     Optional.of(Instant.EPOCH));
+        }
+    }
+
+    private static final class ConcurrentPagedSource implements PagedSource {
+        private final SourceCatalogueItemId itemId = new SourceCatalogueItemId(
+                SourceId.of("test.concurrent"),
+                "title");
+        private final List<SourceContentUnit> units = List.of(
+                contentUnit("a"),
+                contentUnit("b"),
+                contentUnit("c"));
+        private final CountDownLatch started = new CountDownLatch(3);
+        private final CountDownLatch released = new CountDownLatch(1);
+        private final AtomicInteger active = new AtomicInteger();
+        private final AtomicInteger maximumActive = new AtomicInteger();
+
+        @Override
+        public SourceDescriptor descriptor() {
+            return new SourceDescriptor(
+                    itemId.sourceId(),
+                    "Concurrent queue test",
+                    "1.0.0",
+                    "und",
+                    Set.of(SourceContentKind.MANGA),
+                    SourceSdk.API_VERSION);
+        }
+
+        @Override
+        public List<SourceContentUnit> contentUnits(SourceCatalogueItemId requested) {
+            return requested.equals(itemId) ? units : List.of();
+        }
+
+        @Override
+        public List<SourcePageResource> pages(SourceContentUnitId requested) {
+            return List.of(new SourcePageResource(requested, requested.value(), 0, 4L));
+        }
+
+        @Override
+        public byte[] readPage(SourcePageResource page) {
+            int current = active.incrementAndGet();
+            maximumActive.accumulateAndGet(current, Math::max);
+            started.countDown();
+            try {
+                if (!released.await(3L, TimeUnit.SECONDS)) {
+                    throw new DownloadException("Timed out waiting to release concurrent download test");
+                }
+                return new byte[] {1, 2, 3, 4};
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                throw new DownloadException("Interrupted concurrent download test", exception);
+            } finally {
+                active.decrementAndGet();
+            }
+        }
+
+        private SourceContentUnit contentUnit(String id) {
+            return new SourceContentUnit(
+                    new SourceContentUnitId(itemId, id),
+                    id,
+                    Optional.of(Instant.EPOCH));
+        }
+
+        private boolean awaitStarted(int expected) {
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3L);
+            while (started.getCount() > 3L - expected && System.nanoTime() < deadline) {
+                Thread.onSpinWait();
+            }
+            return started.getCount() <= 3L - expected;
+        }
+
+        private void release() {
+            released.countDown();
         }
     }
 

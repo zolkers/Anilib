@@ -36,6 +36,8 @@ public interface DownloadService {
 
     void configureMaximumStorageBytes(long maximumStorageBytes);
 
+    void configureConcurrentJobs(int concurrentJobs);
+
     void changeStorageLocation(Path location);
 
     DownloadIndexRepairResult repairIndex();

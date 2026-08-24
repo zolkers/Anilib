@@ -98,6 +98,11 @@ public final class DefaultDownloadPresentation implements DownloadPresentation {
     }
 
     @Override
+    public void configureConcurrentJobs(int concurrentJobs) {
+        downloads.configureConcurrentJobs(concurrentJobs);
+    }
+
+    @Override
     public void changeStorageLocation(Path location) {
         downloads.changeStorageLocation(location);
     }

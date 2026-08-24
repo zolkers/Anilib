@@ -6,6 +6,9 @@ public record DownloadStoragePolicy(
         int concurrentJobs,
         boolean resumeOnStart,
         boolean removePartialOnCancel) {
+    public static final int MIN_CONCURRENT_JOBS = 1;
+    public static final int MAX_CONCURRENT_JOBS = 8;
+
     public DownloadStoragePolicy {
         if (maximumStorageBytes < 1) {
             throw new IllegalArgumentException("maximumStorageBytes must be positive");
@@ -14,7 +17,7 @@ public record DownloadStoragePolicy(
             throw new IllegalArgumentException(
                     "maximumPageBytes must be positive and not exceed maximumStorageBytes");
         }
-        if (concurrentJobs < 1 || concurrentJobs > 8) {
+        if (concurrentJobs < MIN_CONCURRENT_JOBS || concurrentJobs > MAX_CONCURRENT_JOBS) {
             throw new IllegalArgumentException("concurrentJobs must be between 1 and 8");
         }
     }
@@ -33,6 +36,15 @@ public record DownloadStoragePolicy(
                 maximumBytes,
                 maximumPageBytes,
                 concurrentJobs,
+                resumeOnStart,
+                removePartialOnCancel);
+    }
+
+    public DownloadStoragePolicy withConcurrentJobs(int jobs) {
+        return new DownloadStoragePolicy(
+                maximumStorageBytes,
+                maximumPageBytes,
+                jobs,
                 resumeOnStart,
                 removePartialOnCancel);
     }

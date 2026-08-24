@@ -149,7 +149,7 @@ public final class DefaultDownloadService
                 root,
                 policy,
                 Clock.systemUTC(),
-                ManagedExecutors.fixed("anilib-download", policy.concurrentJobs()),
+                ManagedExecutors.fixed("anilib-download", DownloadStoragePolicy.MAX_CONCURRENT_JOBS),
                 largeTransfersAllowed,
                 httpClient,
                 videoFinalizer);
@@ -249,7 +249,8 @@ public final class DefaultDownloadService
                 jobs,
                 offlineMode,
                 usedStorageBytes,
-                policy.maximumStorageBytes());
+                policy.maximumStorageBytes(),
+                policy.concurrentJobs());
     }
 
     @Override
@@ -553,11 +554,30 @@ public final class DefaultDownloadService
             throw new DownloadException("Invalid download storage limit", exception);
         }
         try {
-            storagePolicyStore.save(maximumStorageBytes);
+            storagePolicyStore.save(maximumStorageBytes, policy.concurrentJobs());
         } catch (IOException exception) {
             throw new DownloadException("Unable to persist the download storage limit", exception);
         }
         policy = requested;
+        notifyListeners();
+    }
+
+    @Override
+    public synchronized void configureConcurrentJobs(int concurrentJobs) {
+        ensureOpen();
+        DownloadStoragePolicy requested;
+        try {
+            requested = policy.withConcurrentJobs(concurrentJobs);
+        } catch (IllegalArgumentException exception) {
+            throw new DownloadException("Invalid simultaneous download limit", exception);
+        }
+        try {
+            storagePolicyStore.save(policy.maximumStorageBytes(), concurrentJobs);
+        } catch (IOException exception) {
+            throw new DownloadException("Unable to persist the simultaneous download limit", exception);
+        }
+        policy = requested;
+        scheduleAvailable();
         notifyListeners();
     }
 
@@ -1395,11 +1415,17 @@ public final class DefaultDownloadService
 
     private void load() {
         try {
-            long maximumStorageBytes = storagePolicyStore.load().orElse(policy.maximumStorageBytes());
+            FileDownloadStoragePolicyStore.StoredPolicy storedPolicy = storagePolicyStore
+                    .load(policy.concurrentJobs())
+                    .orElse(new FileDownloadStoragePolicyStore.StoredPolicy(
+                            policy.maximumStorageBytes(),
+                            policy.concurrentJobs()));
             try {
-                policy = policy.withMaximumStorageBytes(maximumStorageBytes);
+                policy = policy
+                        .withMaximumStorageBytes(storedPolicy.maximumStorageBytes())
+                        .withConcurrentJobs(storedPolicy.concurrentJobs());
             } catch (IllegalArgumentException exception) {
-                throw new IOException("Invalid persisted download storage limit", exception);
+                throw new IOException("Invalid persisted download policy", exception);
             }
             automaticPolicy = automaticPolicyStore.load();
             storageRoot = locationStore.load().orElse(defaultStorageRoot);

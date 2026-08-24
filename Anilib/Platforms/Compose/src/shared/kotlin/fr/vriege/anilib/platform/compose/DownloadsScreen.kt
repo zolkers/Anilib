@@ -22,8 +22,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.AutoMode
@@ -127,9 +129,15 @@ internal fun DownloadsScreen(presentation: DownloadPresentation, goBack: () -> U
                         offlineMode = queue.offlineMode(),
                         usedStorageBytes = queue.usedStorageBytes(),
                         maximumStorageBytes = queue.maximumStorageBytes(),
+                        concurrentJobs = queue.concurrentJobs(),
+                        activeJobs = queue.jobs().count { it.status() == DownloadStatus.DOWNLOADING },
+                        queuedJobs = queue.jobs().count { it.status() == DownloadStatus.QUEUED },
                         openStorage = { storageDialog = true },
                         openAutomation = { automationDialog = true },
                         setOfflineMode = { enabled -> command { presentation.setOfflineMode(enabled) } },
+                        setConcurrentJobs = { jobs ->
+                            command { presentation.configureConcurrentJobs(jobs) }
+                        },
                     )
                 }
                 item {
@@ -322,9 +330,13 @@ private fun DownloadQueueControls(
     offlineMode: Boolean,
     usedStorageBytes: Long,
     maximumStorageBytes: Long,
+    concurrentJobs: Int,
+    activeJobs: Int,
+    queuedJobs: Int,
     openStorage: () -> Unit,
     openAutomation: () -> Unit,
     setOfflineMode: (Boolean) -> Unit,
+    setConcurrentJobs: (Int) -> Unit,
 ) {
     AnilibGroup {
         Column(Modifier.fillMaxWidth().padding(16.dp)) {
@@ -341,6 +353,41 @@ private fun DownloadQueueControls(
                     )
                 }
                 Switch(checked = offlineMode, onCheckedChange = setOfflineMode)
+            }
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 14.dp),
+                color = MaterialTheme.colorScheme.outlineVariant,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("ui.simultaneous.downloads", fontWeight = FontWeight.Medium)
+                    Text(
+                        UiTranslations.format(
+                            "dynamic.download.queue.activity",
+                            LocalLanguagePack.current,
+                            activeJobs,
+                            queuedJobs,
+                        ),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+                IconButton(
+                    onClick = { setConcurrentJobs(concurrentJobs - 1) },
+                    enabled = concurrentJobs > 1,
+                ) {
+                    Icon(Icons.Default.Remove, contentDescription = "ui.decrease")
+                }
+                Text(concurrentJobs.toString(), fontWeight = FontWeight.Bold)
+                IconButton(
+                    onClick = { setConcurrentJobs(concurrentJobs + 1) },
+                    enabled = concurrentJobs < 8,
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "ui.increase")
+                }
             }
             HorizontalDivider(
                 modifier = Modifier.padding(vertical = 14.dp),
