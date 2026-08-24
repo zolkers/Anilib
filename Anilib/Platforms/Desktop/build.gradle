@@ -128,3 +128,30 @@ tasks.register('writeDesktopReleaseChecksums') {
         }.join('\n') + '\n', 'UTF-8')
     }
 }
+
+def stagedDesktopInstallers = fileTree(layout.buildDirectory.dir('compose/binaries/main')) {
+    include '**/*.msi', '**/*.deb', '**/*.dmg'
+}
+
+def stageDesktopReleaseFiles = tasks.register('stageDesktopReleaseFiles', Sync) {
+    dependsOn tasks.named('writeDesktopReleaseChecksums')
+    from(stagedDesktopInstallers) {
+        eachFile { details ->
+            details.path = details.name
+        }
+        includeEmptyDirs = false
+    }
+    from layout.buildDirectory.file('release/SHA256SUMS')
+    into rootProject.layout.projectDirectory.dir('release')
+}
+
+def removeStagedDesktopInstallers = tasks.register('removeStagedDesktopInstallers', Delete) {
+    dependsOn stageDesktopReleaseFiles
+    delete stagedDesktopInstallers
+}
+
+tasks.register('stageDesktopRelease') {
+    group = 'distribution'
+    description = 'Publishes the current-host installer at the repository root and removes module copies.'
+    dependsOn removeStagedDesktopInstallers
+}

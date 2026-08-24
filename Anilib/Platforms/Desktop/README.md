@@ -44,14 +44,16 @@ Run the current-host pipeline locally with:
 
 ```powershell
 .\gradlew.bat --no-daemon --console=plain `
-  :Anilib:Platforms:Desktop:writeDesktopReleaseChecksums `
+  :Anilib:Platforms:Desktop:stageDesktopRelease `
   '-PanilibVersion=0.1.0' '-PanilibPackageVersion=0.1.0'
 ```
 
 The build rejects dynamic or changing dependencies, normalizes every Gradle
 archive's timestamps and entry order, validates the native numeric version,
 uses stable application identifiers, and includes the complete Java runtime
-module set. Every host emits `build/release/SHA256SUMS` beside its installer.
+module set. Every host publishes its installer and `SHA256SUMS` in the visible
+`release/` directory at the repository root, then removes the module's package
+copy.
 AnilibJava verifies that the three target formats, pinned runner matrix,
 toolchain, integrity manifest, and stable identifiers remain present.
 

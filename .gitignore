@@ -5,4 +5,5 @@
 *.iml
 out/
 .release/
+release/
 hs_err_pid*.log
