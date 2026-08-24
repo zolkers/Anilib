@@ -451,18 +451,44 @@ public final class DefaultPlayerService implements PlayerService, PlayerContentR
         List<SourceVideoStream> offline = provider == null
                 ? List.of()
                 : validatedProviderStreams(provider.streams(episodeId));
-        if (!offline.isEmpty()) {
+        if (!fallbackAllowed()) {
+            if (offline.isEmpty()) {
+                throw new PlayerException("This episode is not available while offline mode is enabled");
+            }
             return offline;
         }
-        if (!fallbackAllowed()) {
-            throw new PlayerException("This episode is not available while offline mode is enabled");
+        Optional<Source> installed = sources.find(resolved.sourceItemId().sourceId());
+        if (installed.isEmpty()) {
+            if (!offline.isEmpty()) {
+                return offline;
+            }
+            throw new PlayerException("Library source is not installed");
         }
-        Source source = sources.find(resolved.sourceItemId().sourceId())
-                .orElseThrow(() -> new PlayerException("Library source is not installed"));
+        Source source = installed.orElseThrow();
         if (!(source instanceof StreamingSource streamingSource)) {
+            if (!offline.isEmpty()) {
+                return offline;
+            }
             throw new PlayerException("Library source does not provide streaming content");
         }
-        return validatedStreams(streamingSource, episodeId);
+        try {
+            List<SourceVideoStream> online = validatedStreams(streamingSource, episodeId);
+            if (offline.isEmpty()) {
+                return online;
+            }
+            Map<String, SourceVideoStream> combined = new LinkedHashMap<>();
+            offline.forEach(stream -> combined.put(stream.id(), stream));
+            online.forEach(stream -> combined.putIfAbsent(stream.id(), stream));
+            if (combined.size() > MAXIMUM_STREAMS) {
+                throw new PlayerException("Player content providers returned too many streams");
+            }
+            return List.copyOf(combined.values());
+        } catch (RuntimeException failure) {
+            if (!offline.isEmpty()) {
+                return offline;
+            }
+            throw failure;
+        }
     }
 
     private static List<SourceEpisode> validatedProviderEpisodes(

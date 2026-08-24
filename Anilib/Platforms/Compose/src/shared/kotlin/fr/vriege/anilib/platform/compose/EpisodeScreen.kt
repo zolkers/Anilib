@@ -45,7 +45,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import fr.vriege.anilib.feature.player.PlaybackState
 import fr.vriege.anilib.feature.player.PlayerDecoderPolicy
@@ -53,6 +52,7 @@ import fr.vriege.anilib.feature.player.PlayerPreferences
 import fr.vriege.anilib.feature.player.PlayerQualityPolicy
 import fr.vriege.anilib.feature.player.PlayerSubtitlePolicy
 import fr.vriege.anilib.feature.player.ui.PlayerController
+import fr.vriege.anilib.feature.source.SourceVideoStream
 import java.util.Optional
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -82,6 +82,17 @@ internal fun PlayerSelectionScreen(
         return
     }
     val livePlayback = remember(controller) { mutableStateOf(snapshot.playback()) }
+    val offlineStreams = snapshot.streams().filter(::isOfflineStream)
+    val onlineStreams = snapshot.streams().filterNot(::isOfflineStream)
+    val canChoosePlaybackSource = offlineStreams.isNotEmpty() && onlineStreams.isNotEmpty()
+    val selectedOffline = isOfflineStream(snapshot.selectedStream())
+    val visibleStreams = if (!canChoosePlaybackSource) {
+        snapshot.streams()
+    } else if (selectedOffline) {
+        offlineStreams
+    } else {
+        onlineStreams
+    }
     val command: (() -> Unit) -> Unit = { action ->
         runCatching(action)
             .onSuccess {
@@ -148,8 +159,37 @@ internal fun PlayerSelectionScreen(
                     )
                 }
             }
+            if (canChoosePlaybackSource) {
+                item {
+                    Text("ui.playback.source", fontWeight = FontWeight.SemiBold)
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        item {
+                            FilterChip(
+                                selected = selectedOffline,
+                                onClick = {
+                                    preferredStream(offlineStreams, snapshot.selectedStream())?.let { stream ->
+                                        command { controller.selectStream(stream.id()) }
+                                    }
+                                },
+                                label = { Text("ui.offline") },
+                            )
+                        }
+                        item {
+                            FilterChip(
+                                selected = !selectedOffline,
+                                onClick = {
+                                    preferredStream(onlineStreams, snapshot.selectedStream())?.let { stream ->
+                                        command { controller.selectStream(stream.id()) }
+                                    }
+                                },
+                                label = { Text("ui.online") },
+                            )
+                        }
+                    }
+                }
+            }
             item { Text("ui.video.quality", fontWeight = FontWeight.SemiBold) }
-            items(snapshot.streams(), key = { it.id() }) { stream ->
+            items(visibleStreams, key = { it.id() }) { stream ->
                 Card(
                     modifier = Modifier.fillMaxWidth().clickable {
                         command { controller.selectStream(stream.id()) }
@@ -163,12 +203,9 @@ internal fun PlayerSelectionScreen(
                     ),
                 ) {
                     Column(modifier = Modifier.fillMaxWidth().padding(14.dp)) {
-                        Text(stream.quality(), fontWeight = FontWeight.SemiBold)
                         Text(
-                            stream.location().toString(),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            if (isOfflineStream(stream)) "ui.downloaded.file" else stream.quality(),
+                            fontWeight = FontWeight.SemiBold,
                         )
                         Text(stream.format().name.lowercase().replaceFirstChar(Char::uppercase))
                     }
@@ -217,6 +254,16 @@ internal fun PlayerSelectionScreen(
         )
     }
 }
+
+private fun isOfflineStream(stream: SourceVideoStream): Boolean =
+    stream.location().scheme.equals("file", ignoreCase = true)
+
+private fun preferredStream(
+    candidates: List<SourceVideoStream>,
+    current: SourceVideoStream,
+): SourceVideoStream? = candidates.firstOrNull { candidate ->
+    candidate.quality().equals(current.quality(), ignoreCase = true)
+} ?: candidates.firstOrNull()
 
 @Composable
 private fun LivePlaybackLabel(playback: State<PlaybackState>) {

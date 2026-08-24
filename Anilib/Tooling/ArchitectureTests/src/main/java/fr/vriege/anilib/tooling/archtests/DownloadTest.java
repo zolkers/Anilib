@@ -24,6 +24,13 @@ import fr.vriege.anilib.feature.library.LibraryItem;
 import fr.vriege.anilib.feature.library.LibraryItemId;
 import fr.vriege.anilib.feature.library.LibraryOrigin;
 import fr.vriege.anilib.feature.library.MediaKind;
+import fr.vriege.anilib.feature.player.PlayerBackend;
+import fr.vriege.anilib.feature.player.PlayerMedia;
+import fr.vriege.anilib.feature.player.PlayerPlayback;
+import fr.vriege.anilib.feature.player.PlayerPlaybackSnapshot;
+import fr.vriege.anilib.feature.player.PlayerPlaybackStatus;
+import fr.vriege.anilib.feature.player.PlayerSession;
+import fr.vriege.anilib.feature.player.runtime.DefaultPlayerService;
 import fr.vriege.anilib.feature.reader.ReaderCapabilities;
 import fr.vriege.anilib.feature.reader.ReaderService;
 import fr.vriege.anilib.feature.reader.ReaderSession;
@@ -261,6 +268,24 @@ final class DownloadTest {
                 counter.check(offline.location().getPath().endsWith("offline.mp4")
                                 && offline.format() == SourceStreamFormat.PROGRESSIVE,
                         "the offline player must receive the finalized MKV instead of HLS fragments");
+                try (DefaultPlayerService player = new DefaultPlayerService(
+                        new SingleSourceRegistry(source),
+                        library,
+                        root.resolve("playback-state.anilib"),
+                        new TestPlayerBackend())) {
+                    player.register(downloads);
+                    try (PlayerSession session = player.open(item.id(), source.episode.id())) {
+                        counter.check(session.snapshot().streams().size() == 2
+                                        && session.snapshot().streams().stream()
+                                                .anyMatch(stream -> "file".equals(stream.location().getScheme()))
+                                        && session.snapshot().streams().stream()
+                                                .anyMatch(stream -> "https".equals(stream.location().getScheme())),
+                                "downloaded anime must offer both offline and online playback streams");
+                        session.selectStream("hls");
+                        counter.check("https".equals(session.playback().media().stream().location().getScheme()),
+                                "the player must be able to switch from its local file to an online stream");
+                    }
+                }
             }
         } catch (IOException exception) {
             throw new AssertionError("Unable to prepare finalized anime download test", exception);
@@ -1092,6 +1117,75 @@ final class DownloadTest {
 
         private void releaseStreamResolution() {
             streamResolutionReleased.countDown();
+        }
+    }
+
+    private static final class TestPlayerBackend implements PlayerBackend {
+        @Override
+        public String id() {
+            return "download-test";
+        }
+
+        @Override
+        public boolean available() {
+            return true;
+        }
+
+        @Override
+        public PlayerPlayback open(PlayerMedia media) {
+            return new TestPlayerPlayback(media);
+        }
+    }
+
+    private static final class TestPlayerPlayback implements PlayerPlayback {
+        private final PlayerMedia media;
+
+        private TestPlayerPlayback(PlayerMedia media) {
+            this.media = media;
+        }
+
+        @Override
+        public PlayerMedia media() {
+            return media;
+        }
+
+        @Override
+        public PlayerPlaybackSnapshot snapshot() {
+            return new PlayerPlaybackSnapshot(
+                    PlayerPlaybackStatus.PAUSED,
+                    media.startPositionMillis(),
+                    -1L,
+                    1.0F,
+                    1.0F,
+                    Optional.empty());
+        }
+
+        @Override
+        public void play() {
+        }
+
+        @Override
+        public void pause() {
+        }
+
+        @Override
+        public void seekTo(long positionMillis) {
+        }
+
+        @Override
+        public void setVolume(float volume) {
+        }
+
+        @Override
+        public void setPlaybackSpeed(float speed) {
+        }
+
+        @Override
+        public void selectSubtitle(Optional<String> subtitleId) {
+        }
+
+        @Override
+        public void close() {
         }
     }
 
