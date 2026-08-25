@@ -926,17 +926,15 @@ public final class DefaultDownloadService
         ensureOpen();
         List<DownloadRecord> complete = records.values().stream()
                 .filter(record -> record.status == DownloadStatus.COMPLETED)
+                .filter(record -> !record.video())
                 .filter(record -> record.sourceItemId.equals(itemId))
                 .sorted(Comparator.comparing((DownloadRecord record) -> record.updatedAt).reversed())
                 .toList();
         if (preferredContentId.isPresent()) {
-            Optional<DownloadRecord> preferred = complete.stream()
+            return complete.stream()
                     .filter(record -> record.contentUnit.id().value().equals(preferredContentId.orElseThrow()))
-                    .findFirst();
-            if (preferred.isPresent()) {
-                DownloadRecord record = preferred.orElseThrow();
-                return Optional.of(new ReaderContent(record.contentUnit, record.pages));
-            }
+                    .findFirst()
+                    .map(record -> new ReaderContent(record.contentUnit, record.pages));
         }
         return complete.stream().findFirst().map(record -> new ReaderContent(record.contentUnit, record.pages));
     }

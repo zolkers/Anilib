@@ -32,8 +32,10 @@ import fr.vriege.anilib.feature.player.PlayerPlaybackStatus;
 import fr.vriege.anilib.feature.player.PlayerSession;
 import fr.vriege.anilib.feature.player.runtime.DefaultPlayerService;
 import fr.vriege.anilib.feature.reader.ReaderCapabilities;
+import fr.vriege.anilib.feature.reader.ReaderPolicy;
 import fr.vriege.anilib.feature.reader.ReaderService;
 import fr.vriege.anilib.feature.reader.ReaderSession;
+import fr.vriege.anilib.feature.reader.runtime.DefaultReaderService;
 import fr.vriege.anilib.feature.source.InstalledSourceExtension;
 import fr.vriege.anilib.feature.source.PagedSource;
 import fr.vriege.anilib.feature.source.Source;
@@ -91,6 +93,7 @@ final class DownloadTest {
     static int run() {
         Counter counter = new Counter();
         verifiesStandardOfflineReading(counter);
+        usesOnlineFallbackForAnUndownloadedChapter(counter);
         verifiesResumableQueue(counter);
         verifiesPriorityMetricsAndRecovery(counter);
         verifiesConfigurableConcurrentQueue(counter);
@@ -103,6 +106,46 @@ final class DownloadTest {
         enforcesLargeTransferPolicy(counter);
         cleansOrphanedDownloads(counter);
         return counter.value;
+    }
+
+    private static void usesOnlineFallbackForAnUndownloadedChapter(Counter counter) {
+        Path root = null;
+        try {
+            root = Files.createTempDirectory("anilib-download-exact-offline-content");
+            MemoryLibraryCatalog library = new MemoryLibraryCatalog();
+            LibraryItem item = LibraryItem.create("Exact offline chapter", MediaKind.MANGA)
+                    .withOrigin(new LibraryOrigin("test.queue", "title"));
+            library.save(item);
+            QueuedPagedSource source = new QueuedPagedSource(false, false);
+            SourceRegistry registry = new SingleSourceRegistry(source);
+            DownloadStoragePolicy policy = new DownloadStoragePolicy(4096, 1024, 1, true, true);
+            try (DefaultDownloadService downloads = new DefaultDownloadService(
+                         registry, library, root, policy);
+                 DefaultReaderService reader = new DefaultReaderService(
+                         registry, library, ReaderPolicy.standard())) {
+                AutoCloseable registration = reader.register(downloads);
+                try {
+                    DownloadId downloaded = downloads.enqueue(item.id(), source.unit("a").id());
+                    await(downloads, downloaded, job -> job.status() == DownloadStatus.COMPLETED);
+
+                    counter.check(downloads.find(source.itemId, Optional.of("a")).isPresent(),
+                            "download provider must return the exact downloaded chapter");
+                    counter.check(downloads.find(source.itemId, Optional.of("b")).isEmpty(),
+                            "download provider must not substitute another offline chapter");
+                    try (ReaderSession session = reader.open(item.id(), source.unit("b").id())) {
+                        session.currentPage();
+                    }
+                    counter.check(source.readUnits().contains("b:0"),
+                            "Reader must fall back online for a requested chapter that is not downloaded");
+                } finally {
+                    registration.close();
+                }
+            }
+        } catch (Exception exception) {
+            throw new AssertionError("Unable to verify exact offline chapter selection", exception);
+        } finally {
+            deleteTree(root);
+        }
     }
 
     private static void downloadsHlsEpisodes(Counter counter) {
