@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -46,8 +47,15 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.unit.dp
@@ -66,6 +74,7 @@ import java.util.Optional
 
 private const val PROGRESS_INTERVAL_MILLIS = 5_000L
 private const val CONTROLS_HIDE_DELAY_MILLIS = 3_000L
+private const val SEEK_INTERVAL_MILLIS = 10_000L
 
 @Composable
 internal fun PlayerVideoSurface(
@@ -99,6 +108,7 @@ internal fun PlayerVideoSurface(
     var rightAction by remember(bridge) { mutableStateOf(PlayerCustomAction.SEEK_FORWARD) }
     var drag by remember(bridge) { mutableStateOf(Offset.Zero) }
     var dragStartX by remember(bridge) { mutableFloatStateOf(0f) }
+    val focusRequester = remember(bridge) { FocusRequester() }
     val currentSetPlayerActive = rememberUpdatedState(setPlayerActive)
     DisposableEffect(bridge) {
         currentSetPlayerActive.value(true)
@@ -109,6 +119,9 @@ internal fun PlayerVideoSurface(
         onDispose {
             bridge.detach(player)
         }
+    }
+    CrashSafeLaunchedEffect(bridge) {
+        runCatching { focusRequester.requestFocus() }
     }
     CrashSafeLaunchedEffect(bridge, player) {
         while (!player.hasMedia && player.error == null) delay(50L)
@@ -163,8 +176,8 @@ internal fun PlayerVideoSurface(
     fun execute(action: PlayerCustomAction) {
         revealControls()
         when (action) {
-            PlayerCustomAction.SEEK_BACK -> seekBy(-10_000L)
-            PlayerCustomAction.SEEK_FORWARD -> seekBy(10_000L)
+            PlayerCustomAction.SEEK_BACK -> seekBy(-SEEK_INTERVAL_MILLIS)
+            PlayerCustomAction.SEEK_FORWARD -> seekBy(SEEK_INTERVAL_MILLIS)
             PlayerCustomAction.PLAY_PAUSE -> togglePlayback()
             PlayerCustomAction.SPEED -> cycleSpeed()
             PlayerCustomAction.MUTE -> {
@@ -177,9 +190,34 @@ internal fun PlayerVideoSurface(
     Box(
         modifier = (if (fullscreen) Modifier.fillMaxSize() else Modifier.fillMaxWidth().aspectRatio(16f / 9f))
             .background(Color.Black)
+            .focusRequester(focusRequester)
+            .focusable()
+            .onKeyEvent { event ->
+                if (
+                    event.type != KeyEventType.KeyDown ||
+                    locked ||
+                    customMenu ||
+                    advancedMenu
+                ) {
+                    false
+                } else {
+                    when (event.key) {
+                        Key.DirectionLeft -> {
+                            seekBy(-SEEK_INTERVAL_MILLIS)
+                            true
+                        }
+                        Key.DirectionRight -> {
+                            seekBy(SEEK_INTERVAL_MILLIS)
+                            true
+                        }
+                        else -> false
+                    }
+                }
+            }
             .pointerInput(locked) {
                 detectTapGestures(
                     onTap = {
+                        runCatching { focusRequester.requestFocus() }
                         if (!locked) {
                             if (controlsVisible) controlsVisible = false else revealControls()
                         }
@@ -187,8 +225,8 @@ internal fun PlayerVideoSurface(
                     onDoubleTap = { position ->
                         if (!locked) {
                             when {
-                                position.x < size.width / 3f -> seekBy(-10_000L)
-                                position.x > size.width * 2f / 3f -> seekBy(10_000L)
+                                position.x < size.width / 3f -> seekBy(-SEEK_INTERVAL_MILLIS)
+                                position.x > size.width * 2f / 3f -> seekBy(SEEK_INTERVAL_MILLIS)
                                 else -> togglePlayback()
                             }
                         }
@@ -221,7 +259,7 @@ internal fun PlayerVideoSurface(
                     },
                     onDragEnd = {
                         if (!locked && abs(drag.x) > abs(drag.y) && abs(drag.x) >= 48f) {
-                            seekBy(if (drag.x < 0f) -10_000L else 10_000L)
+                            seekBy(if (drag.x < 0f) -SEEK_INTERVAL_MILLIS else SEEK_INTERVAL_MILLIS)
                         } else if (!locked && abs(drag.y) >= 48f) {
                             val delta = -drag.y / size.height.coerceAtLeast(1)
                             if (dragStartX < size.width / 2f) {
@@ -283,7 +321,7 @@ internal fun PlayerVideoSurface(
                                     tint = Color.White.copy(alpha = if (previousEpisode == null) 0.3f else 1f),
                                 )
                             }
-                            IconButton(onClick = { seekBy(-10_000L) }) {
+                            IconButton(onClick = { seekBy(-SEEK_INTERVAL_MILLIS) }) {
                                 Icon(Icons.Default.Replay10, "Seek back", tint = Color.White)
                             }
                             IconButton(onClick = ::togglePlayback, modifier = Modifier.size(64.dp)) {
@@ -294,7 +332,7 @@ internal fun PlayerVideoSurface(
                                     modifier = Modifier.size(42.dp),
                                 )
                             }
-                            IconButton(onClick = { seekBy(10_000L) }) {
+                            IconButton(onClick = { seekBy(SEEK_INTERVAL_MILLIS) }) {
                                 Icon(Icons.Default.Forward10, "Seek forward", tint = Color.White)
                             }
                             IconButton(
