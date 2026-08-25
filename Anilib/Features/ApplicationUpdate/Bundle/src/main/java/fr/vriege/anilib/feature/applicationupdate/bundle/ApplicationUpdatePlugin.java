@@ -47,7 +47,7 @@ public final class ApplicationUpdatePlugin implements AnilibPlugin {
     }
 
     public static ApplicationUpdatePlugin currentRuntime(Path channelFile) {
-        String version = System.getProperty("anilib.version", "1.0.3");
+        String version = System.getProperty("anilib.version", "1.0.4");
         return new ApplicationUpdatePlugin(
                 ApplicationVersion.parse(version),
                 ApplicationPlatform.current(),
