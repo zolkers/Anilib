@@ -52,7 +52,7 @@ kotlin {
     jvmToolchain(21)
 }
 
-def packageVersionValue = providers.gradleProperty('anilibPackageVersion').orElse('1.0.4').get()
+def packageVersionValue = providers.gradleProperty('anilibPackageVersion').orElse('1.0.5').get()
 if (!(packageVersionValue ==~ /[0-9]+\.[0-9]+\.[0-9]+/)) {
     throw new GradleException('anilibPackageVersion must use MAJOR.MINOR.PATCH numeric form')
 }

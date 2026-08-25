@@ -45,7 +45,7 @@ Run the current-host pipeline locally with:
 ```powershell
 .\gradlew.bat --no-daemon --console=plain `
   :Anilib:Platforms:Desktop:stageDesktopRelease `
-  '-PanilibVersion=1.0.4' '-PanilibPackageVersion=1.0.4'
+  '-PanilibVersion=1.0.5' '-PanilibPackageVersion=1.0.5'
 ```
 
 The build rejects dynamic or changing dependencies, normalizes every Gradle
