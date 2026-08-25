@@ -136,6 +136,7 @@ compose.desktop {
         jvmArgs.addAll([
                 '--add-opens=java.desktop/sun.awt=ALL-UNNAMED',
                 '--add-opens=java.desktop/java.awt.peer=ALL-UNNAMED',
+                '--add-exports=kotlinx.serialization.json/kotlinx.serialization.json.internal=ALL-UNNAMED',
                 "-Danilib.version=${rootProject.version}"
         ])
         nativeDistributions {

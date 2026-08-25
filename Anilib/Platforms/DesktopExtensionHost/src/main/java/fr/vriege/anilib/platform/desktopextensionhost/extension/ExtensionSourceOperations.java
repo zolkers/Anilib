@@ -608,8 +608,7 @@ public final class ExtensionSourceOperations implements AutoCloseable {
         if (failure instanceof ExtensionOperationDispatcher.AbiException
                 || failure instanceof ReflectiveOperationException
                 || failure instanceof LinkageError
-                || failure instanceof ClassCastException
-                || failure instanceof NullPointerException) {
+                || failure instanceof ClassCastException) {
             return ExtensionOperationException.Code.ABI_FAILURE;
         }
         return ExtensionOperationException.Code.INTERNAL_HOST_FAILURE;

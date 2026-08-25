@@ -7,6 +7,7 @@ import fr.vriege.anilib.platform.desktopextensionhost.compat.android.webkit.WebR
 import fr.vriege.anilib.platform.desktopextensionhost.compat.android.webkit.WebResourceResponse;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.android.webkit.WebView;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.android.webkit.WebViewClient;
+import fr.vriege.anilib.platform.desktopextensionhost.compat.injekt.InjektKt;
 import fr.vriege.anilib.platform.desktopextensionhost.extension.ExtensionAbiVerifier;
 import fr.vriege.anilib.platform.desktopextensionhost.extension.ExtensionRegistry;
 import fr.vriege.anilib.platform.desktopextensionhost.extension.ExtensionRuntimeCatalog;
@@ -14,6 +15,7 @@ import fr.vriege.anilib.platform.desktopextensionhost.extension.ExtensionSourceO
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Type;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -62,7 +64,8 @@ final class ExtensionAbiVerifierSmoke {
     private ExtensionAbiVerifierSmoke() {
     }
 
-    static void verify() throws IOException {
+    static void verify() throws Exception {
+        verifyInjectedJsonDefaults();
         Path directory = Files.createTempDirectory("anilib-extension-abi-");
         try {
             Path supported = directory.resolve("supported.jar");
@@ -78,6 +81,24 @@ final class ExtensionAbiVerifierSmoke {
             if (report.compatible() || report.missingSymbols().stream()
                     .noneMatch(symbol -> symbol.contains("missingOperation()V"))) {
                 throw new IllegalStateException("Missing host ABI method was not reported: " + report);
+            }
+
+            Path missingRuntime = directory.resolve("missing-runtime.jar");
+            writeExternalRuntimeArchive(missingRuntime, "sample/missing/RuntimeType");
+            ExtensionAbiVerifier.Report missingRuntimeReport = verifier.inspect(missingRuntime);
+            if (missingRuntimeReport.compatible() || missingRuntimeReport.missingSymbols().stream()
+                    .noneMatch(symbol -> symbol.equals("class sample.missing.RuntimeType"))) {
+                throw new IllegalStateException(
+                        "Missing host runtime class was not reported: " + missingRuntimeReport);
+            }
+
+            Path serializationOkio = directory.resolve("serialization-okio.jar");
+            writeExternalRuntimeArchive(
+                    serializationOkio, "kotlinx/serialization/json/okio/OkioStreamsKt");
+            ExtensionAbiVerifier.Report serializationOkioReport = verifier.inspect(serializationOkio);
+            if (!serializationOkioReport.compatible()) {
+                throw new IllegalStateException(
+                        "Kotlin serialization Okio runtime was rejected: " + serializationOkioReport);
             }
 
             Path mangaDexSurface = directory.resolve("mangadex-surface.jar");
@@ -129,6 +150,19 @@ final class ExtensionAbiVerifierSmoke {
         }
     }
 
+    private static void verifyInjectedJsonDefaults() throws ReflectiveOperationException {
+        Class<?> jsonType = Class.forName("kotlinx.serialization.json.Json");
+        Object json = InjektKt.getInjekt().getInstance(jsonType);
+        Object configuration = jsonType.getMethod("getConfiguration").invoke(json);
+        Class<?> configurationType = Class.forName("kotlinx.serialization.json.JsonConfiguration");
+        boolean ignoresUnknownKeys = (boolean) configurationType
+                .getMethod("getIgnoreUnknownKeys")
+                .invoke(configuration);
+        if (!ignoresUnknownKeys) {
+            throw new IllegalStateException("Injected extension JSON must ignore unknown source fields");
+        }
+    }
+
     private static void verifyInstalledRuntime(Path directory, Path archive) {
         String archiveName = archive.getFileName().toString();
         if (!archiveName.endsWith(".jar")) {
@@ -175,6 +209,26 @@ final class ExtensionAbiVerifierSmoke {
         writer.visitEnd();
         try (JarOutputStream jar = new JarOutputStream(Files.newOutputStream(archive))) {
             jar.putNextEntry(new JarEntry("sample/AbiConsumer.class"));
+            jar.write(writer.toByteArray());
+            jar.closeEntry();
+        }
+    }
+
+    private static void writeExternalRuntimeArchive(Path archive, String runtimeType) throws IOException {
+        ClassWriter writer = new ClassWriter(0);
+        writer.visit(Opcodes.V21, Opcodes.ACC_PUBLIC, "sample/RuntimeConsumer",
+                null, "java/lang/Object", null);
+        MethodVisitor method = writer.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC,
+                "reference", "()V", null, null);
+        method.visitCode();
+        method.visitLdcInsn(Type.getObjectType(runtimeType));
+        method.visitInsn(Opcodes.POP);
+        method.visitInsn(Opcodes.RETURN);
+        method.visitMaxs(1, 0);
+        method.visitEnd();
+        writer.visitEnd();
+        try (JarOutputStream jar = new JarOutputStream(Files.newOutputStream(archive))) {
+            jar.putNextEntry(new JarEntry("sample/RuntimeConsumer.class"));
             jar.write(writer.toByteArray());
             jar.closeEntry();
         }

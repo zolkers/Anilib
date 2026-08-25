@@ -3,6 +3,8 @@ package fr.vriege.anilib.platform.desktopextensionhost.compat.injekt;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.android.app.Application;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.network.NetworkHelper;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.injekt.api.InjektScope;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Proxy;
 import java.lang.reflect.Type;
 import okhttp3.OkHttpClient;
 
@@ -37,9 +39,31 @@ public final class InjektKt {
 
         private static Object jsonDefault() {
             try {
-                return Class.forName("kotlinx.serialization.json.Json").getField("Default").get(null);
-            } catch (ReflectiveOperationException error) {
-                throw new IllegalStateException("Kotlin JSON runtime is unavailable", error);
+                Class<?> jsonType = Class.forName("kotlinx.serialization.json.Json");
+                Class<?> functionType = Class.forName("kotlin.jvm.functions.Function1");
+                Object defaults = jsonType.getField("Default").get(null);
+                InvocationHandler configure = (proxy, method, arguments) -> {
+                    if (method.getDeclaringClass().equals(Object.class)) {
+                        return switch (method.getName()) {
+                            case "toString" -> "AnilibJsonConfiguration";
+                            case "hashCode" -> System.identityHashCode(proxy);
+                            case "equals" -> proxy == arguments[0];
+                            default -> throw new UnsupportedOperationException(method.getName());
+                        };
+                    }
+                    Object builder = arguments[0];
+                    builder.getClass()
+                            .getMethod("setIgnoreUnknownKeys", boolean.class)
+                            .invoke(builder, true);
+                    return Class.forName("kotlin.Unit").getField("INSTANCE").get(null);
+                };
+                Object action = Proxy.newProxyInstance(
+                        InjektKt.class.getClassLoader(), new Class<?>[] {functionType}, configure);
+                return Class.forName("kotlinx.serialization.json.JsonKt")
+                        .getMethod("Json", jsonType, functionType)
+                        .invoke(null, defaults, action);
+            } catch (ReflectiveOperationException exception) {
+                throw new IllegalStateException("Could not configure the extension JSON runtime", exception);
             }
         }
     }

@@ -49,6 +49,8 @@ public final class BuildDependencyRule implements AnilibJavaRule {
                             "'org.ow2.asm:asm-commons:9.10.1'",
                             "'org.ow2.asm:asm-tree:9.10.1'",
                             "'org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.9.0'",
+                            "'org.jetbrains.kotlinx:kotlinx-serialization-json-okio-jvm:1.9.0'",
+                            "'org.jetbrains.kotlinx:kotlinx-serialization-protobuf-jvm:1.9.0'",
                             "'org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.10.2'",
                             "'com.squareup.okhttp3:okhttp:5.4.0'",
                             "'com.squareup.okhttp3:okhttp-brotli:5.4.0'",

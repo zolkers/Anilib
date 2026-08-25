@@ -30,8 +30,6 @@ import org.objectweb.asm.Label;
 
 /* Validates every relocated host ABI symbol before an extension is activated. */
 public final class ExtensionAbiVerifier {
-    private static final String COMPATIBILITY_PREFIX =
-            "fr/vriege/anilib/platform/desktopextensionhost/compat/";
     private static final int MAX_DIAGNOSTICS = 100;
 
     private final ClassLoader hostLoader;
@@ -53,6 +51,7 @@ public final class ExtensionAbiVerifier {
         }
         Set<String> missing = new LinkedHashSet<>();
         try (JarFile jar = new JarFile(source.toFile())) {
+            Set<String> archiveClasses = archiveClasses(jar);
             var entries = jar.entries();
             while (entries.hasMoreElements() && missing.size() < MAX_DIAGNOSTICS) {
                 JarEntry entry = entries.nextElement();
@@ -60,7 +59,9 @@ public final class ExtensionAbiVerifier {
                     continue;
                 }
                 try (InputStream input = jar.getInputStream(entry)) {
-                    new ClassReader(input).accept(visitor(missing), ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
+                    new ClassReader(input).accept(
+                            visitor(missing, archiveClasses),
+                            ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
                 }
             }
         } catch (IOException exception) {
@@ -76,7 +77,22 @@ public final class ExtensionAbiVerifier {
         }
     }
 
-    private ClassVisitor visitor(Set<String> missing) {
+    private static Set<String> archiveClasses(JarFile jar) throws IOException {
+        Set<String> classes = new HashSet<>();
+        var entries = jar.entries();
+        while (entries.hasMoreElements()) {
+            JarEntry entry = entries.nextElement();
+            if (entry.isDirectory() || !entry.getName().endsWith(".class")) {
+                continue;
+            }
+            try (InputStream input = jar.getInputStream(entry)) {
+                classes.add(new ClassReader(input).getClassName());
+            }
+        }
+        return Set.copyOf(classes);
+    }
+
+    private ClassVisitor visitor(Set<String> missing, Set<String> archiveClasses) {
         return new ClassVisitor(Opcodes.ASM9) {
             @Override
             public void visit(
@@ -86,10 +102,10 @@ public final class ExtensionAbiVerifier {
                     String signature,
                     String superName,
                     String[] interfaces) {
-                checkClass(superName, missing);
+                checkClass(superName, missing, archiveClasses);
                 if (interfaces != null) {
                     for (String contract : interfaces) {
-                        checkClass(contract, missing);
+                        checkClass(contract, missing, archiveClasses);
                     }
                 }
             }
@@ -101,7 +117,7 @@ public final class ExtensionAbiVerifier {
                     String descriptor,
                     String signature,
                     Object value) {
-                checkType(Type.getType(descriptor), missing);
+                checkType(Type.getType(descriptor), missing, archiveClasses);
                 return null;
             }
 
@@ -112,28 +128,28 @@ public final class ExtensionAbiVerifier {
                     String descriptor,
                     String signature,
                     String[] exceptions) {
-                checkMethodType(descriptor, missing);
+                checkMethodType(descriptor, missing, archiveClasses);
                 if (exceptions != null) {
                     for (String exception : exceptions) {
-                        checkClass(exception, missing);
+                        checkClass(exception, missing, archiveClasses);
                     }
                 }
-                return methodVisitor(missing);
+                return methodVisitor(missing, archiveClasses);
             }
         };
     }
 
-    private MethodVisitor methodVisitor(Set<String> missing) {
+    private MethodVisitor methodVisitor(Set<String> missing, Set<String> archiveClasses) {
         return new MethodVisitor(Opcodes.ASM9) {
             @Override
             public void visitTypeInsn(int opcode, String type) {
-                checkClass(type, missing);
+                checkClass(type, missing, archiveClasses);
             }
 
             @Override
             public void visitFieldInsn(int opcode, String owner, String name, String descriptor) {
-                checkType(Type.getType(descriptor), missing);
-                if (compatibilityType(owner) && !fieldAvailable(owner, name, descriptor)) {
+                checkType(Type.getType(descriptor), missing, archiveClasses);
+                if (hostRuntimeType(owner, archiveClasses) && !fieldAvailable(owner, name, descriptor)) {
                     add(missing, "field " + binaryName(owner) + '.' + name + ' ' + descriptor);
                 }
             }
@@ -145,8 +161,8 @@ public final class ExtensionAbiVerifier {
                     String name,
                     String descriptor,
                     boolean isInterface) {
-                checkMethodType(descriptor, missing);
-                if (compatibilityType(owner) && !methodAvailable(owner, name, descriptor)) {
+                checkMethodType(descriptor, missing, archiveClasses);
+                if (hostRuntimeType(owner, archiveClasses) && !methodAvailable(owner, name, descriptor)) {
                     add(missing, "method " + binaryName(owner) + '.' + name + descriptor);
                 }
             }
@@ -157,13 +173,13 @@ public final class ExtensionAbiVerifier {
                     String descriptor,
                     Handle bootstrapMethodHandle,
                     Object... bootstrapMethodArguments) {
-                checkMethodType(descriptor, missing);
-                checkHandle(bootstrapMethodHandle, missing);
+                checkMethodType(descriptor, missing, archiveClasses);
+                checkHandle(bootstrapMethodHandle, missing, archiveClasses);
                 for (Object argument : bootstrapMethodArguments) {
                     if (argument instanceof Handle handle) {
-                        checkHandle(handle, missing);
+                        checkHandle(handle, missing, archiveClasses);
                     } else if (argument instanceof Type type) {
-                        checkType(type, missing);
+                        checkType(type, missing, archiveClasses);
                     }
                 }
             }
@@ -171,15 +187,15 @@ public final class ExtensionAbiVerifier {
             @Override
             public void visitLdcInsn(Object value) {
                 if (value instanceof Type type) {
-                    checkType(type, missing);
+                    checkType(type, missing, archiveClasses);
                 } else if (value instanceof Handle handle) {
-                    checkHandle(handle, missing);
+                    checkHandle(handle, missing, archiveClasses);
                 }
             }
 
             @Override
             public void visitMultiANewArrayInsn(String descriptor, int dimensions) {
-                checkType(Type.getType(descriptor), missing);
+                checkType(Type.getType(descriptor), missing, archiveClasses);
             }
 
             @Override
@@ -188,47 +204,47 @@ public final class ExtensionAbiVerifier {
                     Label end,
                     Label handler,
                     String type) {
-                checkClass(type, missing);
+                checkClass(type, missing, archiveClasses);
             }
         };
     }
 
-    private void checkHandle(Handle handle, Set<String> missing) {
+    private void checkHandle(Handle handle, Set<String> missing, Set<String> archiveClasses) {
         int tag = handle.getTag();
         if (tag == Opcodes.H_GETFIELD || tag == Opcodes.H_GETSTATIC
                 || tag == Opcodes.H_PUTFIELD || tag == Opcodes.H_PUTSTATIC) {
-            if (compatibilityType(handle.getOwner())
+            if (hostRuntimeType(handle.getOwner(), archiveClasses)
                     && !fieldAvailable(handle.getOwner(), handle.getName(), handle.getDesc())) {
                 add(missing, "field " + binaryName(handle.getOwner()) + '.'
                         + handle.getName() + ' ' + handle.getDesc());
             }
-        } else if (compatibilityType(handle.getOwner())
+        } else if (hostRuntimeType(handle.getOwner(), archiveClasses)
                 && !methodAvailable(handle.getOwner(), handle.getName(), handle.getDesc())) {
             add(missing, "method " + binaryName(handle.getOwner()) + '.'
                     + handle.getName() + handle.getDesc());
         }
     }
 
-    private void checkMethodType(String descriptor, Set<String> missing) {
+    private void checkMethodType(String descriptor, Set<String> missing, Set<String> archiveClasses) {
         Type type = Type.getMethodType(descriptor);
-        checkType(type.getReturnType(), missing);
+        checkType(type.getReturnType(), missing, archiveClasses);
         for (Type argument : type.getArgumentTypes()) {
-            checkType(argument, missing);
+            checkType(argument, missing, archiveClasses);
         }
     }
 
-    private void checkType(Type type, Set<String> missing) {
+    private void checkType(Type type, Set<String> missing, Set<String> archiveClasses) {
         if (type.getSort() == Type.ARRAY) {
-            checkType(type.getElementType(), missing);
+            checkType(type.getElementType(), missing, archiveClasses);
         } else if (type.getSort() == Type.OBJECT) {
-            checkClass(type.getInternalName(), missing);
+            checkClass(type.getInternalName(), missing, archiveClasses);
         } else if (type.getSort() == Type.METHOD) {
-            checkMethodType(type.getDescriptor(), missing);
+            checkMethodType(type.getDescriptor(), missing, archiveClasses);
         }
     }
 
-    private void checkClass(String internalName, Set<String> missing) {
-        if (compatibilityType(internalName) && hostClass(internalName) == null) {
+    private void checkClass(String internalName, Set<String> missing, Set<String> archiveClasses) {
+        if (hostRuntimeType(internalName, archiveClasses) && hostClass(internalName) == null) {
             add(missing, "class " + binaryName(internalName));
         }
     }
@@ -286,7 +302,7 @@ public final class ExtensionAbiVerifier {
     }
 
     private Class<?> hostClass(String internalName) {
-        if (!compatibilityType(internalName)) {
+        if (platformType(internalName)) {
             return null;
         }
         if (unavailableClasses.contains(internalName)) {
@@ -306,8 +322,19 @@ public final class ExtensionAbiVerifier {
         }
     }
 
-    private static boolean compatibilityType(String internalName) {
-        return internalName != null && internalName.startsWith(COMPATIBILITY_PREFIX);
+    private static boolean hostRuntimeType(String internalName, Set<String> archiveClasses) {
+        return internalName != null
+                && !archiveClasses.contains(internalName)
+                && !platformType(internalName);
+    }
+
+    private static boolean platformType(String internalName) {
+        return internalName == null
+                || internalName.startsWith("[")
+                || internalName.startsWith("java/")
+                || internalName.startsWith("javax/")
+                || internalName.startsWith("jdk/")
+                || internalName.startsWith("sun/");
     }
 
     private static String binaryName(String internalName) {

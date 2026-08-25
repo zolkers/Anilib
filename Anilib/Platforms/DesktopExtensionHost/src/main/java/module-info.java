@@ -7,6 +7,7 @@ module fr.vriege.anilib.platform.desktopextensionhost {
     requires org.objectweb.asm.commons;
     requires org.objectweb.asm.tree;
     requires transitive kotlinx.serialization.json;
+    requires transitive kotlinx.serialization.protobuf;
     requires transitive kotlinx.coroutines.core;
     requires transitive okhttp3;
     requires transitive org.jsoup;
@@ -36,4 +37,28 @@ module fr.vriege.anilib.platform.desktopextensionhost {
     exports fr.vriege.anilib.platform.desktopextensionhost.compat.injekt;
     exports fr.vriege.anilib.platform.desktopextensionhost.compat.injekt.api;
     exports fr.vriege.anilib.platform.desktopextensionhost.compat.quickjs;
+
+    opens fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi;
+    opens fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource;
+    opens fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model;
+    opens fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.online;
+    opens fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.network;
+    opens fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.network.interceptor;
+    opens fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.source;
+    opens fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.source.model;
+    opens fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.source.online;
+    opens fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.util;
+    opens fr.vriege.anilib.platform.desktopextensionhost.compat.android.app;
+    opens fr.vriege.anilib.platform.desktopextensionhost.compat.android.content;
+    opens fr.vriege.anilib.platform.desktopextensionhost.compat.android.net;
+    opens fr.vriege.anilib.platform.desktopextensionhost.compat.android.os;
+    opens fr.vriege.anilib.platform.desktopextensionhost.compat.android.text;
+    opens fr.vriege.anilib.platform.desktopextensionhost.compat.android.util;
+    opens fr.vriege.anilib.platform.desktopextensionhost.compat.android.view;
+    opens fr.vriege.anilib.platform.desktopextensionhost.compat.android.webkit;
+    opens fr.vriege.anilib.platform.desktopextensionhost.compat.android.widget;
+    opens fr.vriege.anilib.platform.desktopextensionhost.compat.androidx.preference;
+    opens fr.vriege.anilib.platform.desktopextensionhost.compat.injekt;
+    opens fr.vriege.anilib.platform.desktopextensionhost.compat.injekt.api;
+    opens fr.vriege.anilib.platform.desktopextensionhost.compat.quickjs;
 }
