@@ -133,7 +133,6 @@ fun main(arguments: Array<String>) {
                         } else {
                             intendedWindowPlacement.value = applicationWindowMode.value.placement()
                         }
-                        windowState.restore(intendedWindowPlacement.value)
                         applicationFullscreen.value = fullscreen
                     }
                 }
@@ -153,10 +152,14 @@ fun main(arguments: Array<String>) {
                         } else {
                             intendedWindowPlacement.value = applicationWindowMode.value.placement()
                         }
-                        windowState.restore(intendedWindowPlacement.value)
                         playerFullscreen.value = fullscreen
                     }
                 }
+            }
+            // Resize the native window only after Compose has committed the matching
+            // player layout. Resizing first can invalidate the video surface mid-frame.
+            LaunchedEffect(applicationFullscreen.value, playerFullscreen.value) {
+                windowState.restore(intendedWindowPlacement.value)
             }
             DisposableEffect(settingsService, windowState) {
                 val observation = settingsService.observe { settings ->

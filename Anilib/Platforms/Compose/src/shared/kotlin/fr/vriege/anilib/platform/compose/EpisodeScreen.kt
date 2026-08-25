@@ -233,7 +233,23 @@ private fun WatchedAction(playback: State<PlaybackState>, markCompleted: () -> U
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun PlayerLoadingScreen(title: String, goBack: () -> Unit) {
+internal fun PlayerLoadingScreen(title: String, fullscreen: Boolean, goBack: () -> Unit) {
+    if (fullscreen) {
+        Box(
+            modifier = Modifier.fillMaxSize().background(Color.Black),
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                CircularProgressIndicator(color = Color.White)
+                Text(title, color = Color.White)
+                Text("ui.resolving.playable.streams", color = Color.White.copy(alpha = 0.72f))
+            }
+        }
+        return
+    }
     Scaffold(
         topBar = {
             TopAppBar(

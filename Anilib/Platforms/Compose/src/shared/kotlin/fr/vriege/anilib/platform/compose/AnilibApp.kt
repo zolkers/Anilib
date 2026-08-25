@@ -94,6 +94,11 @@ internal data class PendingPlayerRequest(
     val title: String,
 )
 
+internal data class PlayerEpisodeTarget(
+    val id: SourceEpisodeId,
+    val title: String,
+)
+
 internal data class PendingReaderRequest(
     val token: Any,
     val title: String,
@@ -150,6 +155,7 @@ fun AnilibApp(
     var pendingReader by remember { mutableStateOf<PendingReaderRequest?>(null) }
     var activePlayer by remember { mutableStateOf<PlayerController?>(null) }
     var pendingPlayer by remember { mutableStateOf<PendingPlayerRequest?>(null) }
+    var playerSwitchToken by remember { mutableStateOf<Any?>(null) }
     var activeTrackingTitle by remember { mutableStateOf<LibraryItemId?>(null) }
     var readerError by remember { mutableStateOf<String?>(null) }
     var playerError by remember { mutableStateOf<String?>(null) }
@@ -227,10 +233,13 @@ fun AnilibApp(
                 }
             }
             val currentSetPlayerFullscreen = rememberUpdatedState(setPlayerFullscreen)
+            val currentPlayerSwitching = rememberUpdatedState(playerSwitchToken != null)
             DisposableEffect(playerController != null) {
                 val resetFullscreenOnDispose = playerController != null
                 onDispose {
-                    if (resetFullscreenOnDispose) currentSetPlayerFullscreen.value(false)
+                    if (resetFullscreenOnDispose && !currentPlayerSwitching.value) {
+                        currentSetPlayerFullscreen.value(false)
+                    }
                 }
             }
             if (readerController != null) {
@@ -254,7 +263,7 @@ fun AnilibApp(
                 // Sources list episodes newest first, so the neighbour towards index 0 is the
                 // next episode and the one after it is the previous, matching the reader.
                 var episodeNeighbours by remember(playerController) {
-                    mutableStateOf<Pair<SourceEpisodeId?, SourceEpisodeId?>>(null to null)
+                    mutableStateOf<Pair<PlayerEpisodeTarget?, PlayerEpisodeTarget?>>(null to null)
                 }
                 // Guards the native player: opening a second session while one is still
                 // initialising tears the first down mid-init and faults the video layer.
@@ -273,31 +282,43 @@ fun AnilibApp(
                     }
                     val index = episodes.indexOfFirst { it.episode().id() == current.episode().id() }
                     if (index < 0) return@CrashSafeLaunchedEffect
-                    episodeNeighbours = episodes.getOrNull(index - 1)?.episode()?.id() to
-                        episodes.getOrNull(index + 1)?.episode()?.id()
+                    episodeNeighbours = episodes.getOrNull(index - 1)?.episode()?.let {
+                        PlayerEpisodeTarget(it.id(), it.title())
+                    } to episodes.getOrNull(index + 1)?.episode()?.let {
+                        PlayerEpisodeTarget(it.id(), it.title())
+                    }
                 }
-                val switchEpisode: (SourceEpisodeId) -> () -> Unit = { episodeId ->
+                val switchEpisode: (PlayerEpisodeTarget) -> () -> Unit = { target ->
                     {
                         val current = runCatching { playerController.snapshot() }.getOrNull()
                         if (current != null && !episodeSwitching) {
                             episodeSwitching = true
-                            val request = PendingPlayerRequest(Any(), current.title())
+                            val request = PendingPlayerRequest(Any(), target.title)
+                            playerSwitchToken = request.token
                             pendingPlayer = request
+                            // Detach the native surface immediately. Keeping it alive until the
+                            // next source finishes resolving makes navigation appear frozen and
+                            // can contend with creation of the replacement playback session.
+                            activePlayer = null
                             scope.launch {
+                                val closeFailure = withContext(Dispatchers.IO) {
+                                    runCatching(playerController::close).exceptionOrNull()
+                                }
+                                closeFailure?.let(handleUiFailure)
                                 withContext(Dispatchers.IO) {
                                     runCatching {
                                         if (presentation.details(current.libraryItemId()).isPresent) {
-                                            player.open(current.libraryItemId(), episodeId)
+                                            player.open(current.libraryItemId(), target.id)
                                         } else {
-                                            player.open(current.title(), episodeId)
+                                            player.open(current.title(), target.id)
                                         }
                                     }
                                 }
                                     .onSuccess { opened ->
                                         if (pendingPlayer?.token === request.token) {
                                             playerError = null
-                                            pendingPlayer = null
                                             activePlayer = opened
+                                            pendingPlayer = null
                                         } else {
                                             // Superseded while opening: never install it.
                                             disposeInBackground(opened::close)
@@ -306,10 +327,14 @@ fun AnilibApp(
                                     .onFailure {
                                         if (pendingPlayer?.token === request.token) {
                                             pendingPlayer = null
+                                            currentSetPlayerFullscreen.value(false)
                                             playerError = it.message
                                                 ?: "The episode could not be opened."
                                         }
                                     }
+                                if (playerSwitchToken === request.token) {
+                                    playerSwitchToken = null
+                                }
                                 episodeSwitching = false
                             }
                         }
@@ -331,8 +356,12 @@ fun AnilibApp(
                     activePlayer = null
                 }
             } else if (playerRequest != null) {
-                PlayerLoadingScreen(playerRequest.title) {
+                PlayerLoadingScreen(playerRequest.title, playerFullscreen) {
                     pendingPlayer = null
+                    if (playerSwitchToken === playerRequest.token) {
+                        playerSwitchToken = null
+                    }
+                    currentSetPlayerFullscreen.value(false)
                 }
             } else {
                 val openReader: (LibraryItemId, SourceContentUnitId?) -> Unit = { id, contentUnitId ->
