@@ -1,5 +1,6 @@
 package fr.vriege.anilib.platform.desktopextensionhost.compat.android.webkit;
 
+import fr.vriege.anilib.framework.concurrent.runtime.ManagedExecutors;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.android.content.Context;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.android.net.Uri;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.android.view.View;
@@ -15,6 +16,7 @@ import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
 
 public class WebView extends View {
@@ -29,9 +31,10 @@ public class WebView extends View {
 
     private final Context context;
     private final WebSettings settings = new WebSettings();
+    private final AtomicLong navigation = new AtomicLong();
     private WebViewClient client = new WebViewClient();
-    private boolean destroyed;
-    private boolean stopped;
+    private volatile boolean destroyed;
+    private volatile boolean stopped;
 
     public WebView(Context context) {
         this.context = Objects.requireNonNull(context, "context");
@@ -49,27 +52,39 @@ public class WebView extends View {
         requireActive();
         stopped = false;
         URI page = webLocation(url);
-        notifyRequest(page);
-        if (stopped || mediaLocation(page)) {
-            return;
-        }
-        inspectDocument(page, headers == null ? Map.of() : headers);
+        Map<String, String> requestHeaders = headers == null ? Map.of() : Map.copyOf(headers);
+        long requestedNavigation = navigation.incrementAndGet();
+        ManagedExecutors.run("desktop-extension-webview-load", () -> {
+            if (!isActive(requestedNavigation)) {
+                return;
+            }
+            notifyRequest(page);
+            if (isActive(requestedNavigation) && !mediaLocation(page)) {
+                inspectDocument(page, requestHeaders, requestedNavigation);
+            }
+        });
+    }
+
+    public void loadUrl(String url) {
+        loadUrl(url, Map.of());
     }
 
     public void stopLoading() {
         stopped = true;
+        navigation.incrementAndGet();
     }
 
     public void destroy() {
         stopped = true;
         destroyed = true;
+        navigation.incrementAndGet();
     }
 
     public Context getContext() {
         return context;
     }
 
-    private void inspectDocument(URI page, Map<String, String> headers) {
+    private void inspectDocument(URI page, Map<String, String> headers, long requestedNavigation) {
         try {
             HttpRequest.Builder request = HttpRequest.newBuilder(page).timeout(Duration.ofSeconds(8)).GET();
             headers.forEach((name, value) -> addHeader(request, name, value));
@@ -85,7 +100,7 @@ public class WebView extends View {
                 if (document.length > MAX_DOCUMENT_BYTES) {
                     return;
                 }
-                notifyMediaLocations(page, new String(document, StandardCharsets.UTF_8));
+                notifyMediaLocations(page, new String(document, StandardCharsets.UTF_8), requestedNavigation);
             }
         } catch (IOException ignored) {
             // A failed embed must not make the whole extension incompatible.
@@ -96,7 +111,7 @@ public class WebView extends View {
         }
     }
 
-    private void notifyMediaLocations(URI page, String document) {
+    private void notifyMediaLocations(URI page, String document, long requestedNavigation) {
         String normalized = document.replace("\\/", "/").replace("&amp;", "&");
         var matches = MEDIA_LOCATION.matcher(normalized);
         var candidates = new LinkedHashSet<URI>();
@@ -108,11 +123,15 @@ public class WebView extends View {
             }
         }
         for (URI candidate : candidates) {
-            if (stopped || destroyed) {
+            if (!isActive(requestedNavigation)) {
                 return;
             }
             notifyRequest(candidate);
         }
+    }
+
+    private boolean isActive(long requestedNavigation) {
+        return !stopped && !destroyed && navigation.get() == requestedNavigation;
     }
 
     private void notifyRequest(URI location) {

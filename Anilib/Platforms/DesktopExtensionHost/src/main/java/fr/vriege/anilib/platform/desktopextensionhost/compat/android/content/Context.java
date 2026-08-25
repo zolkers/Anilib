@@ -1,5 +1,6 @@
 package fr.vriege.anilib.platform.desktopextensionhost.compat.android.content;
 
+import fr.vriege.anilib.platform.desktopextensionhost.compat.android.os.Looper;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -21,7 +22,7 @@ public abstract class Context {
     public Object getSystemService(String name) { return null; }
     public Object getAssets() { return null; }
     public Object getContentResolver() { return null; }
-    public Object getMainLooper() { return null; }
+    public Looper getMainLooper() { return Looper.getMainLooper(); }
     public Object getTheme() { return null; }
     public File getCacheDir() { return CacheDirectory.VALUE; }
     public void startActivity(Intent intent) { }

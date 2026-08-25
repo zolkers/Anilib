@@ -21,7 +21,8 @@ import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
@@ -280,8 +281,16 @@ final class ExtensionAbiVerifierSmoke {
         method.visitInsn(Opcodes.DUP_X1);
         method.visitInsn(Opcodes.SWAP);
         method.visitMethodInsn(Opcodes.INVOKESPECIAL, HANDLER, "<init>", "(L" + LOOPER + ";)V", false);
+        method.visitVarInsn(Opcodes.ASTORE, 2);
+        method.visitVarInsn(Opcodes.ALOAD, 2);
         method.visitInsn(Opcodes.ACONST_NULL);
         method.visitMethodInsn(Opcodes.INVOKEVIRTUAL, HANDLER, "post", "(Ljava/lang/Runnable;)Z", false);
+        method.visitInsn(Opcodes.POP);
+        method.visitVarInsn(Opcodes.ALOAD, 2);
+        method.visitInsn(Opcodes.ACONST_NULL);
+        method.visitInsn(Opcodes.LCONST_1);
+        method.visitMethodInsn(Opcodes.INVOKEVIRTUAL, HANDLER, "postDelayed",
+                "(Ljava/lang/Runnable;J)Z", false);
         method.visitInsn(Opcodes.POP);
         method.visitTypeInsn(Opcodes.NEW, WEB_VIEW);
         method.visitInsn(Opcodes.DUP);
@@ -310,6 +319,10 @@ final class ExtensionAbiVerifierSmoke {
                 "(L" + WEB_VIEW_CLIENT + ";)V", false);
         method.visitVarInsn(Opcodes.ALOAD, 0);
         method.visitLdcInsn("https://example.test/video.m3u8");
+        method.visitMethodInsn(Opcodes.INVOKEVIRTUAL, WEB_VIEW, "loadUrl",
+                "(Ljava/lang/String;)V", false);
+        method.visitVarInsn(Opcodes.ALOAD, 0);
+        method.visitLdcInsn("https://example.test/video.m3u8");
         method.visitInsn(Opcodes.ACONST_NULL);
         method.visitMethodInsn(Opcodes.INVOKEVIRTUAL, WEB_VIEW, "loadUrl",
                 "(Ljava/lang/String;Ljava/util/Map;)V", false);
@@ -329,24 +342,35 @@ final class ExtensionAbiVerifierSmoke {
     }
 
     private static void verifyWebViewSurfaceBehavior() {
-        AtomicBoolean posted = new AtomicBoolean();
+        CountDownLatch posted = new CountDownLatch(1);
         Handler handler = new Handler(Looper.getMainLooper());
-        if (!handler.post(() -> posted.set(true)) || !posted.get()) {
+        if (!handler.post(posted::countDown) || !await(posted)) {
             throw new IllegalStateException("Desktop Handler did not execute its posted action");
         }
+        CountDownLatch requestObserved = new CountDownLatch(1);
         AtomicReference<String> intercepted = new AtomicReference<>();
         WebView view = new WebView(Application.create());
         view.setWebViewClient(new WebViewClient() {
             @Override
             public WebResourceResponse shouldInterceptRequest(WebView source, WebResourceRequest request) {
                 intercepted.set(request.getUrl().toString());
+                requestObserved.countDown();
                 return null;
             }
         });
         view.loadUrl("https://example.test/video.m3u8", Map.of());
-        if (!"https://example.test/video.m3u8".equals(intercepted.get())) {
+        if (!await(requestObserved) || !"https://example.test/video.m3u8".equals(intercepted.get())) {
             throw new IllegalStateException("Desktop WebView did not expose the media request");
         }
         view.destroy();
+    }
+
+    private static boolean await(CountDownLatch latch) {
+        try {
+            return latch.await(1L, TimeUnit.SECONDS);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
     }
 }

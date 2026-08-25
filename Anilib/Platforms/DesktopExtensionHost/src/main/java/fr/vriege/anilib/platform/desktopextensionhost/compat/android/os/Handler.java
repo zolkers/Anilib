@@ -10,8 +10,11 @@ public final class Handler {
     }
 
     public boolean post(Runnable action) {
-        Objects.requireNonNull(action, "action").run();
-        return true;
+        return looper.enqueue(action, 0L);
+    }
+
+    public boolean postDelayed(Runnable action, long delayMillis) {
+        return looper.enqueue(action, delayMillis);
     }
 
     public Looper getLooper() {

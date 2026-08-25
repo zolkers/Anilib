@@ -1,8 +1,15 @@
 package fr.vriege.anilib.platform.desktopextensionhost;
 
+import fr.vriege.anilib.platform.desktopextensionhost.compat.android.content.Context;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.android.net.Uri;
+import fr.vriege.anilib.platform.desktopextensionhost.compat.android.os.Handler;
+import fr.vriege.anilib.platform.desktopextensionhost.compat.android.os.Looper;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.android.util.Base64;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.android.webkit.CookieManager;
+import fr.vriege.anilib.platform.desktopextensionhost.compat.android.webkit.WebView;
+import fr.vriege.anilib.platform.desktopextensionhost.compat.android.webkit.WebViewClient;
+import fr.vriege.anilib.platform.desktopextensionhost.compat.android.webkit.WebResourceRequest;
+import fr.vriege.anilib.platform.desktopextensionhost.compat.android.webkit.WebResourceResponse;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.AnimesPage;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.SAnime;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.Track;
@@ -16,6 +23,7 @@ import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import okhttp3.Headers;
 import okhttp3.HttpUrl;
@@ -34,10 +42,56 @@ public final class LegacyAnimeCompatibilitySmoke {
 
     public static void verify() {
         verifyAndroidUtilities();
+        verifyAndroidSchedulingAndWebView();
         verifyCookieBridge();
         verifyParsedSource();
         verifyVideoDataClassBridge();
         verifyRateLimitBuilder();
+    }
+
+    private static void verifyAndroidSchedulingAndWebView() {
+        Handler handler = new Handler(Looper.getMainLooper());
+        CountDownLatch posted = new CountDownLatch(1);
+        if (!handler.post(posted::countDown)) {
+            throw new IllegalStateException("Android handler rejected its task");
+        }
+        CountDownLatch delayed = new CountDownLatch(1);
+        if (!handler.postDelayed(delayed::countDown, 5L)) {
+            throw new IllegalStateException("Android delayed handler rejected its task");
+        }
+        try {
+            if (!posted.await(1L, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("Android handler did not execute its task");
+            }
+            if (!delayed.await(1L, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("Android delayed handler did not execute its task");
+            }
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Android delayed handler smoke was interrupted", exception);
+        }
+        CountDownLatch intercepted = new CountDownLatch(1);
+        WebView view = new WebView(new Context() { });
+        view.setWebViewClient(new WebViewClient() {
+            @Override
+            public WebResourceResponse shouldInterceptRequest(WebView webView, WebResourceRequest request) {
+                intercepted.countDown();
+                return null;
+            }
+        });
+        view.loadUrl("https://cdn.example/video.mp4");
+        try {
+            if (!intercepted.await(1L, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("Android WebView single-argument load did not dispatch its request");
+            }
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Android WebView dispatch smoke was interrupted", exception);
+        }
+        view.destroy();
+        if (view.getContext().getMainLooper() != Looper.getMainLooper()) {
+            throw new IllegalStateException("Android context does not expose the main looper");
+        }
     }
 
     private static void verifyAndroidUtilities() {
