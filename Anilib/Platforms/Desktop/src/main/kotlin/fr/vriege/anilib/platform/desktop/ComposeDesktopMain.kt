@@ -133,7 +133,7 @@ fun main(arguments: Array<String>) {
                         } else {
                             intendedWindowPlacement.value = applicationWindowMode.value.placement()
                         }
-                        windowState.placement = intendedWindowPlacement.value
+                        windowState.restore(intendedWindowPlacement.value)
                         applicationFullscreen.value = fullscreen
                     }
                 }
@@ -147,15 +147,13 @@ fun main(arguments: Array<String>) {
                             playerWindowMode.value = settingsService.snapshot().playerWindowMode()
                             intendedWindowPlacement.value = playerWindowMode.value.placement(
                                 current = windowState.placement,
-                                applicationUndecorated =
-                                    applicationWindowMode.value == ApplicationWindowMode.BORDERLESS,
                             )
                         } else if (applicationModeBeforeFullscreen.value == applicationWindowMode.value) {
                             intendedWindowPlacement.value = placementBeforeFullscreen.value
                         } else {
                             intendedWindowPlacement.value = applicationWindowMode.value.placement()
                         }
-                        windowState.placement = intendedWindowPlacement.value
+                        windowState.restore(intendedWindowPlacement.value)
                         playerFullscreen.value = fullscreen
                     }
                 }
@@ -165,7 +163,7 @@ fun main(arguments: Array<String>) {
                     applicationWindowMode.value = settings.applicationWindowMode()
                     if (!playerFullscreen.value && !applicationFullscreen.value) {
                         intendedWindowPlacement.value = settings.applicationWindowMode().placement()
-                        windowState.placement = intendedWindowPlacement.value
+                        windowState.restore(intendedWindowPlacement.value)
                     }
                 }
                 onDispose { observation.close() }
@@ -273,7 +271,7 @@ fun main(arguments: Array<String>) {
                     },
                 ) {
                     LaunchedEffect(window) {
-                        windowState.placement = intendedWindowPlacement.value
+                        windowState.restore(intendedWindowPlacement.value)
                         window.isVisible = true
                         window.toFront()
                         window.requestFocus()
@@ -300,15 +298,20 @@ internal fun applicationFullscreenPlacement(): WindowPlacement = WindowPlacement
 
 internal fun PlayerWindowMode.placement(
     current: WindowPlacement,
-    applicationUndecorated: Boolean,
 ): WindowPlacement = when (this) {
     PlayerWindowMode.WINDOWED -> current
-    PlayerWindowMode.FULLSCREEN -> WindowPlacement.Fullscreen
-    PlayerWindowMode.BORDERLESS -> if (applicationUndecorated) {
-        WindowPlacement.Maximized
-    } else {
-        WindowPlacement.Fullscreen
-    }
+    // Compose Desktop maps Fullscreen to AWT exclusive full-screen mode. Windows
+    // iconifies that window when another monitor receives focus and can leave its
+    // WindowState minimized afterwards. A maximized window gives us stable
+    // borderless/windowed full-screen behaviour across multiple displays.
+    PlayerWindowMode.FULLSCREEN,
+    PlayerWindowMode.BORDERLESS,
+    -> WindowPlacement.Maximized
+}
+
+private fun androidx.compose.ui.window.WindowState.restore(placement: WindowPlacement) {
+    isMinimized = false
+    this.placement = placement
 }
 
 internal fun windowUndecorated(applicationWindowMode: ApplicationWindowMode): Boolean =

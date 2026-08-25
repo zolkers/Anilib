@@ -26,19 +26,17 @@ class DesktopWindowModeTest {
     }
 
     @Test
-    fun `borderless player avoids a decorated maximized window`() {
+    fun `player full screen modes avoid exclusive multi monitor windows`() {
         assertEquals(
-            WindowPlacement.Fullscreen,
+            WindowPlacement.Maximized,
             PlayerWindowMode.BORDERLESS.placement(
                 current = WindowPlacement.Floating,
-                applicationUndecorated = false,
             ),
         )
         assertEquals(
             WindowPlacement.Maximized,
-            PlayerWindowMode.BORDERLESS.placement(
-                current = WindowPlacement.Maximized,
-                applicationUndecorated = true,
+            PlayerWindowMode.FULLSCREEN.placement(
+                current = WindowPlacement.Floating,
             ),
         )
     }
