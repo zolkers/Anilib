@@ -1,5 +1,6 @@
 package fr.vriege.anilib.platform.desktopextensionhost.compat.android.net;
 
+import java.io.File;
 import java.net.URI;
 import java.util.Objects;
 
@@ -11,6 +12,9 @@ public final class Uri {
     }
 
     public static Uri parse(String value) { return new Uri(value); }
+    public static Uri fromFile(File file) {
+        return new Uri(Objects.requireNonNull(file, "file").toURI().toString());
+    }
     public String getScheme() { return URI.create(value).getScheme(); }
     public String getHost() { return URI.create(value).getHost(); }
     public String getPath() { return URI.create(value).getPath(); }

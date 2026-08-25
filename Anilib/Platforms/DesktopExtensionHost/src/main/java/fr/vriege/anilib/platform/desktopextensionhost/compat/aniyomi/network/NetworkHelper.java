@@ -12,7 +12,7 @@ public final class NetworkHelper {
     private final OkHttpClient client;
 
     public NetworkHelper() {
-        cookieJar = CookieJar.NO_COOKIES;
+        cookieJar = DesktopCookieJar.shared();
         client = new OkHttpClient.Builder()
                 .cookieJar(cookieJar)
                 .addInterceptor(new UncaughtExceptionInterceptor())

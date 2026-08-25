@@ -89,6 +89,30 @@ public class Video {
     public State getStatus() { return status; }
     public void setStatus(State value) { status = value; }
 
+    public Video copy(String url, String quality, String resolvedVideoUrl, Headers newHeaders,
+                      List<Track> newSubtitleTracks, List<Track> newAudioTracks) {
+        return new Video(url, quality, resolvedVideoUrl, newHeaders, newSubtitleTracks, newAudioTracks);
+    }
+
+    public static Video copy$default(Video video, String url, String quality, String resolvedVideoUrl,
+                                     Headers headers, List<Track> subtitleTracks, List<Track> audioTracks,
+                                     int mask, Object marker) {
+        return video.copy(
+                (mask & 1) == 0 ? url : video.getUrl(),
+                (mask & 2) == 0 ? quality : video.getQuality(),
+                (mask & 4) == 0 ? resolvedVideoUrl : video.getVideoUrl(),
+                (mask & 8) == 0 ? headers : video.getHeaders(),
+                (mask & 16) == 0 ? subtitleTracks : video.getSubtitleTracks(),
+                (mask & 32) == 0 ? audioTracks : video.getAudioTracks());
+    }
+
+    public String component1() { return getUrl(); }
+    public String component2() { return getQuality(); }
+    public String component3() { return getVideoUrl(); }
+    public Headers component4() { return getHeaders(); }
+    public List<Track> component5() { return getSubtitleTracks(); }
+    public List<Track> component6() { return getAudioTracks(); }
+
     public enum State {
         QUEUE,
         LOAD_VIDEO,

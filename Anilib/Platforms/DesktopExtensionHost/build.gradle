@@ -128,6 +128,17 @@ tasks.register('desktopExtensionCompatibilitySmoke', JavaExec) {
     }
 }
 
+tasks.register('desktopExtensionAbiInventory', JavaExec) {
+    group = 'verification'
+    description = 'Inventories missing desktop-host ABI symbols across an existing directory of extension JARs.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'fr.vriege.anilib.platform.desktopextensionhost.ExtensionAbiInventory'
+    def extensionDirectory = providers.gradleProperty('anilib.extensionAbiDirectory')
+    onlyIf { extensionDirectory.isPresent() }
+    doFirst { args extensionDirectory.get() }
+}
+
 tasks.named('test') {
     failOnNoDiscoveredTests = false
 }

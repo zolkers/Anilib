@@ -2,6 +2,7 @@ package fr.vriege.anilib.platform.desktopextensionhost.extension;
 
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.SAnime;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.SEpisode;
+import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.Video;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.AnimeFilter;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.AnimeFilterList;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.AnimesPage;
@@ -120,7 +121,7 @@ public final class ExtensionOperationDispatcherSmoke {
             return List.of(episode);
         }
 
-        public Object getPopularAnime(int page, Continuation<Object> continuation) {
+        public Object getPopularAnime(int page, Continuation<? super AnimesPage> continuation) {
             return null;
         }
 
@@ -132,11 +133,11 @@ public final class ExtensionOperationDispatcherSmoke {
             return null;
         }
 
-        public Object getAnimeDetails(SAnime anime, Continuation<Object> continuation) {
+        public Object getAnimeDetails(SAnime anime, Continuation<? super SAnime> continuation) {
             return anime;
         }
 
-        public Object getVideoList(SEpisode episode, Continuation<Object> continuation) {
+        public Object getVideoList(SEpisode episode, Continuation<? super List<Video>> continuation) {
             return List.of();
         }
     }

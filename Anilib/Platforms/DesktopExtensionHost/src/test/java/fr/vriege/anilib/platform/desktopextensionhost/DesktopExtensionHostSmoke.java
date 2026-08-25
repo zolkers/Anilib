@@ -24,6 +24,7 @@ public final class DesktopExtensionHostSmoke {
         ExtensionAbiVerifierSmoke.verify();
         ExtensionRuntimeCatalogSmoke.verify();
         ExtensionSourceModelSmoke.verify();
+        LegacyAnimeCompatibilitySmoke.verify();
         ExtensionOperationDispatcherSmoke.verify();
         ExtensionRegistryCacheSmoke.verify();
         EmbeddedVideoFallbackSmoke.verify();

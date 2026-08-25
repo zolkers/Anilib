@@ -18,6 +18,7 @@ module fr.vriege.anilib.platform.desktopextensionhost {
     exports fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model;
     exports fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.online;
     exports fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.network;
+    exports fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.network.interceptor;
     exports fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.source;
     exports fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.source.model;
     exports fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.source.online;
