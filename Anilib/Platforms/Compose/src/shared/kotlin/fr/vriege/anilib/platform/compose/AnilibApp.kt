@@ -220,6 +220,12 @@ fun AnilibApp(
             val playerController = activePlayer
             val playerRequest = pendingPlayer
             val trackingTitle = activeTrackingTitle
+            val disposeInBackground: (() -> Unit) -> Unit = { dispose ->
+                scope.launch {
+                    withContext(Dispatchers.IO) { runCatching(dispose) }
+                        .onFailure(handleUiFailure)
+                }
+            }
             val currentSetPlayerFullscreen = rememberUpdatedState(setPlayerFullscreen)
             DisposableEffect(playerController != null) {
                 val resetFullscreenOnDispose = playerController != null
@@ -229,7 +235,7 @@ fun AnilibApp(
             }
             if (readerController != null) {
                 DisposableEffect(readerController) {
-                    onDispose { readerController.close() }
+                    onDispose { disposeInBackground(readerController::close) }
                 }
                 ReaderScreen(
                     readerController,
@@ -242,6 +248,9 @@ fun AnilibApp(
                     pendingReader = null
                 }
             } else if (playerController != null) {
+                DisposableEffect(playerController) {
+                    onDispose { disposeInBackground(playerController::close) }
+                }
                 // Sources list episodes newest first, so the neighbour towards index 0 is the
                 // next episode and the one after it is the previous, matching the reader.
                 var episodeNeighbours by remember(playerController) {
@@ -291,7 +300,7 @@ fun AnilibApp(
                                             activePlayer = opened
                                         } else {
                                             // Superseded while opening: never install it.
-                                            opened.close()
+                                            disposeInBackground(opened::close)
                                         }
                                     }
                                     .onFailure {
@@ -329,7 +338,7 @@ fun AnilibApp(
                 val openReader: (LibraryItemId, SourceContentUnitId?) -> Unit = { id, contentUnitId ->
                     val request = PendingReaderRequest(
                         token = Any(),
-                        title = presentation.details(id).orElse(null)?.title() ?: "Reader",
+                        title = "Reader",
                     )
                     pendingReader = request
                     scope.launch {
@@ -344,7 +353,7 @@ fun AnilibApp(
                                     activeReader = opened
                                     pendingReader = null
                                 } else {
-                                    opened.close()
+                                    disposeInBackground(opened::close)
                                 }
                             }
                             .onFailure {
@@ -365,7 +374,7 @@ fun AnilibApp(
                 val openPlayer: (LibraryItemId, SourceEpisodeId?) -> Unit = { id, episodeId ->
                     val request = PendingPlayerRequest(
                         token = Any(),
-                        title = presentation.details(id).orElse(null)?.title() ?: "Player",
+                        title = "Player",
                     )
                     pendingPlayer = request
                     scope.launch {
@@ -386,7 +395,7 @@ fun AnilibApp(
                                     activePlayer = it
                                     pendingPlayer = null
                                 } else {
-                                    it.close()
+                                    disposeInBackground(it::close)
                                 }
                             }
                             .onFailure {
@@ -479,7 +488,6 @@ fun AnilibApp(
                     message = message,
                     continueApplication = { recoveredFailure = null },
                     returnToLibrary = {
-                        runCatching { activeReader?.close() }
                         activeReader = null
                         pendingReader = null
                         activePlayer = null

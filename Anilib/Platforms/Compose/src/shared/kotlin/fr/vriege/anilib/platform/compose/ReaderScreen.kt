@@ -103,6 +103,12 @@ private const val READER_CONTROLS_HIDE_DELAY_MILLIS = 3_500L
 private const val CONTINUOUS_PREFETCH_MARGIN = 5
 private val READER_ZOOM_STEPS = floatArrayOf(0.25f, 0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f, 2.5f, 3f, 4f, 5f)
 
+private enum class PagedMoveResult {
+    PAGE,
+    CONTENT_UNIT,
+    NONE,
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ReaderLoadingScreen(title: String, goBack: () -> Unit) {
@@ -277,6 +283,7 @@ internal fun ReaderScreen(
     }
 
     fun move(previous: Boolean) {
+        if (readerBusy) return
         if (display.splitPages()) {
             if (previous && splitSecondHalf) {
                 splitSecondHalf = false
@@ -287,25 +294,60 @@ internal fun ReaderScreen(
                 return
             }
         }
-        val moved = if (display.dualPage()) {
-            val delta = if (previous) -2 else 2
-            val target = snapshot.currentPageIndex() + delta
-            if (target in 0 until snapshot.pageCount()) {
-                controller.goToPage(target)
-                true
-            } else {
-                false
+        scope.launch {
+            readerBusy = true
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    val moved = if (display.dualPage()) {
+                        val delta = if (previous) -2 else 2
+                        val target = snapshot.currentPageIndex() + delta
+                        if (target in 0 until snapshot.pageCount()) {
+                            controller.goToPage(target)
+                            true
+                        } else {
+                            false
+                        }
+                    } else if (previous) {
+                        controller.previousPage()
+                    } else {
+                        controller.nextPage()
+                    }
+                    if (moved) {
+                        PagedMoveResult.PAGE
+                    } else if (previous && controller.previousContentUnit()) {
+                        PagedMoveResult.CONTENT_UNIT
+                    } else if (!previous && controller.nextContentUnit()) {
+                        PagedMoveResult.CONTENT_UNIT
+                    } else {
+                        PagedMoveResult.NONE
+                    }
+                }
             }
-        } else if (previous) {
-            controller.previousPage()
-        } else {
-            controller.nextPage()
+            result.onSuccess { moved ->
+                if (moved != PagedMoveResult.NONE) {
+                    splitSecondHalf = moved == PagedMoveResult.PAGE && previous && display.splitPages()
+                    verticalScrollTarget = null
+                    if (moved == PagedMoveResult.CONTENT_UNIT) readerWindow = emptyList()
+                    actionMessage = null
+                    revision++
+                }
+            }.onFailure { actionMessage = it.message ?: "The page could not be opened." }
+            readerBusy = false
         }
-        if (moved) {
-            splitSecondHalf = previous && display.splitPages()
-            revision++
-        } else {
-            moveContentUnit(!previous)
+    }
+
+    fun goToPagedPage(index: Int) {
+        if (readerBusy) return
+        scope.launch {
+            readerBusy = true
+            withContext(Dispatchers.IO) { runCatching { controller.goToPage(index) } }
+                .onSuccess {
+                    splitSecondHalf = false
+                    actionMessage = null
+                    revision++
+                }
+                .onFailure { actionMessage = it.message ?: "The page could not be opened." }
+            readerBusy = false
         }
     }
 
@@ -367,20 +409,12 @@ internal fun ReaderScreen(
             ReaderKeyCommand.FIRST_PAGE -> when {
                 continuous -> continuousScrollTarget = 0
                 verticalPager -> verticalScrollTarget = 0
-                else -> {
-                    controller.goToPage(0)
-                    splitSecondHalf = false
-                    revision++
-                }
+                else -> goToPagedPage(0)
             }
             ReaderKeyCommand.LAST_PAGE -> when {
                 continuous -> continuousScrollTarget = (snapshot.pageCount() - 1).coerceAtLeast(0)
                 verticalPager -> verticalScrollTarget = (snapshot.pageCount() - 1).coerceAtLeast(0)
-                else -> {
-                    controller.goToPage((snapshot.pageCount() - 1).coerceAtLeast(0))
-                    splitSecondHalf = false
-                    revision++
-                }
+                else -> goToPagedPage((snapshot.pageCount() - 1).coerceAtLeast(0))
             }
             ReaderKeyCommand.ZOOM_IN -> execute(ReaderInteractionAction.ZOOM_IN)
             ReaderKeyCommand.ZOOM_OUT -> execute(ReaderInteractionAction.ZOOM_OUT)
@@ -574,11 +608,7 @@ internal fun ReaderScreen(
                     when {
                         continuous -> continuousScrollTarget = index
                         verticalPager -> verticalScrollTarget = index
-                        else -> {
-                            controller.goToPage(index)
-                            splitSecondHalf = false
-                            revision++
-                        }
+                        else -> goToPagedPage(index)
                     }
                 },
                 splitSecondHalf = splitSecondHalf,

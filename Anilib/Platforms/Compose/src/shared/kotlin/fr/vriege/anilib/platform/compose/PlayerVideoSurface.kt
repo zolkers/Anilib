@@ -107,7 +107,6 @@ internal fun PlayerVideoSurface(
     DisposableEffect(bridge, player) {
         bridge.attach(player)
         onDispose {
-            persistProgressNow(controller, bridge)
             bridge.detach(player)
         }
     }
@@ -624,13 +623,6 @@ private suspend fun persistProgress(
     val state = runCatching { playback.snapshot() }.getOrNull() ?: return false
     if (state.durationMillis() <= 0) return false
     return withContext(Dispatchers.IO) {
-        saveProgress(controller, state.positionMillis(), state.durationMillis())
-    }
-}
-
-private fun persistProgressNow(controller: PlayerController, playback: ComposePlayerPlayback) {
-    val state = runCatching { playback.snapshot() }.getOrNull() ?: return
-    if (state.durationMillis() > 0) {
         saveProgress(controller, state.positionMillis(), state.durationMillis())
     }
 }

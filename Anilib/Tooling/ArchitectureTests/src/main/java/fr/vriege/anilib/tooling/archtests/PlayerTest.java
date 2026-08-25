@@ -18,6 +18,7 @@ import fr.vriege.anilib.feature.player.PlayerCapabilities;
 import fr.vriege.anilib.feature.player.PlayerException;
 import fr.vriege.anilib.feature.player.PlayerDecoderPolicy;
 import fr.vriege.anilib.feature.player.PlayerMedia;
+import fr.vriege.anilib.feature.player.PlaybackState;
 import fr.vriege.anilib.feature.player.PlayerPlayback;
 import fr.vriege.anilib.feature.player.PlayerPlaybackSnapshot;
 import fr.vriege.anilib.feature.player.PlayerPlaybackStatus;
@@ -88,6 +89,7 @@ final class PlayerTest {
     static int run() {
         Counter counter = new Counter();
         verifiesSelectionAndPersistence(counter);
+        persistsBackendPositionWhenControllerCloses(counter);
         switchesEpisodeSessionsIndependently(counter);
         migratesLegacySecondProgress(counter);
         completesPlaybackAtConfiguredThreshold(counter);
@@ -98,6 +100,30 @@ final class PlayerTest {
         rejectsInvalidSourceResults(counter);
         doesNotCacheTransientEmptyEpisodes(counter);
         return counter.value;
+    }
+
+    private static void persistsBackendPositionWhenControllerCloses(Counter counter) {
+        Path directory = temporaryDirectory("anilib-player-close-progress");
+        RecordingBackend backend = new RecordingBackend();
+        try (StartedAnilib application = StandardAnilib.start(
+                directory,
+                new UrlConnectionHttpTransport(),
+                backend,
+                List.of(sourcePlugin(new TestStreamingSource(false))))) {
+            LibraryItem item = animeItem("player-close-progress");
+            LibraryCatalog library = application.capability(LibraryCapabilities.CATALOG);
+            library.save(item);
+            PlayerController controller = application.capability(PlayerUiCapabilities.PRESENTATION)
+                    .open(item.id(), FIRST_EPISODE.id());
+            RecordingPlayback playback = backend.opened.getFirst();
+            playback.position = 42_000L;
+            playback.duration = 120_000L;
+            controller.close();
+            counter.check(library.find(item.id()).orElseThrow().progress().orElseThrow().position() == 42_000L,
+                    "closing the Player controller must persist the native backend's final position");
+        } finally {
+            deleteDirectory(directory);
+        }
     }
 
     private static void doesNotCacheTransientEmptyEpisodes(Counter counter) {
@@ -701,6 +727,7 @@ final class PlayerTest {
         private final PlayerMedia media;
         private PlayerPlaybackStatus status = PlayerPlaybackStatus.PAUSED;
         private long position;
+        private long duration = PlaybackState.UNKNOWN_DURATION;
         private float volume = 1.0f;
         private float speed = 1.0f;
         private boolean closed;
@@ -721,7 +748,7 @@ final class PlayerTest {
             return new PlayerPlaybackSnapshot(
                     status,
                     position,
-                    -1L,
+                    duration,
                     volume,
                     speed,
                     Optional.empty());

@@ -3,6 +3,7 @@ package fr.vriege.anilib.feature.player.ui;
 import fr.vriege.anilib.feature.player.PlayerSession;
 import fr.vriege.anilib.feature.player.PlayerSessionSnapshot;
 import fr.vriege.anilib.feature.player.PlayerPlayback;
+import fr.vriege.anilib.feature.player.PlayerPlaybackSnapshot;
 import fr.vriege.anilib.feature.player.PlayerAdvancedCapability;
 import fr.vriege.anilib.feature.player.PlayerAdvancedPlayback;
 import fr.vriege.anilib.feature.player.PlayerAdvancedState;
@@ -23,6 +24,7 @@ import java.util.Set;
 public final class PlayerController implements AutoCloseable {
     private final PlayerSession session;
     private final PlayerPreferenceStore preferences;
+    private boolean closed;
 
     PlayerController(PlayerSession session, PlayerPreferenceStore preferences) {
         this.session = Objects.requireNonNull(session, "session must not be null");
@@ -150,8 +152,19 @@ public final class PlayerController implements AutoCloseable {
     }
 
     @Override
-    public void close() {
-        session.close();
+    public synchronized void close() {
+        if (closed) {
+            return;
+        }
+        closed = true;
+        try {
+            PlayerPlaybackSnapshot playback = session.playback().snapshot();
+            if (playback.durationMillis() > 0L) {
+                session.updatePlayback(playback.positionMillis(), playback.durationMillis());
+            }
+        } finally {
+            session.close();
+        }
     }
 
     private void applyPreferences(PlayerPreferences value) {

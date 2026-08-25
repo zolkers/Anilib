@@ -32,7 +32,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -69,9 +68,6 @@ internal fun PlayerSelectionScreen(
     var revision by remember(controller) { mutableIntStateOf(0) }
     var commandError by remember(controller) { mutableStateOf<String?>(null) }
     var preferenceDialog by remember(controller) { mutableStateOf(false) }
-    DisposableEffect(controller) {
-        onDispose { controller.close() }
-    }
     val result = remember(controller, revision) { runCatching { controller.snapshot() } }
     val snapshot = result.getOrNull()
     if (snapshot == null) {

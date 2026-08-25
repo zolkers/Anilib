@@ -51,6 +51,8 @@ internal class ComposePlayerPlayback(
     }
     @Volatile
     private var state: VideoPlayerState? = null
+    private var lastPositionMillis = media.startPositionMillis()
+    private var lastDurationMillis = PlaybackState.UNKNOWN_DURATION
     private var requestedVolume = 1f
     private var requestedSpeed = 1f
     private var requestedSubtitle = media.subtitleId()
@@ -67,9 +69,9 @@ internal class ComposePlayerPlayback(
     override fun snapshot(): PlayerPlaybackSnapshot = synchronized(this) {
         ensureOpen()
         val player = state ?: return@synchronized PlayerPlaybackSnapshot(
-            PlayerPlaybackStatus.LOADING,
-            media.startPositionMillis(),
-            PlaybackState.UNKNOWN_DURATION,
+            if (lastDurationMillis > 0L) PlayerPlaybackStatus.PAUSED else PlayerPlaybackStatus.LOADING,
+            lastPositionMillis,
+            lastDurationMillis,
             requestedVolume,
             requestedSpeed,
             Optional.empty(),
@@ -82,10 +84,14 @@ internal class ComposePlayerPlayback(
             player.isPlaying -> PlayerPlaybackStatus.PLAYING
             else -> PlayerPlaybackStatus.PAUSED
         }
+        val positionMillis = secondsToMillis(player.currentTime)
+        val durationMillis = durationMillis(player)
+        lastPositionMillis = positionMillis
+        lastDurationMillis = durationMillis
         PlayerPlaybackSnapshot(
             status,
-            secondsToMillis(player.currentTime),
-            durationMillis(player),
+            positionMillis,
+            durationMillis,
             player.volume,
             player.playbackSpeed,
             Optional.ofNullable(error?.toString()),
@@ -185,6 +191,8 @@ internal class ComposePlayerPlayback(
     fun detach(player: VideoPlayerState) = synchronized(this) {
         if (state === player) {
             player.onPlaybackEnded = null
+            lastPositionMillis = secondsToMillis(player.currentTime)
+            lastDurationMillis = durationMillis(player)
             player.pause()
             state = null
         }
