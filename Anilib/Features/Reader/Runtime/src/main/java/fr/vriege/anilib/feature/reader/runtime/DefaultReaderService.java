@@ -241,7 +241,17 @@ public final class DefaultReaderService implements ReaderService, ReaderContentR
                     initialPage)));
         }
         ReaderPagePipeline pipeline = new ReaderPagePipeline(pageReader, pages, policy, pageCache, pageQueue);
-        pipeline.warmUp(initialPage);
+        if (alternate.isPresent()) {
+            /*
+             * Download storage is already local and bounded by the page policy. Read the visible
+             * page before publishing the session so Compose never has to wait for an executor
+             * hand-off just to display bytes that are already on disk. load() also schedules the
+             * surrounding pages as low-priority prefetches.
+             */
+            pipeline.load(initialPage);
+        } else {
+            pipeline.warmUp(initialPage);
+        }
         DefaultReaderSession[] holder = new DefaultReaderSession[1];
         DefaultReaderSession session = new DefaultReaderSession(
                 library,

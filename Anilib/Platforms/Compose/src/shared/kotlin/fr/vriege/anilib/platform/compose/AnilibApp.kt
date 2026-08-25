@@ -94,6 +94,11 @@ internal data class PendingPlayerRequest(
     val title: String,
 )
 
+internal data class PendingReaderRequest(
+    val token: Any,
+    val title: String,
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AnilibApp(
@@ -142,6 +147,7 @@ fun AnilibApp(
     var destination by remember { mutableStateOf(navigator.state()) }
     var section by remember { mutableStateOf(initialSettings.startScreen().appSection()) }
     var activeReader by remember { mutableStateOf<ReaderController?>(null) }
+    var pendingReader by remember { mutableStateOf<PendingReaderRequest?>(null) }
     var activePlayer by remember { mutableStateOf<PlayerController?>(null) }
     var pendingPlayer by remember { mutableStateOf<PendingPlayerRequest?>(null) }
     var activeTrackingTitle by remember { mutableStateOf<LibraryItemId?>(null) }
@@ -210,6 +216,7 @@ fun AnilibApp(
             MaterialTheme(colorScheme = appColorScheme(settings, useDarkTheme)) {
             Surface(modifier = Modifier.fillMaxSize()) {
             val readerController = activeReader
+            val readerRequest = pendingReader
             val playerController = activePlayer
             val playerRequest = pendingPlayer
             val trackingTitle = activeTrackingTitle
@@ -230,6 +237,10 @@ fun AnilibApp(
                     applyReaderOrientationPolicy,
                     responsiveDownloads::enqueue,
                 ) { activeReader = null }
+            } else if (readerRequest != null) {
+                ReaderLoadingScreen(readerRequest.title) {
+                    pendingReader = null
+                }
             } else if (playerController != null) {
                 // Sources list episodes newest first, so the neighbour towards index 0 is the
                 // next episode and the one after it is the previous, matching the reader.
@@ -316,17 +327,32 @@ fun AnilibApp(
                 }
             } else {
                 val openReader: (LibraryItemId, SourceContentUnitId?) -> Unit = { id, contentUnitId ->
+                    val request = PendingReaderRequest(
+                        token = Any(),
+                        title = presentation.details(id).orElse(null)?.title() ?: "Reader",
+                    )
+                    pendingReader = request
                     scope.launch {
                         withContext(Dispatchers.IO) {
                             runCatching {
                                 if (contentUnitId == null) reader.open(id) else reader.open(id, contentUnitId)
                             }
                         }
-                            .onSuccess {
-                                readerError = null
-                                activeReader = it
+                            .onSuccess { opened ->
+                                if (pendingReader?.token === request.token) {
+                                    readerError = null
+                                    activeReader = opened
+                                    pendingReader = null
+                                } else {
+                                    opened.close()
+                                }
                             }
-                            .onFailure { readerError = it.message ?: "The reader could not be opened." }
+                            .onFailure {
+                                if (pendingReader?.token === request.token) {
+                                    pendingReader = null
+                                    readerError = it.message ?: "The reader could not be opened."
+                                }
+                            }
                     }
                 }
                 val enqueueDownload: (LibraryItemId) -> Unit = { id ->
@@ -455,6 +481,7 @@ fun AnilibApp(
                     returnToLibrary = {
                         runCatching { activeReader?.close() }
                         activeReader = null
+                        pendingReader = null
                         activePlayer = null
                         pendingPlayer = null
                         activeTrackingTitle = null

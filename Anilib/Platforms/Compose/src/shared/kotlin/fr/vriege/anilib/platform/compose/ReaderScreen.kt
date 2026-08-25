@@ -39,10 +39,13 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -99,6 +102,30 @@ import kotlin.math.sqrt
 private const val READER_CONTROLS_HIDE_DELAY_MILLIS = 3_500L
 private const val CONTINUOUS_PREFETCH_MARGIN = 5
 private val READER_ZOOM_STEPS = floatArrayOf(0.25f, 0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f, 2.5f, 3f, 4f, 5f)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun ReaderLoadingScreen(title: String, goBack: () -> Unit) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(title) },
+                navigationIcon = {
+                    IconButton(onClick = goBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "ui.back")
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        Box(
+            modifier = Modifier.fillMaxSize().padding(padding).background(Color.Black),
+            contentAlignment = Alignment.Center,
+        ) {
+            CircularProgressIndicator(color = Color.White)
+        }
+    }
+}
 
 @Composable
 internal fun ReaderScreen(

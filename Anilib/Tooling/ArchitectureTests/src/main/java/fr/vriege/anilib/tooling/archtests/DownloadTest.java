@@ -132,6 +132,19 @@ final class DownloadTest {
                             "download provider must return the exact downloaded chapter");
                     counter.check(downloads.find(source.itemId, Optional.of("b")).isEmpty(),
                             "download provider must not substitute another offline chapter");
+                    Path firstDownloadedPage = root.resolve("content")
+                            .resolve(downloaded.toString())
+                            .resolve("00000000.page");
+                    byte[] persistedPage = Files.readAllBytes(firstDownloadedPage);
+                    int sourceReadsBeforeOfflineOpen = source.readUnits().size();
+                    try (ReaderSession session = reader.open(item.id(), source.unit("a").id())) {
+                        Files.delete(firstDownloadedPage);
+                        counter.check(Arrays.equals(session.currentPage(), persistedPage)
+                                        && source.readUnits().size() == sourceReadsBeforeOfflineOpen,
+                                "downloaded manga must prime its visible page before the Reader is published");
+                    } finally {
+                        Files.write(firstDownloadedPage, persistedPage);
+                    }
                     try (ReaderSession session = reader.open(item.id(), source.unit("b").id())) {
                         session.currentPage();
                     }
