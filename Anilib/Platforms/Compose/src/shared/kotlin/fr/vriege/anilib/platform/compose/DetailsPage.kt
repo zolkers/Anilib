@@ -64,7 +64,6 @@ import fr.vriege.anilib.feature.reader.ui.ReaderPresentation
 import fr.vriege.anilib.feature.player.ui.PlayerPresentation
 import fr.vriege.anilib.feature.tracker.ui.TrackerPresentation
 import fr.vriege.anilib.feature.tracker.TrackerAiringSchedule
-import fr.vriege.anilib.feature.tracker.TrackerMediaMetadata
 import fr.vriege.anilib.framework.http.HttpCookieJar
 import fr.vriege.anilib.feature.player.EpisodeSnapshot
 import java.net.URI
@@ -179,24 +178,19 @@ internal fun DetailsDestination(
         val trackedEntries = remember(details.id(), trackerRevision) {
             tracking.entries(details.id())
         }
+        val trackedTrackerIds = trackedEntries.map { it.trackerId() }
         val nextAiring = trackedEntries.asSequence()
             .mapNotNull { it.metadata().nextAiring().orElse(null) }
             .filter { it.airingAt().isAfter(Instant.now()) }
             .minByOrNull(TrackerAiringSchedule::airingAt)
-        CrashSafeLaunchedEffect(details.id()) {
-            val metadataNeedsRefresh = trackedEntries.any { entry ->
-                val metadata = entry.metadata()
-                val nextAiring = metadata.nextAiring().orElse(null)
-                metadata == TrackerMediaMetadata.empty()
-                    || metadata.publishingStatus().orElse("") == "RELEASING" &&
-                    (nextAiring == null || !nextAiring.airingAt().isAfter(Instant.now()))
-            }
-            if (metadataNeedsRefresh) {
-                trackedEntries.forEach { entry ->
-                    runCatching {
-                        withContext(Dispatchers.IO) {
-                            tracking.refresh(details.id(), entry.trackerId())
-                        }
+        CrashSafeLaunchedEffect(details.id(), trackedTrackerIds) {
+            // Airing metadata belongs to the tracked title, not to local watch/read progress.
+            // Refresh it as soon as details open so the next release is visible even while
+            // the user is several units behind.
+            trackedEntries.forEach { entry ->
+                runCatching {
+                    withContext(Dispatchers.IO) {
+                        tracking.refresh(details.id(), entry.trackerId())
                     }
                 }
             }
