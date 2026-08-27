@@ -422,15 +422,19 @@ public final class DesktopExtensionSourceBridge {
     }
 
     private static List<String> splitValues(Object value) {
+        List<String> candidates;
         if (value instanceof List<?> values) {
-            return values.stream().filter(String.class::isInstance).map(String.class::cast)
+            candidates = values.stream().filter(String.class::isInstance).map(String.class::cast)
                     .map(String::strip).filter(item -> !item.isEmpty()).toList();
-        }
-        if (value instanceof String text) {
-            return Arrays.stream(text.split(","))
+        } else if (value instanceof String text) {
+            candidates = Arrays.stream(text.split(","))
                     .map(String::strip).filter(item -> !item.isEmpty()).toList();
+        } else {
+            return List.of();
         }
-        return List.of();
+        Map<String, String> unique = new LinkedHashMap<>();
+        candidates.forEach(candidate -> unique.putIfAbsent(candidate.toLowerCase(Locale.ROOT), candidate));
+        return List.copyOf(unique.values());
     }
 
     private static SourcePublicationStatus publicationStatus(Object value) {

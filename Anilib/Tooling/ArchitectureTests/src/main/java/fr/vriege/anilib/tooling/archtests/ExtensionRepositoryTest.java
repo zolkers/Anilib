@@ -169,6 +169,7 @@ final class ExtensionRepositoryTest {
             var episodes = anime.episodes(animePage.items().getFirst().id());
             var streams = anime.streams(episodes.getFirst().id());
             counter.check(animeDetails.description().equals("Detailed anime")
+                            && animeDetails.genres().equals(List.of("Action", "Mystery", "Adventure"))
                             && mangaFilters.size() == 1
                             && mangaFilters.getFirst().type() == SourceFilterType.TEXT
                             && animeFilters.size() == 1
@@ -1176,7 +1177,7 @@ final class ExtensionRepositoryTest {
                     yield """
                             {"anime":{"url":"/anime/bridge","title":"Bridge Anime",
                             "description":"Detailed anime","author":"Studio","artist":"",
-                            "genre":"Action","status":1,
+                            "genre":"Action, Mystery, action, Adventure, Mystery","status":1,
                             "thumbnail_url":"https://cdn.example/anime-detail.jpg"}}
                             """;
                 }
