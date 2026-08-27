@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -15,8 +16,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
@@ -31,12 +35,15 @@ import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -58,7 +65,12 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import fr.vriege.anilib.feature.player.PlayerPlayback
 import fr.vriege.anilib.feature.player.PlayerAdvancedCapability
 import fr.vriege.anilib.feature.player.PlayerAdvancedState
@@ -93,6 +105,15 @@ internal fun PlayerVideoSurface(
         return
     }
     val player = rememberVideoPlayerState()
+    SideEffect {
+        player.subtitleTextStyle = TextStyle(
+            color = Color.White,
+            fontSize = if (fullscreen) 30.sp else 22.sp,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+        )
+        player.subtitleBackgroundColor = Color.Black.copy(alpha = 0.68f)
+    }
     val persistenceScope = rememberCrashSafeCoroutineScope()
     val preferences = controller.preferences()
     var controlsVisible by remember(bridge) { mutableStateOf(true) }
@@ -352,7 +373,7 @@ internal fun PlayerVideoSurface(
                         Column(
                             modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(12.dp),
                         ) {
-                    Slider(
+                    CompactPlayerSlider(
                         value = player.sliderPos.coerceIn(0f, 1000f),
                         onValueChange = {
                             revealControls()
@@ -365,17 +386,18 @@ internal fun PlayerVideoSurface(
                             }
                         },
                         valueRange = 0f..1000f,
+                        modifier = Modifier.fillMaxWidth(),
                     )
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("ui.volume", color = Color.White, style = MaterialTheme.typography.bodySmall)
-                        Slider(
+                        CompactPlayerSlider(
                             value = volume,
                             onValueChange = {
                                 revealControls()
                                 volume = it
                                 controller.setVolume(it)
                             },
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.width(180.dp),
                         )
                     }
                     Row(
@@ -499,6 +521,45 @@ internal fun PlayerVideoSurface(
             PlayerAdvancedDialog(controller, close = { advancedMenu = false })
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CompactPlayerSlider(
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    modifier: Modifier = Modifier,
+    valueRange: ClosedFloatingPointRange<Float> = 0f..1f,
+    onValueChangeFinished: (() -> Unit)? = null,
+) {
+    val colors = SliderDefaults.colors()
+    val interactionSource = remember { MutableInteractionSource() }
+    Slider(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = modifier.height(28.dp),
+        valueRange = valueRange,
+        onValueChangeFinished = onValueChangeFinished,
+        colors = colors,
+        interactionSource = interactionSource,
+        thumb = {
+            Box(
+                Modifier
+                    .size(DpSize(12.dp, 12.dp))
+                    .background(MaterialTheme.colorScheme.primary, CircleShape),
+            )
+        },
+        track = { state ->
+            SliderDefaults.Track(
+                sliderState = state,
+                modifier = Modifier.height(4.dp),
+                colors = colors,
+                drawStopIndicator = null,
+                thumbTrackGapSize = 0.dp,
+                trackInsideCornerSize = 0.dp,
+            )
+        },
+    )
 }
 
 @Composable
