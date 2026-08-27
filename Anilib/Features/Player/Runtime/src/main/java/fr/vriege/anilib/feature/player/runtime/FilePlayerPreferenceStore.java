@@ -21,10 +21,16 @@ import java.util.Objects;
 import java.util.Optional;
 
 public final class FilePlayerPreferenceStore implements PlayerPreferenceStore {
+    private static final float DEFAULT_VOLUME = 1.0f;
     private final Path file;
 
     public FilePlayerPreferenceStore(Path file) {
         this.file = Objects.requireNonNull(file, "file must not be null").toAbsolutePath().normalize();
+    }
+
+    @Override
+    public synchronized float volume() {
+        return floatValue(readRows(), "volume", DEFAULT_VOLUME);
     }
 
     @Override
@@ -51,6 +57,14 @@ public final class FilePlayerPreferenceStore implements PlayerPreferenceStore {
     public synchronized void save(PlayerPreferences preferences) {
         Map<String, String> values = readRows();
         putPreferences(values, "", Objects.requireNonNull(preferences, "preferences must not be null"));
+        write(values);
+    }
+
+    @Override
+    public synchronized void saveVolume(float volume) {
+        requireVolume(volume);
+        Map<String, String> values = readRows();
+        values.put("volume", Float.toString(volume));
         write(values);
     }
 
@@ -181,6 +195,19 @@ public final class FilePlayerPreferenceStore implements PlayerPreferenceStore {
     private static int intValue(Map<String, String> values, String key, int fallback) {
         String value = values.get(key);
         return value == null ? fallback : Integer.parseInt(value);
+    }
+
+    private static float floatValue(Map<String, String> values, String key, float fallback) {
+        String value = values.get(key);
+        float result = value == null ? fallback : Float.parseFloat(value);
+        requireVolume(result);
+        return result;
+    }
+
+    private static void requireVolume(float volume) {
+        if (!Float.isFinite(volume) || volume < 0.0f || volume > 1.0f) {
+            throw new IllegalArgumentException("volume must be between zero and one");
+        }
     }
 
     private static String titlePrefix(LibraryItemId libraryItemId) {

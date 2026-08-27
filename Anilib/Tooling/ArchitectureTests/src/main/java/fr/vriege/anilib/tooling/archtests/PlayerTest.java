@@ -94,6 +94,7 @@ final class PlayerTest {
         migratesLegacySecondProgress(counter);
         completesPlaybackAtConfiguredThreshold(counter);
         verifiesPreferencePolicies(counter);
+        persistsInteractiveMediaChoices(counter);
         verifiesPlaybackBackup(counter);
         suppressesIncognitoPersistence(counter);
         cleansOrphanedPlaybackState(counter);
@@ -362,6 +363,45 @@ final class PlayerTest {
             }
             counter.check(Files.isRegularFile(directory.resolve("player-preferences.properties")),
                     "Player preferences must persist in their owned file");
+        } finally {
+            deleteDirectory(directory);
+        }
+    }
+
+    private static void persistsInteractiveMediaChoices(Counter counter) {
+        Path directory = temporaryDirectory("anilib-player-interactive-preferences");
+        RecordingBackend backend = new RecordingBackend();
+        try (StartedAnilib application = StandardAnilib.start(
+                directory,
+                new UrlConnectionHttpTransport(),
+                backend,
+                List.of(sourcePlugin(new TestStreamingSource(false))))) {
+            LibraryItem item = animeItem("player-interactive-preferences");
+            application.capability(LibraryCapabilities.CATALOG).save(item);
+            PlayerPresentation presentation = application.capability(PlayerUiCapabilities.PRESENTATION);
+            try (PlayerController controller = presentation.open(item.id(), FIRST_EPISODE.id())) {
+                controller.setVolume(0.35f);
+                controller.selectSubtitle(Optional.of("sub-en"));
+            }
+            try (PlayerController reopened = presentation.open(item.id(), SECOND_EPISODE.id())) {
+                counter.check(Math.abs(reopened.playback().snapshot().volume() - 0.35f) < 0.001f,
+                        "interactive Player volume must survive a new episode session");
+                counter.check(reopened.snapshot().selectedSubtitleId().orElseThrow().equals("sub-en"),
+                        "interactive subtitle language must survive a new episode session");
+                reopened.selectSubtitle(Optional.empty());
+            }
+            try (PlayerController reopened = presentation.open(item.id(), FIRST_EPISODE.id())) {
+                counter.check(reopened.snapshot().selectedSubtitleId().isEmpty()
+                                && reopened.preferences().subtitlePolicy() == PlayerSubtitlePolicy.OFF,
+                        "disabling subtitles interactively must survive a new session");
+            }
+            List<String> rows = Files.readAllLines(
+                    directory.resolve("player-preferences.properties"),
+                    StandardCharsets.UTF_8);
+            counter.check(rows.contains("volume=0.35") && rows.contains("subtitlePolicy=OFF"),
+                    "interactive Player choices must persist in the owned preference file");
+        } catch (IOException exception) {
+            throw new AssertionError("Unable to inspect persisted Player choices", exception);
         } finally {
             deleteDirectory(directory);
         }

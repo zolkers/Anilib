@@ -24,6 +24,7 @@ import java.util.Set;
 public final class PlayerController implements AutoCloseable {
     private final PlayerSession session;
     private final PlayerPreferenceStore preferences;
+    private float volume;
     private boolean closed;
 
     PlayerController(PlayerSession session, PlayerPreferenceStore preferences) {
@@ -31,6 +32,8 @@ public final class PlayerController implements AutoCloseable {
         this.preferences = Objects.requireNonNull(preferences, "preferences must not be null");
         try {
             applyPreferences(this.preferences.snapshot(session.snapshot().libraryItemId()));
+            volume = this.preferences.volume();
+            session.setVolume(volume);
         } catch (RuntimeException failure) {
             try {
                 session.close();
@@ -54,7 +57,23 @@ public final class PlayerController implements AutoCloseable {
     }
 
     public void selectSubtitle(Optional<String> subtitleId) {
-        session.selectSubtitle(subtitleId);
+        Optional<String> requested = Objects.requireNonNull(
+                subtitleId,
+                "subtitleId must not be null").map(String::strip).filter(value -> !value.isEmpty());
+        session.selectSubtitle(requested);
+        PlayerPreferences current = preferences();
+        PlayerPreferences replacement;
+        if (requested.isEmpty()) {
+            replacement = withSubtitle(current, PlayerSubtitlePolicy.OFF, Optional.empty());
+        } else {
+            SourceSubtitleTrack track = session.snapshot().selectedStream().subtitles().stream()
+                    .filter(candidate -> candidate.id().equals(requested.orElseThrow()))
+                    .findFirst()
+                    .orElseThrow(() -> new PlayerException("Selected subtitle is no longer available"));
+            Optional<String> language = track.language().or(() -> Optional.of(track.label()));
+            replacement = withSubtitle(current, PlayerSubtitlePolicy.MATCH_LANGUAGE, language);
+        }
+        saveEffectivePreferences(replacement);
     }
 
     public PlayerPreferences preferences() {
@@ -95,6 +114,7 @@ public final class PlayerController implements AutoCloseable {
 
     public void setVolume(float volume) {
         session.setVolume(volume);
+        this.volume = volume;
     }
 
     public void setPlaybackSpeed(float speed) {
@@ -158,6 +178,7 @@ public final class PlayerController implements AutoCloseable {
         }
         closed = true;
         try {
+            preferences.saveVolume(volume);
             PlayerPlaybackSnapshot playback = session.playback().snapshot();
             if (playback.durationMillis() > 0L) {
                 session.updatePlayback(playback.positionMillis(), playback.durationMillis());
@@ -172,6 +193,30 @@ public final class PlayerController implements AutoCloseable {
         session.setCompletionThresholdPercent(value.completionThresholdPercent());
         selectPreferredStream(value);
         selectPreferredSubtitle(value);
+    }
+
+    private void saveEffectivePreferences(PlayerPreferences value) {
+        if (hasPreferenceOverride()) {
+            preferences.saveOverride(session.snapshot().libraryItemId(), value);
+        } else {
+            preferences.save(value);
+        }
+    }
+
+    private static PlayerPreferences withSubtitle(
+            PlayerPreferences current,
+            PlayerSubtitlePolicy policy,
+            Optional<String> language) {
+        return new PlayerPreferences(
+                current.decoderPolicy(),
+                current.preferredAudioLanguage(),
+                policy,
+                language,
+                current.qualityPolicy(),
+                current.preferredQuality(),
+                current.introEndMillis(),
+                current.outroDurationMillis(),
+                current.completionThresholdPercent());
     }
 
     private void selectPreferredStream(PlayerPreferences value) {
