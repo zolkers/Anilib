@@ -3,6 +3,7 @@ package fr.vriege.anilib.platform.desktopextensionhost.extension;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.SAnime;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.SEpisode;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.Video;
+import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.Track;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.AnimeFilter;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.AnimeFilterList;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.AnimesPage;
@@ -14,6 +15,7 @@ import java.util.Map;
 import kotlin.coroutines.Continuation;
 import okhttp3.Request;
 import okhttp3.Response;
+import okhttp3.Headers;
 
 public final class ExtensionOperationDispatcherSmoke {
     private ExtensionOperationDispatcherSmoke() {
@@ -34,6 +36,7 @@ public final class ExtensionOperationDispatcherSmoke {
             throw new IllegalStateException("Inherited compatibility placeholder was treated as an implementation");
         }
         ExtensionCompatibility.requireSupported(ExtensionKind.ANIME, source);
+        verifyVideoResolution();
 
         var reactive = ExtensionOperationDispatcher.modernOrRx(
                 new ReactiveSource(), "getPageList", "fetchPageList", "chapter");
@@ -50,6 +53,37 @@ public final class ExtensionOperationDispatcherSmoke {
             throw new IllegalStateException("Lazy manga image URL/request dispatch failed");
         }
         verifyFilters();
+    }
+
+    private static void verifyVideoResolution() {
+        ResolvingSource source = new ResolvingSource();
+        Video pending = new Video(
+                "https://resolver.example.invalid/watch/1",
+                "1080p",
+                null,
+                null,
+                new Headers.Builder().build(),
+                false,
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                "resolver-token",
+                false);
+        List<Video> resolved = ExtensionSourceOperations.resolveVideos(source, List.of(pending));
+        if (source.resolutionCount != 1
+                || resolved.size() != 1
+                || !resolved.getFirst().getInitialized()
+                || resolved.getFirst().getSubtitleTracks().size() != 1
+                || !"fr".equals(resolved.getFirst().getSubtitleTracks().getFirst().getLang())) {
+            throw new IllegalStateException("AniYomi deferred video resolution lost subtitle tracks");
+        }
+        ExtensionSourceOperations.resolveVideos(source, resolved);
+        if (source.resolutionCount != 1) {
+            throw new IllegalStateException("Initialized AniYomi videos were resolved more than once");
+        }
     }
 
     private static void verifyFilters() {
@@ -139,6 +173,34 @@ public final class ExtensionOperationDispatcherSmoke {
 
         public Object getVideoList(SEpisode episode, Continuation<? super List<Video>> continuation) {
             return List.of();
+        }
+    }
+
+    private static final class ResolvingSource extends AnimeHttpSource {
+        private int resolutionCount;
+
+        @Override public String getBaseUrl() { return "https://resolver.example.invalid"; }
+        @Override public String getName() { return "Resolving"; }
+        @Override public String getLang() { return "fr"; }
+        @Override public boolean getSupportsLatest() { return false; }
+
+        @Override public Object resolveVideo(Video video, Continuation<? super Video> continuation) {
+            resolutionCount++;
+            return new Video(
+                    "https://cdn.example.invalid/video.m3u8",
+                    video.getVideoTitle(),
+                    video.getResolution(),
+                    video.getBitrate(),
+                    video.getHeaders(),
+                    video.getPreferred(),
+                    List.of(new Track("https://cdn.example.invalid/subtitles-fr.vtt", "fr")),
+                    video.getAudioTracks(),
+                    video.getTimestamps(),
+                    video.getMpvArgs(),
+                    video.getFfmpegStreamArgs(),
+                    video.getFfmpegVideoArgs(),
+                    video.getInternalData(),
+                    true);
         }
     }
 

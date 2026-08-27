@@ -283,7 +283,7 @@ public final class ExtensionSourceOperations implements AutoCloseable {
             if (ExtensionOperationDispatcher.supportsHosters(source)) {
                 var hosters = ExtensionOperationDispatcher.suspend(source, "getHosterList", episode);
                 if (hosters.available()) {
-                    return hosterVideos(source, hosters.value());
+                    return resolveVideos(source, hosterVideos(source, hosters.value()));
                 }
             }
             var modern = ExtensionOperationDispatcher.modernOrRx(
@@ -293,6 +293,7 @@ public final class ExtensionSourceOperations implements AutoCloseable {
                     : ExtensionOperationDispatcher.listResult(requestAndParse(
                             source, "videoListRequest", new Object[]{episode},
                             "videoListParse", List.class), Video.class);
+            result = resolveVideos(source, result);
             if (result.isEmpty()) {
                 OkHttpClient client = ExtensionOperationDispatcher.result(
                         ExtensionOperationDispatcher.invokeAny(source, "getClient"), OkHttpClient.class);
@@ -311,6 +312,23 @@ public final class ExtensionSourceOperations implements AutoCloseable {
             }
             return result;
         });
+    }
+
+    static List<Video> resolveVideos(Object source, List<Video> videos) {
+        List<Video> resolved = new ArrayList<>(videos.size());
+        for (Video video : videos) {
+            if (video.getInitialized()) {
+                resolved.add(video);
+                continue;
+            }
+            var resolution = ExtensionOperationDispatcher.suspend(source, "resolveVideo", video);
+            if (!resolution.available()) {
+                resolved.add(video);
+            } else if (resolution.value() != null) {
+                resolved.add(ExtensionOperationDispatcher.result(resolution.value(), Video.class));
+            }
+        }
+        return List.copyOf(resolved);
     }
 
     private static String episodeHosts(String value) {

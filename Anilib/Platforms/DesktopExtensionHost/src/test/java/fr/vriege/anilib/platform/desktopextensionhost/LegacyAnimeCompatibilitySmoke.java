@@ -140,6 +140,44 @@ public final class LegacyAnimeCompatibilitySmoke {
                 || !original.getVideoUrl().equals(copy.getVideoUrl())) {
             throw new IllegalStateException("Legacy Video.copy default bridge failed");
         }
+        Video modern = new Video(
+                "https://resolver.example/video",
+                "1080p",
+                1080,
+                null,
+                headers,
+                false,
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                "resolver-token",
+                false);
+        Video resolved = Video.copy$default(
+                modern,
+                null,
+                null,
+                null,
+                null,
+                null,
+                false,
+                List.of(new Track("https://cdn.example/subtitles.vtt", "fr")),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                true,
+                1 | 2 | 4 | 8 | 16 | 32 | 128 | 256 | 512 | 1024 | 2048 | 4096,
+                null);
+        if (!resolved.getInitialized()
+                || !"resolver-token".equals(resolved.getInternalData())
+                || resolved.getSubtitleTracks().size() != 1) {
+            throw new IllegalStateException("Modern Video.copy default bridge failed");
+        }
     }
 
     private static void verifyRateLimitBuilder() {

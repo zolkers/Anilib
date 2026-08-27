@@ -2,6 +2,7 @@ package fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesourc
 
 import fr.vriege.anilib.platform.desktopextensionhost.compat.android.net.Uri;
 import java.util.List;
+import java.util.Objects;
 import okhttp3.Headers;
 import kotlin.jvm.internal.DefaultConstructorMarker;
 
@@ -33,14 +34,41 @@ public class Video {
         this.bitrate = bitrate;
         this.headers = headers;
         this.preferred = preferred;
-        this.subtitleTracks = List.copyOf(subtitleTracks);
-        this.audioTracks = List.copyOf(audioTracks);
-        this.timestamps = List.copyOf(timestamps);
-        this.mpvArgs = List.copyOf(mpvArgs);
-        this.ffmpegStreamArgs = List.copyOf(ffmpegStreamArgs);
-        this.ffmpegVideoArgs = List.copyOf(ffmpegVideoArgs);
-        this.internalData = internalData;
+        this.subtitleTracks = immutable(subtitleTracks);
+        this.audioTracks = immutable(audioTracks);
+        this.timestamps = immutable(timestamps);
+        this.mpvArgs = immutable(mpvArgs);
+        this.ffmpegStreamArgs = immutable(ffmpegStreamArgs);
+        this.ffmpegVideoArgs = immutable(ffmpegVideoArgs);
+        this.internalData = Objects.requireNonNullElse(internalData, "");
         this.initialized = initialized;
+    }
+
+    public Video(String videoUrl, String videoTitle, Integer resolution, Integer bitrate, Headers headers,
+                 boolean preferred, List<Track> subtitleTracks, List<Track> audioTracks,
+                 List<TimeStamp> timestamps, List<?> mpvArgs, List<?> ffmpegStreamArgs,
+                 List<?> ffmpegVideoArgs, String internalData, boolean initialized, int mask,
+                 DefaultConstructorMarker marker) {
+        this(
+                (mask & 1) == 0 ? videoUrl : "",
+                (mask & 2) == 0 ? videoTitle : "",
+                (mask & 4) == 0 ? resolution : null,
+                (mask & 8) == 0 ? bitrate : null,
+                (mask & 16) == 0 ? headers : null,
+                (mask & 32) == 0 && preferred,
+                (mask & 64) == 0 ? subtitleTracks : List.of(),
+                (mask & 128) == 0 ? audioTracks : List.of(),
+                (mask & 256) == 0 ? timestamps : List.of(),
+                (mask & 512) == 0 ? mpvArgs : List.of(),
+                (mask & 1024) == 0 ? ffmpegStreamArgs : List.of(),
+                (mask & 2048) == 0 ? ffmpegVideoArgs : List.of(),
+                (mask & 4096) == 0 ? internalData : "",
+                (mask & 8192) == 0 && initialized);
+    }
+
+    public Video() {
+        this("", "", null, null, null, false, List.of(), List.of(), List.of(), List.of(), List.of(),
+                List.of(), "", false);
     }
 
     public Video(String url, String quality, String videoUrl, Headers headers,
@@ -94,6 +122,16 @@ public class Video {
         return new Video(url, quality, resolvedVideoUrl, newHeaders, newSubtitleTracks, newAudioTracks);
     }
 
+    public Video copy(String newVideoUrl, String newVideoTitle, Integer newResolution, Integer newBitrate,
+                      Headers newHeaders, boolean newPreferred, List<Track> newSubtitleTracks,
+                      List<Track> newAudioTracks, List<TimeStamp> newTimestamps, List<?> newMpvArgs,
+                      List<?> newFfmpegStreamArgs, List<?> newFfmpegVideoArgs, String newInternalData,
+                      boolean newInitialized) {
+        return new Video(newVideoUrl, newVideoTitle, newResolution, newBitrate, newHeaders, newPreferred,
+                newSubtitleTracks, newAudioTracks, newTimestamps, newMpvArgs, newFfmpegStreamArgs,
+                newFfmpegVideoArgs, newInternalData, newInitialized);
+    }
+
     public static Video copy$default(Video video, String url, String quality, String resolvedVideoUrl,
                                      Headers headers, List<Track> subtitleTracks, List<Track> audioTracks,
                                      int mask, Object marker) {
@@ -106,12 +144,47 @@ public class Video {
                 (mask & 32) == 0 ? audioTracks : video.getAudioTracks());
     }
 
+    public static Video copy$default(
+            Video video, String videoUrl, String videoTitle, Integer resolution, Integer bitrate, Headers headers,
+            boolean preferred, List<Track> subtitleTracks, List<Track> audioTracks,
+            List<TimeStamp> timestamps, List<?> mpvArgs, List<?> ffmpegStreamArgs, List<?> ffmpegVideoArgs,
+            String internalData, boolean initialized, int mask, Object marker) {
+        return video.copy(
+                (mask & 1) == 0 ? videoUrl : video.getVideoUrl(),
+                (mask & 2) == 0 ? videoTitle : video.getVideoTitle(),
+                (mask & 4) == 0 ? resolution : video.getResolution(),
+                (mask & 8) == 0 ? bitrate : video.getBitrate(),
+                (mask & 16) == 0 ? headers : video.getHeaders(),
+                (mask & 32) == 0 ? preferred : video.getPreferred(),
+                (mask & 64) == 0 ? subtitleTracks : video.getSubtitleTracks(),
+                (mask & 128) == 0 ? audioTracks : video.getAudioTracks(),
+                (mask & 256) == 0 ? timestamps : video.getTimestamps(),
+                (mask & 512) == 0 ? mpvArgs : video.getMpvArgs(),
+                (mask & 1024) == 0 ? ffmpegStreamArgs : video.getFfmpegStreamArgs(),
+                (mask & 2048) == 0 ? ffmpegVideoArgs : video.getFfmpegVideoArgs(),
+                (mask & 4096) == 0 ? internalData : video.getInternalData(),
+                (mask & 8192) == 0 ? initialized : video.getInitialized());
+    }
+
     public String component1() { return getUrl(); }
     public String component2() { return getQuality(); }
     public String component3() { return getVideoUrl(); }
     public Headers component4() { return getHeaders(); }
     public List<Track> component5() { return getSubtitleTracks(); }
     public List<Track> component6() { return getAudioTracks(); }
+
+    public List<Track> component7() { return getSubtitleTracks(); }
+    public List<Track> component8() { return getAudioTracks(); }
+    public List<TimeStamp> component9() { return getTimestamps(); }
+    public List<?> component10() { return getMpvArgs(); }
+    public List<?> component11() { return getFfmpegStreamArgs(); }
+    public List<?> component12() { return getFfmpegVideoArgs(); }
+    public String component13() { return getInternalData(); }
+    public boolean component14() { return getInitialized(); }
+
+    private static <T> List<T> immutable(List<? extends T> values) {
+        return values == null ? List.of() : List.copyOf(values);
+    }
 
     public enum State {
         QUEUE,
