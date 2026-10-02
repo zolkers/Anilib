@@ -12,6 +12,7 @@ repositories {
 
 dependencies {
     implementation project(':Anilib:Framework:Localization:Api')
+    implementation project(':Anilib:Features:CoverCache:Api')
     implementation project(':Anilib:Features:Library:Api')
     implementation project(':Anilib:Features:Library:Ui')
     implementation project(':Anilib:Features:Discovery:Api')

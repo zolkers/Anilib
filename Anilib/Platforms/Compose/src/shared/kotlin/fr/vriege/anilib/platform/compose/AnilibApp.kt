@@ -79,6 +79,8 @@ import fr.vriege.anilib.feature.player.ui.PlayerPresentation
 import fr.vriege.anilib.feature.tracker.ui.TrackerPresentation
 import fr.vriege.anilib.feature.updates.ui.UpdatePresentation
 import fr.vriege.anilib.feature.applicationupdate.ui.ApplicationUpdatePresentation
+import fr.vriege.anilib.feature.covercache.CoverCache
+import fr.vriege.anilib.feature.covercache.DecodedImage
 import fr.vriege.anilib.framework.http.HttpCookieJar
 import fr.vriege.anilib.framework.http.AnilibHttpClient
 import kotlinx.coroutines.Dispatchers
@@ -127,8 +129,10 @@ fun AnilibApp(
     applicationUpdates: ApplicationUpdatePresentation,
     applicationUpdatePlatformController: ApplicationUpdatePlatformController,
     httpClient: AnilibHttpClient,
+    coverCache: CoverCache?,
     shareController: ShareController,
     pageDecoder: (ByteArray) -> ImageBitmap?,
+    cachedImageDecoder: (DecodedImage) -> ImageBitmap?,
     applyReaderOrientationPolicy: (ReaderOrientationPolicy) -> Unit,
     playerFullscreen: Boolean,
     setPlayerFullscreen: (Boolean) -> Unit,
@@ -143,9 +147,6 @@ fun AnilibApp(
     val downloadPreparation = remember(downloads) { DownloadPreparationState() }
     val responsiveDownloads = remember(downloads, downloadPreparation) {
         PreparingDownloadPresentation(downloads, downloadPreparation)
-    }
-    val imageEnvironment = remember(httpClient, pageDecoder) {
-        ExtensionIconEnvironment(httpClient, pageDecoder)
     }
     val navigator = remember { LibraryNavigator() }
     val initialSettings = remember(settingsPresentation) { settingsPresentation.snapshot() }
@@ -163,6 +164,21 @@ fun AnilibApp(
     var moreDestination by remember { mutableStateOf<MoreDestination?>(null) }
     var browseMainDestination by remember { mutableStateOf(true) }
     var settings by remember(settingsPresentation) { mutableStateOf(initialSettings) }
+    val imageEnvironment = remember(
+        httpClient,
+        coverCache,
+        pageDecoder,
+        cachedImageDecoder,
+        settings.incognitoMode(),
+    ) {
+        ExtensionIconEnvironment(
+            httpClient,
+            coverCache,
+            pageDecoder,
+            cachedImageDecoder,
+            coverCache != null && !settings.incognitoMode(),
+        )
+    }
     var recoveredFailure by remember { mutableStateOf<String?>(null) }
     val discoveryRouteState = rememberDiscoveryRouteState()
     val historyRouteState = rememberHistoryRouteState()

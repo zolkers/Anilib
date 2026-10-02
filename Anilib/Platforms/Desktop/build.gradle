@@ -18,6 +18,7 @@ dependencies {
     implementation project(':Anilib:Framework:Http:Api')
     implementation project(':Anilib:Framework:Http:JdkRuntime')
     implementation project(':Anilib:Configurations:Standard')
+    implementation project(':Anilib:Features:CoverCache:Api')
     implementation project(':Anilib:Features:CoverCache:Bundle')
     implementation project(':Anilib:Features:Library:Api')
     implementation project(':Anilib:Features:Discovery:Ui')

@@ -22,6 +22,7 @@ import fr.vriege.anilib.feature.source.SourceId;
 import fr.vriege.anilib.feature.source.SourcePageResource;
 import fr.vriege.anilib.feature.source.SourceRegistry;
 
+import java.nio.file.Path;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -42,6 +43,7 @@ public final class DefaultReaderService implements ReaderService, ReaderContentR
      */
     private static final int READER_PAGE_THREADS =
             Math.min(8, Math.max(4, Runtime.getRuntime().availableProcessors()));
+    private static final long READER_DISK_CACHE_BYTES = 512L * 1024L * 1024L;
 
     private final SourceRegistry sources;
     private final LibraryCatalog library;
@@ -64,12 +66,22 @@ public final class DefaultReaderService implements ReaderService, ReaderContentR
             LibraryCatalog library,
             ReaderPolicy policy,
             BooleanSupplier persistenceAllowed) {
+        this(sources, library, policy, null, persistenceAllowed);
+    }
+
+    public DefaultReaderService(
+            SourceRegistry sources,
+            LibraryCatalog library,
+            ReaderPolicy policy,
+            Path pageCacheDirectory,
+            BooleanSupplier persistenceAllowed) {
         this(
                 sources,
                 library,
                 policy,
                 Clock.systemUTC(),
                 ManagedExecutors.fixed("anilib-reader", READER_PAGE_THREADS),
+                pageCacheDirectory,
                 persistenceAllowed);
     }
 
@@ -80,6 +92,17 @@ public final class DefaultReaderService implements ReaderService, ReaderContentR
             Clock clock,
             ExecutorService pageExecutor,
             BooleanSupplier persistenceAllowed) {
+        this(sources, library, policy, clock, pageExecutor, null, persistenceAllowed);
+    }
+
+    DefaultReaderService(
+            SourceRegistry sources,
+            LibraryCatalog library,
+            ReaderPolicy policy,
+            Clock clock,
+            ExecutorService pageExecutor,
+            Path pageCacheDirectory,
+            BooleanSupplier persistenceAllowed) {
         this.sources = Objects.requireNonNull(sources, "sources must not be null");
         this.library = Objects.requireNonNull(library, "library must not be null");
         this.policy = Objects.requireNonNull(policy, "policy must not be null");
@@ -87,11 +110,15 @@ public final class DefaultReaderService implements ReaderService, ReaderContentR
         this.pageExecutor = Objects.requireNonNull(pageExecutor, "pageExecutor must not be null");
         // One cache and one queue for the whole reader: continuous reading keeps several chapters
         // open, and a per-chapter budget would scale memory with how far the reader has scrolled.
-        this.pageCache = new ReaderPageCache(policy.maximumCacheBytes());
-        this.pageQueue = new ReaderPageLoadQueue(READER_PAGE_THREADS, "anilib-reader-page");
         this.persistenceAllowed = Objects.requireNonNull(
                 persistenceAllowed,
                 "persistenceAllowed must not be null");
+        this.pageCache = new ReaderPageCache(
+                policy.maximumCacheBytes(),
+                pageCacheDirectory,
+                READER_DISK_CACHE_BYTES,
+                this.persistenceAllowed);
+        this.pageQueue = new ReaderPageLoadQueue(READER_PAGE_THREADS, "anilib-reader-page");
     }
 
     @Override

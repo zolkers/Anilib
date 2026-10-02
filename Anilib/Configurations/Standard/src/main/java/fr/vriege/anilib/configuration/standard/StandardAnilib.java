@@ -203,6 +203,7 @@ public final class StandardAnilib {
         Path readerInteractions = dataDirectory.toAbsolutePath().normalize().resolve("reader-interactions.properties");
         Path readerDisplay = dataDirectory.toAbsolutePath().normalize().resolve("reader-display.properties");
         Path readerReadState = dataDirectory.toAbsolutePath().normalize().resolve("reader-read-state.properties");
+        Path readerPageCache = dataDirectory.toAbsolutePath().normalize().resolve("cache").resolve("reader-pages");
         List<AnilibPlugin> plugins = new ArrayList<>();
         ExtensionBundleSelection extensionSelection = portableBundleLoading == PortableBundleLoading.ENABLED
                 ? InstalledExtensionBundles.select(extensions)
@@ -214,7 +215,7 @@ public final class StandardAnilib {
         plugins.add(new SettingsPlugin(settings));
         plugins.add(new DiscoveryPlugin(sourcePreferences));
         plugins.add(new ExtensionRepositoryPlugin(extensionRepositories, extensionSelection.failures()));
-        plugins.add(new ReaderPlugin(readerInteractions, readerDisplay, readerReadState));
+        plugins.add(new ReaderPlugin(readerInteractions, readerDisplay, readerReadState, readerPageCache));
         plugins.add(new DownloadPlugin(downloads, DownloadStoragePolicy.standard(), videoFinalizer));
         plugins.add(new PlayerPlugin(playbackState, playerPreferences, playerBackend));
         plugins.add(new TrackerPlugin(trackingState));

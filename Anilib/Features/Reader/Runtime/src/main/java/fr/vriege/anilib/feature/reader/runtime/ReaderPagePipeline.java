@@ -2,6 +2,8 @@ package fr.vriege.anilib.feature.reader.runtime;
 
 import fr.vriege.anilib.feature.reader.ReaderException;
 import fr.vriege.anilib.feature.reader.ReaderPolicy;
+import fr.vriege.anilib.feature.source.SourceCatalogueItemId;
+import fr.vriege.anilib.feature.source.SourceContentUnitId;
 import fr.vriege.anilib.feature.source.SourcePageResource;
 
 import java.util.List;
@@ -61,7 +63,7 @@ final class ReaderPagePipeline implements AutoCloseable {
     byte[] load(int index) {
         validateIndex(index);
         ensureOpen();
-        byte[] cached = cache.get(new ReaderPageCache.Key(owner, index));
+        byte[] cached = cache.get(key(index));
         if (cached != null) {
             prefetchAround(index);
             return cached;
@@ -81,7 +83,7 @@ final class ReaderPagePipeline implements AutoCloseable {
     }
 
     private CompletableFuture<byte[]> request(int index, ReaderPageLoadQueue.Priority priority) {
-        ReaderPageCache.Key key = new ReaderPageCache.Key(owner, index);
+        ReaderPageCache.Key key = key(index);
         byte[] cached = cache.get(key);
         if (cached != null) {
             return CompletableFuture.completedFuture(cached);
@@ -134,6 +136,17 @@ final class ReaderPagePipeline implements AutoCloseable {
         }
     }
 
+    private ReaderPageCache.Key key(int index) {
+        SourcePageResource resource = pages.get(index);
+        SourceContentUnitId contentId = resource.contentUnitId();
+        SourceCatalogueItemId itemId = contentId.itemId();
+        String persistentId = itemId.sourceId()
+                + "\u0000" + itemId.value()
+                + "\u0000" + contentId.value()
+                + "\u0000" + resource.index();
+        return new ReaderPageCache.Key(owner, persistentId, index);
+    }
+
     private void ensureOpen() {
         if (closed) {
             throw new ReaderException("Reader page pipeline is closed");
@@ -144,7 +157,7 @@ final class ReaderPagePipeline implements AutoCloseable {
     public void close() {
         closed = true;
         for (int index = 0; index < pages.size(); index++) {
-            queue.cancel(new ReaderPageCache.Key(owner, index));
+            queue.cancel(key(index));
         }
         cache.evictOwner(owner);
     }

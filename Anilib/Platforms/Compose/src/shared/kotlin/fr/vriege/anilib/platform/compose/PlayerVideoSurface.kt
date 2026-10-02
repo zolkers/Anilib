@@ -388,7 +388,11 @@ internal fun PlayerVideoSurface(
                         valueRange = 0f..1000f,
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
                         Text("ui.volume", color = Color.White, style = MaterialTheme.typography.bodySmall)
                         CompactPlayerSlider(
                             value = volume,

@@ -81,6 +81,15 @@ final class CoverCacheTest {
             restarted.invalidate(key);
             check(restarted.find(key).isEmpty(), "invalidating a cover must remove its durable entry");
 
+            Path boundedDirectory = directory.resolve("bounded-covers");
+            CoverCache bounded = new JdkFileCoverCache(boundedDirectory, encoded.length + 1L);
+            CoverKey oldest = new CoverKey("oldest");
+            CoverKey newest = new CoverKey("newest");
+            bounded.load(oldest, () -> encoded);
+            bounded.load(newest, () -> encoded);
+            check(bounded.find(oldest).isEmpty(), "cover cache must evict the least recently used image");
+            check(bounded.find(newest).isPresent(), "cover cache must retain the newest image within its budget");
+
             Path productDirectory = directory.resolve("product");
             try (StartedAnilib application = StandardAnilib.start(
                     productDirectory,

@@ -40,12 +40,14 @@ public final class ReaderPlugin implements AnilibPlugin {
     private final Path interactionPreferences;
     private final Path displayPreferences;
     private final Path readState;
+    private final Path pageCacheDirectory;
 
     public ReaderPlugin() {
         this(
                 Path.of("reader-interactions.properties"),
                 Path.of("reader-display.properties"),
                 Path.of("reader-read-state.properties"),
+                Path.of("reader-page-cache"),
                 ReaderPolicy.standard());
     }
 
@@ -54,11 +56,25 @@ public final class ReaderPlugin implements AnilibPlugin {
                 Path.of("reader-interactions.properties"),
                 Path.of("reader-display.properties"),
                 Path.of("reader-read-state.properties"),
+                Path.of("reader-page-cache"),
                 policy);
     }
 
     public ReaderPlugin(Path interactionPreferences, Path displayPreferences, Path readState) {
-        this(interactionPreferences, displayPreferences, readState, ReaderPolicy.standard());
+        this(
+                interactionPreferences,
+                displayPreferences,
+                readState,
+                defaultPageCacheDirectory(readState),
+                ReaderPolicy.standard());
+    }
+
+    public ReaderPlugin(
+            Path interactionPreferences,
+            Path displayPreferences,
+            Path readState,
+            Path pageCacheDirectory) {
+        this(interactionPreferences, displayPreferences, readState, pageCacheDirectory, ReaderPolicy.standard());
     }
 
     public ReaderPlugin(
@@ -66,11 +82,28 @@ public final class ReaderPlugin implements AnilibPlugin {
             Path displayPreferences,
             Path readState,
             ReaderPolicy policy) {
+        this(
+                interactionPreferences,
+                displayPreferences,
+                readState,
+                defaultPageCacheDirectory(readState),
+                policy);
+    }
+
+    public ReaderPlugin(
+            Path interactionPreferences,
+            Path displayPreferences,
+            Path readState,
+            Path pageCacheDirectory,
+            ReaderPolicy policy) {
         this.interactionPreferences = Objects.requireNonNull(
                 interactionPreferences,
                 "interactionPreferences must not be null");
         this.displayPreferences = Objects.requireNonNull(displayPreferences, "displayPreferences must not be null");
         this.readState = Objects.requireNonNull(readState, "readState must not be null");
+        this.pageCacheDirectory = Objects.requireNonNull(
+                pageCacheDirectory,
+                "pageCacheDirectory must not be null");
         this.policy = Objects.requireNonNull(policy, "policy must not be null");
     }
 
@@ -88,6 +121,7 @@ public final class ReaderPlugin implements AnilibPlugin {
                 sources,
                 library,
                 policy,
+                pageCacheDirectory,
                 () -> !settings.snapshot().incognitoMode()));
         ReaderReadStateStore readStateStore = new PrivacyAwareReaderReadStateStore(
                 new FileReaderReadStateStore(readState),
@@ -100,5 +134,15 @@ public final class ReaderPlugin implements AnilibPlugin {
                 new FileReaderInteractionPreferenceStore(interactionPreferences),
                 new FileReaderDisplayPreferenceStore(displayPreferences),
                 readStateStore));
+    }
+
+    private static Path defaultPageCacheDirectory(Path readState) {
+        Path absolute = Objects.requireNonNull(readState, "readState must not be null")
+                .toAbsolutePath()
+                .normalize();
+        Path parent = absolute.getParent();
+        return (parent == null ? Path.of(".").toAbsolutePath().normalize() : parent)
+                .resolve("cache")
+                .resolve("reader-pages");
     }
 }

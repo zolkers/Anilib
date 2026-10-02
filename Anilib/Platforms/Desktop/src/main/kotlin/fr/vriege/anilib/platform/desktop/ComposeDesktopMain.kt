@@ -22,6 +22,8 @@ import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import fr.vriege.anilib.configuration.standard.StandardAnilib
+import fr.vriege.anilib.feature.covercache.CoverCacheCapabilities
+import fr.vriege.anilib.feature.covercache.DecodedImage
 import fr.vriege.anilib.feature.covercache.bundle.CoverCachePlugin
 import fr.vriege.anilib.feature.discovery.ui.DiscoveryUiCapabilities
 import fr.vriege.anilib.feature.extensionrepository.ui.ExtensionRepositoryUiCapabilities
@@ -54,7 +56,10 @@ import fr.vriege.anilib.platform.compose.DesktopBrowserRuntime
 import fr.vriege.anilib.platform.compose.ShareController
 import java.awt.GraphicsEnvironment
 import java.util.concurrent.atomic.AtomicBoolean
+import org.jetbrains.skia.ColorAlphaType
+import org.jetbrains.skia.ColorType
 import org.jetbrains.skia.Image
+import org.jetbrains.skia.ImageInfo
 
 fun main(arguments: Array<String>) {
     val dataDirectory = DesktopDataDirectory.resolve()
@@ -365,8 +370,10 @@ internal fun DesktopAnilibContent(
         applicationUpdates = started.capability(ApplicationUpdateUiCapabilities.PRESENTATION),
         applicationUpdatePlatformController = applicationUpdatePlatformController,
         httpClient = started.capability(NetworkCapabilities.HTTP_CLIENT),
+        coverCache = runCatching { started.capability(CoverCacheCapabilities.CACHE) }.getOrNull(),
         shareController = shareController,
         pageDecoder = ::decodePage,
+        cachedImageDecoder = ::decodeCachedImage,
         applyReaderOrientationPolicy = {},
         playerFullscreen = playerFullscreen,
         setPlayerFullscreen = setPlayerFullscreen,
@@ -386,6 +393,25 @@ internal fun DesktopAnilibContent(
 
 private fun decodePage(bytes: ByteArray): ImageBitmap? =
     runCatching { Image.makeFromEncoded(bytes).toComposeImageBitmap() }.getOrNull()
+
+private fun decodeCachedImage(image: DecodedImage): ImageBitmap? = runCatching {
+    val argb = image.argbPixels()
+    val bgra = ByteArray(argb.size * 4)
+    argb.forEachIndexed { index, pixel ->
+        val offset = index * 4
+        bgra[offset] = pixel.toByte()
+        bgra[offset + 1] = (pixel ushr 8).toByte()
+        bgra[offset + 2] = (pixel ushr 16).toByte()
+        bgra[offset + 3] = (pixel ushr 24).toByte()
+    }
+    val info = ImageInfo(
+        image.width(),
+        image.height(),
+        ColorType.BGRA_8888,
+        ColorAlphaType.UNPREMUL,
+    )
+    Image.makeRaster(info, bgra, image.width() * 4).toComposeImageBitmap()
+}.getOrNull()
 
 private fun loadApplicationIcon(): Painter? = runCatching {
     val loader = Thread.currentThread().contextClassLoader

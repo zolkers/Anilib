@@ -1,7 +1,13 @@
 package fr.vriege.anilib.platform.compose
 
 import androidx.compose.ui.graphics.ImageBitmap
+import fr.vriege.anilib.feature.covercache.CoverKey
+import fr.vriege.anilib.framework.http.HttpCachePolicy
+import fr.vriege.anilib.framework.http.HttpRequest
 import java.net.URI
+import java.net.URLDecoder
+import java.nio.charset.StandardCharsets
+import java.time.Duration
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -137,3 +143,69 @@ internal fun remoteImageCacheKey(
     append(':')
     append(uri.toASCIIString())
 }
+
+internal fun persistentRemoteImageCacheKey(purpose: String, uri: URI): String =
+    "$purpose:${persistentRemoteImageIdentity(uri)}"
+
+internal fun loadRemoteImage(
+    environment: ExtensionIconEnvironment,
+    purpose: String,
+    uri: URI,
+    maximumBytes: Int,
+): ImageBitmap {
+    fun loadBytes(): ByteArray {
+        val response = environment.httpClient.execute(
+            HttpRequest.builder(uri)
+                .cache(HttpCachePolicy.preferCache(Duration.ofDays(7)))
+                .build(),
+        )
+        check(response.statusCode() in 200..299) {
+            "Remote image request failed with HTTP ${response.statusCode()}"
+        }
+        check(response.body().size <= maximumBytes) {
+            "Remote image exceeds the encoded size limit"
+        }
+        return response.body()
+    }
+    if (!environment.persistentCacheAllowed) {
+        return environment.decode(loadBytes()) ?: error("Unsupported remote image format")
+    }
+    val coverCache = checkNotNull(environment.coverCache)
+    val cacheKey = CoverKey(persistentRemoteImageCacheKey(purpose, uri))
+    val cached = runCatching { coverCache.find(cacheKey).orElse(null) }
+        .getOrElse {
+            runCatching { coverCache.invalidate(cacheKey) }
+            null
+        }
+    if (cached != null) {
+        environment.decodeCached(cached)?.let { return it }
+        runCatching { coverCache.invalidate(cacheKey) }
+    }
+    val encoded = loadBytes()
+    val decoded = coverCache.load(cacheKey) { encoded }
+    return environment.decodeCached(decoded)
+        ?: environment.decode(encoded)
+        ?: error("Unsupported remote image format")
+}
+
+private fun persistentRemoteImageIdentity(uri: URI): String {
+    val loopbackProxy = uri.path == "/api/v1/proxy" &&
+        (uri.host.equals("127.0.0.1", ignoreCase = true) || uri.host == "::1")
+    if (!loopbackProxy) {
+        return uri.toASCIIString()
+    }
+    val parameters = uri.rawQuery.orEmpty()
+        .split('&')
+        .mapNotNull { parameter ->
+            val separator = parameter.indexOf('=')
+            if (separator < 0) null else {
+                decodeQuery(parameter.substring(0, separator)) to decodeQuery(parameter.substring(separator + 1))
+            }
+        }
+        .toMap()
+    val original = parameters["url"] ?: return uri.toASCIIString()
+    return "extension-proxy:${parameters["sourceId"].orEmpty()}:$original"
+}
+
+private fun decodeQuery(value: String): String =
+    URLDecoder.decode(value, StandardCharsets.UTF_8)

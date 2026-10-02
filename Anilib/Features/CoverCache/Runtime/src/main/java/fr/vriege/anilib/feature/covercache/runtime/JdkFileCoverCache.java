@@ -22,27 +22,46 @@ import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.FileTime;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
+import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 public final class JdkFileCoverCache implements CoverCache {
     private static final int MAX_ENCODED_BYTES = 16 * 1024 * 1024;
     private static final long MAX_PIXELS = 16L * 1024L * 1024L;
+    private static final long DEFAULT_MAXIMUM_CACHE_BYTES = 512L * 1024L * 1024L;
     private static final HexFormat HEX = HexFormat.of();
 
     private final Path root;
+    private final long maximumCacheBytes;
+    private final Map<Path, Long> entries = new LinkedHashMap<>(64, 0.75f, true);
+    private long cachedBytes;
 
     public JdkFileCoverCache(Path root) {
+        this(root, DEFAULT_MAXIMUM_CACHE_BYTES);
+    }
+
+    public JdkFileCoverCache(Path root, long maximumCacheBytes) {
         this.root = Objects.requireNonNull(root, "root must not be null").toAbsolutePath().normalize();
+        if (maximumCacheBytes <= 0) {
+            throw new IllegalArgumentException("maximumCacheBytes must be positive");
+        }
+        this.maximumCacheBytes = maximumCacheBytes;
         try {
             Files.createDirectories(this.root);
             if (Files.isSymbolicLink(this.root) || !Files.isDirectory(this.root, LinkOption.NOFOLLOW_LINKS)) {
                 throw new CoverCacheException("Cover cache root must be a real directory");
             }
+            indexExistingEntries();
         } catch (IOException exception) {
             throw failure("create cover cache root", exception);
         }
@@ -54,9 +73,12 @@ public final class JdkFileCoverCache implements CoverCache {
         Path cacheFile = cacheFile(key);
         if (Files.exists(cacheFile, LinkOption.NOFOLLOW_LINKS)) {
             try {
-                return decode(readEncoded(cacheFile));
+                DecodedImage cached = decode(readEncoded(cacheFile));
+                touch(cacheFile);
+                return cached;
             } catch (CoverCacheException invalidCache) {
                 delete(cacheFile, "discard invalid cached cover");
+                removeEntry(cacheFile);
             }
         }
 
@@ -69,6 +91,7 @@ public final class JdkFileCoverCache implements CoverCache {
         requireEncodedSize(encoded.length);
         DecodedImage decoded = decode(encoded);
         store(cacheFile, encoded);
+        recordStored(cacheFile, encoded.length);
         return decoded;
     }
 
@@ -78,17 +101,89 @@ public final class JdkFileCoverCache implements CoverCache {
         if (!Files.exists(cacheFile, LinkOption.NOFOLLOW_LINKS)) {
             return Optional.empty();
         }
-        return Optional.of(decode(readEncoded(cacheFile)));
+        DecodedImage decoded = decode(readEncoded(cacheFile));
+        touch(cacheFile);
+        return Optional.of(decoded);
     }
 
     @Override
     public synchronized void invalidate(CoverKey key) {
-        delete(cacheFile(key), "invalidate cached cover");
+        Path file = cacheFile(key);
+        delete(file, "invalidate cached cover");
+        removeEntry(file);
     }
 
     private Path cacheFile(CoverKey key) {
         Objects.requireNonNull(key, "key must not be null");
         return root.resolve(digest(key.value()) + ".image");
+    }
+
+    private void indexExistingEntries() throws IOException {
+        try (Stream<Path> files = Files.list(root)) {
+            for (Path file : files
+                    .filter(path -> path.getFileName().toString().endsWith(".image"))
+                    .sorted(Comparator.comparing(JdkFileCoverCache::lastModified))
+                    .toList()) {
+                if (!Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)) {
+                    continue;
+                }
+                long size = Files.size(file);
+                if (size <= 0 || size > MAX_ENCODED_BYTES) {
+                    Files.deleteIfExists(file);
+                    continue;
+                }
+                entries.put(file, size);
+                cachedBytes += size;
+            }
+        }
+        evictDown();
+    }
+
+    private void touch(Path file) {
+        entries.get(file);
+        try {
+            Files.setLastModifiedTime(file, FileTime.from(Instant.now()));
+        } catch (IOException ignored) {
+            // The in-process LRU order remains valid even when metadata cannot be updated.
+        }
+    }
+
+    private void recordStored(Path file, long size) {
+        Long previous = entries.put(file, size);
+        if (previous != null) {
+            cachedBytes -= previous;
+        }
+        cachedBytes += size;
+        evictDown();
+    }
+
+    private void removeEntry(Path file) {
+        Long removed = entries.remove(file);
+        if (removed != null) {
+            cachedBytes -= removed;
+        }
+    }
+
+    private void evictDown() {
+        Iterator<Map.Entry<Path, Long>> iterator = entries.entrySet().iterator();
+        while (cachedBytes > maximumCacheBytes && iterator.hasNext()) {
+            Map.Entry<Path, Long> oldest = iterator.next();
+            try {
+                Files.deleteIfExists(oldest.getKey());
+            } catch (IOException ignored) {
+                // Removing the index entry prevents a failed eviction from blocking newer covers.
+            }
+            cachedBytes -= oldest.getValue();
+            iterator.remove();
+        }
+    }
+
+    private static FileTime lastModified(Path path) {
+        try {
+            return Files.getLastModifiedTime(path, LinkOption.NOFOLLOW_LINKS);
+        } catch (IOException ignored) {
+            return FileTime.fromMillis(0L);
+        }
     }
 
     private static String digest(String value) {

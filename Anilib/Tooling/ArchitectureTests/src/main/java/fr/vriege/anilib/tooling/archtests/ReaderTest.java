@@ -69,6 +69,7 @@ final class ReaderTest {
         Counter counter = new Counter();
         verifiesStandardLocalReader(counter);
         verifiesBoundedPipeline(counter);
+        persistsReaderPagesAcrossRestarts(counter);
         suppressesIncognitoPersistence(counter);
         persistsInteractionPreferences(counter);
         repairsDuplicateHorizontalTapDirections(counter);
@@ -306,6 +307,75 @@ final class ReaderTest {
                 "closed reader services must reject further access");
     }
 
+    private static void persistsReaderPagesAcrossRestarts(Counter counter) {
+        Path directory;
+        try {
+            directory = Files.createTempDirectory("anilib-reader-page-cache-test");
+        } catch (IOException exception) {
+            throw new AssertionError("Unable to prepare reader page cache test", exception);
+        }
+        try {
+            SourceCatalogueItemId itemId = new SourceCatalogueItemId(SourceId.of("test.reader.cache"), "title");
+            SourceContentUnit unit = new SourceContentUnit(
+                    new SourceContentUnitId(itemId, "chapter-1"),
+                    "Chapter 1",
+                    Optional.of(Instant.EPOCH));
+            AtomicInteger initialReads = new AtomicInteger();
+            try (DefaultReaderService reader = new DefaultReaderService(
+                    new SingleSourceRegistry(new SinglePageSource(unit, initialReads)),
+                    new MemoryLibraryCatalog(),
+                    new ReaderPolicy(0, 1024, 128),
+                    directory,
+                    () -> true);
+                    ReaderSession session = reader.open("Cached title", unit.id())) {
+                counter.check(Arrays.equals(session.currentPage(), FIRST_PAGE),
+                        "reader disk cache must preserve source page bytes");
+                counter.check(initialReads.get() == 1,
+                        "first reader page access must invoke the source once");
+            }
+
+            AtomicInteger restartedReads = new AtomicInteger();
+            try (DefaultReaderService reader = new DefaultReaderService(
+                    new SingleSourceRegistry(new SinglePageSource(unit, restartedReads)),
+                    new MemoryLibraryCatalog(),
+                    new ReaderPolicy(0, 1024, 128),
+                    directory,
+                    () -> true);
+                    ReaderSession session = reader.open("Cached title", unit.id())) {
+                counter.check(Arrays.equals(session.currentPage(), FIRST_PAGE),
+                        "reader page cache must survive a service restart");
+                counter.check(restartedReads.get() == 0,
+                        "durable reader page cache must avoid a second source read");
+            }
+
+            Path privateDirectory = directory.resolve("private");
+            AtomicInteger privateReads = new AtomicInteger();
+            try (DefaultReaderService reader = new DefaultReaderService(
+                    new SingleSourceRegistry(new SinglePageSource(unit, privateReads)),
+                    new MemoryLibraryCatalog(),
+                    new ReaderPolicy(0, 1024, 128),
+                    privateDirectory,
+                    () -> false);
+                    ReaderSession session = reader.open("Private title", unit.id())) {
+                session.currentPage();
+            }
+            AtomicInteger readsAfterPrivateSession = new AtomicInteger();
+            try (DefaultReaderService reader = new DefaultReaderService(
+                    new SingleSourceRegistry(new SinglePageSource(unit, readsAfterPrivateSession)),
+                    new MemoryLibraryCatalog(),
+                    new ReaderPolicy(0, 1024, 128),
+                    privateDirectory,
+                    () -> true);
+                    ReaderSession session = reader.open("Private title", unit.id())) {
+                session.currentPage();
+                counter.check(privateReads.get() == 1 && readsAfterPrivateSession.get() == 1,
+                        "incognito reader pages must not be persisted to disk");
+            }
+        } finally {
+            deleteTree(directory);
+        }
+    }
+
     private static void suppressesIncognitoPersistence(Counter counter) {
         SourceCatalogueItemId sourceItemId = new SourceCatalogueItemId(SourceId.of("test.reader"), "title");
         SourceContentUnit unit = new SourceContentUnit(
@@ -389,6 +459,43 @@ final class ReaderTest {
         public byte[] readPage(SourcePageResource page) {
             reads.incrementAndGet();
             return content.get(page.index());
+        }
+    }
+
+    private static final class SinglePageSource implements PagedSource {
+        private final SourceContentUnit unit;
+        private final AtomicInteger reads;
+
+        private SinglePageSource(SourceContentUnit unit, AtomicInteger reads) {
+            this.unit = unit;
+            this.reads = reads;
+        }
+
+        @Override
+        public SourceDescriptor descriptor() {
+            return new SourceDescriptor(
+                    unit.id().itemId().sourceId(),
+                    "Single page reader",
+                    "1.0.0",
+                    "und",
+                    Set.of(SourceContentKind.MANGA),
+                    SourceSdk.API_VERSION);
+        }
+
+        @Override
+        public List<SourceContentUnit> contentUnits(SourceCatalogueItemId itemId) {
+            return List.of(unit);
+        }
+
+        @Override
+        public List<SourcePageResource> pages(SourceContentUnitId contentUnitId) {
+            return List.of(new SourcePageResource(contentUnitId, "0", 0, FIRST_PAGE.length));
+        }
+
+        @Override
+        public byte[] readPage(SourcePageResource page) {
+            reads.incrementAndGet();
+            return FIRST_PAGE;
         }
     }
 

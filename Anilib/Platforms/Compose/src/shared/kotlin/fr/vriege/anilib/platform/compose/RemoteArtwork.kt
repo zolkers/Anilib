@@ -17,10 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import fr.vriege.anilib.framework.http.HttpCachePolicy
-import fr.vriege.anilib.framework.http.HttpRequest
 import java.net.URI
-import java.time.Duration
 
 @Composable
 internal fun RemoteArtwork(
@@ -45,14 +42,7 @@ internal fun RemoteArtwork(
             return@CrashSafeLaunchedEffect
         }
         RemoteImageCache.load(cacheKey) {
-            val response = environment.httpClient.execute(
-                HttpRequest.builder(uri)
-                    .cache(HttpCachePolicy.preferCache(Duration.ofDays(7)))
-                    .build(),
-            )
-            check(response.statusCode() in 200..299)
-            check(response.body().size <= MAX_ARTWORK_BYTES)
-            environment.decode(response.body()) ?: error("Unsupported artwork format")
+            loadRemoteImage(environment, "artwork", uri, MAX_ARTWORK_BYTES)
         }.onSuccess { image = it }.onFailure { failed = true }
     }
     Box(

@@ -23,15 +23,17 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import fr.vriege.anilib.feature.covercache.CoverCache
+import fr.vriege.anilib.feature.covercache.DecodedImage
 import fr.vriege.anilib.framework.http.AnilibHttpClient
-import fr.vriege.anilib.framework.http.HttpCachePolicy
-import fr.vriege.anilib.framework.http.HttpRequest
 import java.net.URI
-import java.time.Duration
 
 internal data class ExtensionIconEnvironment(
     val httpClient: AnilibHttpClient,
+    val coverCache: CoverCache?,
     val decode: (ByteArray) -> ImageBitmap?,
+    val decodeCached: (DecodedImage) -> ImageBitmap?,
+    val persistentCacheAllowed: Boolean,
 )
 
 internal val LocalExtensionIconEnvironment =
@@ -66,18 +68,7 @@ internal fun ExtensionIcon(
             return@CrashSafeLaunchedEffect
         }
         RemoteImageCache.load(cacheKey) {
-            val response = environment.httpClient.execute(
-                HttpRequest.builder(iconUri)
-                    .cache(HttpCachePolicy.preferCache(Duration.ofDays(7)))
-                    .build(),
-            )
-            check(response.statusCode() in 200..299) {
-                "Extension icon request failed with HTTP ${response.statusCode()}"
-            }
-            check(response.body().size <= MAX_EXTENSION_ICON_BYTES) {
-                "Extension icon exceeds the 2 MiB limit"
-            }
-            environment.decode(response.body()) ?: error("Unsupported extension icon format")
+            loadRemoteImage(environment, "extension-icon", iconUri, MAX_EXTENSION_ICON_BYTES)
         }.onSuccess { image = it }.onFailure { failed = true }
     }
 
