@@ -45,7 +45,7 @@ import androidx.compose.ui.unit.dp
 import fr.vriege.anilib.feature.library.LibraryItemId
 import fr.vriege.anilib.feature.library.MediaKind
 import fr.vriege.anilib.feature.downloads.ui.DownloadPresentation
-import fr.vriege.anilib.feature.library.ui.LibraryCard
+import fr.vriege.anilib.feature.library.ui.LibraryDetails
 import fr.vriege.anilib.feature.library.ui.LibraryHistoryRow
 import fr.vriege.anilib.feature.library.ui.LibraryNavigator
 import fr.vriege.anilib.feature.library.ui.LibraryPresentation
@@ -100,7 +100,11 @@ internal fun HistoryPage(
         onDispose { runCatching { observation.close() } }
     }
     val history = remember(revision) { presentation.history() }
-    val cards = remember(revision) { presentation.library().titles().associateBy { it.id() } }
+    val details = remember(revision, history) {
+        history.entries().map { it.libraryItemId() }.distinct().mapNotNull { id ->
+            presentation.details(id).orElse(null)?.let { id to it }
+        }.toMap()
+    }
     var query by routeState.query
     var searching by routeState.searching
     val searchFocus = rememberSearchFocusRequester(searching)
@@ -248,7 +252,7 @@ internal fun HistoryPage(
                         ) { row ->
                             HistoryCard(
                                 row,
-                                cards[row.libraryItemId()],
+                                details[row.libraryItemId()],
                                 contentLabels[HistoryContentKey(row.libraryItemId(), row.contentId())],
                                 resume = {
                                     val key = HistoryContentKey(row.libraryItemId(), row.contentId())
@@ -268,10 +272,10 @@ internal fun HistoryPage(
                                     )
                                 },
                                 toggleLibraryMembership = {
-                                    if (cards[row.libraryItemId()] == null) {
-                                        presentation.restoreTitle(row.libraryItemId())
-                                    } else {
+                                    if (details[row.libraryItemId()]?.inLibrary() == true) {
                                         presentation.deleteTitles(setOf(row.libraryItemId()))
+                                    } else {
+                                        presentation.restoreTitle(row.libraryItemId())
                                     }
                                 },
                                 canDownload = runCatching {
@@ -308,7 +312,7 @@ internal fun HistoryPage(
 @Composable
 internal fun HistoryCard(
     row: LibraryHistoryRow,
-    card: LibraryCard?,
+    details: LibraryDetails?,
     contentLabel: String?,
     resume: () -> Unit,
     remove: () -> Unit,
@@ -325,7 +329,7 @@ internal fun HistoryCard(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         RemoteArtwork(
-            card?.artwork()?.orElse(null),
+            details?.artwork()?.orElse(null),
             row.title(),
             modifier = Modifier.width(56.dp).height(82.dp).clip(RoundedCornerShape(6.dp)),
         )
@@ -361,9 +365,10 @@ internal fun HistoryCard(
             contentDescription = "ui.download",
         )
         IconButton(onClick = toggleLibraryMembership) {
+            val inLibrary = details?.inLibrary() == true
             Icon(
-                if (card != null) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                contentDescription = if (card != null) {
+                if (inLibrary) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                contentDescription = if (inLibrary) {
                     "ui.remove.from.library"
                 } else {
                     "ui.add.to.library"
