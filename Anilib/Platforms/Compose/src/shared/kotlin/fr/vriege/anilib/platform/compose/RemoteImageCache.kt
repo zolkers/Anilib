@@ -154,28 +154,41 @@ internal fun loadRemoteImage(
     maximumBytes: Int,
     forceRefresh: Boolean = false,
 ): ImageBitmap {
-    fun loadBytes(): ByteArray {
-        val response = environment.httpClient.execute(
-            HttpRequest.builder(uri)
-                .cache(
-                    if (forceRefresh) {
-                        HttpCachePolicy.refresh(Duration.ofDays(7))
-                    } else {
-                        HttpCachePolicy.preferCache(Duration.ofDays(7))
-                    },
+    fun loadFreshImage(): Pair<ByteArray, ImageBitmap> {
+        var lastFailure: Throwable? = null
+        remoteImageFetchCandidates(uri).forEach { candidate ->
+            try {
+                val response = environment.httpClient.execute(
+                    HttpRequest.builder(candidate)
+                        .cache(
+                            if (forceRefresh) {
+                                HttpCachePolicy.refresh(Duration.ofDays(7))
+                            } else {
+                                HttpCachePolicy.preferCache(Duration.ofDays(7))
+                            },
+                        )
+                        .build(),
                 )
-                .build(),
-        )
-        check(response.statusCode() in 200..299) {
-            "Remote image request failed with HTTP ${response.statusCode()}"
+                check(response.statusCode() in 200..299) {
+                    "Remote image request failed with HTTP ${response.statusCode()}"
+                }
+                check(response.body().size <= maximumBytes) {
+                    "Remote image exceeds the encoded size limit"
+                }
+                val encoded = response.body()
+                val decoded = environment.decode(encoded)
+                    ?: error("Unsupported remote image format")
+                return encoded to decoded
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Throwable) {
+                lastFailure = failure
+            }
         }
-        check(response.body().size <= maximumBytes) {
-            "Remote image exceeds the encoded size limit"
-        }
-        return response.body()
+        throw checkNotNull(lastFailure) { "No remote image location is available" }
     }
     if (!environment.persistentCacheAllowed) {
-        return environment.decode(loadBytes()) ?: error("Unsupported remote image format")
+        return loadFreshImage().second
     }
     val coverCache = checkNotNull(environment.coverCache)
     val cacheKey = CoverKey(persistentRemoteImageCacheKey(purpose, uri))
@@ -195,19 +208,36 @@ internal fun loadRemoteImage(
         environment.decode(cached)?.let { return it }
         runCatching { coverCache.invalidate(cacheKey) }
     }
-    val encoded = loadBytes()
-    val image = environment.decode(encoded) ?: error("Unsupported remote image format")
+    val (encoded, image) = loadFreshImage()
     runCatching { coverCache.loadEncoded(cacheKey) { encoded } }
     return image
 }
 
 private fun persistentRemoteImageIdentity(uri: URI): String {
+    val parameters = extensionProxyParameters(uri) ?: return uri.toASCIIString()
+    val original = parameters["url"] ?: return uri.toASCIIString()
+    return "extension-proxy:${parameters["sourceId"].orEmpty()}:$original"
+}
+
+internal fun remoteImageFetchCandidates(uri: URI): List<URI> = buildList {
+    add(uri)
+    extensionProxyParameters(uri)
+        ?.get("url")
+        ?.let { original -> runCatching { URI.create(original) }.getOrNull() }
+        ?.takeIf { original ->
+            original.isAbsolute &&
+                (original.scheme.equals("http", ignoreCase = true) ||
+                    original.scheme.equals("https", ignoreCase = true)) &&
+                original != uri
+        }
+        ?.let(::add)
+}
+
+private fun extensionProxyParameters(uri: URI): Map<String, String>? {
     val loopbackProxy = uri.path == "/api/v1/proxy" &&
         (uri.host.equals("127.0.0.1", ignoreCase = true) || uri.host == "::1")
-    if (!loopbackProxy) {
-        return uri.toASCIIString()
-    }
-    val parameters = uri.rawQuery.orEmpty()
+    if (!loopbackProxy) return null
+    return uri.rawQuery.orEmpty()
         .split('&')
         .mapNotNull { parameter ->
             val separator = parameter.indexOf('=')
@@ -216,8 +246,6 @@ private fun persistentRemoteImageIdentity(uri: URI): String {
             }
         }
         .toMap()
-    val original = parameters["url"] ?: return uri.toASCIIString()
-    return "extension-proxy:${parameters["sourceId"].orEmpty()}:$original"
 }
 
 private fun decodeQuery(value: String): String =

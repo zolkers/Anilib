@@ -601,13 +601,18 @@ public final class DesktopExtensionSourceBridge {
     private Optional<String> originalImage(RemoteSource source, Optional<URI> image) {
         if (image.isEmpty()) return Optional.empty();
         URI location = image.orElseThrow();
-        if (location.getHost() == null
-                || !location.getHost().equalsIgnoreCase(baseUri.getHost())
-                || location.getPort() != baseUri.getPort()) {
+        String host = location.getHost();
+        boolean loopbackProxy = "http".equalsIgnoreCase(location.getScheme())
+                && "/api/v1/proxy".equals(location.getPath())
+                && ("127.0.0.1".equals(host) || "::1".equals(host));
+        if (!loopbackProxy) {
             return Optional.of(location.toASCIIString());
         }
         Map<String, String> query = query(location.getRawQuery());
-        return source.remoteId.equals(query.get("sourceId")) ? Optional.ofNullable(query.get("url")) : Optional.empty();
+        if (!source.remoteId.equals(query.get("sourceId"))) {
+            return Optional.empty();
+        }
+        return webUri(query.get("url")).map(URI::toASCIIString);
     }
 
     private static Map<String, String> query(String value) {

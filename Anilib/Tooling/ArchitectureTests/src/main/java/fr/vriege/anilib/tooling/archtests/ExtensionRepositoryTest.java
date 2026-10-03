@@ -187,6 +187,19 @@ final class ExtensionRepositoryTest {
                             && animeWeb.titlePage(animePage.items().getFirst().id()).orElseThrow()
                             .equals(URI.create("https://anime.example/anime/bridge")),
                     "desktop APK sources must resolve WebView pages from their live base-URL preference");
+
+            DesktopExtensionSourceBridge restartedBridge = new DesktopExtensionSourceBridge(
+                    URI.create("http://127.0.0.1:43128/"), client);
+            List<AnilibPlugin> restartedPlugins = new ArrayList<>();
+            restartedPlugins.add(new SourceSdkPlugin());
+            restartedPlugins.addAll(restartedBridge.sourceBundles());
+            try (StartedAnilib restarted = new DefaultPluginEngine().start(restartedPlugins)) {
+                DetailedSource restartedManga = (DetailedSource) restarted.capability(SourceCapabilities.REGISTRY)
+                        .find(SourceId.of("aniyomi.42")).orElseThrow();
+                SourceTitleDetails restartedDetails = restartedManga.details(mangaPage.items().getFirst());
+                counter.check(restartedDetails.thumbnail().orElseThrow().getPort() == 43128,
+                        "persisted extension artwork must be rebound to the current loopback host after restart");
+            }
         }
         String installed = bridge.install(URI.create("https://repo.example/extensions/example.apk"));
         String uninstalled = bridge.uninstall("example.pkg");
