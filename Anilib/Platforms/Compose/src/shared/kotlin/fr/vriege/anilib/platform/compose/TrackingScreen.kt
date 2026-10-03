@@ -1489,6 +1489,8 @@ private fun TrackerAuthorizationScreen(
                 captureBackPresses = true,
                 platformWebViewParams = platformBridge.parameters,
                 onCreated = platformBridge.onCreated,
+                onDispose = platformBridge.onDispose,
+                factory = platformBridge.factory,
                 modifier = Modifier.fillMaxSize(),
             )
         }

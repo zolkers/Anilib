@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -32,17 +34,24 @@ internal fun RemoteArtwork(
     }
     var image by remember(cacheKey) { mutableStateOf(cacheKey?.let(RemoteImageCache::get)) }
     var failed by remember(cacheKey) { mutableStateOf(false) }
+    var retryRevision by remember(cacheKey) { mutableStateOf(0) }
     DisposableEffect(cacheKey) {
         cacheKey?.let(RemoteImageCache::acquire)
         onDispose { cacheKey?.let(RemoteImageCache::release) }
     }
-    CrashSafeLaunchedEffect(cacheKey) {
+    CrashSafeLaunchedEffect(cacheKey, retryRevision) {
         failed = false
         if (cacheKey == null || uri == null || environment == null || image != null) {
             return@CrashSafeLaunchedEffect
         }
         RemoteImageCache.load(cacheKey) {
-            loadRemoteImage(environment, "artwork", uri, MAX_ARTWORK_BYTES)
+            loadRemoteImage(
+                environment = environment,
+                purpose = "artwork",
+                uri = uri,
+                maximumBytes = MAX_ARTWORK_BYTES,
+                forceRefresh = retryRevision > 0,
+            )
         }.onSuccess { image = it }.onFailure { failed = true }
     }
     Box(
@@ -60,15 +69,30 @@ internal fun RemoteArtwork(
                 modifier = Modifier.fillMaxSize(),
                 contentScale = contentScale,
             )
-        } ?: Icon(
-            Icons.Outlined.Image,
-            contentDescription = UiTranslations.format(
-                if (failed) "dynamic.title.cover.unavailable" else "dynamic.title.cover",
-                LocalLanguagePack.current,
-                title,
-            ),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        } ?: if (failed) {
+            IconButton(
+                onClick = {
+                    failed = false
+                    retryRevision += 1
+                },
+            ) {
+                Icon(
+                    Icons.Outlined.Refresh,
+                    contentDescription = "ui.retry",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else {
+            Icon(
+                Icons.Outlined.Image,
+                contentDescription = UiTranslations.format(
+                    "dynamic.title.cover",
+                    LocalLanguagePack.current,
+                    title,
+                ),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 

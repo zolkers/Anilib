@@ -152,11 +152,18 @@ internal fun loadRemoteImage(
     purpose: String,
     uri: URI,
     maximumBytes: Int,
+    forceRefresh: Boolean = false,
 ): ImageBitmap {
     fun loadBytes(): ByteArray {
         val response = environment.httpClient.execute(
             HttpRequest.builder(uri)
-                .cache(HttpCachePolicy.preferCache(Duration.ofDays(7)))
+                .cache(
+                    if (forceRefresh) {
+                        HttpCachePolicy.refresh(Duration.ofDays(7))
+                    } else {
+                        HttpCachePolicy.preferCache(Duration.ofDays(7))
+                    },
+                )
                 .build(),
         )
         check(response.statusCode() in 200..299) {
@@ -172,11 +179,18 @@ internal fun loadRemoteImage(
     }
     val coverCache = checkNotNull(environment.coverCache)
     val cacheKey = CoverKey(persistentRemoteImageCacheKey(purpose, uri))
-    val cached = runCatching { coverCache.findEncoded(cacheKey).orElse(null) }
-        .getOrElse {
-            runCatching { coverCache.invalidate(cacheKey) }
-            null
-        }
+    if (forceRefresh) {
+        runCatching { coverCache.invalidate(cacheKey) }
+    }
+    val cached = if (forceRefresh) {
+        null
+    } else {
+        runCatching { coverCache.findEncoded(cacheKey).orElse(null) }
+            .getOrElse {
+                runCatching { coverCache.invalidate(cacheKey) }
+                null
+            }
+    }
     if (cached != null) {
         environment.decode(cached)?.let { return it }
         runCatching { coverCache.invalidate(cacheKey) }
