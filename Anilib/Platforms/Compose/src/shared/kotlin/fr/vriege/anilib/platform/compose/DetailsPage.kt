@@ -516,6 +516,10 @@ internal fun DetailsPage(
         languagePack,
         episodes.size,
     )
+    val detailsErrors = listOfNotNull(readerError, downloadError, unitError)
+        .filter(String::isNotBlank)
+    val contentUnavailable = !contentLoading && chapters.isEmpty() && episodes.isEmpty()
+    val contentUnavailableError = detailsErrors.firstOrNull().takeIf { contentUnavailable }
     MediaDetailsScreen(
         model = MediaDetailsUiModel(
             title = details.title(),
@@ -550,7 +554,7 @@ internal fun DetailsPage(
         canShare = canShare,
         primaryLabel = if (canWatch) "ui.watch" else "ui.read",
         canOpenPrimary = canWatch || canRead,
-        errors = listOfNotNull(readerError, downloadError, unitError),
+        errors = if (contentUnavailableError == null) detailsErrors else emptyList(),
         toggleLibraryMembership = toggleLibraryMembership,
         refreshing = refreshing,
         refresh = refresh,
@@ -570,7 +574,7 @@ internal fun DetailsPage(
             )
         } else if (chapters.isEmpty() && episodes.isEmpty()) {
             mediaUnitsStatusSection(
-                message = UiTranslations.translate(
+                message = contentUnavailableError ?: UiTranslations.translate(
                     "ui.no.episodes.or.chapters.available",
                     languagePack,
                 ),
