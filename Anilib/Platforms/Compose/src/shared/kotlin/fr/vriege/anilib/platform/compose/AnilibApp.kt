@@ -80,7 +80,6 @@ import fr.vriege.anilib.feature.tracker.ui.TrackerPresentation
 import fr.vriege.anilib.feature.updates.ui.UpdatePresentation
 import fr.vriege.anilib.feature.applicationupdate.ui.ApplicationUpdatePresentation
 import fr.vriege.anilib.feature.covercache.CoverCache
-import fr.vriege.anilib.feature.covercache.DecodedImage
 import fr.vriege.anilib.framework.http.HttpCookieJar
 import fr.vriege.anilib.framework.http.AnilibHttpClient
 import kotlinx.coroutines.Dispatchers
@@ -132,7 +131,6 @@ fun AnilibApp(
     coverCache: CoverCache?,
     shareController: ShareController,
     pageDecoder: (ByteArray) -> ImageBitmap?,
-    cachedImageDecoder: (DecodedImage) -> ImageBitmap?,
     applyReaderOrientationPolicy: (ReaderOrientationPolicy) -> Unit,
     playerFullscreen: Boolean,
     setPlayerFullscreen: (Boolean) -> Unit,
@@ -168,14 +166,12 @@ fun AnilibApp(
         httpClient,
         coverCache,
         pageDecoder,
-        cachedImageDecoder,
         settings.incognitoMode(),
     ) {
         ExtensionIconEnvironment(
             httpClient,
             coverCache,
             pageDecoder,
-            cachedImageDecoder,
             coverCache != null && !settings.incognitoMode(),
         )
     }

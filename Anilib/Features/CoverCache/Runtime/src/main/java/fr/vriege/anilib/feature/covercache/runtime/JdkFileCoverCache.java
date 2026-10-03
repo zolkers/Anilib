@@ -107,6 +107,44 @@ public final class JdkFileCoverCache implements CoverCache {
     }
 
     @Override
+    public synchronized byte[] loadEncoded(CoverKey key, CoverLoader loader) {
+        Objects.requireNonNull(loader, "loader must not be null");
+        Path cacheFile = cacheFile(key);
+        if (Files.exists(cacheFile, LinkOption.NOFOLLOW_LINKS)) {
+            try {
+                byte[] cached = readEncoded(cacheFile);
+                touch(cacheFile);
+                return cached;
+            } catch (CoverCacheException invalidCache) {
+                delete(cacheFile, "discard invalid cached cover");
+                removeEntry(cacheFile);
+            }
+        }
+
+        byte[] encoded;
+        try {
+            encoded = Objects.requireNonNull(loader.load(), "loader result must not be null");
+        } catch (IOException exception) {
+            throw failure("load cover bytes", exception);
+        }
+        requireEncodedSize(encoded.length);
+        store(cacheFile, encoded);
+        recordStored(cacheFile, encoded.length);
+        return encoded.clone();
+    }
+
+    @Override
+    public synchronized Optional<byte[]> findEncoded(CoverKey key) {
+        Path cacheFile = cacheFile(key);
+        if (!Files.exists(cacheFile, LinkOption.NOFOLLOW_LINKS)) {
+            return Optional.empty();
+        }
+        byte[] encoded = readEncoded(cacheFile);
+        touch(cacheFile);
+        return Optional.of(encoded);
+    }
+
+    @Override
     public synchronized void invalidate(CoverKey key) {
         Path file = cacheFile(key);
         delete(file, "invalidate cached cover");

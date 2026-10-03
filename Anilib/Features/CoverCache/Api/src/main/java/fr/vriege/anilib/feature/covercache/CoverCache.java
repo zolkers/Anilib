@@ -7,5 +7,9 @@ public interface CoverCache {
 
     Optional<DecodedImage> find(CoverKey key);
 
+    byte[] loadEncoded(CoverKey key, CoverLoader loader);
+
+    Optional<byte[]> findEncoded(CoverKey key);
+
     void invalidate(CoverKey key);
 }

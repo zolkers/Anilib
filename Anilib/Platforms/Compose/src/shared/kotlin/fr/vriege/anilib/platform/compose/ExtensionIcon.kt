@@ -24,7 +24,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import fr.vriege.anilib.feature.covercache.CoverCache
-import fr.vriege.anilib.feature.covercache.DecodedImage
 import fr.vriege.anilib.framework.http.AnilibHttpClient
 import java.net.URI
 
@@ -32,7 +31,6 @@ internal data class ExtensionIconEnvironment(
     val httpClient: AnilibHttpClient,
     val coverCache: CoverCache?,
     val decode: (ByteArray) -> ImageBitmap?,
-    val decodeCached: (DecodedImage) -> ImageBitmap?,
     val persistentCacheAllowed: Boolean,
 )
 

@@ -16,6 +16,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Stream;
@@ -55,6 +56,15 @@ final class CoverCacheTest {
 
             CoverCache restarted = new JdkFileCoverCache(cacheDirectory);
             check(restarted.find(key).orElseThrow().equals(first), "cover must survive cache restart");
+
+            CoverKey encodedKey = new CoverKey("extension/raw-format");
+            byte[] rawFormat = new byte[] {82, 73, 70, 70, 4, 0, 0, 0, 87, 69, 66, 80};
+            check(Arrays.equals(restarted.loadEncoded(encodedKey, () -> rawFormat), rawFormat),
+                    "encoded covers must be returned without JDK image conversion");
+            CoverCache encodedRestart = new JdkFileCoverCache(cacheDirectory);
+            check(Arrays.equals(encodedRestart.findEncoded(encodedKey).orElseThrow(), rawFormat),
+                    "encoded covers must survive cache restart regardless of image format support");
+            encodedRestart.invalidate(encodedKey);
 
             Path storedCover = onlyEntry(cacheDirectory);
             check(storedCover.getFileName().toString().matches("[0-9a-f]{64}\\.image"),

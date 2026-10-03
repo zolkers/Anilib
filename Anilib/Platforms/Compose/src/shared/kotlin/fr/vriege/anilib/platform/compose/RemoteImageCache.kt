@@ -172,20 +172,19 @@ internal fun loadRemoteImage(
     }
     val coverCache = checkNotNull(environment.coverCache)
     val cacheKey = CoverKey(persistentRemoteImageCacheKey(purpose, uri))
-    val cached = runCatching { coverCache.find(cacheKey).orElse(null) }
+    val cached = runCatching { coverCache.findEncoded(cacheKey).orElse(null) }
         .getOrElse {
             runCatching { coverCache.invalidate(cacheKey) }
             null
         }
     if (cached != null) {
-        environment.decodeCached(cached)?.let { return it }
+        environment.decode(cached)?.let { return it }
         runCatching { coverCache.invalidate(cacheKey) }
     }
     val encoded = loadBytes()
-    val decoded = coverCache.load(cacheKey) { encoded }
-    return environment.decodeCached(decoded)
-        ?: environment.decode(encoded)
-        ?: error("Unsupported remote image format")
+    val image = environment.decode(encoded) ?: error("Unsupported remote image format")
+    runCatching { coverCache.loadEncoded(cacheKey) { encoded } }
+    return image
 }
 
 private fun persistentRemoteImageIdentity(uri: URI): String {
