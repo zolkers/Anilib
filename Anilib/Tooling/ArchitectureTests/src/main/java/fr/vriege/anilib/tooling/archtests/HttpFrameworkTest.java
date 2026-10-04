@@ -239,9 +239,11 @@ final class HttpFrameworkTest {
             URI routed = proxy.route(
                     mediaRoot.resolve("master.m3u8"),
                     Map.of("Referer", "https://source.example/", "Cookie", "session=protected"));
+            counter.check(routed.getPath().endsWith(".m3u8"),
+                    "media relay routes must preserve the playlist extension for native players");
             ProxyResponse playlist = fetch(routed, Map.of());
             counter.check(playlist.status() == 200 && playlist.contentType().contains("mpegurl"),
-                    "media relay must preserve playlist status and content type");
+                    "media relay must expose playlists with a native-player-compatible content type");
             String segmentRoute = playlist.body().lines()
                     .filter(line -> !line.isBlank() && !line.startsWith("#"))
                     .findFirst()
@@ -250,8 +252,10 @@ final class HttpFrameworkTest {
             int keyEnd = playlist.body().indexOf('"', keyStart);
             String keyRoute = playlist.body().substring(keyStart, keyEnd);
             counter.check(segmentRoute.startsWith("http://127.0.0.1:")
-                            && keyRoute.startsWith("http://127.0.0.1:"),
-                    "media relay must rewrite HLS segments and key attributes to private routes");
+                            && segmentRoute.endsWith(".ts")
+                            && keyRoute.startsWith("http://127.0.0.1:")
+                            && keyRoute.endsWith(".bin"),
+                    "media relay must rewrite HLS references without losing their media extensions");
             ProxyResponse segment = fetch(URI.create(segmentRoute), Map.of("Range", "bytes=0-"));
             ProxyResponse key = fetch(URI.create(keyRoute), Map.of());
             counter.check(rangedRequests.get() == 1,
@@ -285,7 +289,7 @@ final class HttpFrameworkTest {
                     rangedRequests.incrementAndGet();
                 }
                 if (path.endsWith("master.m3u8")) {
-                    exchange.getResponseHeaders().set("Content-Type", "application/vnd.apple.mpegurl");
+                    exchange.getResponseHeaders().set("Content-Type", "application/octet-stream");
                     exchange.getResponseHeaders().add("Set-Cookie", "media=granted; Path=/media");
                     respond(exchange, "#EXTM3U\n#EXT-X-KEY:METHOD=AES-128,URI=\"key.bin\"\nsegment.ts\n");
                 } else if (path.endsWith("key.bin")) {

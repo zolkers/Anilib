@@ -96,7 +96,8 @@ public final class MediaHeaderProxy implements AutoCloseable {
             if (targets.size() >= MAXIMUM_TARGETS) {
                 throw new HttpException("Media header proxy route limit exceeded");
             }
-            String route = Long.toUnsignedString(nextTarget.incrementAndGet(), 36);
+            String route = Long.toUnsignedString(nextTarget.incrementAndGet(), 36)
+                    + routeSuffix(value.location());
             targets.put(route, value);
             return route;
         });
@@ -394,8 +395,24 @@ public final class MediaHeaderProxy implements AutoCloseable {
     private static Map<String, String> playlistHeaders(HttpURLConnection connection) {
         Map<String, String> headers = new LinkedHashMap<>(responseHeaders(connection));
         headers.keySet().removeIf(name -> name.equalsIgnoreCase("Content-Range")
-                || name.equalsIgnoreCase("Accept-Ranges"));
+                || name.equalsIgnoreCase("Accept-Ranges")
+                || name.equalsIgnoreCase("Content-Type"));
+        headers.put("Content-Type", "application/vnd.apple.mpegurl");
         return Map.copyOf(headers);
+    }
+
+    private static String routeSuffix(URI location) {
+        String path = Objects.toString(location.getPath(), "");
+        int nameStart = path.lastIndexOf('/') + 1;
+        int extensionStart = path.lastIndexOf('.');
+        if (extensionStart < nameStart || extensionStart + 1 >= path.length()) {
+            return "";
+        }
+        String extension = path.substring(extensionStart + 1);
+        if (extension.length() > 16 || !extension.chars().allMatch(Character::isLetterOrDigit)) {
+            return "";
+        }
+        return "." + extension.toLowerCase(Locale.ROOT);
     }
 
     private static long contentLength(HttpURLConnection connection) {

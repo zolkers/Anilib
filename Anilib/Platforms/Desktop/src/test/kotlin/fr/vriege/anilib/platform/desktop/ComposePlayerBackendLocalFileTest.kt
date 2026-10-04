@@ -9,6 +9,7 @@ import java.nio.file.Files
 import java.util.Optional
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class ComposePlayerBackendLocalFileTest {
     @Test
@@ -39,6 +40,36 @@ class ComposePlayerBackendLocalFileTest {
             }
 
             assertEquals(location.toString(), routed)
+        } finally {
+            playback.close()
+        }
+    }
+
+    @Test
+    fun `protected HLS uri keeps its playlist extension through the relay`() {
+        val playback = ComposePlayerBackend().open(
+            PlayerMedia(
+                "Protected episode",
+                SourceVideoStream(
+                    "protected",
+                    "1080p",
+                    URI.create("https://media.example/master.m3u8?token=secret"),
+                    SourceStreamFormat.HLS,
+                    mapOf("Referer" to "https://source.example/"),
+                    emptyList(),
+                ),
+                Optional.empty(),
+                0L,
+            ),
+        )
+        try {
+            val routed = playback.javaClass.getDeclaredField("mediaLocation").run {
+                isAccessible = true
+                get(playback) as String
+            }
+
+            assertTrue(routed.startsWith("http://127.0.0.1:"))
+            assertTrue(URI.create(routed).path.endsWith(".m3u8"))
         } finally {
             playback.close()
         }
