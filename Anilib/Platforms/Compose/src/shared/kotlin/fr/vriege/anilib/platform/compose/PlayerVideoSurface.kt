@@ -37,11 +37,13 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -538,32 +540,34 @@ private fun CompactPlayerSlider(
 ) {
     val colors = SliderDefaults.colors()
     val interactionSource = remember { MutableInteractionSource() }
-    Slider(
-        value = value,
-        onValueChange = onValueChange,
-        modifier = modifier.height(28.dp),
-        valueRange = valueRange,
-        onValueChangeFinished = onValueChangeFinished,
-        colors = colors,
-        interactionSource = interactionSource,
-        thumb = {
-            Box(
-                Modifier
-                    .size(DpSize(12.dp, 12.dp))
-                    .background(MaterialTheme.colorScheme.primary, CircleShape),
-            )
-        },
-        track = { state ->
-            SliderDefaults.Track(
-                sliderState = state,
-                modifier = Modifier.height(4.dp),
-                colors = colors,
-                drawStopIndicator = null,
-                thumbTrackGapSize = 0.dp,
-                trackInsideCornerSize = 0.dp,
-            )
-        },
-    )
+    CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
+        Slider(
+            value = value,
+            onValueChange = onValueChange,
+            modifier = modifier.height(28.dp),
+            valueRange = valueRange,
+            onValueChangeFinished = onValueChangeFinished,
+            colors = colors,
+            interactionSource = interactionSource,
+            thumb = {
+                Box(
+                    Modifier
+                        .size(DpSize(12.dp, 12.dp))
+                        .background(MaterialTheme.colorScheme.primary, CircleShape),
+                )
+            },
+            track = { state ->
+                SliderDefaults.Track(
+                    sliderState = state,
+                    modifier = Modifier.height(4.dp),
+                    colors = colors,
+                    drawStopIndicator = null,
+                    thumbTrackGapSize = 0.dp,
+                    trackInsideCornerSize = 0.dp,
+                )
+            },
+        )
+    }
 }
 
 @Composable
