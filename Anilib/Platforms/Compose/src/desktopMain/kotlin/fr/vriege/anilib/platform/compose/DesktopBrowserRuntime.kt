@@ -1,6 +1,7 @@
 package fr.vriege.anilib.platform.compose
 
 import dev.datlag.kcef.KCEF
+import dev.datlag.kcef.KCEFBuilder
 import java.io.IOException
 import java.nio.file.FileVisitResult
 import java.nio.file.Files
@@ -10,6 +11,9 @@ import java.nio.file.SimpleFileVisitor
 import java.nio.file.attribute.BasicFileAttributes
 
 object DesktopBrowserRuntime {
+    const val NATIVE_RELEASE = "jbr-release-17.0.14b1367.22"
+    private const val RUNTIME_DIRECTORY = "runtime-kcef-2025.03.23"
+    private const val CACHE_DIRECTORY = "cache-kcef-2025.03.23"
     @Volatile
     private var cachedStatus: BrowserRuntimeStatus? = null
 
@@ -27,9 +31,11 @@ object DesktopBrowserRuntime {
             clearPendingData(browserDirectory)
             KCEF.initBlocking(
                 builder = {
-                    installDir(browserDirectory.resolve("runtime").toFile())
+                    installDir(browserDirectory.resolve(RUNTIME_DIRECTORY).toFile())
+                    download { github { release(NATIVE_RELEASE) } }
                     settings {
-                        cachePath = browserDirectory.resolve("cache").toString()
+                        configureNativePaths(this, browserDirectory.resolve(RUNTIME_DIRECTORY))
+                        cachePath = browserDirectory.resolve(CACHE_DIRECTORY).toString()
                         persistSessionCookies = true
                     }
                 },
@@ -50,6 +56,14 @@ object DesktopBrowserRuntime {
         }.also { cachedStatus = it }
     }
 
+    fun configureNativePaths(settings: KCEFBuilder.Settings, runtime: Path) {
+        // JCEF otherwise derives these from java.home, which belongs to the app's JVM, not Chromium.
+        val helper = if (System.getProperty("os.name").startsWith("Windows")) "jcef_helper.exe" else "jcef_helper"
+        settings.browserSubProcessPath = runtime.resolve(helper).toString()
+        settings.resourcesDirPath = runtime.toString()
+        settings.localesDirPath = runtime.resolve("locales").toString()
+    }
+
     @Synchronized
     fun dispose() {
         if (initializationAttempted) {
@@ -67,7 +81,7 @@ object DesktopBrowserRuntime {
         require(Files.isRegularFile(marker, LinkOption.NOFOLLOW_LINKS)) {
             "Browser cleanup marker is not a regular file"
         }
-        val cacheDirectory = browserDirectory.resolve("cache").normalize()
+        val cacheDirectory = browserDirectory.resolve(CACHE_DIRECTORY).normalize()
         require(cacheDirectory.parent == browserDirectory) { "Browser cache escaped its data directory" }
         if (Files.exists(cacheDirectory, LinkOption.NOFOLLOW_LINKS)) {
             Files.walkFileTree(cacheDirectory, object : SimpleFileVisitor<Path>() {

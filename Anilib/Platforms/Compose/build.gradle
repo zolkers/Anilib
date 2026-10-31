@@ -44,6 +44,7 @@ dependencies {
     implementation compose.materialIconsExtended
     implementation 'io.github.kdroidfilter:composemediaplayer:0.11.4'
     implementation 'io.github.kevinnzou:compose-webview-multiplatform:2.0.3'
+    implementation 'dev.datlag:kcef:2025.03.23'
 }
 
 kotlin {

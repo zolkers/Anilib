@@ -94,6 +94,7 @@ fun main(arguments: Array<String>) {
         return
     }
     val browserRuntime = DesktopBrowserRuntime
+    DesktopExtensionBrowser.install(dataDirectory)
     val browserRuntimeStatus = BrowserRuntimeStatus.deferred {
         browserRuntime.initialize(dataDirectory)
     }

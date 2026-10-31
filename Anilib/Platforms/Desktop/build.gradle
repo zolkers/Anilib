@@ -45,12 +45,25 @@ dependencies {
     implementation project(':Anilib:Platforms:DesktopExtensionHost')
     implementation compose.desktop.currentOs
     implementation 'io.github.kevinnzou:compose-webview-multiplatform:2.0.3'
+    implementation 'dev.datlag:kcef:2025.03.23'
     testImplementation 'org.jetbrains.kotlin:kotlin-test:2.4.10'
     testImplementation compose.uiTest
 }
 
 kotlin {
     jvmToolchain(21)
+}
+
+tasks.register('desktopExtensionBrowserSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Runs real Chromium extension execution against local fixtures using an existing browser runtime.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'fr.vriege.anilib.platform.desktop.DesktopExtensionBrowserSmoke'
+    jvmArgs '--add-opens=java.desktop/sun.awt=ALL-UNNAMED', '--add-opens=java.desktop/java.awt.peer=ALL-UNNAMED'
+    def runtime = providers.gradleProperty('anilib.browserRuntime')
+    onlyIf { runtime.isPresent() }
+    doFirst { args runtime.get() }
 }
 
 def packageVersionValue = providers.gradleProperty('anilibPackageVersion').orElse('1.0.11').get()

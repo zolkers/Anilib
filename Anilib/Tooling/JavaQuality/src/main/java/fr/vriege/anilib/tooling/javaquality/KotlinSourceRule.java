@@ -24,6 +24,8 @@ public final class KotlinSourceRule implements AnilibJavaRule {
             "platform.desktop", Set.of(
                     "androidx.compose.",
                     "com.multiplatform.webview.",
+                    "dev.datlag.kcef.",
+                    "com.sun.net.httpserver.",
                     "org.cef.",
                     "org.jetbrains.compose.",
                     "org.jetbrains.skia."));

@@ -128,19 +128,20 @@ final class DesktopApkExtensionPlatform implements ApkExtensionPlatform, AutoClo
                 .uri();
         return CompletableFuture.supplyAsync(() -> {
             ensureAvailable();
+            boolean replacing = installedPackageNames().contains(extensionPackage.packageName());
             bridge.install(artifact);
-            installedPackageNames.add(extensionPackage.packageName());
+            synchronized (this) { installedPackageNames.add(extensionPackage.packageName()); }
             int activated = activateNewSources();
             String compatibilityFailure = bridge.compatibilityFailures().get(extensionPackage.packageName());
             if (compatibilityFailure != null) {
                 throw new IllegalStateException(extensionPackage.displayName()
                         + " is installed but incompatible with the desktop host: " + compatibilityFailure);
             }
-            if (activated == 0) {
+            if (activated == 0 && !activePackageNames().contains(extensionPackage.packageName())) {
                 throw new IllegalStateException(extensionPackage.displayName()
                         + " was installed, but it did not expose a compatible source.");
             }
-            return extensionPackage.displayName() + " installed. " + activated
+            return extensionPackage.displayName() + (replacing ? " updated. " : " installed. ") + activated
                     + " source(s) added immediately to Browse.";
         }, operations);
     }
