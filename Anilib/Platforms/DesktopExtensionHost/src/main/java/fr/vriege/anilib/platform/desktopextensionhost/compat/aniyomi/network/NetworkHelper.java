@@ -1,5 +1,7 @@
 package fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.network;
 
+import fr.vriege.anilib.platform.desktopextensionhost.compat.android.content.Context;
+
 import okhttp3.CookieJar;
 import okhttp3.OkHttpClient;
 
@@ -13,20 +15,42 @@ public final class NetworkHelper {
 
     public NetworkHelper() {
         cookieJar = DesktopCookieJar.shared();
-        client = new OkHttpClient.Builder()
-                .cookieJar(cookieJar)
-                .addInterceptor(new UncaughtExceptionInterceptor())
-                .addInterceptor(new UserAgentInterceptor(USER_AGENT))
-                .addInterceptor(new CloudflareInterceptor())
-                .callTimeout(25L, TimeUnit.SECONDS)
-                .connectTimeout(10L, TimeUnit.SECONDS)
-                .readTimeout(20L, TimeUnit.SECONDS)
-                .writeTimeout(20L, TimeUnit.SECONDS)
-                .build();
+        client =
+                new OkHttpClient.Builder()
+                        .cookieJar(cookieJar)
+                        .addInterceptor(new UncaughtExceptionInterceptor())
+                        .addInterceptor(new UserAgentInterceptor(USER_AGENT))
+                        .addInterceptor(new CloudflareInterceptor())
+                        .callTimeout(25L, TimeUnit.SECONDS)
+                        .connectTimeout(10L, TimeUnit.SECONDS)
+                        .readTimeout(20L, TimeUnit.SECONDS)
+                        .writeTimeout(20L, TimeUnit.SECONDS)
+                        .build();
     }
 
-    public static NetworkHelper shared() { return SHARED; }
-    public CookieJar getCookieJar() { return cookieJar; }
-    public OkHttpClient getClient() { return client; }
-    public String defaultUserAgentProvider() { return USER_AGENT; }
+    public NetworkHelper(Context context) {
+        this();
+    }
+
+    public OkHttpClient getCloudflareClient() {
+        return client;
+    }
+
+    public static void getCloudflareClient$annotations() {}
+
+    public static NetworkHelper shared() {
+        return SHARED;
+    }
+
+    public CookieJar getCookieJar() {
+        return cookieJar;
+    }
+
+    public OkHttpClient getClient() {
+        return client;
+    }
+
+    public String defaultUserAgentProvider() {
+        return USER_AGENT;
+    }
 }

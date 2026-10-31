@@ -61,6 +61,19 @@ public final class ExtensionRuntimeCatalog implements AutoCloseable {
         }
     }
 
+    public synchronized void validate(InstalledExtension extension) {
+        requireSupportedApi(extension.metadata());
+        try (Snapshot snapshot = discover(List.of(extension), true)) {
+            if (!snapshot.failures().isEmpty()) {
+                throw new IllegalArgumentException(
+                        "Extension validation failed: "
+                                + String.join("; ", snapshot.failures().values()));
+            }
+            if (snapshot.sources().isEmpty())
+                throw new IllegalArgumentException("Extension exposes no supported sources");
+        }
+    }
+
     private Snapshot discover(List<InstalledExtension> extensions, boolean validateCompatibility) {
         List<LoadedSource> sources = new ArrayList<>();
         Map<String, String> failures = new LinkedHashMap<>();
@@ -68,33 +81,64 @@ public final class ExtensionRuntimeCatalog implements AutoCloseable {
         for (InstalledExtension extension : extensions) {
             try {
                 if (validateCompatibility) {
+                    requireSupportedApi(extension.metadata());
                     abiVerifier.requireCompatible(extension.archive());
                 }
-                ExtensionClassLoader loader = new ExtensionClassLoader(extension.archive(), extension.apk());
+                ExtensionClassLoader loader =
+                        new ExtensionClassLoader(extension.archive(), extension.apk());
                 loaders.add(loader);
                 load(extension.metadata(), loader, sources, validateCompatibility);
-            } catch (LinkageError | ReflectiveOperationException | IOException | RuntimeException failure) {
+            } catch (LinkageError
+                    | ReflectiveOperationException
+                    | IOException
+                    | RuntimeException failure) {
                 failures.put(extension.metadata().packageName(), conciseMessage(failure));
             }
         }
         return new Snapshot(sources, failures, loaders);
     }
 
+    private static void requireSupportedApi(ExtensionApkMetadata metadata) {
+        if (metadata.extensionApiVersion() > 17) {
+            throw new IllegalArgumentException(
+                    "This extension requires Aniyomi API "
+                            + metadata.extensionApiVersion()
+                            + ". Update Anilib before installing it. The previous extension version"
+                            + " was preserved.");
+        }
+        if (metadata.torrent()) {
+            throw new IllegalArgumentException(
+                    "This extension requires torrent streaming, which is not supported by the"
+                            + " desktop host");
+        }
+    }
+
     private static String signature(List<InstalledExtension> extensions) {
-        return String.join("\n", extensions.stream()
-                .map(extension -> extension.metadata().packageName()
-                        + ':' + extension.metadata().versionCode()
-                        + ':' + extension.archive().toAbsolutePath().normalize())
-                .sorted()
-                .toList());
+        return String.join(
+                "\n",
+                extensions.stream()
+                        .map(
+                                extension ->
+                                        extension.metadata().packageName()
+                                                + ':'
+                                                + extension.metadata().versionCode()
+                                                + ':'
+                                                + extension.archive().toAbsolutePath().normalize())
+                        .sorted()
+                        .toList());
     }
 
     public void reset() {
+        update(() -> {});
+    }
+
+    public void update(Runnable commit) {
         Lock writeLock = lifecycleLock.writeLock();
         writeLock.lock();
         try {
             synchronized (this) {
                 closeGenerations();
+                commit.run();
             }
         } finally {
             writeLock.unlock();
@@ -129,10 +173,14 @@ public final class ExtensionRuntimeCatalog implements AutoCloseable {
             ExtensionApkMetadata metadata,
             ClassLoader loader,
             List<LoadedSource> sources,
-            boolean validateCompatibility) throws ReflectiveOperationException {
+            boolean validateCompatibility)
+            throws ReflectiveOperationException {
         List<Object> instances = new ArrayList<>();
         if (metadata.factoryClass().isPresent()) {
-            expandFactory(instantiate(loader.loadClass(metadata.factoryClass().orElseThrow())), instances, true);
+            expandFactory(
+                    instantiate(loader.loadClass(metadata.factoryClass().orElseThrow())),
+                    instances,
+                    true);
         }
         for (String className : metadata.sourceClasses()) {
             Object entryPoint = instantiate(loader.loadClass(className));
@@ -142,8 +190,11 @@ public final class ExtensionRuntimeCatalog implements AutoCloseable {
             throw new IllegalStateException("Extension produced no sources");
         }
         for (Object instance : instances) {
-            sources.add(describe(
-                    metadata, Objects.requireNonNull(instance, "source instance"), validateCompatibility));
+            sources.add(
+                    describe(
+                            metadata,
+                            Objects.requireNonNull(instance, "source instance"),
+                            validateCompatibility));
         }
     }
 
@@ -171,9 +222,7 @@ public final class ExtensionRuntimeCatalog implements AutoCloseable {
     }
 
     private static LoadedSource describe(
-            ExtensionApkMetadata metadata,
-            Object source,
-            boolean validateCompatibility)
+            ExtensionApkMetadata metadata, Object source, boolean validateCompatibility)
             throws ReflectiveOperationException {
         if (validateCompatibility) {
             ExtensionCompatibility.requireSupported(metadata.kind(), source);
@@ -181,7 +230,8 @@ public final class ExtensionRuntimeCatalog implements AutoCloseable {
         long id = number(source, "getId").longValue();
         String name = text(source, "getName");
         String language = optionalText(source, "getLang", "und");
-        return new LoadedSource(id, name, language, metadata.packageName(), metadata.kind(), source);
+        return new LoadedSource(
+                id, name, language, metadata.packageName(), metadata.kind(), source);
     }
 
     private static Number number(Object source, String method) throws ReflectiveOperationException {
@@ -232,7 +282,8 @@ public final class ExtensionRuntimeCatalog implements AutoCloseable {
             current = current.getCause();
         }
         String message = current.getMessage();
-        return current.getClass().getSimpleName() + (message == null || message.isBlank() ? "" : ": " + message);
+        return current.getClass().getSimpleName()
+                + (message == null || message.isBlank() ? "" : ": " + message);
     }
 
     public static final class Snapshot implements AutoCloseable {
@@ -246,7 +297,7 @@ public final class ExtensionRuntimeCatalog implements AutoCloseable {
                 List<LoadedSource> sources,
                 Map<String, String> failures,
                 List<ExtensionClassLoader> loaders) {
-            this(sources, failures, loaders, () -> { });
+            this(sources, failures, loaders, () -> {});
         }
 
         private Snapshot(

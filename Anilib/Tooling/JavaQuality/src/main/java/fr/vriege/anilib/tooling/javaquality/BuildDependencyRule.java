@@ -32,13 +32,15 @@ public final class BuildDependencyRule implements AnilibJavaRule {
                             "compose.material3",
                             "compose.materialIconsExtended",
                             "'io.github.kevinnzou:compose-webview-multiplatform:2.0.3'",
-                            "'io.github.kdroidfilter:composemediaplayer:0.11.4'")),
+                            "'io.github.kdroidfilter:composemediaplayer:0.11.4'",
+                            "'dev.datlag:kcef:2025.03.23'")),
             Map.entry(
                     DESKTOP_BUILD,
                     Set.of(
                             "compose.desktop.currentOs",
                             "compose.uiTest",
                             "'org.jetbrains.kotlin:kotlin-test:2.4.10'",
+                            "'dev.datlag:kcef:2025.03.23'",
                             "'io.github.kevinnzou:compose-webview-multiplatform:2.0.3'")),
             Map.entry(
                     DESKTOP_EXTENSION_HOST_BUILD,
@@ -48,6 +50,7 @@ public final class BuildDependencyRule implements AnilibJavaRule {
                             "'org.ow2.asm:asm:9.10.1'",
                             "'org.ow2.asm:asm-commons:9.10.1'",
                             "'org.ow2.asm:asm-tree:9.10.1'",
+                            "'org.ow2.asm:asm-analysis:9.10.1'",
                             "'org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.9.0'",
                             "'org.jetbrains.kotlinx:kotlinx-serialization-json-okio-jvm:1.9.0'",
                             "'org.jetbrains.kotlinx:kotlinx-serialization-protobuf-jvm:1.9.0'",
@@ -57,7 +60,8 @@ public final class BuildDependencyRule implements AnilibJavaRule {
                             "'com.squareup.okhttp3:okhttp-zstd:5.4.0'",
                             "'io.reactivex:rxjava:1.3.8'",
                             "files(rxjavaModuleJar)",
-                            "'org.jsoup:jsoup:1.19.1'")));
+                            "'org.jsoup:jsoup:1.19.1'",
+                            "'org.jetbrains:annotations:26.0.2-1'")));
     private static final Map<String, Set<String>> ALLOWED_EXTERNAL_PLUGINS = Map.ofEntries(
             Map.entry(
                     COMPOSE_BUILD,

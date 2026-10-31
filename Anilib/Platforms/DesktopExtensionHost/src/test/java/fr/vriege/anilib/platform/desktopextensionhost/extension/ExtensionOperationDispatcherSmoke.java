@@ -1,45 +1,64 @@
 package fr.vriege.anilib.platform.desktopextensionhost.extension;
 
-import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.SAnime;
-import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.SEpisode;
-import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.Video;
-import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.Track;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.AnimeFilter;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.AnimeFilterList;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.AnimesPage;
+import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.SAnime;
+import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.SEpisode;
+import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.Track;
+import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model.Video;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.online.AnimeHttpSource;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.source.model.Page;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.source.online.HttpSource;
-import java.util.List;
-import java.util.Map;
+
+import kotlin.ResultKt;
 import kotlin.coroutines.Continuation;
+import kotlin.coroutines.intrinsics.IntrinsicsKt;
+
+import okhttp3.Headers;
 import okhttp3.Request;
 import okhttp3.Response;
-import okhttp3.Headers;
+
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.util.List;
+import java.util.Map;
 
 public final class ExtensionOperationDispatcherSmoke {
-    private ExtensionOperationDispatcherSmoke() {
-    }
+    private ExtensionOperationDispatcherSmoke() {}
 
     public static void verify() {
         ModernSource source = new ModernSource();
         SAnime anime = SAnime.Companion.create();
         anime.setUrl("/title");
         anime.setTitle("Retained title");
-        var modern = ExtensionOperationDispatcher.modernOrRx(
-                source, "getEpisodeList", "fetchEpisodeList", anime);
-        List<SEpisode> episodes = ExtensionOperationDispatcher.listResult(modern.value(), SEpisode.class);
-        if (!modern.available() || episodes.size() != 1 || !episodes.getFirst().getName().equals("Episode 1")) {
+        var modern =
+                ExtensionOperationDispatcher.modernOrRx(
+                        source, "getEpisodeList", "fetchEpisodeList", anime);
+        List<SEpisode> episodes =
+                ExtensionOperationDispatcher.listResult(modern.value(), SEpisode.class);
+        if (!modern.available()
+                || episodes.size() != 1
+                || !episodes.getFirst().getName().equals("Episode 1")) {
             throw new IllegalStateException("Modern suspend source dispatch failed");
         }
-        if (ExtensionOperationDispatcher.hasClassicImplementation(source, "episodeListParse", (Object) null)) {
-            throw new IllegalStateException("Inherited compatibility placeholder was treated as an implementation");
+        if (ExtensionOperationDispatcher.hasClassicImplementation(
+                source, "episodeListParse", (Object) null)) {
+            throw new IllegalStateException(
+                    "Inherited compatibility placeholder was treated as an implementation");
         }
         ExtensionCompatibility.requireSupported(ExtensionKind.ANIME, source);
+        try {
+            ExtensionOperationDispatcher.suspend(new FailedSuspendSource(), "load");
+            throw new IllegalStateException("Checked coroutine failure was lost");
+        } catch (UncheckedIOException expected) {
+            if (!(expected.getCause() instanceof IOException)) throw expected;
+        }
         verifyVideoResolution();
 
-        var reactive = ExtensionOperationDispatcher.modernOrRx(
-                new ReactiveSource(), "getPageList", "fetchPageList", "chapter");
+        var reactive =
+                ExtensionOperationDispatcher.modernOrRx(
+                        new ReactiveSource(), "getPageList", "fetchPageList", "chapter");
         if (!reactive.available() || !reactive.value().equals(List.of("page"))) {
             throw new IllegalStateException("Reactive source fallback dispatch failed");
         }
@@ -49,62 +68,77 @@ public final class ExtensionOperationDispatcherSmoke {
         Request imageRequest = ExtensionSourceOperations.imageRequest(imageSource, page);
         if (!page.getImageUrl().equals("https://cdn.example.invalid/page-1.webp")
                 || !imageRequest.url().toString().equals(page.getImageUrl())
-                || !"https://example.invalid/chapter/page-1".equals(imageRequest.header("Referer"))) {
+                || !"https://example.invalid/chapter/page-1"
+                        .equals(imageRequest.header("Referer"))) {
             throw new IllegalStateException("Lazy manga image URL/request dispatch failed");
         }
         verifyFilters();
     }
 
+    private static final class FailedSuspendSource {
+        public Object load(Continuation<Object> continuation) {
+            continuation.resumeWith(ResultKt.createFailure(new IOException("offline")));
+            return IntrinsicsKt.getCOROUTINE_SUSPENDED();
+        }
+    }
+
     private static void verifyVideoResolution() {
         ResolvingSource source = new ResolvingSource();
-        Video pending = new Video(
-                "https://resolver.example.invalid/watch/1",
-                "1080p",
-                null,
-                null,
-                new Headers.Builder().build(),
-                false,
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                "resolver-token",
-                false);
+        Video pending =
+                new Video(
+                        "https://resolver.example.invalid/watch/1",
+                        "1080p",
+                        null,
+                        null,
+                        new Headers.Builder().build(),
+                        false,
+                        List.of(),
+                        List.of(),
+                        List.of(),
+                        List.of(),
+                        List.of(),
+                        List.of(),
+                        "resolver-token",
+                        false);
         List<Video> resolved = ExtensionSourceOperations.resolveVideos(source, List.of(pending));
         if (source.resolutionCount != 1
                 || resolved.size() != 1
                 || !resolved.getFirst().getInitialized()
                 || resolved.getFirst().getSubtitleTracks().size() != 1
                 || !"fr".equals(resolved.getFirst().getSubtitleTracks().getFirst().getLang())) {
-            throw new IllegalStateException("AniYomi deferred video resolution lost subtitle tracks");
+            throw new IllegalStateException(
+                    "AniYomi deferred video resolution lost subtitle tracks");
         }
         ExtensionSourceOperations.resolveVideos(source, resolved);
         if (source.resolutionCount != 1) {
-            throw new IllegalStateException("Initialized AniYomi videos were resolved more than once");
+            throw new IllegalStateException(
+                    "Initialized AniYomi videos were resolved more than once");
         }
     }
 
     private static void verifyFilters() {
-        AnimeFilter.Text query = new AnimeFilter.Text("Title", "") { };
-        AnimeFilter.CheckBox dubbed = new AnimeFilter.CheckBox("Dubbed", false) { };
-        AnimeFilter.Select<String> genre = new AnimeFilter.Select<>(
-                "Genre", new String[]{"All", "Action"}, 0) { };
-        AnimeFilter.TriState completed = new AnimeFilter.TriState("Completed", 0) { };
-        AnimeFilter.Group<AnimeFilter<?>> status = new AnimeFilter.Group<>("Status", List.of(completed)) { };
-        AnimeFilter.Sort sort = new AnimeFilter.Sort(
-                "Sort",
-                new String[]{"Popular", "Newest"},
-                new AnimeFilter.Sort.Selection(0, true)) { };
-        ExtensionSourceFilterCodec.FilterSet filters = ExtensionSourceFilterCodec.from(
-                new AnimeFilterList(query, dubbed, genre, status, sort));
-        filters.apply(Map.of(
-                "filter.0", "wanted",
-                "filter.1", "true",
-                "filter.2", "Action",
-                "filter.3.0", "include",
-                "filter.4", "↓ Newest"));
+        AnimeFilter.Text query = new AnimeFilter.Text("Title", "") {};
+        AnimeFilter.CheckBox dubbed = new AnimeFilter.CheckBox("Dubbed", false) {};
+        AnimeFilter.Select<String> genre =
+                new AnimeFilter.Select<>("Genre", new String[] {"All", "Action"}, 0) {};
+        AnimeFilter.TriState completed = new AnimeFilter.TriState("Completed", 0) {};
+        AnimeFilter.Group<AnimeFilter<?>> status =
+                new AnimeFilter.Group<>("Status", List.of(completed)) {};
+        AnimeFilter.Sort sort =
+                new AnimeFilter.Sort(
+                        "Sort",
+                        new String[] {"Popular", "Newest"},
+                        new AnimeFilter.Sort.Selection(0, true)) {};
+        ExtensionSourceFilterCodec.FilterSet filters =
+                ExtensionSourceFilterCodec.from(
+                        new AnimeFilterList(query, dubbed, genre, status, sort));
+        filters.apply(
+                Map.of(
+                        "filter.0", "wanted",
+                        "filter.1", "true",
+                        "filter.2", "Action",
+                        "filter.3.0", "include",
+                        "filter.4", "↓ Newest"));
         AnimeFilter.Sort.Selection selection = sort.getState();
         if (filters.definitions().size() != 6
                 || !query.getState().equals("wanted")
@@ -113,39 +147,73 @@ public final class ExtensionOperationDispatcherSmoke {
                 || completed.getState() != AnimeFilter.TriState.STATE_INCLUDE
                 || selection.getIndex() != 1
                 || selection.getAscending()) {
-            throw new IllegalStateException("Dynamic extension filters did not round-trip through the host codec");
+            throw new IllegalStateException(
+                    "Dynamic extension filters did not round-trip through the host codec");
         }
     }
 
     private static final class LazyImageSource extends HttpSource {
-        @Override public String getBaseUrl() { return "https://example.invalid"; }
-        @Override public String getName() { return "Lazy images"; }
-        @Override public String getLang() { return "en"; }
-        @Override public boolean getSupportsLatest() { return false; }
+        @Override
+        public String getBaseUrl() {
+            return "https://example.invalid";
+        }
+
+        @Override
+        public String getName() {
+            return "Lazy images";
+        }
+
+        @Override
+        public String getLang() {
+            return "en";
+        }
+
+        @Override
+        public boolean getSupportsLatest() {
+            return false;
+        }
 
         public Object getImageUrl(Page page, Continuation<? super String> continuation) {
             return "https://cdn.example.invalid/page-1.webp";
         }
 
-        @Override protected Request imageRequest(Page page) {
+        @Override
+        protected Request imageRequest(Page page) {
             return new Request.Builder()
                     .url(page.getImageUrl())
                     .header("Referer", page.getUrl())
                     .build();
         }
 
-        @Override protected String imageUrlParse(Response response) {
+        @Override
+        protected String imageUrlParse(Response response) {
             throw new AssertionError("The modern image URL operation should be preferred");
         }
     }
 
     private static final class ModernSource extends AnimeHttpSource {
-        @Override public String getBaseUrl() { return "https://example.invalid"; }
-        @Override public String getName() { return "Modern"; }
-        @Override public String getLang() { return "en"; }
-        @Override public boolean getSupportsLatest() { return false; }
+        @Override
+        public String getBaseUrl() {
+            return "https://example.invalid";
+        }
 
-        public Object getEpisodeList(SAnime anime, Continuation<? super List<SEpisode>> continuation) {
+        @Override
+        public String getName() {
+            return "Modern";
+        }
+
+        @Override
+        public String getLang() {
+            return "en";
+        }
+
+        @Override
+        public boolean getSupportsLatest() {
+            return false;
+        }
+
+        public Object getEpisodeList(
+                SAnime anime, Continuation<? super List<SEpisode>> continuation) {
             if (!anime.getTitle().equals("Retained title")) {
                 throw new IllegalStateException("Catalogue model was not retained");
             }
@@ -159,7 +227,8 @@ public final class ExtensionOperationDispatcherSmoke {
             return null;
         }
 
-        @Override public Object getSearchAnime(
+        @Override
+        public Object getSearchAnime(
                 int page,
                 String query,
                 AnimeFilterList filters,
@@ -171,7 +240,8 @@ public final class ExtensionOperationDispatcherSmoke {
             return anime;
         }
 
-        public Object getVideoList(SEpisode episode, Continuation<? super List<Video>> continuation) {
+        public Object getVideoList(
+                SEpisode episode, Continuation<? super List<Video>> continuation) {
             return List.of();
         }
     }
@@ -179,12 +249,28 @@ public final class ExtensionOperationDispatcherSmoke {
     private static final class ResolvingSource extends AnimeHttpSource {
         private int resolutionCount;
 
-        @Override public String getBaseUrl() { return "https://resolver.example.invalid"; }
-        @Override public String getName() { return "Resolving"; }
-        @Override public String getLang() { return "fr"; }
-        @Override public boolean getSupportsLatest() { return false; }
+        @Override
+        public String getBaseUrl() {
+            return "https://resolver.example.invalid";
+        }
 
-        @Override public Object resolveVideo(Video video, Continuation<? super Video> continuation) {
+        @Override
+        public String getName() {
+            return "Resolving";
+        }
+
+        @Override
+        public String getLang() {
+            return "fr";
+        }
+
+        @Override
+        public boolean getSupportsLatest() {
+            return false;
+        }
+
+        @Override
+        public Object resolveVideo(Video video, Continuation<? super Video> continuation) {
             resolutionCount++;
             return new Video(
                     "https://cdn.example.invalid/video.m3u8",

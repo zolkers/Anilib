@@ -3,9 +3,11 @@ module fr.vriege.anilib.platform.desktopextensionhost {
     requires jdk.httpserver;
     requires java.net.http;
     requires java.xml;
+    requires static org.jetbrains.annotations;
     requires org.objectweb.asm;
     requires org.objectweb.asm.commons;
     requires org.objectweb.asm.tree;
+    requires org.objectweb.asm.tree.analysis;
     requires transitive kotlinx.serialization.json;
     requires transitive kotlinx.serialization.protobuf;
     requires transitive kotlinx.coroutines.core;
@@ -27,6 +29,7 @@ module fr.vriege.anilib.platform.desktopextensionhost {
     exports fr.vriege.anilib.platform.desktopextensionhost.compat.android.content;
     exports fr.vriege.anilib.platform.desktopextensionhost.compat.android.app;
     exports fr.vriege.anilib.platform.desktopextensionhost.compat.android.net;
+    exports fr.vriege.anilib.platform.desktopextensionhost.compat.android.media;
     exports fr.vriege.anilib.platform.desktopextensionhost.compat.android.os;
     exports fr.vriege.anilib.platform.desktopextensionhost.compat.android.text;
     exports fr.vriege.anilib.platform.desktopextensionhost.compat.android.util;
@@ -51,6 +54,7 @@ module fr.vriege.anilib.platform.desktopextensionhost {
     opens fr.vriege.anilib.platform.desktopextensionhost.compat.android.app;
     opens fr.vriege.anilib.platform.desktopextensionhost.compat.android.content;
     opens fr.vriege.anilib.platform.desktopextensionhost.compat.android.net;
+    opens fr.vriege.anilib.platform.desktopextensionhost.compat.android.media;
     opens fr.vriege.anilib.platform.desktopextensionhost.compat.android.os;
     opens fr.vriege.anilib.platform.desktopextensionhost.compat.android.text;
     opens fr.vriege.anilib.platform.desktopextensionhost.compat.android.util;

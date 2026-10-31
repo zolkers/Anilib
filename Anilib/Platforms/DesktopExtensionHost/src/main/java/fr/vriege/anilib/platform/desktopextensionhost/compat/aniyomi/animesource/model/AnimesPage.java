@@ -12,20 +12,51 @@ public final class AnimesPage {
         this.hasNextPage = hasNextPage;
     }
 
-    public List<SAnime> getAnimes() { return animes; }
-    public boolean getHasNextPage() { return hasNextPage; }
-    public List<SAnime> component1() { return animes; }
-    public boolean component2() { return hasNextPage; }
+    public List<SAnime> getAnimes() {
+        return animes;
+    }
+
+    public boolean getHasNextPage() {
+        return hasNextPage;
+    }
+
+    public List<SAnime> component1() {
+        return animes;
+    }
+
+    public boolean component2() {
+        return hasNextPage;
+    }
+
     public AnimesPage copy(List<? extends SAnime> values, boolean nextPage) {
         return new AnimesPage(values, nextPage);
     }
 
-    @Override public boolean equals(Object value) {
+    public static AnimesPage copy$default(
+            AnimesPage source,
+            List<? extends SAnime> values,
+            boolean next,
+            int mask,
+            Object marker) {
+        return source.copy(
+                (mask & 1) == 0 ? values : source.animes,
+                (mask & 2) == 0 ? next : source.hasNextPage);
+    }
+
+    @Override
+    public boolean equals(Object value) {
         return value instanceof AnimesPage other
                 && hasNextPage == other.hasNextPage
                 && animes.equals(other.animes);
     }
 
-    @Override public int hashCode() { return Objects.hash(animes, hasNextPage); }
-    @Override public String toString() { return "AnimesPage(animes=" + animes + ", hasNextPage=" + hasNextPage + ')'; }
+    @Override
+    public int hashCode() {
+        return Objects.hash(animes, hasNextPage);
+    }
+
+    @Override
+    public String toString() {
+        return "AnimesPage(animes=" + animes + ", hasNextPage=" + hasNextPage + ')';
+    }
 }

@@ -1,5 +1,13 @@
 package fr.vriege.anilib.platform.desktopextensionhost.extension;
 
+import kotlin.ResultKt;
+import kotlin.coroutines.Continuation;
+import kotlin.coroutines.CoroutineContext;
+import kotlin.coroutines.EmptyCoroutineContext;
+import kotlin.coroutines.intrinsics.IntrinsicsKt;
+
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.time.Duration;
@@ -10,31 +18,24 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import kotlin.ResultKt;
-import kotlin.coroutines.Continuation;
-import kotlin.coroutines.CoroutineContext;
-import kotlin.coroutines.EmptyCoroutineContext;
-import kotlin.coroutines.intrinsics.IntrinsicsKt;
 
 final class ExtensionOperationDispatcher {
     private static final String COMPATIBILITY_PACKAGE =
             "fr.vriege.anilib.platform.desktopextensionhost.compat.";
     private static final Duration SUSPEND_TIMEOUT = Duration.ofSeconds(45);
 
-    private ExtensionOperationDispatcher() {
-    }
+    private ExtensionOperationDispatcher() {}
 
     static Invocation modernOrRx(
-            Object source,
-            String suspendMethod,
-            String reactiveMethod,
-            Object... arguments) {
-        Optional<Method> suspend = extensionSuspendMethod(source.getClass(), suspendMethod, arguments);
+            Object source, String suspendMethod, String reactiveMethod, Object... arguments) {
+        Optional<Method> suspend =
+                extensionSuspendMethod(source.getClass(), suspendMethod, arguments);
         if (suspend.isPresent()) {
             return new Invocation(true, invokeSuspend(source, suspend.orElseThrow(), arguments));
         }
         Optional<Method> reactive = extensionMethod(source.getClass(), reactiveMethod, arguments);
-        return reactive.map(method -> new Invocation(true, await(invoke(source, method, arguments))))
+        return reactive.map(
+                        method -> new Invocation(true, await(invoke(source, method, arguments))))
                 .orElseGet(() -> new Invocation(false, null));
     }
 
@@ -51,22 +52,33 @@ final class ExtensionOperationDispatcher {
     }
 
     static Object invokeAny(Object target, String methodName, Object... arguments) {
-        Method method = compatibleMethod(target.getClass(), methodName, arguments)
-                .orElseThrow(() -> new AbiException("Extension ABI method is unavailable: " + methodName));
+        Method method =
+                compatibleMethod(target.getClass(), methodName, arguments)
+                        .orElseThrow(
+                                () ->
+                                        new AbiException(
+                                                "Extension ABI method is unavailable: "
+                                                        + methodName));
         return invoke(target, method, arguments);
     }
 
     static boolean hasClassicImplementation(Object source, String methodName, Object... arguments) {
-        return extensionMethod(source.getClass(), methodName, arguments).isPresent();
+        return extensionMethod(source.getClass(), methodName, arguments).isPresent()
+                || ExtensionCompatibility.hasParsedImplementation(source, methodName);
     }
 
     static boolean hasExtensionMethod(Object source, String methodName, int parameterCount) {
-        for (Class<?> current = source.getClass(); current != null; current = current.getSuperclass()) {
+        for (Class<?> current = source.getClass();
+                current != null;
+                current = current.getSuperclass()) {
             if (current.getName().startsWith(COMPATIBILITY_PACKAGE)) {
                 continue;
             }
-            if (Arrays.stream(current.getDeclaredMethods()).anyMatch(method -> method.getName().equals(methodName)
-                    && method.getParameterCount() == parameterCount)) {
+            if (Arrays.stream(current.getDeclaredMethods())
+                    .anyMatch(
+                            method ->
+                                    method.getName().equals(methodName)
+                                            && method.getParameterCount() == parameterCount)) {
                 return true;
             }
         }
@@ -74,16 +86,21 @@ final class ExtensionOperationDispatcher {
     }
 
     static boolean supportsHosters(Object source) {
-        return extensionSuspendMethod(source.getClass(), "getHosterList", new Object[]{null}).isPresent()
-                || declaredExtensionMethod(source.getClass(), "hosterListParse");
+        return extensionSuspendMethod(source.getClass(), "getHosterList", new Object[] {null})
+                        .isPresent()
+                || declaredExtensionMethod(source.getClass(), "hosterListParse")
+                || ExtensionCompatibility.hasParsedImplementation(source, "hosterListParse");
     }
 
     static <T> T result(Object value, Class<T> type) {
         if (type.isInstance(value)) {
             return type.cast(value);
         }
-        throw new AbiException("Extension operation returned "
-                + (value == null ? "null" : value.getClass().getName()) + " instead of " + type.getName());
+        throw new AbiException(
+                "Extension operation returned "
+                        + (value == null ? "null" : value.getClass().getName())
+                        + " instead of "
+                        + type.getName());
     }
 
     static <T> List<T> listResult(Object value, Class<T> elementType) {
@@ -97,7 +114,8 @@ final class ExtensionOperationDispatcher {
         if (value == null) {
             return null;
         }
-        Optional<Method> toBlocking = compatibleMethod(value.getClass(), "toBlocking", new Object[0]);
+        Optional<Method> toBlocking =
+                compatibleMethod(value.getClass(), "toBlocking", new Object[0]);
         if (toBlocking.isEmpty()) {
             return value;
         }
@@ -107,22 +125,23 @@ final class ExtensionOperationDispatcher {
 
     private static Object invokeSuspend(Object target, Method method, Object[] arguments) {
         CompletableFuture<Object> resumed = new CompletableFuture<>();
-        Continuation<Object> continuation = new Continuation<>() {
-            @Override
-            public CoroutineContext getContext() {
-                return EmptyCoroutineContext.INSTANCE;
-            }
+        Continuation<Object> continuation =
+                new Continuation<>() {
+                    @Override
+                    public CoroutineContext getContext() {
+                        return EmptyCoroutineContext.INSTANCE;
+                    }
 
-            @Override
-            public void resumeWith(Object value) {
-                try {
-                    ResultKt.throwOnFailure(value);
-                    resumed.complete(value);
-                } catch (RuntimeException | Error failure) {
-                    resumed.completeExceptionally(failure);
-                }
-            }
-        };
+                    @Override
+                    public void resumeWith(Object value) {
+                        try {
+                            ResultKt.throwOnFailure(value);
+                            resumed.complete(value);
+                        } catch (Throwable failure) {
+                            resumed.completeExceptionally(failure);
+                        }
+                    }
+                };
         Object[] invocation = Arrays.copyOf(arguments, arguments.length + 1);
         invocation[arguments.length] = continuation;
         Object result = invoke(target, method, invocation);
@@ -132,10 +151,12 @@ final class ExtensionOperationDispatcher {
         try {
             return resumed.get(SUSPEND_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
         } catch (TimeoutException exception) {
-            throw new IllegalStateException("Extension operation timed out: " + method.getName(), exception);
+            throw new IllegalStateException(
+                    "Extension operation timed out: " + method.getName(), exception);
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
-            throw new IllegalStateException("Extension operation was interrupted: " + method.getName(), exception);
+            throw new IllegalStateException(
+                    "Extension operation was interrupted: " + method.getName(), exception);
         } catch (ExecutionException exception) {
             throw propagate(exception.getCause());
         }
@@ -146,26 +167,29 @@ final class ExtensionOperationDispatcher {
             method.setAccessible(true);
             return method.invoke(target, arguments);
         } catch (IllegalAccessException exception) {
-            throw new AbiException("Extension ABI method is inaccessible: " + method.getName(), exception);
+            throw new AbiException(
+                    "Extension ABI method is inaccessible: " + method.getName(), exception);
         } catch (InvocationTargetException exception) {
             throw propagate(exception.getCause() == null ? exception : exception.getCause());
         }
     }
 
     private static Optional<Method> extensionSuspendMethod(
-            Class<?> type,
-            String methodName,
-            Object[] arguments) {
+            Class<?> type, String methodName, Object[] arguments) {
         Object[] invocation = Arrays.copyOf(arguments, arguments.length + 1);
         invocation[arguments.length] = ContinuationMarker.INSTANCE;
-        return compatibleMethod(type, methodName, invocation).filter(ExtensionOperationDispatcher::extensionOwned);
+        return compatibleMethod(type, methodName, invocation)
+                .filter(ExtensionOperationDispatcher::extensionOwned);
     }
 
-    private static Optional<Method> extensionMethod(Class<?> type, String methodName, Object[] arguments) {
-        return compatibleMethod(type, methodName, arguments).filter(ExtensionOperationDispatcher::extensionOwned);
+    private static Optional<Method> extensionMethod(
+            Class<?> type, String methodName, Object[] arguments) {
+        return compatibleMethod(type, methodName, arguments)
+                .filter(ExtensionOperationDispatcher::extensionOwned);
     }
 
-    private static Optional<Method> compatibleMethod(Class<?> type, String methodName, Object[] arguments) {
+    private static Optional<Method> compatibleMethod(
+            Class<?> type, String methodName, Object[] arguments) {
         for (Class<?> current = type; current != null; current = current.getSuperclass()) {
             for (Method method : current.getDeclaredMethods()) {
                 if (method.getName().equals(methodName)
@@ -175,7 +199,8 @@ final class ExtensionOperationDispatcher {
             }
         }
         for (Method method : type.getMethods()) {
-            if (method.getName().equals(methodName) && compatible(method.getParameterTypes(), arguments)) {
+            if (method.getName().equals(methodName)
+                    && compatible(method.getParameterTypes(), arguments)) {
                 return Optional.of(method);
             }
         }
@@ -190,7 +215,8 @@ final class ExtensionOperationDispatcher {
             Object argument = arguments[index];
             Class<?> parameter = parameters[index];
             if (argument == ContinuationMarker.INSTANCE) {
-                if (!(parameter.getName().equals("kotlin.coroutines.Continuation") || parameter == Object.class)) {
+                if (!(parameter.getName().equals("kotlin.coroutines.Continuation")
+                        || parameter == Object.class)) {
                     return false;
                 }
             } else if (argument == null) {
@@ -213,7 +239,8 @@ final class ExtensionOperationDispatcher {
             if (current.getName().startsWith(COMPATIBILITY_PACKAGE)) {
                 continue;
             }
-            if (Arrays.stream(current.getDeclaredMethods()).anyMatch(method -> method.getName().equals(methodName))) {
+            if (Arrays.stream(current.getDeclaredMethods())
+                    .anyMatch(method -> method.getName().equals(methodName))) {
                 return true;
             }
         }
@@ -236,6 +263,9 @@ final class ExtensionOperationDispatcher {
     }
 
     private static RuntimeException propagate(Throwable failure) {
+        if (failure instanceof IOException io) {
+            return new UncheckedIOException("Source request failed", io);
+        }
         if (failure instanceof RuntimeException runtime) {
             return runtime;
         }
@@ -245,8 +275,7 @@ final class ExtensionOperationDispatcher {
         return new IllegalStateException("Extension operation failed", failure);
     }
 
-    record Invocation(boolean available, Object value) {
-    }
+    record Invocation(boolean available, Object value) {}
 
     static final class AbiException extends RuntimeException {
         private static final long serialVersionUID = 1L;

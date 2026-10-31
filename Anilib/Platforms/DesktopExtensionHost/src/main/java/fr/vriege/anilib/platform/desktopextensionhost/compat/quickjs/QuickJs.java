@@ -1,5 +1,9 @@
 package fr.vriege.anilib.platform.desktopextensionhost.compat.quickjs;
 
+import fr.vriege.anilib.platform.desktopextensionhost.ExtensionBrowser;
+import fr.vriege.anilib.platform.desktopextensionhost.ExtensionPlatformServices;
+import fr.vriege.anilib.platform.desktopextensionhost.ExtensionScriptValues;
+
 import java.io.Closeable;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -7,17 +11,14 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
-/*
- * Bounded compatibility surface for extensions that use QuickJS to read simple
- * JavaScript data files.
- *
- * <p>The desktop host deliberately does not expose a general-purpose script
- * engine. It supports the global array declarations and deterministic JSON
- * projection used by current Aniyomi extensions, and fails closed for other
- * expressions.</p>
- */
+/* Real JavaScript through the injected desktop browser; a bounded episode-array fallback
+ * remains available to the standalone headless host. */
 public final class QuickJs implements Closeable {
+    private ExtensionBrowser browser;
     private static final int MAX_SCRIPT_CHARACTERS = 4 * 1024 * 1024;
     private static final int MAX_GLOBALS = 10_000;
     private static final int MAX_NESTING = 32;
@@ -26,8 +27,7 @@ public final class QuickJs implements Closeable {
     private final Map<String, Object> globals = new LinkedHashMap<>();
     private boolean closed;
 
-    private QuickJs() {
-    }
+    private QuickJs() {}
 
     public static QuickJs create() {
         return new QuickJs();
@@ -40,6 +40,19 @@ public final class QuickJs implements Closeable {
         }
         if (script.length() > MAX_SCRIPT_CHARACTERS) {
             throw new IllegalArgumentException("JavaScript input exceeds 4 MiB");
+        }
+        var factory = ExtensionPlatformServices.browserFactory();
+        if (factory != null) {
+            if (browser == null) browser = factory.create(resource -> {}, finished -> {});
+            try {
+                return ExtensionScriptValues.decode(
+                        browser.evaluate(script).get(20, TimeUnit.SECONDS));
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("Extension JavaScript interrupted", exception);
+            } catch (ExecutionException | TimeoutException exception) {
+                throw new IllegalStateException("Extension JavaScript failed", exception);
+            }
         }
         if (episodeProjection(script)) {
             return episodeGlobalsJson();
@@ -59,6 +72,10 @@ public final class QuickJs implements Closeable {
     public synchronized void close() {
         closed = true;
         globals.clear();
+        if (browser != null) {
+            browser.close();
+            browser = null;
+        }
     }
 
     private boolean episodeProjection(String script) {
@@ -128,10 +145,11 @@ public final class QuickJs implements Closeable {
     }
 
     private String episodeGlobalsJson() {
-        List<Map.Entry<String, Object>> episodes = globals.entrySet().stream()
-                .filter(entry -> episodeName(entry.getKey()))
-                .sorted(Comparator.comparingInt(entry -> episodeNumber(entry.getKey())))
-                .toList();
+        List<Map.Entry<String, Object>> episodes =
+                globals.entrySet().stream()
+                        .filter(entry -> episodeName(entry.getKey()))
+                        .sorted(Comparator.comparingInt(entry -> episodeNumber(entry.getKey())))
+                        .toList();
         StringBuilder result = new StringBuilder("[");
         for (int index = 0; index < episodes.size(); index++) {
             if (index > 0) {
@@ -254,8 +272,7 @@ public final class QuickJs implements Closeable {
         return Character.isLetterOrDigit(value) || value == '_' || value == '$';
     }
 
-    private record Assignment(String name, int valueStart) {
-    }
+    private record Assignment(String name, int valueStart) {}
 
     private static final class Parser {
         private final String input;
@@ -309,8 +326,7 @@ public final class QuickJs implements Closeable {
             int start = position;
             while (position < input.length()) {
                 char character = input.charAt(position);
-                if (character == ',' || character == ']'
-                        || Character.isWhitespace(character)) {
+                if (character == ',' || character == ']' || Character.isWhitespace(character)) {
                     break;
                 }
                 position++;
@@ -359,8 +375,7 @@ public final class QuickJs implements Closeable {
                     case 't' -> result.append('\t');
                     case 'u' -> result.append(codePoint(4));
                     case 'x' -> result.append(codePoint(2));
-                    case '\n' -> {
-                    }
+                    case '\n' -> {}
                     case '\r' -> {
                         if (position < input.length() && input.charAt(position) == '\n') {
                             position++;
@@ -381,7 +396,8 @@ public final class QuickJs implements Closeable {
             try {
                 return (char) Integer.parseInt(encoded, 16);
             } catch (NumberFormatException exception) {
-                throw new IllegalArgumentException("Invalid JavaScript hexadecimal escape", exception);
+                throw new IllegalArgumentException(
+                        "Invalid JavaScript hexadecimal escape", exception);
             }
         }
 
@@ -389,7 +405,8 @@ public final class QuickJs implements Closeable {
             boolean advanced;
             do {
                 advanced = false;
-                while (position < input.length() && Character.isWhitespace(input.charAt(position))) {
+                while (position < input.length()
+                        && Character.isWhitespace(input.charAt(position))) {
                     position++;
                     advanced = true;
                 }
@@ -413,7 +430,8 @@ public final class QuickJs implements Closeable {
         private void expect(char expected) {
             skipWhitespaceAndComments();
             if (!peek(expected)) {
-                throw new IllegalArgumentException("Expected '" + expected + "' in JavaScript array");
+                throw new IllegalArgumentException(
+                        "Expected '" + expected + "' in JavaScript array");
             }
             position++;
         }

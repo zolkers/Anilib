@@ -6,8 +6,6 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.InputSource;
 
-import javax.xml.XMLConstants;
-import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.IOException;
 import java.io.StringReader;
 import java.nio.file.Files;
@@ -18,6 +16,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+
+import javax.xml.XMLConstants;
+import javax.xml.parsers.DocumentBuilderFactory;
 
 public final class ApkMetadataReader {
     private static final String ANDROID_NAMESPACE = "http://schemas.android.com/apk/res/android";
@@ -36,7 +37,8 @@ public final class ApkMetadataReader {
         try {
             Map<String, String> metadata = manifestMetadata(apkMetadata.manifestXml());
             String packageName = required(apkMetadata.packageName(), "APK package name");
-            boolean anime = hasText(metadata.get(ANIME_CLASS)) || hasText(metadata.get(ANIME_FACTORY));
+            boolean anime =
+                    hasText(metadata.get(ANIME_CLASS)) || hasText(metadata.get(ANIME_FACTORY));
             ExtensionKind kind = anime ? ExtensionKind.ANIME : ExtensionKind.MANGA;
             String classKey = anime ? ANIME_CLASS : MANGA_CLASS;
             String factoryKey = anime ? ANIME_FACTORY : MANGA_FACTORY;
@@ -46,27 +48,46 @@ public final class ApkMetadataReader {
             String fallbackName = packageName.substring(packageName.lastIndexOf('.') + 1);
             return new ExtensionApkMetadata(
                     packageName,
-                    textOr(metadata.get(NAME), fallbackName),
+                    textOr(metadata.get("aniyomix.name"), textOr(metadata.get(NAME), fallbackName)),
                     textOr(apkMetadata.versionName(), "0"),
                     apkMetadata.versionCode(),
                     kind,
                     "1".equals(metadata.get(adultKey)),
                     sources,
-                    factory);
+                    factory,
+                    extensionApiVersion(
+                            metadata.get("aniyomix.extensionLib"), apkMetadata.versionName()),
+                    Boolean.parseBoolean(metadata.getOrDefault("aniyomix.torrent", "false")));
         } catch (IllegalArgumentException exception) {
             throw exception;
         }
     }
 
+    private static int extensionApiVersion(String explicit, String version) {
+        if (hasText(explicit)) {
+            try {
+                return Integer.parseInt(explicit);
+            } catch (NumberFormatException exception) {
+                throw new IllegalArgumentException("Invalid extension API version", exception);
+            }
+        }
+        if (version != null && version.matches("(?:1[4-9]|[2-9][0-9])\\..+")) {
+            return Integer.parseInt(version.substring(0, version.indexOf('.')));
+        }
+        return 0;
+    }
+
     private static Path requireApk(Path value) {
         Path path = value.toAbsolutePath().normalize();
         try {
-            if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(path)) {
+            if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)
+                    || Files.isSymbolicLink(path)) {
                 throw new IllegalArgumentException("Extension APK must be a regular non-link file");
             }
             long size = Files.size(path);
             if (size == 0 || size > MAX_APK_BYTES) {
-                throw new IllegalArgumentException("Extension APK size is outside the accepted range");
+                throw new IllegalArgumentException(
+                        "Extension APK size is outside the accepted range");
             }
             return path;
         } catch (IOException exception) {
@@ -83,16 +104,19 @@ public final class ApkMetadataReader {
             factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
             factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
             factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
-            Document document = factory.newDocumentBuilder().parse(new InputSource(new StringReader(manifest)));
+            Document document =
+                    factory.newDocumentBuilder().parse(new InputSource(new StringReader(manifest)));
             NodeList applications = document.getElementsByTagName("application");
             if (applications.getLength() != 1) {
-                throw new IllegalArgumentException("APK manifest must contain one application element");
+                throw new IllegalArgumentException(
+                        "APK manifest must contain one application element");
             }
             Map<String, String> result = new LinkedHashMap<>();
             NodeList children = applications.item(0).getChildNodes();
             for (int index = 0; index < children.getLength(); index++) {
                 Node node = children.item(index);
-                if (node.getNodeType() != Node.ELEMENT_NODE || !"meta-data".equals(node.getNodeName())) {
+                if (node.getNodeType() != Node.ELEMENT_NODE
+                        || !"meta-data".equals(node.getNodeName())) {
                     continue;
                 }
                 Element element = (Element) node;
@@ -129,7 +153,9 @@ public final class ApkMetadataReader {
     }
 
     private static Optional<String> optionalClass(String value, String packageName) {
-        return hasText(value) ? Optional.of(resolveClass(value.strip(), packageName)) : Optional.empty();
+        return hasText(value)
+                ? Optional.of(resolveClass(value.strip(), packageName))
+                : Optional.empty();
     }
 
     private static String resolveClass(String value, String packageName) {

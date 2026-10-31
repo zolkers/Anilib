@@ -1,0 +1,681 @@
+# Aniyomi official binary API; generated, do not hand-edit
+# classes.jar SHA-256: 7b4f6d648f556b337ab7b8a7c0e2ea22b64f693c40a9e395e701f42323c6d86a
+C	android/content/Context
+C	androidx/preference/CheckBoxPreference
+C	androidx/preference/DialogPreference
+C	androidx/preference/EditTextPreference
+C	androidx/preference/EditTextPreference$OnBindEditTextListener
+C	androidx/preference/ListPreference
+C	androidx/preference/MultiSelectListPreference
+C	androidx/preference/Preference
+C	androidx/preference/Preference$OnPreferenceChangeListener
+C	androidx/preference/Preference$OnPreferenceClickListener
+C	androidx/preference/PreferenceScreen
+C	androidx/preference/SwitchPreferenceCompat
+C	androidx/preference/TwoStatePreference
+C	eu/kanade/tachiyomi/AppInfo
+C	eu/kanade/tachiyomi/animesource/AnimeCatalogueSource
+C	eu/kanade/tachiyomi/animesource/AnimeCatalogueSource$DefaultImpls
+C	eu/kanade/tachiyomi/animesource/AnimeSource
+C	eu/kanade/tachiyomi/animesource/AnimeSource$DefaultImpls
+C	eu/kanade/tachiyomi/animesource/AnimeSourceFactory
+C	eu/kanade/tachiyomi/animesource/ConfigurableAnimeSource
+C	eu/kanade/tachiyomi/animesource/UnmeteredSource
+C	eu/kanade/tachiyomi/animesource/model/AnimeFilter
+C	eu/kanade/tachiyomi/animesource/model/AnimeFilter$CheckBox
+C	eu/kanade/tachiyomi/animesource/model/AnimeFilter$Group
+C	eu/kanade/tachiyomi/animesource/model/AnimeFilter$Header
+C	eu/kanade/tachiyomi/animesource/model/AnimeFilter$Select
+C	eu/kanade/tachiyomi/animesource/model/AnimeFilter$Separator
+C	eu/kanade/tachiyomi/animesource/model/AnimeFilter$Sort
+C	eu/kanade/tachiyomi/animesource/model/AnimeFilter$Sort$Selection
+C	eu/kanade/tachiyomi/animesource/model/AnimeFilter$Text
+C	eu/kanade/tachiyomi/animesource/model/AnimeFilter$TriState
+C	eu/kanade/tachiyomi/animesource/model/AnimeFilter$TriState$Companion
+C	eu/kanade/tachiyomi/animesource/model/AnimeFilterList
+C	eu/kanade/tachiyomi/animesource/model/AnimeRelation
+C	eu/kanade/tachiyomi/animesource/model/AnimeUpdateStrategy
+C	eu/kanade/tachiyomi/animesource/model/AnimesPage
+C	eu/kanade/tachiyomi/animesource/model/ChapterType
+C	eu/kanade/tachiyomi/animesource/model/FetchType
+C	eu/kanade/tachiyomi/animesource/model/Hoster
+C	eu/kanade/tachiyomi/animesource/model/Hoster$Companion
+C	eu/kanade/tachiyomi/animesource/model/HttpServer
+C	eu/kanade/tachiyomi/animesource/model/HttpServer$Companion
+C	eu/kanade/tachiyomi/animesource/model/SAnime
+C	eu/kanade/tachiyomi/animesource/model/SAnime$Companion
+C	eu/kanade/tachiyomi/animesource/model/SAnimeEpisodeUpdate
+C	eu/kanade/tachiyomi/animesource/model/SAnimeSeasonUpdate
+C	eu/kanade/tachiyomi/animesource/model/SEpisode
+C	eu/kanade/tachiyomi/animesource/model/SEpisode$Companion
+C	eu/kanade/tachiyomi/animesource/model/ThumbnailInfo
+C	eu/kanade/tachiyomi/animesource/model/TileInfo
+C	eu/kanade/tachiyomi/animesource/model/TimeStamp
+C	eu/kanade/tachiyomi/animesource/model/Track
+C	eu/kanade/tachiyomi/animesource/model/Video
+C	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource
+C	eu/kanade/tachiyomi/animesource/online/ParsedAnimeHttpSource
+C	eu/kanade/tachiyomi/animesource/online/ResolvableAnimeSource
+C	eu/kanade/tachiyomi/animesource/online/ResolvableAnimeSource$DefaultImpls
+C	eu/kanade/tachiyomi/animesource/online/UriType
+C	eu/kanade/tachiyomi/animesource/online/UriType$Anime
+C	eu/kanade/tachiyomi/animesource/online/UriType$Episode
+C	eu/kanade/tachiyomi/animesource/online/UriType$Unknown
+C	eu/kanade/tachiyomi/network/HttpException
+C	eu/kanade/tachiyomi/network/JavaScriptEngine
+C	eu/kanade/tachiyomi/network/NetworkHelper
+C	eu/kanade/tachiyomi/network/OkHttpExtensionsKt
+C	eu/kanade/tachiyomi/network/RequestsKt
+C	eu/kanade/tachiyomi/network/interceptor/RateLimitInterceptorKt
+C	eu/kanade/tachiyomi/network/interceptor/SpecificHostRateLimitInterceptorKt
+C	eu/kanade/tachiyomi/torrentutils/TorrentUtils
+C	eu/kanade/tachiyomi/torrentutils/model/DeadTorrentException
+C	eu/kanade/tachiyomi/torrentutils/model/TorrentFile
+C	eu/kanade/tachiyomi/torrentutils/model/TorrentInfo
+C	eu/kanade/tachiyomi/util/CoroutinesExtensionsKt
+C	eu/kanade/tachiyomi/util/JsonExtensionsKt
+C	eu/kanade/tachiyomi/util/JsoupExtensionsKt
+F	eu/kanade/tachiyomi/AppInfo	INSTANCE	Leu/kanade/tachiyomi/AppInfo;	25
+F	eu/kanade/tachiyomi/animesource/model/AnimeFilter$TriState	Companion	Leu/kanade/tachiyomi/animesource/model/AnimeFilter$TriState$Companion;	25
+F	eu/kanade/tachiyomi/animesource/model/AnimeFilter$TriState	STATE_EXCLUDE	I	25
+F	eu/kanade/tachiyomi/animesource/model/AnimeFilter$TriState	STATE_IGNORE	I	25
+F	eu/kanade/tachiyomi/animesource/model/AnimeFilter$TriState	STATE_INCLUDE	I	25
+F	eu/kanade/tachiyomi/animesource/model/AnimeUpdateStrategy	ALWAYS_UPDATE	Leu/kanade/tachiyomi/animesource/model/AnimeUpdateStrategy;	16409
+F	eu/kanade/tachiyomi/animesource/model/AnimeUpdateStrategy	ONLY_FETCH_ONCE	Leu/kanade/tachiyomi/animesource/model/AnimeUpdateStrategy;	16409
+F	eu/kanade/tachiyomi/animesource/model/ChapterType	Ending	Leu/kanade/tachiyomi/animesource/model/ChapterType;	16409
+F	eu/kanade/tachiyomi/animesource/model/ChapterType	MixedOp	Leu/kanade/tachiyomi/animesource/model/ChapterType;	16409
+F	eu/kanade/tachiyomi/animesource/model/ChapterType	Opening	Leu/kanade/tachiyomi/animesource/model/ChapterType;	16409
+F	eu/kanade/tachiyomi/animesource/model/ChapterType	Other	Leu/kanade/tachiyomi/animesource/model/ChapterType;	16409
+F	eu/kanade/tachiyomi/animesource/model/ChapterType	Recap	Leu/kanade/tachiyomi/animesource/model/ChapterType;	16409
+F	eu/kanade/tachiyomi/animesource/model/FetchType	Episodes	Leu/kanade/tachiyomi/animesource/model/FetchType;	16409
+F	eu/kanade/tachiyomi/animesource/model/FetchType	Seasons	Leu/kanade/tachiyomi/animesource/model/FetchType;	16409
+F	eu/kanade/tachiyomi/animesource/model/Hoster	Companion	Leu/kanade/tachiyomi/animesource/model/Hoster$Companion;	25
+F	eu/kanade/tachiyomi/animesource/model/Hoster	NO_HOSTER_LIST	Ljava/lang/String;	25
+F	eu/kanade/tachiyomi/animesource/model/HttpServer	Companion	Leu/kanade/tachiyomi/animesource/model/HttpServer$Companion;	25
+F	eu/kanade/tachiyomi/animesource/model/HttpServer	PLACEHOLDER_URL	Ljava/lang/String;	25
+F	eu/kanade/tachiyomi/animesource/model/SAnime	CANCELLED	I	25
+F	eu/kanade/tachiyomi/animesource/model/SAnime	COMPLETED	I	25
+F	eu/kanade/tachiyomi/animesource/model/SAnime	Companion	Leu/kanade/tachiyomi/animesource/model/SAnime$Companion;	25
+F	eu/kanade/tachiyomi/animesource/model/SAnime	LICENSED	I	25
+F	eu/kanade/tachiyomi/animesource/model/SAnime	ONGOING	I	25
+F	eu/kanade/tachiyomi/animesource/model/SAnime	ON_HIATUS	I	25
+F	eu/kanade/tachiyomi/animesource/model/SAnime	PUBLISHING_FINISHED	I	25
+F	eu/kanade/tachiyomi/animesource/model/SAnime	UNKNOWN	I	25
+F	eu/kanade/tachiyomi/animesource/model/SAnime	UPCOMING	I	25
+F	eu/kanade/tachiyomi/animesource/model/SAnime$Companion	CANCELLED	I	25
+F	eu/kanade/tachiyomi/animesource/model/SAnime$Companion	COMPLETED	I	25
+F	eu/kanade/tachiyomi/animesource/model/SAnime$Companion	LICENSED	I	25
+F	eu/kanade/tachiyomi/animesource/model/SAnime$Companion	ONGOING	I	25
+F	eu/kanade/tachiyomi/animesource/model/SAnime$Companion	ON_HIATUS	I	25
+F	eu/kanade/tachiyomi/animesource/model/SAnime$Companion	PUBLISHING_FINISHED	I	25
+F	eu/kanade/tachiyomi/animesource/model/SAnime$Companion	UNKNOWN	I	25
+F	eu/kanade/tachiyomi/animesource/model/SAnime$Companion	UPCOMING	I	25
+F	eu/kanade/tachiyomi/animesource/model/SEpisode	Companion	Leu/kanade/tachiyomi/animesource/model/SEpisode$Companion;	25
+F	eu/kanade/tachiyomi/animesource/online/UriType$Anime	INSTANCE	Leu/kanade/tachiyomi/animesource/online/UriType$Anime;	25
+F	eu/kanade/tachiyomi/animesource/online/UriType$Episode	INSTANCE	Leu/kanade/tachiyomi/animesource/online/UriType$Episode;	25
+F	eu/kanade/tachiyomi/animesource/online/UriType$Unknown	INSTANCE	Leu/kanade/tachiyomi/animesource/online/UriType$Unknown;	25
+F	eu/kanade/tachiyomi/torrentutils/TorrentUtils	INSTANCE	Leu/kanade/tachiyomi/torrentutils/TorrentUtils;	25
+M	android/content/Context	<init>	()V	1
+M	androidx/preference/CheckBoxPreference	<init>	(Landroid/content/Context;)V	1
+M	androidx/preference/DialogPreference	<init>	()V	1
+M	androidx/preference/DialogPreference	getDialogMessage	()Ljava/lang/CharSequence;	1
+M	androidx/preference/DialogPreference	getDialogTitle	()Ljava/lang/CharSequence;	1
+M	androidx/preference/DialogPreference	setDialogMessage	(Ljava/lang/CharSequence;)V	1
+M	androidx/preference/DialogPreference	setDialogTitle	(Ljava/lang/CharSequence;)V	1
+M	androidx/preference/EditTextPreference	<init>	(Landroid/content/Context;)V	1
+M	androidx/preference/EditTextPreference	getText	()Ljava/lang/String;	1
+M	androidx/preference/EditTextPreference	setOnBindEditTextListener	(Landroidx/preference/EditTextPreference$OnBindEditTextListener;)V	1
+M	androidx/preference/EditTextPreference	setText	(Ljava/lang/String;)V	1
+M	androidx/preference/EditTextPreference$OnBindEditTextListener	onBindEditText	(Landroid/widget/EditText;)V	1025
+M	androidx/preference/ListPreference	<init>	(Landroid/content/Context;)V	1
+M	androidx/preference/ListPreference	findIndexOfValue	(Ljava/lang/String;)I	1
+M	androidx/preference/ListPreference	getEntries	()[Ljava/lang/CharSequence;	1
+M	androidx/preference/ListPreference	getEntryValues	()[Ljava/lang/CharSequence;	1
+M	androidx/preference/ListPreference	getValue	()Ljava/lang/String;	1
+M	androidx/preference/ListPreference	setEntries	([Ljava/lang/CharSequence;)V	1
+M	androidx/preference/ListPreference	setEntryValues	([Ljava/lang/CharSequence;)V	1
+M	androidx/preference/ListPreference	setValue	(Ljava/lang/String;)V	1
+M	androidx/preference/ListPreference	setValueIndex	(I)V	1
+M	androidx/preference/MultiSelectListPreference	<init>	(Landroid/content/Context;)V	1
+M	androidx/preference/MultiSelectListPreference	findIndexOfValue	(Ljava/lang/String;)I	1
+M	androidx/preference/MultiSelectListPreference	getEntries	()[Ljava/lang/CharSequence;	1
+M	androidx/preference/MultiSelectListPreference	getEntryValues	()[Ljava/lang/CharSequence;	1
+M	androidx/preference/MultiSelectListPreference	getValues	()Ljava/util/Set;	1
+M	androidx/preference/MultiSelectListPreference	setEntries	([Ljava/lang/CharSequence;)V	1
+M	androidx/preference/MultiSelectListPreference	setEntryValues	([Ljava/lang/CharSequence;)V	1
+M	androidx/preference/MultiSelectListPreference	setValues	(Ljava/util/Set;)V	1
+M	androidx/preference/Preference	<init>	()V	1
+M	androidx/preference/Preference	getKey	()Ljava/lang/String;	1
+M	androidx/preference/Preference	getSummary	()Ljava/lang/CharSequence;	1
+M	androidx/preference/Preference	getTitle	()Ljava/lang/CharSequence;	1
+M	androidx/preference/Preference	setDefaultValue	(Ljava/lang/Object;)V	1
+M	androidx/preference/Preference	setEnabled	(Z)V	1
+M	androidx/preference/Preference	setKey	(Ljava/lang/String;)V	1
+M	androidx/preference/Preference	setOnPreferenceChangeListener	(Landroidx/preference/Preference$OnPreferenceChangeListener;)V	1
+M	androidx/preference/Preference	setOnPreferenceClickListener	(Landroidx/preference/Preference$OnPreferenceClickListener;)V	1
+M	androidx/preference/Preference	setSummary	(Ljava/lang/CharSequence;)V	1
+M	androidx/preference/Preference	setTitle	(Ljava/lang/CharSequence;)V	1
+M	androidx/preference/Preference	setVisible	(Z)V	1
+M	androidx/preference/Preference$OnPreferenceChangeListener	onPreferenceChange	(Landroidx/preference/Preference;Ljava/lang/Object;)Z	1025
+M	androidx/preference/Preference$OnPreferenceClickListener	onPreferenceClick	(Landroidx/preference/Preference;)Z	1025
+M	androidx/preference/PreferenceScreen	<init>	()V	1
+M	androidx/preference/PreferenceScreen	addPreference	(Landroidx/preference/Preference;)Z	1
+M	androidx/preference/PreferenceScreen	getContext	()Landroid/content/Context;	1
+M	androidx/preference/SwitchPreferenceCompat	<init>	(Landroid/content/Context;)V	1
+M	androidx/preference/TwoStatePreference	<init>	(Landroid/content/Context;)V	1
+M	androidx/preference/TwoStatePreference	getDisableDependentsState	()Z	1
+M	androidx/preference/TwoStatePreference	getSummaryOff	()Ljava/lang/CharSequence;	1
+M	androidx/preference/TwoStatePreference	getSummaryOn	()Ljava/lang/CharSequence;	1
+M	androidx/preference/TwoStatePreference	isChecked	()Z	1
+M	androidx/preference/TwoStatePreference	setChecked	(Z)V	1
+M	androidx/preference/TwoStatePreference	setDisableDependentsState	(Z)V	1
+M	androidx/preference/TwoStatePreference	setSummaryOff	(Ljava/lang/CharSequence;)V	1
+M	androidx/preference/TwoStatePreference	setSummaryOn	(Ljava/lang/CharSequence;)V	1
+M	eu/kanade/tachiyomi/AppInfo	getVersionCode	()I	17
+M	eu/kanade/tachiyomi/AppInfo	getVersionName	()Ljava/lang/String;	17
+M	eu/kanade/tachiyomi/animesource/AnimeCatalogueSource	access$getAnimeDetails$jd	(Leu/kanade/tachiyomi/animesource/AnimeCatalogueSource;Leu/kanade/tachiyomi/animesource/model/SAnime;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	4105
+M	eu/kanade/tachiyomi/animesource/AnimeCatalogueSource	access$getAnimeEpisodeUpdate$jd	(Leu/kanade/tachiyomi/animesource/AnimeCatalogueSource;Leu/kanade/tachiyomi/animesource/model/SAnime;Ljava/util/List;ZZLkotlin/coroutines/Continuation;)Ljava/lang/Object;	4105
+M	eu/kanade/tachiyomi/animesource/AnimeCatalogueSource	access$getAnimeSeasonUpdate$jd	(Leu/kanade/tachiyomi/animesource/AnimeCatalogueSource;Leu/kanade/tachiyomi/animesource/model/SAnime;Ljava/util/List;ZZLkotlin/coroutines/Continuation;)Ljava/lang/Object;	4105
+M	eu/kanade/tachiyomi/animesource/AnimeCatalogueSource	access$getEpisodeList$jd	(Leu/kanade/tachiyomi/animesource/AnimeCatalogueSource;Leu/kanade/tachiyomi/animesource/model/SAnime;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	4105
+M	eu/kanade/tachiyomi/animesource/AnimeCatalogueSource	access$getFilterList$jd	(Leu/kanade/tachiyomi/animesource/AnimeCatalogueSource;)Leu/kanade/tachiyomi/animesource/model/AnimeFilterList;	4105
+M	eu/kanade/tachiyomi/animesource/AnimeCatalogueSource	access$getHosterList$jd	(Leu/kanade/tachiyomi/animesource/AnimeCatalogueSource;Leu/kanade/tachiyomi/animesource/model/SEpisode;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	4105
+M	eu/kanade/tachiyomi/animesource/AnimeCatalogueSource	access$getLatestUpdates$jd	(Leu/kanade/tachiyomi/animesource/AnimeCatalogueSource;ILkotlin/coroutines/Continuation;)Ljava/lang/Object;	4105
+M	eu/kanade/tachiyomi/animesource/AnimeCatalogueSource	access$getPopularAnime$jd	(Leu/kanade/tachiyomi/animesource/AnimeCatalogueSource;ILkotlin/coroutines/Continuation;)Ljava/lang/Object;	4105
+M	eu/kanade/tachiyomi/animesource/AnimeCatalogueSource	access$getRelatedAnimeList$jd	(Leu/kanade/tachiyomi/animesource/AnimeCatalogueSource;Leu/kanade/tachiyomi/animesource/model/SAnime;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	4105
+M	eu/kanade/tachiyomi/animesource/AnimeCatalogueSource	access$getSearchAnime$jd	(Leu/kanade/tachiyomi/animesource/AnimeCatalogueSource;ILjava/lang/String;Leu/kanade/tachiyomi/animesource/model/AnimeFilterList;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	4105
+M	eu/kanade/tachiyomi/animesource/AnimeCatalogueSource	access$getSeasonList$jd	(Leu/kanade/tachiyomi/animesource/AnimeCatalogueSource;Leu/kanade/tachiyomi/animesource/model/SAnime;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	4105
+M	eu/kanade/tachiyomi/animesource/AnimeCatalogueSource	access$getVideoList$jd	(Leu/kanade/tachiyomi/animesource/AnimeCatalogueSource;Leu/kanade/tachiyomi/animesource/model/Hoster;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	4105
+M	eu/kanade/tachiyomi/animesource/AnimeCatalogueSource	getAnimeEpisodeUpdate	(Leu/kanade/tachiyomi/animesource/model/SAnime;Ljava/util/List;ZZLkotlin/coroutines/Continuation;)Ljava/lang/Object;	1
+M	eu/kanade/tachiyomi/animesource/AnimeCatalogueSource	getAnimeEpisodeUpdate$suspendImpl	(Leu/kanade/tachiyomi/animesource/AnimeCatalogueSource;Leu/kanade/tachiyomi/animesource/model/SAnime;Ljava/util/List;ZZLkotlin/coroutines/Continuation;)Ljava/lang/Object;	4105
+M	eu/kanade/tachiyomi/animesource/AnimeCatalogueSource	getAnimeSeasonUpdate	(Leu/kanade/tachiyomi/animesource/model/SAnime;Ljava/util/List;ZZLkotlin/coroutines/Continuation;)Ljava/lang/Object;	1
+M	eu/kanade/tachiyomi/animesource/AnimeCatalogueSource	getAnimeSeasonUpdate$suspendImpl	(Leu/kanade/tachiyomi/animesource/AnimeCatalogueSource;Leu/kanade/tachiyomi/animesource/model/SAnime;Ljava/util/List;ZZLkotlin/coroutines/Continuation;)Ljava/lang/Object;	4105
+M	eu/kanade/tachiyomi/animesource/AnimeCatalogueSource	getHosterList	(Leu/kanade/tachiyomi/animesource/model/SEpisode;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	1
+M	eu/kanade/tachiyomi/animesource/AnimeCatalogueSource	getHosterList$suspendImpl	(Leu/kanade/tachiyomi/animesource/AnimeCatalogueSource;Leu/kanade/tachiyomi/animesource/model/SEpisode;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	4105
+M	eu/kanade/tachiyomi/animesource/AnimeCatalogueSource	getLang	()Ljava/lang/String;	1025
+M	eu/kanade/tachiyomi/animesource/AnimeCatalogueSource	getLatestUpdates	(ILkotlin/coroutines/Continuation;)Ljava/lang/Object;	1
+M	eu/kanade/tachiyomi/animesource/AnimeCatalogueSource	getLatestUpdates$suspendImpl	(Leu/kanade/tachiyomi/animesource/AnimeCatalogueSource;ILkotlin/coroutines/Continuation;)Ljava/lang/Object;	4105
+M	eu/kanade/tachiyomi/animesource/AnimeCatalogueSource	getPopularAnime	(ILkotlin/coroutines/Continuation;)Ljava/lang/Object;	1
+M	eu/kanade/tachiyomi/animesource/AnimeCatalogueSource	getPopularAnime$suspendImpl	(Leu/kanade/tachiyomi/animesource/AnimeCatalogueSource;ILkotlin/coroutines/Continuation;)Ljava/lang/Object;	4105
+M	eu/kanade/tachiyomi/animesource/AnimeCatalogueSource	getRelatedAnimeList	(Leu/kanade/tachiyomi/animesource/model/SAnime;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	1
+M	eu/kanade/tachiyomi/animesource/AnimeCatalogueSource	getRelatedAnimeList$suspendImpl	(Leu/kanade/tachiyomi/animesource/AnimeCatalogueSource;Leu/kanade/tachiyomi/animesource/model/SAnime;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	4105
+M	eu/kanade/tachiyomi/animesource/AnimeCatalogueSource	getSearchAnime	(ILjava/lang/String;Leu/kanade/tachiyomi/animesource/model/AnimeFilterList;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	1
+M	eu/kanade/tachiyomi/animesource/AnimeCatalogueSource	getSearchAnime$suspendImpl	(Leu/kanade/tachiyomi/animesource/AnimeCatalogueSource;ILjava/lang/String;Leu/kanade/tachiyomi/animesource/model/AnimeFilterList;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	4105
+M	eu/kanade/tachiyomi/animesource/AnimeCatalogueSource	getVideoList	(Leu/kanade/tachiyomi/animesource/model/Hoster;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	1
+M	eu/kanade/tachiyomi/animesource/AnimeCatalogueSource	getVideoList$suspendImpl	(Leu/kanade/tachiyomi/animesource/AnimeCatalogueSource;Leu/kanade/tachiyomi/animesource/model/Hoster;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	4105
+M	eu/kanade/tachiyomi/animesource/AnimeCatalogueSource$DefaultImpls	getAnimeDetails	(Leu/kanade/tachiyomi/animesource/AnimeCatalogueSource;Leu/kanade/tachiyomi/animesource/model/SAnime;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	131081
+M	eu/kanade/tachiyomi/animesource/AnimeCatalogueSource$DefaultImpls	getAnimeEpisodeUpdate	(Leu/kanade/tachiyomi/animesource/AnimeCatalogueSource;Leu/kanade/tachiyomi/animesource/model/SAnime;Ljava/util/List;ZZLkotlin/coroutines/Continuation;)Ljava/lang/Object;	131081
+M	eu/kanade/tachiyomi/animesource/AnimeCatalogueSource$DefaultImpls	getAnimeSeasonUpdate	(Leu/kanade/tachiyomi/animesource/AnimeCatalogueSource;Leu/kanade/tachiyomi/animesource/model/SAnime;Ljava/util/List;ZZLkotlin/coroutines/Continuation;)Ljava/lang/Object;	131081
+M	eu/kanade/tachiyomi/animesource/AnimeCatalogueSource$DefaultImpls	getEpisodeList	(Leu/kanade/tachiyomi/animesource/AnimeCatalogueSource;Leu/kanade/tachiyomi/animesource/model/SAnime;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	131081
+M	eu/kanade/tachiyomi/animesource/AnimeCatalogueSource$DefaultImpls	getFilterList	(Leu/kanade/tachiyomi/animesource/AnimeCatalogueSource;)Leu/kanade/tachiyomi/animesource/model/AnimeFilterList;	131081
+M	eu/kanade/tachiyomi/animesource/AnimeCatalogueSource$DefaultImpls	getHosterList	(Leu/kanade/tachiyomi/animesource/AnimeCatalogueSource;Leu/kanade/tachiyomi/animesource/model/SEpisode;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	131081
+M	eu/kanade/tachiyomi/animesource/AnimeCatalogueSource$DefaultImpls	getLatestUpdates	(Leu/kanade/tachiyomi/animesource/AnimeCatalogueSource;ILkotlin/coroutines/Continuation;)Ljava/lang/Object;	131081
+M	eu/kanade/tachiyomi/animesource/AnimeCatalogueSource$DefaultImpls	getPopularAnime	(Leu/kanade/tachiyomi/animesource/AnimeCatalogueSource;ILkotlin/coroutines/Continuation;)Ljava/lang/Object;	131081
+M	eu/kanade/tachiyomi/animesource/AnimeCatalogueSource$DefaultImpls	getRelatedAnimeList	(Leu/kanade/tachiyomi/animesource/AnimeCatalogueSource;Leu/kanade/tachiyomi/animesource/model/SAnime;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	131081
+M	eu/kanade/tachiyomi/animesource/AnimeCatalogueSource$DefaultImpls	getSearchAnime	(Leu/kanade/tachiyomi/animesource/AnimeCatalogueSource;ILjava/lang/String;Leu/kanade/tachiyomi/animesource/model/AnimeFilterList;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	131081
+M	eu/kanade/tachiyomi/animesource/AnimeCatalogueSource$DefaultImpls	getSeasonList	(Leu/kanade/tachiyomi/animesource/AnimeCatalogueSource;Leu/kanade/tachiyomi/animesource/model/SAnime;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	131081
+M	eu/kanade/tachiyomi/animesource/AnimeCatalogueSource$DefaultImpls	getVideoList	(Leu/kanade/tachiyomi/animesource/AnimeCatalogueSource;Leu/kanade/tachiyomi/animesource/model/Hoster;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	131081
+M	eu/kanade/tachiyomi/animesource/AnimeSource	access$getAnimeDetails$jd	(Leu/kanade/tachiyomi/animesource/AnimeSource;Leu/kanade/tachiyomi/animesource/model/SAnime;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	4105
+M	eu/kanade/tachiyomi/animesource/AnimeSource	access$getEpisodeList$jd	(Leu/kanade/tachiyomi/animesource/AnimeSource;Leu/kanade/tachiyomi/animesource/model/SAnime;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	4105
+M	eu/kanade/tachiyomi/animesource/AnimeSource	access$getFilterList$jd	(Leu/kanade/tachiyomi/animesource/AnimeSource;)Leu/kanade/tachiyomi/animesource/model/AnimeFilterList;	4105
+M	eu/kanade/tachiyomi/animesource/AnimeSource	access$getSeasonList$jd	(Leu/kanade/tachiyomi/animesource/AnimeSource;Leu/kanade/tachiyomi/animesource/model/SAnime;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	4105
+M	eu/kanade/tachiyomi/animesource/AnimeSource	getAnimeDetails	(Leu/kanade/tachiyomi/animesource/model/SAnime;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	131073
+M	eu/kanade/tachiyomi/animesource/AnimeSource	getAnimeDetails$suspendImpl	(Leu/kanade/tachiyomi/animesource/AnimeSource;Leu/kanade/tachiyomi/animesource/model/SAnime;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	135177
+M	eu/kanade/tachiyomi/animesource/AnimeSource	getAnimeEpisodeUpdate	(Leu/kanade/tachiyomi/animesource/model/SAnime;Ljava/util/List;ZZLkotlin/coroutines/Continuation;)Ljava/lang/Object;	1025
+M	eu/kanade/tachiyomi/animesource/AnimeSource	getAnimeSeasonUpdate	(Leu/kanade/tachiyomi/animesource/model/SAnime;Ljava/util/List;ZZLkotlin/coroutines/Continuation;)Ljava/lang/Object;	1025
+M	eu/kanade/tachiyomi/animesource/AnimeSource	getEpisodeList	(Leu/kanade/tachiyomi/animesource/model/SAnime;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	131073
+M	eu/kanade/tachiyomi/animesource/AnimeSource	getEpisodeList$suspendImpl	(Leu/kanade/tachiyomi/animesource/AnimeSource;Leu/kanade/tachiyomi/animesource/model/SAnime;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	135177
+M	eu/kanade/tachiyomi/animesource/AnimeSource	getFilterList	()Leu/kanade/tachiyomi/animesource/model/AnimeFilterList;	1
+M	eu/kanade/tachiyomi/animesource/AnimeSource	getHosterList	(Leu/kanade/tachiyomi/animesource/model/SEpisode;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	1025
+M	eu/kanade/tachiyomi/animesource/AnimeSource	getId	()J	1025
+M	eu/kanade/tachiyomi/animesource/AnimeSource	getLatestUpdates	(ILkotlin/coroutines/Continuation;)Ljava/lang/Object;	1025
+M	eu/kanade/tachiyomi/animesource/AnimeSource	getName	()Ljava/lang/String;	1025
+M	eu/kanade/tachiyomi/animesource/AnimeSource	getPopularAnime	(ILkotlin/coroutines/Continuation;)Ljava/lang/Object;	1025
+M	eu/kanade/tachiyomi/animesource/AnimeSource	getRelatedAnimeList	(Leu/kanade/tachiyomi/animesource/model/SAnime;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	1025
+M	eu/kanade/tachiyomi/animesource/AnimeSource	getSearchAnime	(ILjava/lang/String;Leu/kanade/tachiyomi/animesource/model/AnimeFilterList;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	1025
+M	eu/kanade/tachiyomi/animesource/AnimeSource	getSeasonList	(Leu/kanade/tachiyomi/animesource/model/SAnime;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	131073
+M	eu/kanade/tachiyomi/animesource/AnimeSource	getSeasonList$suspendImpl	(Leu/kanade/tachiyomi/animesource/AnimeSource;Leu/kanade/tachiyomi/animesource/model/SAnime;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	135177
+M	eu/kanade/tachiyomi/animesource/AnimeSource	getSupportsLatest	()Z	1025
+M	eu/kanade/tachiyomi/animesource/AnimeSource	getSupportsRelatedAnime	()Z	1025
+M	eu/kanade/tachiyomi/animesource/AnimeSource	getVideoList	(Leu/kanade/tachiyomi/animesource/model/Hoster;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	1025
+M	eu/kanade/tachiyomi/animesource/AnimeSource$DefaultImpls	getAnimeDetails	(Leu/kanade/tachiyomi/animesource/AnimeSource;Leu/kanade/tachiyomi/animesource/model/SAnime;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	131081
+M	eu/kanade/tachiyomi/animesource/AnimeSource$DefaultImpls	getEpisodeList	(Leu/kanade/tachiyomi/animesource/AnimeSource;Leu/kanade/tachiyomi/animesource/model/SAnime;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	131081
+M	eu/kanade/tachiyomi/animesource/AnimeSource$DefaultImpls	getFilterList	(Leu/kanade/tachiyomi/animesource/AnimeSource;)Leu/kanade/tachiyomi/animesource/model/AnimeFilterList;	131081
+M	eu/kanade/tachiyomi/animesource/AnimeSource$DefaultImpls	getSeasonList	(Leu/kanade/tachiyomi/animesource/AnimeSource;Leu/kanade/tachiyomi/animesource/model/SAnime;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	131081
+M	eu/kanade/tachiyomi/animesource/AnimeSourceFactory	createSources	()Ljava/util/List;	1025
+M	eu/kanade/tachiyomi/animesource/ConfigurableAnimeSource	setupPreferenceScreen	(Landroidx/preference/PreferenceScreen;)V	1025
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilter	<init>	(Ljava/lang/String;Ljava/lang/Object;Lkotlin/jvm/internal/DefaultConstructorMarker;)V	4097
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilter	getName	()Ljava/lang/String;	17
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilter	getState	()Ljava/lang/Object;	17
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilter	setState	(Ljava/lang/Object;)V	17
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilter$CheckBox	<init>	(Ljava/lang/String;Z)V	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilter$CheckBox	<init>	(Ljava/lang/String;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V	4097
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilter$Group	<init>	(Ljava/lang/String;Ljava/util/List;)V	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilter$Header	<init>	(Ljava/lang/String;)V	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilter$Select	<init>	(Ljava/lang/String;[Ljava/lang/Object;I)V	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilter$Select	<init>	(Ljava/lang/String;[Ljava/lang/Object;IILkotlin/jvm/internal/DefaultConstructorMarker;)V	4097
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilter$Select	getValues	()[Ljava/lang/Object;	17
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilter$Separator	<init>	()V	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilter$Separator	<init>	(Ljava/lang/String;)V	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilter$Separator	<init>	(Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V	4097
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilter$Sort	<init>	(Ljava/lang/String;[Ljava/lang/String;Leu/kanade/tachiyomi/animesource/model/AnimeFilter$Sort$Selection;)V	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilter$Sort	<init>	(Ljava/lang/String;[Ljava/lang/String;Leu/kanade/tachiyomi/animesource/model/AnimeFilter$Sort$Selection;ILkotlin/jvm/internal/DefaultConstructorMarker;)V	4097
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilter$Sort	getValues	()[Ljava/lang/String;	17
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilter$Sort$Selection	<init>	(IZ)V	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilter$Sort$Selection	component1	()I	17
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilter$Sort$Selection	component2	()Z	17
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilter$Sort$Selection	copy	(IZ)Leu/kanade/tachiyomi/animesource/model/AnimeFilter$Sort$Selection;	17
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilter$Sort$Selection	copy$default	(Leu/kanade/tachiyomi/animesource/model/AnimeFilter$Sort$Selection;IZILjava/lang/Object;)Leu/kanade/tachiyomi/animesource/model/AnimeFilter$Sort$Selection;	4105
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilter$Sort$Selection	equals	(Ljava/lang/Object;)Z	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilter$Sort$Selection	getAscending	()Z	17
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilter$Sort$Selection	getIndex	()I	17
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilter$Sort$Selection	hashCode	()I	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilter$Sort$Selection	toString	()Ljava/lang/String;	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilter$Text	<init>	(Ljava/lang/String;Ljava/lang/String;)V	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilter$Text	<init>	(Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V	4097
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilter$TriState	<init>	(Ljava/lang/String;I)V	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilter$TriState	<init>	(Ljava/lang/String;IILkotlin/jvm/internal/DefaultConstructorMarker;)V	4097
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilter$TriState	isExcluded	()Z	17
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilter$TriState	isIgnored	()Z	17
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilter$TriState	isIncluded	()Z	17
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilter$TriState$Companion	<init>	(Lkotlin/jvm/internal/DefaultConstructorMarker;)V	4097
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	<init>	(Ljava/util/List;)V	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	<init>	([Leu/kanade/tachiyomi/animesource/model/AnimeFilter;)V	129
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	add	(ILeu/kanade/tachiyomi/animesource/model/AnimeFilter;)V	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	add	(ILjava/lang/Object;)V	4161
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	add	(Leu/kanade/tachiyomi/animesource/model/AnimeFilter;)Z	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	add	(Ljava/lang/Object;)Z	4161
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	addAll	(ILjava/util/Collection;)Z	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	addAll	(Ljava/util/Collection;)Z	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	addFirst	(Leu/kanade/tachiyomi/animesource/model/AnimeFilter;)V	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	addFirst	(Ljava/lang/Object;)V	4161
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	addLast	(Leu/kanade/tachiyomi/animesource/model/AnimeFilter;)V	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	addLast	(Ljava/lang/Object;)V	4161
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	clear	()V	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	component1	()Ljava/util/List;	17
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	contains	(Leu/kanade/tachiyomi/animesource/model/AnimeFilter;)Z	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	contains	(Ljava/lang/Object;)Z	81
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	containsAll	(Ljava/util/Collection;)Z	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	copy	(Ljava/util/List;)Leu/kanade/tachiyomi/animesource/model/AnimeFilterList;	17
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	copy$default	(Leu/kanade/tachiyomi/animesource/model/AnimeFilterList;Ljava/util/List;ILjava/lang/Object;)Leu/kanade/tachiyomi/animesource/model/AnimeFilterList;	4105
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	equals	(Ljava/lang/Object;)Z	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	get	(I)Leu/kanade/tachiyomi/animesource/model/AnimeFilter;	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	get	(I)Ljava/lang/Object;	4161
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	getList	()Ljava/util/List;	17
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	getSize	()I	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	hashCode	()I	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	indexOf	(Leu/kanade/tachiyomi/animesource/model/AnimeFilter;)I	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	indexOf	(Ljava/lang/Object;)I	81
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	isEmpty	()Z	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	iterator	()Ljava/util/Iterator;	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	lastIndexOf	(Leu/kanade/tachiyomi/animesource/model/AnimeFilter;)I	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	lastIndexOf	(Ljava/lang/Object;)I	81
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	listIterator	()Ljava/util/ListIterator;	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	listIterator	(I)Ljava/util/ListIterator;	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	remove	(I)Leu/kanade/tachiyomi/animesource/model/AnimeFilter;	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	remove	(I)Ljava/lang/Object;	4161
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	remove	(Ljava/lang/Object;)Z	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	removeAll	(Ljava/util/Collection;)Z	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	removeFirst	()Leu/kanade/tachiyomi/animesource/model/AnimeFilter;	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	removeFirst	()Ljava/lang/Object;	4161
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	removeLast	()Leu/kanade/tachiyomi/animesource/model/AnimeFilter;	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	removeLast	()Ljava/lang/Object;	4161
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	replaceAll	(Ljava/util/function/UnaryOperator;)V	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	retainAll	(Ljava/util/Collection;)Z	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	set	(ILeu/kanade/tachiyomi/animesource/model/AnimeFilter;)Leu/kanade/tachiyomi/animesource/model/AnimeFilter;	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	set	(ILjava/lang/Object;)Ljava/lang/Object;	4161
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	size	()I	81
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	sort	(Ljava/util/Comparator;)V	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	subList	(II)Ljava/util/List;	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	toArray	()[Ljava/lang/Object;	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	toArray	([Ljava/lang/Object;)[Ljava/lang/Object;	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeFilterList	toString	()Ljava/lang/String;	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeRelation	<init>	(Ljava/lang/String;Ljava/util/List;)V	1
+M	eu/kanade/tachiyomi/animesource/model/AnimeRelation	getAnimes	()Ljava/util/List;	17
+M	eu/kanade/tachiyomi/animesource/model/AnimeRelation	getName	()Ljava/lang/String;	17
+M	eu/kanade/tachiyomi/animesource/model/AnimeUpdateStrategy	getEntries	()Lkotlin/enums/EnumEntries;	9
+M	eu/kanade/tachiyomi/animesource/model/AnimeUpdateStrategy	valueOf	(Ljava/lang/String;)Leu/kanade/tachiyomi/animesource/model/AnimeUpdateStrategy;	9
+M	eu/kanade/tachiyomi/animesource/model/AnimeUpdateStrategy	values	()[Leu/kanade/tachiyomi/animesource/model/AnimeUpdateStrategy;	9
+M	eu/kanade/tachiyomi/animesource/model/AnimesPage	<init>	(Ljava/util/List;Z)V	1
+M	eu/kanade/tachiyomi/animesource/model/AnimesPage	component1	()Ljava/util/List;	131089
+M	eu/kanade/tachiyomi/animesource/model/AnimesPage	component2	()Z	131089
+M	eu/kanade/tachiyomi/animesource/model/AnimesPage	copy	(Ljava/util/List;Z)Leu/kanade/tachiyomi/animesource/model/AnimesPage;	131089
+M	eu/kanade/tachiyomi/animesource/model/AnimesPage	copy$default	(Leu/kanade/tachiyomi/animesource/model/AnimesPage;Ljava/util/List;ZILjava/lang/Object;)Leu/kanade/tachiyomi/animesource/model/AnimesPage;	135177
+M	eu/kanade/tachiyomi/animesource/model/AnimesPage	getAnimes	()Ljava/util/List;	17
+M	eu/kanade/tachiyomi/animesource/model/AnimesPage	getHasNextPage	()Z	17
+M	eu/kanade/tachiyomi/animesource/model/ChapterType	getEntries	()Lkotlin/enums/EnumEntries;	9
+M	eu/kanade/tachiyomi/animesource/model/ChapterType	valueOf	(Ljava/lang/String;)Leu/kanade/tachiyomi/animesource/model/ChapterType;	9
+M	eu/kanade/tachiyomi/animesource/model/ChapterType	values	()[Leu/kanade/tachiyomi/animesource/model/ChapterType;	9
+M	eu/kanade/tachiyomi/animesource/model/FetchType	getEntries	()Lkotlin/enums/EnumEntries;	9
+M	eu/kanade/tachiyomi/animesource/model/FetchType	valueOf	(Ljava/lang/String;)Leu/kanade/tachiyomi/animesource/model/FetchType;	9
+M	eu/kanade/tachiyomi/animesource/model/FetchType	values	()[Leu/kanade/tachiyomi/animesource/model/FetchType;	9
+M	eu/kanade/tachiyomi/animesource/model/Hoster	<init>	()V	1
+M	eu/kanade/tachiyomi/animesource/model/Hoster	<init>	(Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;ZLkotlinx/serialization/json/JsonObject;)V	1
+M	eu/kanade/tachiyomi/animesource/model/Hoster	<init>	(Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;ZLkotlinx/serialization/json/JsonObject;ILkotlin/jvm/internal/DefaultConstructorMarker;)V	4097
+M	eu/kanade/tachiyomi/animesource/model/Hoster	getHosterName	()Ljava/lang/String;	17
+M	eu/kanade/tachiyomi/animesource/model/Hoster	getHosterUrl	()Ljava/lang/String;	17
+M	eu/kanade/tachiyomi/animesource/model/Hoster	getInternalData	()Ljava/lang/String;	131089
+M	eu/kanade/tachiyomi/animesource/model/Hoster	getInternalData$annotations	()V	135177
+M	eu/kanade/tachiyomi/animesource/model/Hoster	getLazy	()Z	17
+M	eu/kanade/tachiyomi/animesource/model/Hoster	getMemo	()Lkotlinx/serialization/json/JsonObject;	17
+M	eu/kanade/tachiyomi/animesource/model/Hoster	getVideoList	()Ljava/util/List;	17
+M	eu/kanade/tachiyomi/animesource/model/Hoster$Companion	<init>	(Lkotlin/jvm/internal/DefaultConstructorMarker;)V	4097
+M	eu/kanade/tachiyomi/animesource/model/Hoster$Companion	toHosterList	(Ljava/util/List;)Ljava/util/List;	17
+M	eu/kanade/tachiyomi/animesource/model/HttpServer	<init>	()V	1
+M	eu/kanade/tachiyomi/animesource/model/HttpServer	getUrl	()Ljava/lang/String;	17
+M	eu/kanade/tachiyomi/animesource/model/HttpServer$Companion	<init>	(Lkotlin/jvm/internal/DefaultConstructorMarker;)V	4097
+M	eu/kanade/tachiyomi/animesource/model/SAnime	getArtist	()Ljava/lang/String;	1025
+M	eu/kanade/tachiyomi/animesource/model/SAnime	getAuthor	()Ljava/lang/String;	1025
+M	eu/kanade/tachiyomi/animesource/model/SAnime	getBackground_url	()Ljava/lang/String;	1025
+M	eu/kanade/tachiyomi/animesource/model/SAnime	getDescription	()Ljava/lang/String;	1025
+M	eu/kanade/tachiyomi/animesource/model/SAnime	getFetch_type	()Leu/kanade/tachiyomi/animesource/model/FetchType;	1025
+M	eu/kanade/tachiyomi/animesource/model/SAnime	getGenre	()Ljava/lang/String;	1025
+M	eu/kanade/tachiyomi/animesource/model/SAnime	getInitialized	()Z	1025
+M	eu/kanade/tachiyomi/animesource/model/SAnime	getMemo	()Lkotlinx/serialization/json/JsonObject;	1025
+M	eu/kanade/tachiyomi/animesource/model/SAnime	getSeason_number	()D	1025
+M	eu/kanade/tachiyomi/animesource/model/SAnime	getStatus	()I	1025
+M	eu/kanade/tachiyomi/animesource/model/SAnime	getThumbnail_url	()Ljava/lang/String;	1025
+M	eu/kanade/tachiyomi/animesource/model/SAnime	getTitle	()Ljava/lang/String;	1025
+M	eu/kanade/tachiyomi/animesource/model/SAnime	getUpdate_strategy	()Leu/kanade/tachiyomi/animesource/model/AnimeUpdateStrategy;	1025
+M	eu/kanade/tachiyomi/animesource/model/SAnime	getUrl	()Ljava/lang/String;	1025
+M	eu/kanade/tachiyomi/animesource/model/SAnime	setArtist	(Ljava/lang/String;)V	1025
+M	eu/kanade/tachiyomi/animesource/model/SAnime	setAuthor	(Ljava/lang/String;)V	1025
+M	eu/kanade/tachiyomi/animesource/model/SAnime	setBackground_url	(Ljava/lang/String;)V	1025
+M	eu/kanade/tachiyomi/animesource/model/SAnime	setDescription	(Ljava/lang/String;)V	1025
+M	eu/kanade/tachiyomi/animesource/model/SAnime	setFetch_type	(Leu/kanade/tachiyomi/animesource/model/FetchType;)V	1025
+M	eu/kanade/tachiyomi/animesource/model/SAnime	setGenre	(Ljava/lang/String;)V	1025
+M	eu/kanade/tachiyomi/animesource/model/SAnime	setInitialized	(Z)V	1025
+M	eu/kanade/tachiyomi/animesource/model/SAnime	setMemo	(Lkotlinx/serialization/json/JsonObject;)V	1025
+M	eu/kanade/tachiyomi/animesource/model/SAnime	setSeason_number	(D)V	1025
+M	eu/kanade/tachiyomi/animesource/model/SAnime	setStatus	(I)V	1025
+M	eu/kanade/tachiyomi/animesource/model/SAnime	setThumbnail_url	(Ljava/lang/String;)V	1025
+M	eu/kanade/tachiyomi/animesource/model/SAnime	setTitle	(Ljava/lang/String;)V	1025
+M	eu/kanade/tachiyomi/animesource/model/SAnime	setUpdate_strategy	(Leu/kanade/tachiyomi/animesource/model/AnimeUpdateStrategy;)V	1025
+M	eu/kanade/tachiyomi/animesource/model/SAnime	setUrl	(Ljava/lang/String;)V	1025
+M	eu/kanade/tachiyomi/animesource/model/SAnime$Companion	create	()Leu/kanade/tachiyomi/animesource/model/SAnime;	17
+M	eu/kanade/tachiyomi/animesource/model/SAnimeEpisodeUpdate	<init>	(Leu/kanade/tachiyomi/animesource/model/SAnime;Ljava/util/List;)V	1
+M	eu/kanade/tachiyomi/animesource/model/SAnimeEpisodeUpdate	getAnime	()Leu/kanade/tachiyomi/animesource/model/SAnime;	17
+M	eu/kanade/tachiyomi/animesource/model/SAnimeEpisodeUpdate	getEpisodes	()Ljava/util/List;	17
+M	eu/kanade/tachiyomi/animesource/model/SAnimeSeasonUpdate	<init>	(Leu/kanade/tachiyomi/animesource/model/SAnime;Ljava/util/List;)V	1
+M	eu/kanade/tachiyomi/animesource/model/SAnimeSeasonUpdate	getAnime	()Leu/kanade/tachiyomi/animesource/model/SAnime;	17
+M	eu/kanade/tachiyomi/animesource/model/SAnimeSeasonUpdate	getSeasons	()Ljava/util/List;	17
+M	eu/kanade/tachiyomi/animesource/model/SEpisode	getDate_upload	()J	1025
+M	eu/kanade/tachiyomi/animesource/model/SEpisode	getEpisode_number	()F	1025
+M	eu/kanade/tachiyomi/animesource/model/SEpisode	getFillermark	()Z	1025
+M	eu/kanade/tachiyomi/animesource/model/SEpisode	getMemo	()Lkotlinx/serialization/json/JsonObject;	1025
+M	eu/kanade/tachiyomi/animesource/model/SEpisode	getName	()Ljava/lang/String;	1025
+M	eu/kanade/tachiyomi/animesource/model/SEpisode	getPreview_url	()Ljava/lang/String;	1025
+M	eu/kanade/tachiyomi/animesource/model/SEpisode	getScanlator	()Ljava/lang/String;	1025
+M	eu/kanade/tachiyomi/animesource/model/SEpisode	getSummary	()Ljava/lang/String;	1025
+M	eu/kanade/tachiyomi/animesource/model/SEpisode	getUrl	()Ljava/lang/String;	1025
+M	eu/kanade/tachiyomi/animesource/model/SEpisode	setDate_upload	(J)V	1025
+M	eu/kanade/tachiyomi/animesource/model/SEpisode	setEpisode_number	(F)V	1025
+M	eu/kanade/tachiyomi/animesource/model/SEpisode	setFillermark	(Z)V	1025
+M	eu/kanade/tachiyomi/animesource/model/SEpisode	setMemo	(Lkotlinx/serialization/json/JsonObject;)V	1025
+M	eu/kanade/tachiyomi/animesource/model/SEpisode	setName	(Ljava/lang/String;)V	1025
+M	eu/kanade/tachiyomi/animesource/model/SEpisode	setPreview_url	(Ljava/lang/String;)V	1025
+M	eu/kanade/tachiyomi/animesource/model/SEpisode	setScanlator	(Ljava/lang/String;)V	1025
+M	eu/kanade/tachiyomi/animesource/model/SEpisode	setSummary	(Ljava/lang/String;)V	1025
+M	eu/kanade/tachiyomi/animesource/model/SEpisode	setUrl	(Ljava/lang/String;)V	1025
+M	eu/kanade/tachiyomi/animesource/model/SEpisode$Companion	create	()Leu/kanade/tachiyomi/animesource/model/SEpisode;	17
+M	eu/kanade/tachiyomi/animesource/model/ThumbnailInfo	<init>	(Ljava/util/List;Ljava/util/List;)V	1
+M	eu/kanade/tachiyomi/animesource/model/ThumbnailInfo	getImageTileUrls	()Ljava/util/List;	17
+M	eu/kanade/tachiyomi/animesource/model/ThumbnailInfo	getTileInfo	()Ljava/util/List;	17
+M	eu/kanade/tachiyomi/animesource/model/TileInfo	<init>	(IJIIII)V	1
+M	eu/kanade/tachiyomi/animesource/model/TileInfo	component1	()I	17
+M	eu/kanade/tachiyomi/animesource/model/TileInfo	component2	()J	17
+M	eu/kanade/tachiyomi/animesource/model/TileInfo	component3	()I	17
+M	eu/kanade/tachiyomi/animesource/model/TileInfo	component4	()I	17
+M	eu/kanade/tachiyomi/animesource/model/TileInfo	component5	()I	17
+M	eu/kanade/tachiyomi/animesource/model/TileInfo	component6	()I	17
+M	eu/kanade/tachiyomi/animesource/model/TileInfo	copy	(IJIIII)Leu/kanade/tachiyomi/animesource/model/TileInfo;	17
+M	eu/kanade/tachiyomi/animesource/model/TileInfo	copy$default	(Leu/kanade/tachiyomi/animesource/model/TileInfo;IJIIIIILjava/lang/Object;)Leu/kanade/tachiyomi/animesource/model/TileInfo;	4105
+M	eu/kanade/tachiyomi/animesource/model/TileInfo	equals	(Ljava/lang/Object;)Z	1
+M	eu/kanade/tachiyomi/animesource/model/TileInfo	getHeight	()I	17
+M	eu/kanade/tachiyomi/animesource/model/TileInfo	getImageIndex	()I	17
+M	eu/kanade/tachiyomi/animesource/model/TileInfo	getTimeMs	()J	17
+M	eu/kanade/tachiyomi/animesource/model/TileInfo	getWidth	()I	17
+M	eu/kanade/tachiyomi/animesource/model/TileInfo	getX	()I	17
+M	eu/kanade/tachiyomi/animesource/model/TileInfo	getY	()I	17
+M	eu/kanade/tachiyomi/animesource/model/TileInfo	hashCode	()I	1
+M	eu/kanade/tachiyomi/animesource/model/TileInfo	toString	()Ljava/lang/String;	1
+M	eu/kanade/tachiyomi/animesource/model/TimeStamp	<init>	(DDLjava/lang/String;Leu/kanade/tachiyomi/animesource/model/ChapterType;)V	1
+M	eu/kanade/tachiyomi/animesource/model/TimeStamp	<init>	(DDLjava/lang/String;Leu/kanade/tachiyomi/animesource/model/ChapterType;ILkotlin/jvm/internal/DefaultConstructorMarker;)V	4097
+M	eu/kanade/tachiyomi/animesource/model/TimeStamp	component1	()D	17
+M	eu/kanade/tachiyomi/animesource/model/TimeStamp	component2	()D	17
+M	eu/kanade/tachiyomi/animesource/model/TimeStamp	component3	()Ljava/lang/String;	17
+M	eu/kanade/tachiyomi/animesource/model/TimeStamp	component4	()Leu/kanade/tachiyomi/animesource/model/ChapterType;	17
+M	eu/kanade/tachiyomi/animesource/model/TimeStamp	copy	(DDLjava/lang/String;Leu/kanade/tachiyomi/animesource/model/ChapterType;)Leu/kanade/tachiyomi/animesource/model/TimeStamp;	17
+M	eu/kanade/tachiyomi/animesource/model/TimeStamp	copy$default	(Leu/kanade/tachiyomi/animesource/model/TimeStamp;DDLjava/lang/String;Leu/kanade/tachiyomi/animesource/model/ChapterType;ILjava/lang/Object;)Leu/kanade/tachiyomi/animesource/model/TimeStamp;	4105
+M	eu/kanade/tachiyomi/animesource/model/TimeStamp	equals	(Ljava/lang/Object;)Z	1
+M	eu/kanade/tachiyomi/animesource/model/TimeStamp	getEnd	()D	17
+M	eu/kanade/tachiyomi/animesource/model/TimeStamp	getName	()Ljava/lang/String;	17
+M	eu/kanade/tachiyomi/animesource/model/TimeStamp	getStart	()D	17
+M	eu/kanade/tachiyomi/animesource/model/TimeStamp	getType	()Leu/kanade/tachiyomi/animesource/model/ChapterType;	17
+M	eu/kanade/tachiyomi/animesource/model/TimeStamp	hashCode	()I	1
+M	eu/kanade/tachiyomi/animesource/model/TimeStamp	toString	()Ljava/lang/String;	1
+M	eu/kanade/tachiyomi/animesource/model/Track	<init>	(Ljava/lang/String;Ljava/lang/String;)V	1
+M	eu/kanade/tachiyomi/animesource/model/Track	component1	()Ljava/lang/String;	17
+M	eu/kanade/tachiyomi/animesource/model/Track	component2	()Ljava/lang/String;	17
+M	eu/kanade/tachiyomi/animesource/model/Track	copy	(Ljava/lang/String;Ljava/lang/String;)Leu/kanade/tachiyomi/animesource/model/Track;	17
+M	eu/kanade/tachiyomi/animesource/model/Track	copy$default	(Leu/kanade/tachiyomi/animesource/model/Track;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Leu/kanade/tachiyomi/animesource/model/Track;	4105
+M	eu/kanade/tachiyomi/animesource/model/Track	equals	(Ljava/lang/Object;)Z	1
+M	eu/kanade/tachiyomi/animesource/model/Track	getLang	()Ljava/lang/String;	17
+M	eu/kanade/tachiyomi/animesource/model/Track	getUrl	()Ljava/lang/String;	17
+M	eu/kanade/tachiyomi/animesource/model/Track	hashCode	()I	1
+M	eu/kanade/tachiyomi/animesource/model/Track	toString	()Ljava/lang/String;	1
+M	eu/kanade/tachiyomi/animesource/model/Video	<init>	()V	1
+M	eu/kanade/tachiyomi/animesource/model/Video	<init>	(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/Integer;Lokhttp3/Headers;ZLjava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/String;ZLkotlinx/serialization/json/JsonObject;)V	1
+M	eu/kanade/tachiyomi/animesource/model/Video	<init>	(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/Integer;Lokhttp3/Headers;ZLjava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/String;ZLkotlinx/serialization/json/JsonObject;ILkotlin/jvm/internal/DefaultConstructorMarker;)V	4097
+M	eu/kanade/tachiyomi/animesource/model/Video	<init>	(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lokhttp3/Headers;Ljava/util/List;Ljava/util/List;)V	131073
+M	eu/kanade/tachiyomi/animesource/model/Video	<init>	(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lokhttp3/Headers;Ljava/util/List;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V	135169
+M	eu/kanade/tachiyomi/animesource/model/Video	component1	()Ljava/lang/String;	17
+M	eu/kanade/tachiyomi/animesource/model/Video	component10	()Ljava/util/List;	17
+M	eu/kanade/tachiyomi/animesource/model/Video	component11	()Ljava/util/List;	17
+M	eu/kanade/tachiyomi/animesource/model/Video	component12	()Ljava/util/List;	17
+M	eu/kanade/tachiyomi/animesource/model/Video	component13	()Ljava/lang/String;	17
+M	eu/kanade/tachiyomi/animesource/model/Video	component14	()Z	17
+M	eu/kanade/tachiyomi/animesource/model/Video	component15	()Lkotlinx/serialization/json/JsonObject;	17
+M	eu/kanade/tachiyomi/animesource/model/Video	component2	()Ljava/lang/String;	17
+M	eu/kanade/tachiyomi/animesource/model/Video	component3	()Ljava/lang/Integer;	17
+M	eu/kanade/tachiyomi/animesource/model/Video	component4	()Ljava/lang/Integer;	17
+M	eu/kanade/tachiyomi/animesource/model/Video	component5	()Lokhttp3/Headers;	17
+M	eu/kanade/tachiyomi/animesource/model/Video	component6	()Z	17
+M	eu/kanade/tachiyomi/animesource/model/Video	component7	()Ljava/util/List;	17
+M	eu/kanade/tachiyomi/animesource/model/Video	component8	()Ljava/util/List;	17
+M	eu/kanade/tachiyomi/animesource/model/Video	component9	()Ljava/util/List;	17
+M	eu/kanade/tachiyomi/animesource/model/Video	copy	(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/Integer;Lokhttp3/Headers;ZLjava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/String;ZLkotlinx/serialization/json/JsonObject;)Leu/kanade/tachiyomi/animesource/model/Video;	17
+M	eu/kanade/tachiyomi/animesource/model/Video	copy$default	(Leu/kanade/tachiyomi/animesource/model/Video;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/Integer;Lokhttp3/Headers;ZLjava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/String;ZLkotlinx/serialization/json/JsonObject;ILjava/lang/Object;)Leu/kanade/tachiyomi/animesource/model/Video;	4105
+M	eu/kanade/tachiyomi/animesource/model/Video	equals	(Ljava/lang/Object;)Z	1
+M	eu/kanade/tachiyomi/animesource/model/Video	getAudioTracks	()Ljava/util/List;	17
+M	eu/kanade/tachiyomi/animesource/model/Video	getBitrate	()Ljava/lang/Integer;	17
+M	eu/kanade/tachiyomi/animesource/model/Video	getFfmpegStreamArgs	()Ljava/util/List;	17
+M	eu/kanade/tachiyomi/animesource/model/Video	getFfmpegVideoArgs	()Ljava/util/List;	17
+M	eu/kanade/tachiyomi/animesource/model/Video	getHeaders	()Lokhttp3/Headers;	17
+M	eu/kanade/tachiyomi/animesource/model/Video	getInitialized	()Z	17
+M	eu/kanade/tachiyomi/animesource/model/Video	getInternalData	()Ljava/lang/String;	131089
+M	eu/kanade/tachiyomi/animesource/model/Video	getInternalData$annotations	()V	135177
+M	eu/kanade/tachiyomi/animesource/model/Video	getMemo	()Lkotlinx/serialization/json/JsonObject;	17
+M	eu/kanade/tachiyomi/animesource/model/Video	getMpvArgs	()Ljava/util/List;	17
+M	eu/kanade/tachiyomi/animesource/model/Video	getPreferred	()Z	17
+M	eu/kanade/tachiyomi/animesource/model/Video	getResolution	()Ljava/lang/Integer;	17
+M	eu/kanade/tachiyomi/animesource/model/Video	getSubtitleTracks	()Ljava/util/List;	17
+M	eu/kanade/tachiyomi/animesource/model/Video	getTimestamps	()Ljava/util/List;	17
+M	eu/kanade/tachiyomi/animesource/model/Video	getVideoTitle	()Ljava/lang/String;	17
+M	eu/kanade/tachiyomi/animesource/model/Video	getVideoUrl	()Ljava/lang/String;	17
+M	eu/kanade/tachiyomi/animesource/model/Video	hashCode	()I	1
+M	eu/kanade/tachiyomi/animesource/model/Video	toString	()Ljava/lang/String;	1
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	<init>	()V	1
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	animeDetailsParse	(Lokhttp3/Response;)Leu/kanade/tachiyomi/animesource/model/SAnime;	131076
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	animeDetailsRequest	(Leu/kanade/tachiyomi/animesource/model/SAnime;)Lokhttp3/Request;	131073
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	createHttpServer	()Leu/kanade/tachiyomi/animesource/model/HttpServer;	1
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	episodeListParse	(Lokhttp3/Response;)Ljava/util/List;	131076
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	episodeListRequest	(Leu/kanade/tachiyomi/animesource/model/SAnime;)Lokhttp3/Request;	131076
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	generateId	(Ljava/lang/String;Ljava/lang/String;I)J	20
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	getAnimeDetails	(Leu/kanade/tachiyomi/animesource/model/SAnime;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	131073
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	getAnimeEpisodeUpdate	(Leu/kanade/tachiyomi/animesource/model/SAnime;Ljava/util/List;ZZLkotlin/coroutines/Continuation;)Ljava/lang/Object;	65
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	getAnimeSeasonUpdate	(Leu/kanade/tachiyomi/animesource/model/SAnime;Ljava/util/List;ZZLkotlin/coroutines/Continuation;)Ljava/lang/Object;	65
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	getAnimeUrl	(Leu/kanade/tachiyomi/animesource/model/SAnime;)Ljava/lang/String;	1
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	getBaseUrl	()Ljava/lang/String;	1025
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	getClient	()Lokhttp3/OkHttpClient;	1
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	getEpisodeList	(Leu/kanade/tachiyomi/animesource/model/SAnime;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	131073
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	getEpisodeUrl	(Leu/kanade/tachiyomi/animesource/model/SEpisode;)Ljava/lang/String;	1
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	getFilterList	()Leu/kanade/tachiyomi/animesource/model/AnimeFilterList;	65
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	getHeaders	()Lokhttp3/Headers;	17
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	getHomeUrl	()Ljava/lang/String;	1
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	getHosterList	(Leu/kanade/tachiyomi/animesource/model/SEpisode;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	65
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	getId	()J	1
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	getImageTile	(Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	1
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	getLatestUpdates	(ILkotlin/coroutines/Continuation;)Ljava/lang/Object;	65
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	getNetwork	()Leu/kanade/tachiyomi/network/NetworkHelper;	20
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	getPopularAnime	(ILkotlin/coroutines/Continuation;)Ljava/lang/Object;	65
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	getRelatedAnimeList	(Leu/kanade/tachiyomi/animesource/model/SAnime;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	65
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	getSearchAnime	(ILjava/lang/String;Leu/kanade/tachiyomi/animesource/model/AnimeFilterList;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	65
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	getSeasonList	(Leu/kanade/tachiyomi/animesource/model/SAnime;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	131073
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	getVersionId	()I	1
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	getVideoList	(Leu/kanade/tachiyomi/animesource/model/Hoster;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	65
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	getVideoThumbnails	(Leu/kanade/tachiyomi/animesource/model/Video;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	1
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	getVideoUrl	(Leu/kanade/tachiyomi/animesource/model/Video;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	131073
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	headersBuilder	()Lokhttp3/Headers$Builder;	4
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	hosterListParse	(Lokhttp3/Response;)Ljava/util/List;	131076
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	hosterListRequest	(Leu/kanade/tachiyomi/animesource/model/SEpisode;)Lokhttp3/Request;	131076
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	latestUpdatesParse	(Lokhttp3/Response;)Leu/kanade/tachiyomi/animesource/model/AnimesPage;	131076
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	latestUpdatesRequest	(I)Lokhttp3/Request;	131076
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	popularAnimeParse	(Lokhttp3/Response;)Leu/kanade/tachiyomi/animesource/model/AnimesPage;	131076
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	popularAnimeRequest	(I)Lokhttp3/Request;	131076
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	prepareNewEpisode	(Leu/kanade/tachiyomi/animesource/model/SEpisode;Leu/kanade/tachiyomi/animesource/model/SAnime;)V	131073
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	resolveVideo	(Leu/kanade/tachiyomi/animesource/model/Video;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	1
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	searchAnimeParse	(Lokhttp3/Response;)Leu/kanade/tachiyomi/animesource/model/AnimesPage;	131076
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	searchAnimeRequest	(ILjava/lang/String;Leu/kanade/tachiyomi/animesource/model/AnimeFilterList;)Lokhttp3/Request;	131076
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	seasonListParse	(Lokhttp3/Response;)Ljava/util/List;	131076
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	seasonListRequest	(Leu/kanade/tachiyomi/animesource/model/SAnime;)Lokhttp3/Request;	131076
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	setUrlWithoutDomain	(Leu/kanade/tachiyomi/animesource/model/SAnime;Ljava/lang/String;)V	17
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	setUrlWithoutDomain	(Leu/kanade/tachiyomi/animesource/model/SEpisode;Ljava/lang/String;)V	17
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	sortHosters	(Ljava/util/List;)Ljava/util/List;	1
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	sortVideos	(Ljava/util/List;)Ljava/util/List;	4
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	toString	()Ljava/lang/String;	1
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	videoListParse	(Lokhttp3/Response;Leu/kanade/tachiyomi/animesource/model/Hoster;)Ljava/util/List;	131076
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	videoListRequest	(Leu/kanade/tachiyomi/animesource/model/Hoster;)Lokhttp3/Request;	131076
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	videoUrlParse	(Lokhttp3/Response;)Ljava/lang/String;	131076
+M	eu/kanade/tachiyomi/animesource/online/AnimeHttpSource	videoUrlRequest	(Leu/kanade/tachiyomi/animesource/model/Video;)Lokhttp3/Request;	131076
+M	eu/kanade/tachiyomi/animesource/online/ParsedAnimeHttpSource	<init>	()V	1
+M	eu/kanade/tachiyomi/animesource/online/ParsedAnimeHttpSource	animeDetailsParse	(Lokhttp3/Response;)Leu/kanade/tachiyomi/animesource/model/SAnime;	4
+M	eu/kanade/tachiyomi/animesource/online/ParsedAnimeHttpSource	animeDetailsParse	(Lorg/jsoup/nodes/Document;)Leu/kanade/tachiyomi/animesource/model/SAnime;	1028
+M	eu/kanade/tachiyomi/animesource/online/ParsedAnimeHttpSource	episodeFromElement	(Lorg/jsoup/nodes/Element;)Leu/kanade/tachiyomi/animesource/model/SEpisode;	1028
+M	eu/kanade/tachiyomi/animesource/online/ParsedAnimeHttpSource	episodeListParse	(Lokhttp3/Response;)Ljava/util/List;	4
+M	eu/kanade/tachiyomi/animesource/online/ParsedAnimeHttpSource	episodeListSelector	()Ljava/lang/String;	1028
+M	eu/kanade/tachiyomi/animesource/online/ParsedAnimeHttpSource	latestUpdatesFromElement	(Lorg/jsoup/nodes/Element;)Leu/kanade/tachiyomi/animesource/model/SAnime;	1028
+M	eu/kanade/tachiyomi/animesource/online/ParsedAnimeHttpSource	latestUpdatesNextPageSelector	()Ljava/lang/String;	1028
+M	eu/kanade/tachiyomi/animesource/online/ParsedAnimeHttpSource	latestUpdatesParse	(Lokhttp3/Response;)Leu/kanade/tachiyomi/animesource/model/AnimesPage;	4
+M	eu/kanade/tachiyomi/animesource/online/ParsedAnimeHttpSource	latestUpdatesSelector	()Ljava/lang/String;	1028
+M	eu/kanade/tachiyomi/animesource/online/ParsedAnimeHttpSource	popularAnimeFromElement	(Lorg/jsoup/nodes/Element;)Leu/kanade/tachiyomi/animesource/model/SAnime;	1028
+M	eu/kanade/tachiyomi/animesource/online/ParsedAnimeHttpSource	popularAnimeNextPageSelector	()Ljava/lang/String;	1028
+M	eu/kanade/tachiyomi/animesource/online/ParsedAnimeHttpSource	popularAnimeParse	(Lokhttp3/Response;)Leu/kanade/tachiyomi/animesource/model/AnimesPage;	4
+M	eu/kanade/tachiyomi/animesource/online/ParsedAnimeHttpSource	popularAnimeSelector	()Ljava/lang/String;	1028
+M	eu/kanade/tachiyomi/animesource/online/ParsedAnimeHttpSource	searchAnimeFromElement	(Lorg/jsoup/nodes/Element;)Leu/kanade/tachiyomi/animesource/model/SAnime;	1028
+M	eu/kanade/tachiyomi/animesource/online/ParsedAnimeHttpSource	searchAnimeNextPageSelector	()Ljava/lang/String;	1028
+M	eu/kanade/tachiyomi/animesource/online/ParsedAnimeHttpSource	searchAnimeParse	(Lokhttp3/Response;)Leu/kanade/tachiyomi/animesource/model/AnimesPage;	4
+M	eu/kanade/tachiyomi/animesource/online/ParsedAnimeHttpSource	searchAnimeSelector	()Ljava/lang/String;	1028
+M	eu/kanade/tachiyomi/animesource/online/ParsedAnimeHttpSource	seasonFromElement	(Lorg/jsoup/nodes/Element;)Leu/kanade/tachiyomi/animesource/model/SAnime;	1028
+M	eu/kanade/tachiyomi/animesource/online/ParsedAnimeHttpSource	seasonListParse	(Lokhttp3/Response;)Ljava/util/List;	4
+M	eu/kanade/tachiyomi/animesource/online/ParsedAnimeHttpSource	seasonListSelector	()Ljava/lang/String;	1028
+M	eu/kanade/tachiyomi/animesource/online/ResolvableAnimeSource	access$getAnimeDetails$jd	(Leu/kanade/tachiyomi/animesource/online/ResolvableAnimeSource;Leu/kanade/tachiyomi/animesource/model/SAnime;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	4105
+M	eu/kanade/tachiyomi/animesource/online/ResolvableAnimeSource	access$getEpisodeList$jd	(Leu/kanade/tachiyomi/animesource/online/ResolvableAnimeSource;Leu/kanade/tachiyomi/animesource/model/SAnime;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	4105
+M	eu/kanade/tachiyomi/animesource/online/ResolvableAnimeSource	access$getFilterList$jd	(Leu/kanade/tachiyomi/animesource/online/ResolvableAnimeSource;)Leu/kanade/tachiyomi/animesource/model/AnimeFilterList;	4105
+M	eu/kanade/tachiyomi/animesource/online/ResolvableAnimeSource	access$getSeasonList$jd	(Leu/kanade/tachiyomi/animesource/online/ResolvableAnimeSource;Leu/kanade/tachiyomi/animesource/model/SAnime;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	4105
+M	eu/kanade/tachiyomi/animesource/online/ResolvableAnimeSource	getAnime	(Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	1025
+M	eu/kanade/tachiyomi/animesource/online/ResolvableAnimeSource	getEpisode	(Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	1025
+M	eu/kanade/tachiyomi/animesource/online/ResolvableAnimeSource	getUriType	(Ljava/lang/String;)Leu/kanade/tachiyomi/animesource/online/UriType;	1025
+M	eu/kanade/tachiyomi/animesource/online/ResolvableAnimeSource$DefaultImpls	getAnimeDetails	(Leu/kanade/tachiyomi/animesource/online/ResolvableAnimeSource;Leu/kanade/tachiyomi/animesource/model/SAnime;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	131081
+M	eu/kanade/tachiyomi/animesource/online/ResolvableAnimeSource$DefaultImpls	getEpisodeList	(Leu/kanade/tachiyomi/animesource/online/ResolvableAnimeSource;Leu/kanade/tachiyomi/animesource/model/SAnime;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	131081
+M	eu/kanade/tachiyomi/animesource/online/ResolvableAnimeSource$DefaultImpls	getFilterList	(Leu/kanade/tachiyomi/animesource/online/ResolvableAnimeSource;)Leu/kanade/tachiyomi/animesource/model/AnimeFilterList;	131081
+M	eu/kanade/tachiyomi/animesource/online/ResolvableAnimeSource$DefaultImpls	getSeasonList	(Leu/kanade/tachiyomi/animesource/online/ResolvableAnimeSource;Leu/kanade/tachiyomi/animesource/model/SAnime;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	131081
+M	eu/kanade/tachiyomi/animesource/online/UriType$Anime	equals	(Ljava/lang/Object;)Z	1
+M	eu/kanade/tachiyomi/animesource/online/UriType$Anime	hashCode	()I	1
+M	eu/kanade/tachiyomi/animesource/online/UriType$Anime	toString	()Ljava/lang/String;	1
+M	eu/kanade/tachiyomi/animesource/online/UriType$Episode	equals	(Ljava/lang/Object;)Z	1
+M	eu/kanade/tachiyomi/animesource/online/UriType$Episode	hashCode	()I	1
+M	eu/kanade/tachiyomi/animesource/online/UriType$Episode	toString	()Ljava/lang/String;	1
+M	eu/kanade/tachiyomi/animesource/online/UriType$Unknown	equals	(Ljava/lang/Object;)Z	1
+M	eu/kanade/tachiyomi/animesource/online/UriType$Unknown	hashCode	()I	1
+M	eu/kanade/tachiyomi/animesource/online/UriType$Unknown	toString	()Ljava/lang/String;	1
+M	eu/kanade/tachiyomi/network/HttpException	<init>	(I)V	1
+M	eu/kanade/tachiyomi/network/HttpException	getCode	()I	17
+M	eu/kanade/tachiyomi/network/JavaScriptEngine	<init>	(Landroid/content/Context;)V	1
+M	eu/kanade/tachiyomi/network/JavaScriptEngine	evaluate	(Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	17
+M	eu/kanade/tachiyomi/network/NetworkHelper	<init>	(Landroid/content/Context;)V	1
+M	eu/kanade/tachiyomi/network/NetworkHelper	defaultUserAgentProvider	()Ljava/lang/String;	17
+M	eu/kanade/tachiyomi/network/NetworkHelper	getClient	()Lokhttp3/OkHttpClient;	17
+M	eu/kanade/tachiyomi/network/NetworkHelper	getCloudflareClient	()Lokhttp3/OkHttpClient;	131089
+M	eu/kanade/tachiyomi/network/NetworkHelper	getCloudflareClient$annotations	()V	135177
+M	eu/kanade/tachiyomi/network/OkHttpExtensionsKt	await	(Lokhttp3/Call;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	25
+M	eu/kanade/tachiyomi/network/OkHttpExtensionsKt	awaitSuccess	(Lokhttp3/Call;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	25
+M	eu/kanade/tachiyomi/network/RequestsKt	GET	(Ljava/lang/String;Lokhttp3/Headers;Lokhttp3/CacheControl;)Lokhttp3/Request;	25
+M	eu/kanade/tachiyomi/network/RequestsKt	GET	(Lokhttp3/HttpUrl;Lokhttp3/Headers;Lokhttp3/CacheControl;)Lokhttp3/Request;	25
+M	eu/kanade/tachiyomi/network/RequestsKt	GET$default	(Ljava/lang/String;Lokhttp3/Headers;Lokhttp3/CacheControl;ILjava/lang/Object;)Lokhttp3/Request;	4105
+M	eu/kanade/tachiyomi/network/RequestsKt	GET$default	(Lokhttp3/HttpUrl;Lokhttp3/Headers;Lokhttp3/CacheControl;ILjava/lang/Object;)Lokhttp3/Request;	4105
+M	eu/kanade/tachiyomi/network/RequestsKt	POST	(Ljava/lang/String;Lokhttp3/Headers;Lokhttp3/RequestBody;Lokhttp3/CacheControl;)Lokhttp3/Request;	25
+M	eu/kanade/tachiyomi/network/RequestsKt	POST$default	(Ljava/lang/String;Lokhttp3/Headers;Lokhttp3/RequestBody;Lokhttp3/CacheControl;ILjava/lang/Object;)Lokhttp3/Request;	4105
+M	eu/kanade/tachiyomi/network/RequestsKt	get	(Lokhttp3/OkHttpClient;Ljava/lang/String;Lokhttp3/Headers;Lokhttp3/CacheControl;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	131097
+M	eu/kanade/tachiyomi/network/RequestsKt	get	(Lokhttp3/OkHttpClient;Lokhttp3/HttpUrl;Lokhttp3/Headers;Lokhttp3/CacheControl;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	131097
+M	eu/kanade/tachiyomi/network/RequestsKt	get$default	(Lokhttp3/OkHttpClient;Ljava/lang/String;Lokhttp3/Headers;Lokhttp3/CacheControl;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;	135177
+M	eu/kanade/tachiyomi/network/RequestsKt	get$default	(Lokhttp3/OkHttpClient;Lokhttp3/HttpUrl;Lokhttp3/Headers;Lokhttp3/CacheControl;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;	135177
+M	eu/kanade/tachiyomi/network/RequestsKt	post	(Lokhttp3/OkHttpClient;Ljava/lang/String;Lokhttp3/Headers;Lokhttp3/RequestBody;Lokhttp3/CacheControl;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	131097
+M	eu/kanade/tachiyomi/network/RequestsKt	post$default	(Lokhttp3/OkHttpClient;Ljava/lang/String;Lokhttp3/Headers;Lokhttp3/RequestBody;Lokhttp3/CacheControl;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;	135177
+M	eu/kanade/tachiyomi/network/interceptor/RateLimitInterceptorKt	rateLimit	(Lokhttp3/OkHttpClient$Builder;IJLjava/util/concurrent/TimeUnit;)Lokhttp3/OkHttpClient$Builder;	131097
+M	eu/kanade/tachiyomi/network/interceptor/RateLimitInterceptorKt	rateLimit$default	(Lokhttp3/OkHttpClient$Builder;IJLjava/util/concurrent/TimeUnit;ILjava/lang/Object;)Lokhttp3/OkHttpClient$Builder;	135177
+M	eu/kanade/tachiyomi/network/interceptor/RateLimitInterceptorKt	rateLimit-SxA4cEA	(Lokhttp3/OkHttpClient$Builder;IJ)Lokhttp3/OkHttpClient$Builder;	131097
+M	eu/kanade/tachiyomi/network/interceptor/RateLimitInterceptorKt	rateLimit-SxA4cEA$default	(Lokhttp3/OkHttpClient$Builder;IJILjava/lang/Object;)Lokhttp3/OkHttpClient$Builder;	135177
+M	eu/kanade/tachiyomi/network/interceptor/SpecificHostRateLimitInterceptorKt	rateLimitHost	(Lokhttp3/OkHttpClient$Builder;Lokhttp3/HttpUrl;IJLjava/util/concurrent/TimeUnit;)Lokhttp3/OkHttpClient$Builder;	131097
+M	eu/kanade/tachiyomi/network/interceptor/SpecificHostRateLimitInterceptorKt	rateLimitHost$default	(Lokhttp3/OkHttpClient$Builder;Lokhttp3/HttpUrl;IJLjava/util/concurrent/TimeUnit;ILjava/lang/Object;)Lokhttp3/OkHttpClient$Builder;	135177
+M	eu/kanade/tachiyomi/network/interceptor/SpecificHostRateLimitInterceptorKt	rateLimitHost-Wn2Vu4Y	(Lokhttp3/OkHttpClient$Builder;Ljava/lang/String;IJ)Lokhttp3/OkHttpClient$Builder;	131097
+M	eu/kanade/tachiyomi/network/interceptor/SpecificHostRateLimitInterceptorKt	rateLimitHost-Wn2Vu4Y	(Lokhttp3/OkHttpClient$Builder;Lokhttp3/HttpUrl;IJ)Lokhttp3/OkHttpClient$Builder;	131097
+M	eu/kanade/tachiyomi/network/interceptor/SpecificHostRateLimitInterceptorKt	rateLimitHost-Wn2Vu4Y$default	(Lokhttp3/OkHttpClient$Builder;Ljava/lang/String;IJILjava/lang/Object;)Lokhttp3/OkHttpClient$Builder;	135177
+M	eu/kanade/tachiyomi/network/interceptor/SpecificHostRateLimitInterceptorKt	rateLimitHost-Wn2Vu4Y$default	(Lokhttp3/OkHttpClient$Builder;Lokhttp3/HttpUrl;IJILjava/lang/Object;)Lokhttp3/OkHttpClient$Builder;	135177
+M	eu/kanade/tachiyomi/torrentutils/TorrentUtils	getTorrentInfo	(Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	17
+M	eu/kanade/tachiyomi/torrentutils/model/DeadTorrentException	<init>	()V	1
+M	eu/kanade/tachiyomi/torrentutils/model/TorrentFile	<init>	(Ljava/lang/String;IJLjava/lang/String;Ljava/util/List;)V	1
+M	eu/kanade/tachiyomi/torrentutils/model/TorrentFile	<init>	(Ljava/lang/String;IJLjava/lang/String;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V	4097
+M	eu/kanade/tachiyomi/torrentutils/model/TorrentFile	component1	()Ljava/lang/String;	17
+M	eu/kanade/tachiyomi/torrentutils/model/TorrentFile	component2	()I	17
+M	eu/kanade/tachiyomi/torrentutils/model/TorrentFile	component3	()J	17
+M	eu/kanade/tachiyomi/torrentutils/model/TorrentFile	copy	(Ljava/lang/String;IJLjava/lang/String;Ljava/util/List;)Leu/kanade/tachiyomi/torrentutils/model/TorrentFile;	17
+M	eu/kanade/tachiyomi/torrentutils/model/TorrentFile	copy$default	(Leu/kanade/tachiyomi/torrentutils/model/TorrentFile;Ljava/lang/String;IJLjava/lang/String;Ljava/util/List;ILjava/lang/Object;)Leu/kanade/tachiyomi/torrentutils/model/TorrentFile;	4105
+M	eu/kanade/tachiyomi/torrentutils/model/TorrentFile	equals	(Ljava/lang/Object;)Z	1
+M	eu/kanade/tachiyomi/torrentutils/model/TorrentFile	getIndexFile	()I	17
+M	eu/kanade/tachiyomi/torrentutils/model/TorrentFile	getPath	()Ljava/lang/String;	17
+M	eu/kanade/tachiyomi/torrentutils/model/TorrentFile	getSize	()J	17
+M	eu/kanade/tachiyomi/torrentutils/model/TorrentFile	hashCode	()I	1
+M	eu/kanade/tachiyomi/torrentutils/model/TorrentFile	toMagnetURI	()Ljava/lang/String;	17
+M	eu/kanade/tachiyomi/torrentutils/model/TorrentFile	toString	()Ljava/lang/String;	1
+M	eu/kanade/tachiyomi/torrentutils/model/TorrentInfo	<init>	(Ljava/lang/String;Ljava/util/List;Ljava/lang/String;JLjava/util/List;)V	1
+M	eu/kanade/tachiyomi/torrentutils/model/TorrentInfo	<init>	(Ljava/lang/String;Ljava/util/List;Ljava/lang/String;JLjava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V	4097
+M	eu/kanade/tachiyomi/torrentutils/model/TorrentInfo	component1	()Ljava/lang/String;	17
+M	eu/kanade/tachiyomi/torrentutils/model/TorrentInfo	component2	()Ljava/util/List;	17
+M	eu/kanade/tachiyomi/torrentutils/model/TorrentInfo	component3	()Ljava/lang/String;	17
+M	eu/kanade/tachiyomi/torrentutils/model/TorrentInfo	component4	()J	17
+M	eu/kanade/tachiyomi/torrentutils/model/TorrentInfo	component5	()Ljava/util/List;	17
+M	eu/kanade/tachiyomi/torrentutils/model/TorrentInfo	copy	(Ljava/lang/String;Ljava/util/List;Ljava/lang/String;JLjava/util/List;)Leu/kanade/tachiyomi/torrentutils/model/TorrentInfo;	17
+M	eu/kanade/tachiyomi/torrentutils/model/TorrentInfo	copy$default	(Leu/kanade/tachiyomi/torrentutils/model/TorrentInfo;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;JLjava/util/List;ILjava/lang/Object;)Leu/kanade/tachiyomi/torrentutils/model/TorrentInfo;	4105
+M	eu/kanade/tachiyomi/torrentutils/model/TorrentInfo	equals	(Ljava/lang/Object;)Z	1
+M	eu/kanade/tachiyomi/torrentutils/model/TorrentInfo	getFiles	()Ljava/util/List;	17
+M	eu/kanade/tachiyomi/torrentutils/model/TorrentInfo	getHash	()Ljava/lang/String;	17
+M	eu/kanade/tachiyomi/torrentutils/model/TorrentInfo	getSize	()J	17
+M	eu/kanade/tachiyomi/torrentutils/model/TorrentInfo	getTitle	()Ljava/lang/String;	17
+M	eu/kanade/tachiyomi/torrentutils/model/TorrentInfo	getTrackers	()Ljava/util/List;	17
+M	eu/kanade/tachiyomi/torrentutils/model/TorrentInfo	hashCode	()I	1
+M	eu/kanade/tachiyomi/torrentutils/model/TorrentInfo	setTrackers	(Ljava/util/List;)Leu/kanade/tachiyomi/torrentutils/model/TorrentInfo;	17
+M	eu/kanade/tachiyomi/torrentutils/model/TorrentInfo	toString	()Ljava/lang/String;	1
+M	eu/kanade/tachiyomi/util/CoroutinesExtensionsKt	parallelCatchingFlatMap	(Ljava/lang/Iterable;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	131097
+M	eu/kanade/tachiyomi/util/CoroutinesExtensionsKt	parallelCatchingFlatMapBlocking	(Ljava/lang/Iterable;Lkotlin/jvm/functions/Function2;)Ljava/util/List;	131097
+M	eu/kanade/tachiyomi/util/CoroutinesExtensionsKt	parallelFlatMap	(Ljava/lang/Iterable;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	131097
+M	eu/kanade/tachiyomi/util/CoroutinesExtensionsKt	parallelFlatMapBlocking	(Ljava/lang/Iterable;Lkotlin/jvm/functions/Function2;)Ljava/util/List;	131097
+M	eu/kanade/tachiyomi/util/CoroutinesExtensionsKt	parallelMap	(Ljava/lang/Iterable;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	131097
+M	eu/kanade/tachiyomi/util/CoroutinesExtensionsKt	parallelMapBlocking	(Ljava/lang/Iterable;Lkotlin/jvm/functions/Function2;)Ljava/util/List;	131097
+M	eu/kanade/tachiyomi/util/CoroutinesExtensionsKt	parallelMapNotNull	(Ljava/lang/Iterable;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;	131097
+M	eu/kanade/tachiyomi/util/CoroutinesExtensionsKt	parallelMapNotNullBlocking	(Ljava/lang/Iterable;Lkotlin/jvm/functions/Function2;)Ljava/util/List;	131097
+M	eu/kanade/tachiyomi/util/JsonExtensionsKt	parseAs	(Ljava/lang/String;)Ljava/lang/Object;	135193
+M	eu/kanade/tachiyomi/util/JsonExtensionsKt	parseAs	(Ljava/lang/String;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;	135193
+M	eu/kanade/tachiyomi/util/JsonExtensionsKt	parseAs	(Lokhttp3/Response;)Ljava/lang/Object;	135193
+M	eu/kanade/tachiyomi/util/JsonExtensionsKt	parseAs	(Lokhttp3/Response;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;	135193
+M	eu/kanade/tachiyomi/util/JsoupExtensionsKt	asJsoup	(Lokhttp3/Response;Ljava/lang/String;)Lorg/jsoup/nodes/Document;	25
+M	eu/kanade/tachiyomi/util/JsoupExtensionsKt	asJsoup$default	(Lokhttp3/Response;Ljava/lang/String;ILjava/lang/Object;)Lorg/jsoup/nodes/Document;	4105

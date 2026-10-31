@@ -6,6 +6,7 @@ import fr.vriege.anilib.platform.desktopextensionhost.extension.ExtensionRegistr
 import fr.vriege.anilib.platform.desktopextensionhost.extension.ExtensionRuntimeCatalog;
 import fr.vriege.anilib.platform.desktopextensionhost.extension.InstalledExtension;
 import fr.vriege.anilib.platform.desktopextensionhost.extension.LoadedSource;
+
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
@@ -33,8 +34,7 @@ final class ExtensionRuntimeCatalogSmoke {
     private static final String TRANSLATION_RESOURCE = "assets/i18n/messages_en.properties";
     private static final String TRANSLATION = "search=Search\n";
 
-    private ExtensionRuntimeCatalogSmoke() {
-    }
+    private ExtensionRuntimeCatalogSmoke() {}
 
     static void verify() throws Exception {
         Path directory = Files.createTempDirectory("anilib-extension-runtime-");
@@ -43,26 +43,32 @@ final class ExtensionRuntimeCatalogSmoke {
             Path apk = directory.resolve("extension.apk");
             writeArchive(archive);
             writeApk(apk);
-            ExtensionApkMetadata metadata = new ExtensionApkMetadata(
-                    "org.example.dynamic",
-                    "Dynamic",
-                    "1.0",
-                    1,
-                    ExtensionKind.ANIME,
-                    false,
-                    List.of(FACTORY_CLASS),
-                    Optional.empty());
-            InstalledExtension installed = new InstalledExtension(
-                    metadata, apk, archive);
-            try (ExtensionRuntimeCatalog catalog = new ExtensionRuntimeCatalog(new ExtensionRegistry(directory))) {
+            ExtensionApkMetadata metadata =
+                    new ExtensionApkMetadata(
+                            "org.example.dynamic",
+                            "Dynamic",
+                            "1.0",
+                            1,
+                            ExtensionKind.ANIME,
+                            false,
+                            List.of(FACTORY_CLASS),
+                            Optional.empty());
+            InstalledExtension installed = new InstalledExtension(metadata, apk, archive);
+            try (ExtensionRuntimeCatalog catalog =
+                    new ExtensionRuntimeCatalog(new ExtensionRegistry(directory))) {
+                verifyUnsupportedRequirements(catalog, apk, archive);
                 ExtensionRuntimeCatalog.Snapshot snapshot = catalog.discover(List.of(installed));
                 if (!snapshot.failures().isEmpty() || snapshot.sources().size() != 1) {
-                    throw new IllegalStateException("Dynamic extension discovery failed: " + snapshot.failures());
+                    throw new IllegalStateException(
+                            "Dynamic extension discovery failed: " + snapshot.failures());
                 }
                 LoadedSource source = snapshot.sources().getFirst();
-                if (source.id() != 42L || !source.name().equals("Dynamic source")
-                        || !source.language().equals("fr") || source.kind() != ExtensionKind.ANIME) {
-                    throw new IllegalStateException("Dynamic source descriptor is invalid: " + source);
+                if (source.id() != 42L
+                        || !source.name().equals("Dynamic source")
+                        || !source.language().equals("fr")
+                        || source.kind() != ExtensionKind.ANIME) {
+                    throw new IllegalStateException(
+                            "Dynamic source descriptor is invalid: " + source);
                 }
                 verifyApkResource(source);
                 verifyLifecycleReset(catalog, snapshot);
@@ -78,22 +84,50 @@ final class ExtensionRuntimeCatalogSmoke {
         }
     }
 
+    private static void verifyUnsupportedRequirements(
+            ExtensionRuntimeCatalog catalog, Path apk, Path archive) {
+        for (boolean torrent : List.of(false, true)) {
+            ExtensionApkMetadata metadata =
+                    new ExtensionApkMetadata(
+                            "org.example.future",
+                            "Future",
+                            "99.1",
+                            1,
+                            ExtensionKind.ANIME,
+                            false,
+                            List.of(SOURCE_CLASS),
+                            Optional.empty(),
+                            torrent ? 16 : 99,
+                            torrent);
+            try {
+                catalog.validate(new InstalledExtension(metadata, apk, archive));
+                throw new IllegalStateException("Unsupported extension requirements were accepted");
+            } catch (IllegalArgumentException expected) {
+                String requirement = torrent ? "torrent streaming" : "Aniyomi API 99";
+                if (!expected.getMessage().contains(requirement)) throw expected;
+            }
+        }
+    }
+
     private static void verifyLifecycleReset(
-            ExtensionRuntimeCatalog catalog,
-            ExtensionRuntimeCatalog.Snapshot lease) throws Exception {
+            ExtensionRuntimeCatalog catalog, ExtensionRuntimeCatalog.Snapshot lease)
+            throws Exception {
         var executor = Executors.newVirtualThreadPerTaskExecutor();
         try {
             CountDownLatch started = new CountDownLatch(1);
-            var reset = executor.submit(() -> {
-                started.countDown();
-                catalog.reset();
-            });
+            var reset =
+                    executor.submit(
+                            () -> {
+                                started.countDown();
+                                catalog.reset();
+                            });
             if (!started.await(5, TimeUnit.SECONDS)) {
                 throw new IllegalStateException("Runtime catalogue reset did not start");
             }
             try {
                 reset.get(100, TimeUnit.MILLISECONDS);
-                throw new IllegalStateException("Runtime catalogue reset ignored an active source operation");
+                throw new IllegalStateException(
+                        "Runtime catalogue reset ignored an active source operation");
             } catch (TimeoutException expected) {
                 lease.close();
             }
@@ -115,8 +149,11 @@ final class ExtensionRuntimeCatalogSmoke {
     private static void verifyApkResource(LoadedSource source) throws IOException {
         ClassLoader loader = source.instance().getClass().getClassLoader();
         try (InputStream input = loader.getResourceAsStream(TRANSLATION_RESOURCE)) {
-            if (input == null || !new String(input.readAllBytes(), StandardCharsets.UTF_8).equals(TRANSLATION)) {
-                throw new IllegalStateException("Extension APK resources are not visible to converted classes");
+            if (input == null
+                    || !new String(input.readAllBytes(), StandardCharsets.UTF_8)
+                            .equals(TRANSLATION)) {
+                throw new IllegalStateException(
+                        "Extension APK resources are not visible to converted classes");
             }
         }
     }
@@ -137,12 +174,19 @@ final class ExtensionRuntimeCatalogSmoke {
     private static byte[] sourceClass() {
         ClassWriter writer = new ClassWriter(0);
         String name = SOURCE_CLASS.replace('.', '/');
-        writer.visit(Opcodes.V21, Opcodes.ACC_PUBLIC, name, null, "java/lang/Object",
-                new String[]{ANIME_SOURCE});
-        MethodVisitor constructor = writer.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
+        writer.visit(
+                Opcodes.V21,
+                Opcodes.ACC_PUBLIC,
+                name,
+                null,
+                "java/lang/Object",
+                new String[] {ANIME_SOURCE});
+        MethodVisitor constructor =
+                writer.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
         constructor.visitCode();
         constructor.visitVarInsn(Opcodes.ALOAD, 0);
-        constructor.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
+        constructor.visitMethodInsn(
+                Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
         constructor.visitInsn(Opcodes.RETURN);
         constructor.visitMaxs(1, 1);
         constructor.visitEnd();
@@ -158,23 +202,29 @@ final class ExtensionRuntimeCatalogSmoke {
         ClassWriter writer = new ClassWriter(0);
         String name = FACTORY_CLASS.replace('.', '/');
         writer.visit(Opcodes.V21, Opcodes.ACC_PUBLIC, name, null, "java/lang/Object", null);
-        MethodVisitor constructor = writer.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
+        MethodVisitor constructor =
+                writer.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
         constructor.visitCode();
         constructor.visitVarInsn(Opcodes.ALOAD, 0);
-        constructor.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
+        constructor.visitMethodInsn(
+                Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
         constructor.visitInsn(Opcodes.RETURN);
         constructor.visitMaxs(1, 1);
         constructor.visitEnd();
-        MethodVisitor factory = writer.visitMethod(
-                Opcodes.ACC_PUBLIC, "createSources", "()Ljava/util/List;", null, null);
+        MethodVisitor factory =
+                writer.visitMethod(
+                        Opcodes.ACC_PUBLIC, "createSources", "()Ljava/util/List;", null, null);
         factory.visitCode();
         factory.visitTypeInsn(Opcodes.NEW, SOURCE_CLASS.replace('.', '/'));
         factory.visitInsn(Opcodes.DUP);
         factory.visitMethodInsn(
                 Opcodes.INVOKESPECIAL, SOURCE_CLASS.replace('.', '/'), "<init>", "()V", false);
         factory.visitMethodInsn(
-                Opcodes.INVOKESTATIC, "java/util/List", "of",
-                "(Ljava/lang/Object;)Ljava/util/List;", true);
+                Opcodes.INVOKESTATIC,
+                "java/util/List",
+                "of",
+                "(Ljava/lang/Object;)Ljava/util/List;",
+                true);
         factory.visitInsn(Opcodes.ARETURN);
         factory.visitMaxs(2, 1);
         factory.visitEnd();
@@ -192,8 +242,8 @@ final class ExtensionRuntimeCatalogSmoke {
     }
 
     private static void constantText(ClassWriter writer, String name, String value) {
-        MethodVisitor method = writer.visitMethod(
-                Opcodes.ACC_PUBLIC, name, "()Ljava/lang/String;", null, null);
+        MethodVisitor method =
+                writer.visitMethod(Opcodes.ACC_PUBLIC, name, "()Ljava/lang/String;", null, null);
         method.visitCode();
         method.visitLdcInsn(value);
         method.visitInsn(Opcodes.ARETURN);

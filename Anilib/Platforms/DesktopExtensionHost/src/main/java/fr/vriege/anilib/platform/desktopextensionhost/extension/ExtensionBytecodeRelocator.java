@@ -15,6 +15,10 @@ import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
 import org.objectweb.asm.tree.TypeInsnNode;
 import org.objectweb.asm.tree.VarInsnNode;
+import org.objectweb.asm.tree.analysis.Analyzer;
+import org.objectweb.asm.tree.analysis.AnalyzerException;
+import org.objectweb.asm.tree.analysis.SourceInterpreter;
+import org.objectweb.asm.tree.analysis.SourceValue;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -22,43 +26,54 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.jar.JarOutputStream;
-import java.util.Arrays;
-import java.util.Locale;
 
 public final class ExtensionBytecodeRelocator {
-    static final String FORMAT = "2";
+    static final String FORMAT = "3";
     private static final int MAX_ENTRIES = 25_000;
     private static final long MAX_EXPANDED_BYTES = 256L * 1024L * 1024L;
     private static final String TARGET = "fr/vriege/anilib/platform/desktopextensionhost/compat/";
-    private static final Map<String, String> TYPES = Map.of(
-            "eu/kanade/tachiyomi/AppInfo", TARGET + "aniyomi/AppInfo");
-    private static final Map<String, String> PREFIXES = Map.ofEntries(
-            Map.entry("eu/kanade/tachiyomi/source/", TARGET + "aniyomi/source/"),
-            Map.entry("eu/kanade/tachiyomi/animesource/", TARGET + "aniyomi/animesource/"),
-            Map.entry("eu/kanade/tachiyomi/network/", TARGET + "aniyomi/network/"),
-            Map.entry("eu/kanade/tachiyomi/util/", TARGET + "aniyomi/util/"),
-            Map.entry("eu/kanade/tachiyomi/torrentutils/", TARGET + "aniyomi/torrentutils/"),
-            Map.entry("tachiyomi/core/", TARGET + "tachiyomi/core/"),
-            Map.entry("aniyomi/core/", TARGET + "aniyomi/core/"),
-            Map.entry("androidx/preference/", TARGET + "androidx/preference/"),
-            Map.entry("android/", TARGET + "android/"),
-            Map.entry("uy/kohesive/injekt/", TARGET + "injekt/"),
-            Map.entry("app/cash/quickjs/", TARGET + "quickjs/"),
-            Map.entry("com/squareup/duktape/", TARGET + "duktape/"),
-            Map.entry("logcat/", TARGET + "logcat/"),
-            Map.entry("mihon/core/", TARGET + "mihon/core/"));
+    private static final Map<String, String> TYPES =
+            Map.of("eu/kanade/tachiyomi/AppInfo", TARGET + "aniyomi/AppInfo");
+    private static final Map<String, String> PREFIXES =
+            Map.ofEntries(
+                    Map.entry("eu/kanade/tachiyomi/source/", TARGET + "aniyomi/source/"),
+                    Map.entry("eu/kanade/tachiyomi/animesource/", TARGET + "aniyomi/animesource/"),
+                    Map.entry("eu/kanade/tachiyomi/network/", TARGET + "aniyomi/network/"),
+                    Map.entry("eu/kanade/tachiyomi/util/", TARGET + "aniyomi/util/"),
+                    Map.entry(
+                            "eu/kanade/tachiyomi/torrentutils/", TARGET + "aniyomi/torrentutils/"),
+                    Map.entry("tachiyomi/core/", TARGET + "tachiyomi/core/"),
+                    Map.entry("aniyomi/core/", TARGET + "aniyomi/core/"),
+                    Map.entry("androidx/preference/", TARGET + "androidx/preference/"),
+                    Map.entry("android/", TARGET + "android/"),
+                    Map.entry("uy/kohesive/injekt/", TARGET + "injekt/"),
+                    Map.entry("app/cash/quickjs/", TARGET + "quickjs/"),
+                    Map.entry("com/squareup/duktape/", TARGET + "duktape/"),
+                    Map.entry("logcat/", TARGET + "logcat/"),
+                    Map.entry("mihon/core/", TARGET + "mihon/core/"));
     private static final List<String> FORBIDDEN = List.copyOf(PREFIXES.keySet());
+
+    public static String relocatedApiType(String name) {
+        return new AbiRemapper().mapType(name);
+    }
+
+    public static String relocatedApiDescriptor(String descriptor) {
+        AbiRemapper mapper = new AbiRemapper();
+        return descriptor.startsWith("(")
+                ? mapper.mapMethodDesc(descriptor)
+                : mapper.mapDesc(descriptor);
+    }
 
     public RelocationResult relocate(Path inputJar, Path outputJar) {
         Path input = inputJar.toAbsolutePath().normalize();
@@ -88,11 +103,20 @@ public final class ExtensionBytecodeRelocator {
             String className = new ClassReader(transformation.bytes()).getClassName() + ".class";
             putUnique(transformed, className, transformation.bytes());
         }
-        putUnique(transformed, "META-INF/anilib-desktop-extension.properties",
-                ("format=" + FORMAT + "\nrelocatedClasses=" + relocatedClasses + "\nrepairs=" + repairs + "\n")
+        putUnique(
+                transformed,
+                "META-INF/anilib-desktop-extension.properties",
+                ("format="
+                                + FORMAT
+                                + "\nrelocatedClasses="
+                                + relocatedClasses
+                                + "\nrepairs="
+                                + repairs
+                                + "\n")
                         .getBytes(StandardCharsets.UTF_8));
         writeEntries(output, transformed);
-        return new RelocationResult(relocatedClasses, repairs, unresolved.stream().sorted().toList());
+        return new RelocationResult(
+                relocatedClasses, repairs, unresolved.stream().sorted().toList());
     }
 
     private static Transformation transform(ClassNode node, ClassHierarchy hierarchy) {
@@ -165,14 +189,21 @@ public final class ExtensionBytecodeRelocator {
                 || arguments[0].getSort() != Type.OBJECT
                 || !"java/lang/String".equals(arguments[0].getInternalName())
                 || arguments[1].getSort() != Type.INT) {
-            throw new IllegalArgumentException("Converted enum has an invalid constructor descriptor");
+            throw new IllegalArgumentException(
+                    "Converted enum has an invalid constructor descriptor");
         }
-        MethodNode constructor = new MethodNode(Opcodes.ACC_PRIVATE, "<init>", descriptor, null, null);
+        MethodNode constructor =
+                new MethodNode(Opcodes.ACC_PRIVATE, "<init>", descriptor, null, null);
         constructor.instructions.add(new VarInsnNode(Opcodes.ALOAD, 0));
         constructor.instructions.add(new VarInsnNode(Opcodes.ALOAD, 1));
         constructor.instructions.add(new VarInsnNode(Opcodes.ILOAD, 2));
-        constructor.instructions.add(new MethodInsnNode(
-                Opcodes.INVOKESPECIAL, "java/lang/Enum", "<init>", "(Ljava/lang/String;I)V", false));
+        constructor.instructions.add(
+                new MethodInsnNode(
+                        Opcodes.INVOKESPECIAL,
+                        "java/lang/Enum",
+                        "<init>",
+                        "(Ljava/lang/String;I)V",
+                        false));
         constructor.instructions.add(new InsnNode(Opcodes.RETURN));
         owner.methods.add(constructor);
     }
@@ -207,11 +238,18 @@ public final class ExtensionBytecodeRelocator {
                 }
                 ClassReader reader = new ClassReader(entry.getValue());
                 String name = remapper.mapType(reader.getClassName());
-                String parent = reader.getSuperName() == null ? null : remapper.mapType(reader.getSuperName());
-                List<String> interfaces = Arrays.stream(reader.getInterfaces())
-                        .map(remapper::mapType)
-                        .toList();
-                result.put(name, new ClassInfo(parent, interfaces, (reader.getAccess() & Opcodes.ACC_INTERFACE) != 0));
+                String parent =
+                        reader.getSuperName() == null
+                                ? null
+                                : remapper.mapType(reader.getSuperName());
+                List<String> interfaces =
+                        Arrays.stream(reader.getInterfaces()).map(remapper::mapType).toList();
+                result.put(
+                        name,
+                        new ClassInfo(
+                                parent,
+                                interfaces,
+                                (reader.getAccess() & Opcodes.ACC_INTERFACE) != 0));
             }
             return new ClassHierarchy(result);
         }
@@ -271,8 +309,11 @@ public final class ExtensionBytecodeRelocator {
                 return info.interfaceType();
             }
             try {
-                return Class.forName(name.replace('/', '.'), false,
-                        ExtensionBytecodeRelocator.class.getClassLoader()).isInterface();
+                return Class.forName(
+                                name.replace('/', '.'),
+                                false,
+                                ExtensionBytecodeRelocator.class.getClassLoader())
+                        .isInterface();
             } catch (ClassNotFoundException | LinkageError ignored) {
                 return false;
             }
@@ -284,8 +325,12 @@ public final class ExtensionBytecodeRelocator {
                 return info.parent();
             }
             try {
-                Class<?> parent = Class.forName(name.replace('/', '.'), false,
-                        ExtensionBytecodeRelocator.class.getClassLoader()).getSuperclass();
+                Class<?> parent =
+                        Class.forName(
+                                        name.replace('/', '.'),
+                                        false,
+                                        ExtensionBytecodeRelocator.class.getClassLoader())
+                                .getSuperclass();
                 return parent == null ? null : parent.getName().replace('.', '/');
             } catch (ClassNotFoundException | LinkageError ignored) {
                 return "java/lang/Object".equals(name) ? null : "java/lang/Object";
@@ -293,10 +338,10 @@ public final class ExtensionBytecodeRelocator {
         }
     }
 
-    private record ClassInfo(String parent, List<String> interfaces, boolean interfaceType) {
-    }
+    private record ClassInfo(String parent, List<String> interfaces, boolean interfaceType) {}
 
-    private static int repairWrongConstructorOwners(ClassNode owner, Map<String, ClassNode> classes) {
+    private static int repairWrongConstructorOwners(
+            ClassNode owner, Map<String, ClassNode> classes) {
         int repairs = 0;
         for (MethodNode method : List.copyOf(owner.methods)) {
             if ("<init>".equals(method.name)) {
@@ -317,28 +362,50 @@ public final class ExtensionBytecodeRelocator {
                     }
                 }
             }
-            ArrayDeque<TypeInsnNode> pending = new ArrayDeque<>();
-            TypeInsnNode created = null;
-            for (AbstractInsnNode instruction : method.instructions) {
-                if (instruction instanceof TypeInsnNode type && type.getOpcode() == Opcodes.NEW) {
-                    created = type;
-                } else if (instruction instanceof InsnNode simple
-                        && simple.getOpcode() == Opcodes.DUP && created != null) {
-                    pending.push(created);
-                    created = null;
-                } else if (instruction instanceof MethodInsnNode call
-                        && call.getOpcode() == Opcodes.INVOKESPECIAL
-                        && "<init>".equals(call.name)
-                        && !pending.isEmpty()) {
-                    String expectedOwner = pending.pop().desc;
-                    if (!expectedOwner.equals(call.owner)) {
-                        call.owner = expectedOwner;
-                        repairs++;
-                    }
-                }
-            }
+            repairs += repairAllocationConstructors(owner, method);
         }
         return repairs;
+    }
+
+    private static int repairAllocationConstructors(ClassNode owner, MethodNode method) {
+        if (method.instructions.size() == 0) return 0;
+        // Trace the actual receiver across branches and local stores. A linear NEW/DUP stack
+        // confuses mutually exclusive allocations in suspend state machines and corrupts valid
+        // code.
+        SourceInterpreter origins =
+                new SourceInterpreter(Opcodes.ASM9) {
+                    @Override
+                    public SourceValue copyOperation(
+                            AbstractInsnNode instruction, SourceValue value) {
+                        return value;
+                    }
+                };
+        try {
+            var frames = new Analyzer<>(origins).analyze(owner.name, method);
+            int repairs = 0;
+            for (int index = 0; index < method.instructions.size(); index++) {
+                if (!(method.instructions.get(index) instanceof MethodInsnNode call)
+                        || call.getOpcode() != Opcodes.INVOKESPECIAL
+                        || !"<init>".equals(call.name)
+                        || frames[index] == null) continue;
+                var frame = frames[index];
+                int receiver = frame.getStackSize() - Type.getArgumentTypes(call.desc).length - 1;
+                if (receiver < 0) continue;
+                SourceValue value = frame.getStack(receiver);
+                if (value.insns.size() == 1
+                        && value.insns.iterator().next() instanceof TypeInsnNode allocation
+                        && allocation.getOpcode() == Opcodes.NEW
+                        && !allocation.desc.equals(call.owner)) {
+                    call.owner = allocation.desc;
+                    repairs++;
+                }
+            }
+            return repairs;
+        } catch (AnalyzerException failure) {
+            // Keep unverifiable input unchanged; runtime preflight rejects it before replacing an
+            // install.
+            return 0;
+        }
     }
 
     private static int repairDirectObjectStores(ClassNode owner, Map<String, ClassNode> classes) {
@@ -346,8 +413,10 @@ public final class ExtensionBytecodeRelocator {
         for (MethodNode method : List.copyOf(owner.methods)) {
             for (AbstractInsnNode instruction : method.instructions) {
                 if (!(instruction instanceof FieldInsnNode field)
-                        || (field.getOpcode() != Opcodes.PUTFIELD && field.getOpcode() != Opcodes.PUTSTATIC)
-                        || !field.desc.startsWith("L") || !field.desc.endsWith(";")) {
+                        || (field.getOpcode() != Opcodes.PUTFIELD
+                                && field.getOpcode() != Opcodes.PUTSTATIC)
+                        || !field.desc.startsWith("L")
+                        || !field.desc.endsWith(";")) {
                     continue;
                 }
                 AbstractInsnNode callNode = previousMeaningful(field);
@@ -359,7 +428,8 @@ public final class ExtensionBytecodeRelocator {
                         || !(createdNode instanceof TypeInsnNode created)
                         || created.getOpcode() != Opcodes.NEW
                         || !"java/lang/Object".equals(created.desc)
-                        || duplicate == null || duplicate.getOpcode() != Opcodes.DUP
+                        || duplicate == null
+                        || duplicate.getOpcode() != Opcodes.DUP
                         || !(callNode instanceof MethodInsnNode call)
                         || call.getOpcode() != Opcodes.INVOKESPECIAL
                         || !"<init>".equals(call.name)
@@ -381,13 +451,16 @@ public final class ExtensionBytecodeRelocator {
         for (MethodNode method : List.copyOf(owner.methods)) {
             for (AbstractInsnNode instruction : method.instructions) {
                 if (!(instruction instanceof FieldInsnNode field)
-                        || (field.getOpcode() != Opcodes.PUTFIELD && field.getOpcode() != Opcodes.PUTSTATIC)) {
+                        || (field.getOpcode() != Opcodes.PUTFIELD
+                                && field.getOpcode() != Opcodes.PUTSTATIC)) {
                     continue;
                 }
-                String target = field.getOpcode() == Opcodes.PUTSTATIC
-                        && field.desc.startsWith("L") && field.desc.endsWith(";")
-                        ? field.desc.substring(1, field.desc.length() - 1)
-                        : field.owner;
+                String target =
+                        field.getOpcode() == Opcodes.PUTSTATIC
+                                        && field.desc.startsWith("L")
+                                        && field.desc.endsWith(";")
+                                ? field.desc.substring(1, field.desc.length() - 1)
+                                : field.owner;
                 ClassNode targetClass = classes.get(target);
                 if (targetClass == null) {
                     continue;
@@ -395,7 +468,8 @@ public final class ExtensionBytecodeRelocator {
                 AbstractInsnNode cursor = previousMeaningful(field);
                 int remaining = field.getOpcode() == Opcodes.PUTSTATIC ? 1 : 32;
                 while (cursor != null && remaining-- > 0) {
-                    if (cursor instanceof VarInsnNode load && load.getOpcode() == Opcodes.ALOAD
+                    if (cursor instanceof VarInsnNode load
+                            && load.getOpcode() == Opcodes.ALOAD
                             && repairLocalConstruction(load, target, targetClass)) {
                         repairs++;
                         break;
@@ -408,13 +482,12 @@ public final class ExtensionBytecodeRelocator {
     }
 
     private static boolean repairLocalConstruction(
-            VarInsnNode load,
-            String target,
-            ClassNode targetClass) {
+            VarInsnNode load, String target, ClassNode targetClass) {
         AbstractInsnNode cursor = previousMeaningful(load);
         for (int distance = 0; cursor != null && distance < 64; distance++) {
             if (cursor instanceof VarInsnNode store
-                    && store.getOpcode() == Opcodes.ASTORE && store.var == load.var) {
+                    && store.getOpcode() == Opcodes.ASTORE
+                    && store.var == load.var) {
                 AbstractInsnNode callNode = previousMeaningful(store);
                 AbstractInsnNode duplicate = previousMeaningful(callNode);
                 AbstractInsnNode createdNode = previousMeaningful(duplicate);
@@ -434,13 +507,12 @@ public final class ExtensionBytecodeRelocator {
     }
 
     private static boolean objectConstruction(
-            AbstractInsnNode created,
-            AbstractInsnNode duplicate,
-            AbstractInsnNode call) {
+            AbstractInsnNode created, AbstractInsnNode duplicate, AbstractInsnNode call) {
         return created instanceof TypeInsnNode type
                 && type.getOpcode() == Opcodes.NEW
                 && "java/lang/Object".equals(type.desc)
-                && duplicate != null && duplicate.getOpcode() == Opcodes.DUP
+                && duplicate != null
+                && duplicate.getOpcode() == Opcodes.DUP
                 && call instanceof MethodInsnNode method
                 && method.getOpcode() == Opcodes.INVOKESPECIAL
                 && "<init>".equals(method.name)
@@ -449,10 +521,12 @@ public final class ExtensionBytecodeRelocator {
     }
 
     private static int repairBrokenStringLazyInitializers(
-            ClassNode owner,
-            Map<String, ClassNode> classes) {
-        if (owner.methods.stream().noneMatch(method -> "getBaseUrl".equals(method.name)
-                && "()Ljava/lang/String;".equals(method.desc))) {
+            ClassNode owner, Map<String, ClassNode> classes) {
+        if (owner.methods.stream()
+                .noneMatch(
+                        method ->
+                                "getBaseUrl".equals(method.name)
+                                        && "()Ljava/lang/String;".equals(method.desc))) {
             return 0;
         }
         int repairs = 0;
@@ -470,7 +544,8 @@ public final class ExtensionBytecodeRelocator {
                 AbstractInsnNode constructor = nextMeaningful(duplicate);
                 AbstractInsnNode lazyCall = nextMeaningful(constructor);
                 AbstractInsnNode store = nextMeaningful(lazyCall);
-                if (duplicate == null || duplicate.getOpcode() != Opcodes.DUP
+                if (duplicate == null
+                        || duplicate.getOpcode() != Opcodes.DUP
                         || !(constructor instanceof MethodInsnNode initialized)
                         || initialized.getOpcode() != Opcodes.INVOKESPECIAL
                         || !"java/lang/Object".equals(initialized.owner)
@@ -489,13 +564,15 @@ public final class ExtensionBytecodeRelocator {
                 }
                 InsnList replacement = new InsnList();
                 replacement.add(new VarInsnNode(Opcodes.ALOAD, 0));
-                replacement.add(new MethodInsnNode(
-                        Opcodes.INVOKESTATIC,
-                        TARGET + "aniyomi/source/online/ExtensionLazySupport",
-                        "baseUrlHostInitializer",
-                        "(Ljava/lang/Object;)Ljava/lang/Object;",
-                        false));
-                replacement.add(new TypeInsnNode(Opcodes.CHECKCAST, "kotlin/jvm/functions/Function0"));
+                replacement.add(
+                        new MethodInsnNode(
+                                Opcodes.INVOKESTATIC,
+                                TARGET + "aniyomi/source/online/ExtensionLazySupport",
+                                "baseUrlHostInitializer",
+                                "(Ljava/lang/Object;)Ljava/lang/Object;",
+                                false));
+                replacement.add(
+                        new TypeInsnNode(Opcodes.CHECKCAST, "kotlin/jvm/functions/Function0"));
                 method.instructions.insertBefore(created, replacement);
                 method.instructions.remove(created);
                 method.instructions.remove(duplicate);
@@ -507,9 +584,7 @@ public final class ExtensionBytecodeRelocator {
     }
 
     private static boolean stringLazyField(
-            Map<String, ClassNode> classes,
-            String owner,
-            String fieldName) {
+            Map<String, ClassNode> classes, String owner, String fieldName) {
         for (ClassNode candidate : classes.values()) {
             for (MethodNode method : candidate.methods) {
                 for (AbstractInsnNode instruction : method.instructions) {
@@ -560,15 +635,17 @@ public final class ExtensionBytecodeRelocator {
         }
         MethodNode constructor = new MethodNode(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
         constructor.instructions.add(new VarInsnNode(Opcodes.ALOAD, 0));
-        constructor.instructions.add(new MethodInsnNode(
-                Opcodes.INVOKESPECIAL, target.superName, "<init>", "()V", false));
+        constructor.instructions.add(
+                new MethodInsnNode(
+                        Opcodes.INVOKESPECIAL, target.superName, "<init>", "()V", false));
         constructor.instructions.add(new InsnNode(Opcodes.RETURN));
         target.methods.add(constructor);
     }
 
     private static Map<String, byte[]> readEntries(Path jar) {
         if (!Files.isRegularFile(jar) || Files.isSymbolicLink(jar)) {
-            throw new IllegalArgumentException("Converted extension must be a regular non-link JAR");
+            throw new IllegalArgumentException(
+                    "Converted extension must be a regular non-link JAR");
         }
         Map<String, byte[]> result = new LinkedHashMap<>();
         long expanded = 0;
@@ -582,7 +659,8 @@ public final class ExtensionBytecodeRelocator {
                 }
                 count++;
                 if (count > MAX_ENTRIES) {
-                    throw new IllegalArgumentException("Converted extension contains too many entries");
+                    throw new IllegalArgumentException(
+                            "Converted extension contains too many entries");
                 }
                 String name = safeEntryName(entry.getName());
                 byte[] bytes;
@@ -591,7 +669,8 @@ public final class ExtensionBytecodeRelocator {
                 }
                 expanded = Math.addExact(expanded, bytes.length);
                 if (bytes.length > MAX_EXPANDED_BYTES || expanded > MAX_EXPANDED_BYTES) {
-                    throw new IllegalArgumentException("Converted extension exceeds the expanded size limit");
+                    throw new IllegalArgumentException(
+                            "Converted extension exceeds the expanded size limit");
                 }
                 putUnique(result, name, bytes);
             }
@@ -620,8 +699,12 @@ public final class ExtensionBytecodeRelocator {
     }
 
     private static String safeEntryName(String name) {
-        if (name.isBlank() || name.startsWith("/") || name.startsWith("\\")
-                || name.contains("../") || name.contains("..\\") || name.indexOf('\0') >= 0) {
+        if (name.isBlank()
+                || name.startsWith("/")
+                || name.startsWith("\\")
+                || name.contains("../")
+                || name.contains("..\\")
+                || name.indexOf('\0') >= 0) {
             throw new IllegalArgumentException("Unsafe archive entry: " + name);
         }
         return name.replace('\\', '/');
@@ -648,14 +731,14 @@ public final class ExtensionBytecodeRelocator {
         }
     }
 
-    public record RelocationResult(int relocatedClasses, int repairedInstructions, List<String> unresolvedPrefixes) {
+    public record RelocationResult(
+            int relocatedClasses, int repairedInstructions, List<String> unresolvedPrefixes) {
         public RelocationResult {
             unresolvedPrefixes = List.copyOf(unresolvedPrefixes);
         }
     }
 
-    private record Transformation(byte[] bytes) {
-    }
+    private record Transformation(byte[] bytes) {}
 
     private static final class AbiRemapper extends Remapper {
         private AbiRemapper() {

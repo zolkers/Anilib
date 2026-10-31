@@ -1,10 +1,12 @@
 package fr.vriege.anilib.platform.desktopextensionhost;
 
-import fr.vriege.anilib.platform.desktopextensionhost.protocol.DesktopExtensionHostProtocol;
-import fr.vriege.anilib.platform.desktopextensionhost.server.DesktopExtensionHostServer;
 import fr.vriege.anilib.platform.desktopextensionhost.extension.EmbeddedVideoFallbackSmoke;
+import fr.vriege.anilib.platform.desktopextensionhost.extension.ExtensionInstallTransactionSmoke;
 import fr.vriege.anilib.platform.desktopextensionhost.extension.ExtensionOperationDispatcherSmoke;
 import fr.vriege.anilib.platform.desktopextensionhost.extension.ExtensionRegistryCacheSmoke;
+import fr.vriege.anilib.platform.desktopextensionhost.extension.ParsedAnimeSourceSmoke;
+import fr.vriege.anilib.platform.desktopextensionhost.protocol.DesktopExtensionHostProtocol;
+import fr.vriege.anilib.platform.desktopextensionhost.server.DesktopExtensionHostServer;
 
 import java.net.InetAddress;
 import java.net.URI;
@@ -16,8 +18,7 @@ import java.nio.file.Path;
 import java.util.Comparator;
 
 public final class DesktopExtensionHostSmoke {
-    private DesktopExtensionHostSmoke() {
-    }
+    private DesktopExtensionHostSmoke() {}
 
     public static void main(String[] arguments) throws Exception {
         ExtensionRelocationSmoke.verify();
@@ -25,35 +26,63 @@ public final class DesktopExtensionHostSmoke {
         ExtensionRuntimeCatalogSmoke.verify();
         ExtensionSourceModelSmoke.verify();
         LegacyAnimeCompatibilitySmoke.verify();
+        ModernAnimeCompatibilitySmoke.verify();
+        ExtensionInstallTransactionSmoke.verify();
         ExtensionOperationDispatcherSmoke.verify();
+        ParsedAnimeSourceSmoke.verify();
         ExtensionRegistryCacheSmoke.verify();
         EmbeddedVideoFallbackSmoke.verify();
         QuickJsCompatibilitySmoke.verify();
         Path data = Files.createTempDirectory("anilib-desktop-extension-host-");
-        try (DesktopExtensionHostServer server = DesktopExtensionHostServer.open(
-                InetAddress.getLoopbackAddress(), 0, data)) {
+        try (DesktopExtensionHostServer server =
+                DesktopExtensionHostServer.open(InetAddress.getLoopbackAddress(), 0, data)) {
             server.start();
-            HttpResponse<String> response = HttpClient.newHttpClient().send(
-                    HttpRequest.newBuilder(URI.create(
-                            "http://127.0.0.1:" + server.port() + DesktopExtensionHostProtocol.HEALTH_PATH)).build(),
-                    HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response =
+                    HttpClient.newHttpClient()
+                            .send(
+                                    HttpRequest.newBuilder(
+                                                    URI.create(
+                                                            "http://127.0.0.1:"
+                                                                    + server.port()
+                                                                    + DesktopExtensionHostProtocol
+                                                                            .HEALTH_PATH))
+                                            .build(),
+                                    HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() != 200
-                    || !response.body().contains("\"service\":\"" + DesktopExtensionHostProtocol.SERVICE + "\"")) {
-                throw new IllegalStateException("Desktop engine health protocol failed: " + response);
+                    || !response.body()
+                            .contains(
+                                    "\"service\":\""
+                                            + DesktopExtensionHostProtocol.SERVICE
+                                            + "\"")) {
+                throw new IllegalStateException(
+                        "Desktop engine health protocol failed: " + response);
             }
-            verifyGet(server, DesktopExtensionHostProtocol.INSTALLED_EXTENSIONS_PATH, "\"extensions\":[]");
+            verifyGet(
+                    server,
+                    DesktopExtensionHostProtocol.INSTALLED_EXTENSIONS_PATH,
+                    "\"extensions\":[]");
             verifyGet(server, DesktopExtensionHostProtocol.SOURCES_PATH, "\"anime\":[]");
-            verifyGet(server, DesktopExtensionHostProtocol.CAPABILITIES_PATH, "\"sourceCatalogue\":true");
-            HttpResponse<String> rejected = HttpClient.newHttpClient().send(
-                    HttpRequest.newBuilder(endpoint(server, DesktopExtensionHostProtocol.UNINSTALL_EXTENSION_PATH))
-                            .header("content-type", "application/json")
-                            .POST(HttpRequest.BodyPublishers.ofString("not-json"))
-                            .build(),
-                    HttpResponse.BodyHandlers.ofString());
+            verifyGet(
+                    server,
+                    DesktopExtensionHostProtocol.CAPABILITIES_PATH,
+                    "\"sourceCatalogue\":true");
+            HttpResponse<String> rejected =
+                    HttpClient.newHttpClient()
+                            .send(
+                                    HttpRequest.newBuilder(
+                                                    endpoint(
+                                                            server,
+                                                            DesktopExtensionHostProtocol
+                                                                    .UNINSTALL_EXTENSION_PATH))
+                                            .header("content-type", "application/json")
+                                            .POST(HttpRequest.BodyPublishers.ofString("not-json"))
+                                            .build(),
+                                    HttpResponse.BodyHandlers.ofString());
             if (rejected.statusCode() != 400
                     || !rejected.body().contains("\"code\":\"invalid_request\"")
                     || rejected.headers().firstValue("X-Anilib-Correlation-Id").isEmpty()) {
-                throw new IllegalStateException("Desktop engine did not isolate a malformed request");
+                throw new IllegalStateException(
+                        "Desktop engine did not isolate a malformed request");
             }
             verifyGet(server, DesktopExtensionHostProtocol.HEALTH_PATH, "\"status\":\"ok\"");
         } finally {
@@ -65,12 +94,16 @@ public final class DesktopExtensionHostSmoke {
         }
     }
 
-    private static void verifyGet(DesktopExtensionHostServer server, String path, String expected) throws Exception {
-        HttpResponse<String> response = HttpClient.newHttpClient().send(
-                HttpRequest.newBuilder(endpoint(server, path)).build(),
-                HttpResponse.BodyHandlers.ofString());
+    private static void verifyGet(DesktopExtensionHostServer server, String path, String expected)
+            throws Exception {
+        HttpResponse<String> response =
+                HttpClient.newHttpClient()
+                        .send(
+                                HttpRequest.newBuilder(endpoint(server, path)).build(),
+                                HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() != 200 || !response.body().contains(expected)) {
-            throw new IllegalStateException("Desktop engine endpoint failed: " + path + ' ' + response);
+            throw new IllegalStateException(
+                    "Desktop engine endpoint failed: " + path + ' ' + response);
         }
     }
 

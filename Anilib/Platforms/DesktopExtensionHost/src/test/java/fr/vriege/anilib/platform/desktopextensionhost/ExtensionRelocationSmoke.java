@@ -1,28 +1,29 @@
 package fr.vriege.anilib.platform.desktopextensionhost;
 
 import fr.vriege.anilib.platform.desktopextensionhost.extension.ExtensionBytecodeRelocator;
+
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
 
 import java.io.IOException;
+import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.jar.JarOutputStream;
-import java.net.URL;
 
 final class ExtensionRelocationSmoke {
     private static final String ORIGINAL = "eu/kanade/tachiyomi/source/Source";
     private static final String RELOCATED =
             "fr/vriege/anilib/platform/desktopextensionhost/compat/aniyomi/source/Source";
 
-    private ExtensionRelocationSmoke() {
-    }
+    private ExtensionRelocationSmoke() {}
 
     static void verify() throws IOException {
         Path directory = Files.createTempDirectory("anilib-extension-relocation-");
@@ -32,33 +33,51 @@ final class ExtensionRelocationSmoke {
             writeInput(input);
             ExtensionBytecodeRelocator.RelocationResult result =
                     new ExtensionBytecodeRelocator().relocate(input, output);
-            if (result.relocatedClasses() != 3 || result.repairedInstructions() != 3
+            if (result.relocatedClasses() != 3
+                    || result.repairedInstructions() != 3
                     || !result.unresolvedPrefixes().isEmpty()) {
-                throw new IllegalStateException("Extension ABI relocation result is invalid: " + result);
+                throw new IllegalStateException(
+                        "Extension ABI relocation result is invalid: " + result);
             }
             try (JarFile jar = new JarFile(output.toFile())) {
                 JarEntry entry = jar.getJarEntry("sample/Extension.class");
                 byte[] bytes = jar.getInputStream(entry).readAllBytes();
                 String constants = new String(bytes, StandardCharsets.ISO_8859_1);
-                if (!constants.contains(RELOCATED) || constants.contains(ORIGINAL)
+                if (!constants.contains(RELOCATED)
+                        || constants.contains(ORIGINAL)
                         || !"sample/Extension".equals(new ClassReader(bytes).getClassName())) {
-                    throw new IllegalStateException("Extension ABI was not relocated in class bytecode");
+                    throw new IllegalStateException(
+                            "Extension ABI was not relocated in class bytecode");
                 }
                 JarEntry marker = jar.getJarEntry("META-INF/anilib-desktop-extension.properties");
-                if (marker == null || !new String(jar.getInputStream(marker).readAllBytes(),
-                        StandardCharsets.UTF_8).contains("format=2")) {
+                if (marker == null
+                        || !new String(
+                                        jar.getInputStream(marker).readAllBytes(),
+                                        StandardCharsets.UTF_8)
+                                .contains("format=3")) {
                     throw new IllegalStateException("Prepared extension marker is missing");
                 }
             }
-            try (URLClassLoader loader = new URLClassLoader(new URL[]{output.toUri().toURL()})) {
+            try (URLClassLoader loader = new URLClassLoader(new URL[] {output.toUri().toURL()})) {
+                Object allocated =
+                        Class.forName("sample.Allocations", true, loader)
+                                .getMethod("build")
+                                .invoke(null);
+                if (!(allocated instanceof ArrayList<?>)) {
+                    throw new IllegalStateException(
+                            "Constructor receiver tracing corrupted local allocations");
+                }
                 Class<?> enumType = Class.forName("sample.BrokenEnum", true, loader);
                 if (enumType.getField("ITEM").get(null) == null) {
                     throw new IllegalStateException("Converted enum constant was not repaired");
                 }
-                Object lazy = Class.forName("sample.BrokenLazy", true, loader)
-                        .getConstructor().newInstance();
+                Object lazy =
+                        Class.forName("sample.BrokenLazy", true, loader)
+                                .getConstructor()
+                                .newInstance();
                 if (!"example.invalid".equals(lazy.getClass().getMethod("read").invoke(lazy))) {
-                    throw new IllegalStateException("Converted base URL host lazy was not repaired");
+                    throw new IllegalStateException(
+                            "Converted base URL host lazy was not repaired");
                 }
             } catch (ReflectiveOperationException exception) {
                 throw new IllegalStateException("Converted enum cannot be loaded", exception);
@@ -74,10 +93,22 @@ final class ExtensionRelocationSmoke {
 
     private static void writeInput(Path input) throws IOException {
         ClassWriter writer = new ClassWriter(0);
-        writer.visit(Opcodes.V21, Opcodes.ACC_PUBLIC, "sample/Extension", null, "java/lang/Object", null);
-        writer.visitField(Opcodes.ACC_PRIVATE, "source", 'L' + ORIGINAL + ';', null, null).visitEnd();
-        writer.visitField(Opcodes.ACC_PRIVATE, "sourceClass", "Ljava/lang/String;", null,
-                ORIGINAL.replace('/', '.')).visitEnd();
+        writer.visit(
+                Opcodes.V21,
+                Opcodes.ACC_PUBLIC,
+                "sample/Extension",
+                null,
+                "java/lang/Object",
+                null);
+        writer.visitField(Opcodes.ACC_PRIVATE, "source", 'L' + ORIGINAL + ';', null, null)
+                .visitEnd();
+        writer.visitField(
+                        Opcodes.ACC_PRIVATE,
+                        "sourceClass",
+                        "Ljava/lang/String;",
+                        null,
+                        ORIGINAL.replace('/', '.'))
+                .visitEnd();
         writer.visitEnd();
         try (JarOutputStream jar = new JarOutputStream(Files.newOutputStream(input))) {
             jar.putNextEntry(new JarEntry("sample/Extension.class"));
@@ -85,24 +116,75 @@ final class ExtensionRelocationSmoke {
             jar.closeEntry();
             writeBrokenEnum(jar);
             writeBrokenLazy(jar);
+            writeLocalAllocations(jar);
         }
+    }
+
+    private static void writeLocalAllocations(JarOutputStream jar) throws IOException {
+        ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
+        writer.visit(
+                Opcodes.V21,
+                Opcodes.ACC_PUBLIC,
+                "sample/Allocations",
+                null,
+                "java/lang/Object",
+                null);
+        var build =
+                writer.visitMethod(
+                        Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC,
+                        "build",
+                        "()Ljava/lang/Object;",
+                        null,
+                        null);
+        build.visitCode();
+        build.visitTypeInsn(Opcodes.NEW, "java/lang/StringBuilder");
+        build.visitInsn(Opcodes.DUP);
+        build.visitVarInsn(Opcodes.ASTORE, 0);
+        build.visitTypeInsn(Opcodes.NEW, "java/util/ArrayList");
+        build.visitVarInsn(Opcodes.ASTORE, 1);
+        build.visitVarInsn(Opcodes.ALOAD, 1);
+        build.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/util/ArrayList", "<init>", "()V", false);
+        build.visitMethodInsn(
+                Opcodes.INVOKESPECIAL, "java/lang/StringBuilder", "<init>", "()V", false);
+        build.visitVarInsn(Opcodes.ALOAD, 1);
+        build.visitInsn(Opcodes.ARETURN);
+        build.visitMaxs(0, 0);
+        build.visitEnd();
+        writer.visitEnd();
+        jar.putNextEntry(new JarEntry("sample/Allocations.class"));
+        jar.write(writer.toByteArray());
+        jar.closeEntry();
     }
 
     private static void writeBrokenEnum(JarOutputStream jar) throws IOException {
         ClassWriter writer = new ClassWriter(0);
-        writer.visit(Opcodes.V21, Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL | Opcodes.ACC_ENUM,
-                "sample/BrokenEnum", "Ljava/lang/Enum<Lsample/BrokenEnum;>;", "java/lang/Enum", null);
-        writer.visitField(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC | Opcodes.ACC_FINAL | Opcodes.ACC_ENUM,
-                "ITEM", "Lsample/BrokenEnum;", null, null).visitEnd();
+        writer.visit(
+                Opcodes.V21,
+                Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL | Opcodes.ACC_ENUM,
+                "sample/BrokenEnum",
+                "Ljava/lang/Enum<Lsample/BrokenEnum;>;",
+                "java/lang/Enum",
+                null);
+        writer.visitField(
+                        Opcodes.ACC_PUBLIC
+                                | Opcodes.ACC_STATIC
+                                | Opcodes.ACC_FINAL
+                                | Opcodes.ACC_ENUM,
+                        "ITEM",
+                        "Lsample/BrokenEnum;",
+                        null,
+                        null)
+                .visitEnd();
         var initializer = writer.visitMethod(Opcodes.ACC_STATIC, "<clinit>", "()V", null, null);
         initializer.visitCode();
         initializer.visitTypeInsn(Opcodes.NEW, "java/lang/Enum");
         initializer.visitInsn(Opcodes.DUP);
         initializer.visitLdcInsn("ITEM");
         initializer.visitInsn(Opcodes.ICONST_0);
-        initializer.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Enum", "<init>",
-                "(Ljava/lang/String;I)V", false);
-        initializer.visitFieldInsn(Opcodes.PUTSTATIC, "sample/BrokenEnum", "ITEM", "Lsample/BrokenEnum;");
+        initializer.visitMethodInsn(
+                Opcodes.INVOKESPECIAL, "java/lang/Enum", "<init>", "(Ljava/lang/String;I)V", false);
+        initializer.visitFieldInsn(
+                Opcodes.PUTSTATIC, "sample/BrokenEnum", "ITEM", "Lsample/BrokenEnum;");
         initializer.visitInsn(Opcodes.RETURN);
         initializer.visitMaxs(4, 0);
         initializer.visitEnd();
@@ -114,37 +196,55 @@ final class ExtensionRelocationSmoke {
 
     private static void writeBrokenLazy(JarOutputStream jar) throws IOException {
         ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
-        writer.visit(Opcodes.V21, Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL,
-                "sample/BrokenLazy", null, "java/lang/Object", null);
-        writer.visitField(Opcodes.ACC_PRIVATE | Opcodes.ACC_FINAL,
-                "host", "Lkotlin/Lazy;", null, null).visitEnd();
+        writer.visit(
+                Opcodes.V21,
+                Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL,
+                "sample/BrokenLazy",
+                null,
+                "java/lang/Object",
+                null);
+        writer.visitField(
+                        Opcodes.ACC_PRIVATE | Opcodes.ACC_FINAL,
+                        "host",
+                        "Lkotlin/Lazy;",
+                        null,
+                        null)
+                .visitEnd();
         var constructor = writer.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
         constructor.visitCode();
         constructor.visitVarInsn(Opcodes.ALOAD, 0);
-        constructor.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
+        constructor.visitMethodInsn(
+                Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
         constructor.visitVarInsn(Opcodes.ALOAD, 0);
         constructor.visitTypeInsn(Opcodes.NEW, "java/lang/Object");
         constructor.visitInsn(Opcodes.DUP);
-        constructor.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
-        constructor.visitMethodInsn(Opcodes.INVOKESTATIC, "kotlin/LazyKt", "lazy",
-                "(Lkotlin/jvm/functions/Function0;)Lkotlin/Lazy;", false);
+        constructor.visitMethodInsn(
+                Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
+        constructor.visitMethodInsn(
+                Opcodes.INVOKESTATIC,
+                "kotlin/LazyKt",
+                "lazy",
+                "(Lkotlin/jvm/functions/Function0;)Lkotlin/Lazy;",
+                false);
         constructor.visitFieldInsn(Opcodes.PUTFIELD, "sample/BrokenLazy", "host", "Lkotlin/Lazy;");
         constructor.visitInsn(Opcodes.RETURN);
         constructor.visitMaxs(0, 0);
         constructor.visitEnd();
-        var baseUrl = writer.visitMethod(Opcodes.ACC_PUBLIC, "getBaseUrl",
-                "()Ljava/lang/String;", null, null);
+        var baseUrl =
+                writer.visitMethod(
+                        Opcodes.ACC_PUBLIC, "getBaseUrl", "()Ljava/lang/String;", null, null);
         baseUrl.visitCode();
         baseUrl.visitLdcInsn("https://example.invalid/path");
         baseUrl.visitInsn(Opcodes.ARETURN);
         baseUrl.visitMaxs(1, 1);
         baseUrl.visitEnd();
-        var read = writer.visitMethod(Opcodes.ACC_PUBLIC, "read", "()Ljava/lang/String;", null, null);
+        var read =
+                writer.visitMethod(Opcodes.ACC_PUBLIC, "read", "()Ljava/lang/String;", null, null);
         read.visitCode();
         read.visitVarInsn(Opcodes.ALOAD, 0);
         read.visitFieldInsn(Opcodes.GETFIELD, "sample/BrokenLazy", "host", "Lkotlin/Lazy;");
-        read.visitMethodInsn(Opcodes.INVOKEINTERFACE, "kotlin/Lazy", "getValue",
-                "()Ljava/lang/Object;", true);
+        read.visitMethodInsn(
+                Opcodes.INVOKEINTERFACE, "kotlin/Lazy", "getValue", "()Ljava/lang/Object;", true);
         read.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/String");
         read.visitInsn(Opcodes.ARETURN);
         read.visitMaxs(1, 1);

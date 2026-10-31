@@ -4,6 +4,7 @@ import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.FieldVisitor;
 import org.objectweb.asm.Handle;
+import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
@@ -13,6 +14,7 @@ import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
@@ -26,7 +28,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
-import org.objectweb.asm.Label;
 
 /* Validates every relocated host ABI symbol before an extension is activated. */
 public final class ExtensionAbiVerifier {
@@ -46,7 +47,8 @@ public final class ExtensionAbiVerifier {
 
     public Report inspect(Path archive) {
         Path source = archive.toAbsolutePath().normalize();
-        if (!Files.isRegularFile(source, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(source)) {
+        if (!Files.isRegularFile(source, LinkOption.NOFOLLOW_LINKS)
+                || Files.isSymbolicLink(source)) {
             throw new IllegalArgumentException("Extension archive must be a regular non-link JAR");
         }
         Set<String> missing = new LinkedHashSet<>();
@@ -59,9 +61,10 @@ public final class ExtensionAbiVerifier {
                     continue;
                 }
                 try (InputStream input = jar.getInputStream(entry)) {
-                    new ClassReader(input).accept(
-                            visitor(missing, archiveClasses),
-                            ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
+                    new ClassReader(input)
+                            .accept(
+                                    visitor(missing, archiveClasses),
+                                    ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
                 }
             }
         } catch (IOException exception) {
@@ -112,11 +115,7 @@ public final class ExtensionAbiVerifier {
 
             @Override
             public FieldVisitor visitField(
-                    int access,
-                    String name,
-                    String descriptor,
-                    String signature,
-                    Object value) {
+                    int access, String name, String descriptor, String signature, Object value) {
                 checkType(Type.getType(descriptor), missing, archiveClasses);
                 return null;
             }
@@ -149,20 +148,23 @@ public final class ExtensionAbiVerifier {
             @Override
             public void visitFieldInsn(int opcode, String owner, String name, String descriptor) {
                 checkType(Type.getType(descriptor), missing, archiveClasses);
-                if (hostRuntimeType(owner, archiveClasses) && !fieldAvailable(owner, name, descriptor)) {
+                if (hostRuntimeType(owner, archiveClasses)
+                        && !fieldAvailable(
+                                owner,
+                                name,
+                                descriptor,
+                                opcode == Opcodes.GETSTATIC || opcode == Opcodes.PUTSTATIC)) {
                     add(missing, "field " + binaryName(owner) + '.' + name + ' ' + descriptor);
                 }
             }
 
             @Override
             public void visitMethodInsn(
-                    int opcode,
-                    String owner,
-                    String name,
-                    String descriptor,
-                    boolean isInterface) {
+                    int opcode, String owner, String name, String descriptor, boolean isInterface) {
                 checkMethodType(descriptor, missing, archiveClasses);
-                if (hostRuntimeType(owner, archiveClasses) && !methodAvailable(owner, name, descriptor)) {
+                if (hostRuntimeType(owner, archiveClasses)
+                        && !methodAvailable(
+                                owner, name, descriptor, opcode == Opcodes.INVOKESTATIC)) {
                     add(missing, "method " + binaryName(owner) + '.' + name + descriptor);
                 }
             }
@@ -199,11 +201,7 @@ public final class ExtensionAbiVerifier {
             }
 
             @Override
-            public void visitTryCatchBlock(
-                    Label start,
-                    Label end,
-                    Label handler,
-                    String type) {
+            public void visitTryCatchBlock(Label start, Label end, Label handler, String type) {
                 checkClass(type, missing, archiveClasses);
             }
         };
@@ -211,21 +209,43 @@ public final class ExtensionAbiVerifier {
 
     private void checkHandle(Handle handle, Set<String> missing, Set<String> archiveClasses) {
         int tag = handle.getTag();
-        if (tag == Opcodes.H_GETFIELD || tag == Opcodes.H_GETSTATIC
-                || tag == Opcodes.H_PUTFIELD || tag == Opcodes.H_PUTSTATIC) {
+        if (tag == Opcodes.H_GETFIELD
+                || tag == Opcodes.H_GETSTATIC
+                || tag == Opcodes.H_PUTFIELD
+                || tag == Opcodes.H_PUTSTATIC) {
             if (hostRuntimeType(handle.getOwner(), archiveClasses)
-                    && !fieldAvailable(handle.getOwner(), handle.getName(), handle.getDesc())) {
-                add(missing, "field " + binaryName(handle.getOwner()) + '.'
-                        + handle.getName() + ' ' + handle.getDesc());
+                    && !fieldAvailable(
+                            handle.getOwner(),
+                            handle.getName(),
+                            handle.getDesc(),
+                            tag == Opcodes.H_GETSTATIC || tag == Opcodes.H_PUTSTATIC)) {
+                add(
+                        missing,
+                        "field "
+                                + binaryName(handle.getOwner())
+                                + '.'
+                                + handle.getName()
+                                + ' '
+                                + handle.getDesc());
             }
         } else if (hostRuntimeType(handle.getOwner(), archiveClasses)
-                && !methodAvailable(handle.getOwner(), handle.getName(), handle.getDesc())) {
-            add(missing, "method " + binaryName(handle.getOwner()) + '.'
-                    + handle.getName() + handle.getDesc());
+                && !methodAvailable(
+                        handle.getOwner(),
+                        handle.getName(),
+                        handle.getDesc(),
+                        tag == Opcodes.H_INVOKESTATIC)) {
+            add(
+                    missing,
+                    "method "
+                            + binaryName(handle.getOwner())
+                            + '.'
+                            + handle.getName()
+                            + handle.getDesc());
         }
     }
 
-    private void checkMethodType(String descriptor, Set<String> missing, Set<String> archiveClasses) {
+    private void checkMethodType(
+            String descriptor, Set<String> missing, Set<String> archiveClasses) {
         Type type = Type.getMethodType(descriptor);
         checkType(type.getReturnType(), missing, archiveClasses);
         for (Type argument : type.getArgumentTypes()) {
@@ -249,30 +269,46 @@ public final class ExtensionAbiVerifier {
         }
     }
 
-    private boolean methodAvailable(String owner, String name, String descriptor) {
+    private boolean methodAvailable(
+            String owner, String name, String descriptor, boolean isStatic) {
         Class<?> type = hostClass(owner);
         if (type == null) {
             return false;
         }
         if ("<init>".equals(name)) {
             for (Constructor<?> constructor : type.getDeclaredConstructors()) {
-                if (Type.getConstructorDescriptor(constructor).equals(descriptor)) {
+                if (Type.getConstructorDescriptor(constructor).equals(descriptor)
+                        && accessible(constructor.getModifiers())) {
                     return true;
                 }
             }
             return false;
         }
-        return methods(type).stream().anyMatch(method -> method.getName().equals(name)
-                && Type.getMethodDescriptor(method).equals(descriptor));
+        return methods(type).stream()
+                .anyMatch(
+                        method ->
+                                method.getName().equals(name)
+                                        && Type.getMethodDescriptor(method).equals(descriptor)
+                                        && Modifier.isStatic(method.getModifiers()) == isStatic
+                                        && accessible(method.getModifiers()));
     }
 
-    private boolean fieldAvailable(String owner, String name, String descriptor) {
+    private boolean fieldAvailable(String owner, String name, String descriptor, boolean isStatic) {
         Class<?> type = hostClass(owner);
         if (type == null) {
             return false;
         }
-        return fields(type).stream().anyMatch(field -> field.getName().equals(name)
-                && Type.getDescriptor(field.getType()).equals(descriptor));
+        return fields(type).stream()
+                .anyMatch(
+                        field ->
+                                field.getName().equals(name)
+                                        && Type.getDescriptor(field.getType()).equals(descriptor)
+                                        && Modifier.isStatic(field.getModifiers()) == isStatic
+                                        && accessible(field.getModifiers()));
+    }
+
+    private static boolean accessible(int modifiers) {
+        return Modifier.isPublic(modifiers) || Modifier.isProtected(modifiers);
     }
 
     private List<Method> methods(Class<?> type) {

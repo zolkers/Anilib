@@ -78,6 +78,7 @@ dependencies {
     implementation 'org.ow2.asm:asm:9.10.1'
     implementation 'org.ow2.asm:asm-commons:9.10.1'
     implementation 'org.ow2.asm:asm-tree:9.10.1'
+    implementation 'org.ow2.asm:asm-analysis:9.10.1'
     implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.9.0'
     implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json-okio-jvm:1.9.0'
     implementation 'org.jetbrains.kotlinx:kotlinx-serialization-protobuf-jvm:1.9.0'
@@ -88,6 +89,7 @@ dependencies {
     add('rxjavaOriginal', 'io.reactivex:rxjava:1.3.8')
     implementation files(rxjavaModuleJar)
     implementation 'org.jsoup:jsoup:1.19.1'
+    compileOnly 'org.jetbrains:annotations:26.0.2-1'
 }
 
 application {
@@ -98,6 +100,19 @@ application {
             '--add-exports=kotlinx.serialization.json/kotlinx.serialization.json.internal=ALL-UNNAMED'
     ]
 }
+
+def compatibilityBridges = tasks.register('generateCompatibilityBridges', JavaExec) {
+    dependsOn tasks.named('compileJava')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'fr.vriege.anilib.platform.desktopextensionhost.CompatibilityBridges'
+    args layout.buildDirectory.dir('classes/java/main').get().asFile.absolutePath
+}
+tasks.named('compileJava') {
+    // Serialization's JPMS descriptor omits its optional IntelliJ language annotations.
+    options.compilerArgs.addAll(['--add-reads', 'kotlinx.serialization.json=org.jetbrains.annotations'])
+}
+tasks.named('compileTestJava') { dependsOn compatibilityBridges }
+tasks.named('jar') { dependsOn compatibilityBridges }
 
 tasks.register('desktopExtensionHostSmoke', JavaExec) {
     group = 'verification'
@@ -146,6 +161,36 @@ tasks.register('desktopExtensionAbiInventory', JavaExec) {
 
 tasks.named('test') {
     failOnNoDiscoveredTests = false
+}
+
+tasks.register('officialExtensionApi', JavaExec) {
+    group = 'verification'
+    description = 'Checks or generates a binary contract using official Aniyomi API artifacts (never packaged at runtime).'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'fr.vriege.anilib.platform.desktopextensionhost.OfficialExtensionApi'
+    def reference = providers.gradleProperty('anilib.apiReference')
+    def output = providers.gradleProperty('anilib.apiContract')
+    doFirst {
+        if (!output.isPresent()) throw new GradleException('anilib.apiContract is required')
+        if (reference.isPresent()) args 'generate', reference.get(), output.get()
+        else args output.get()
+    }
+}
+
+tasks.register('desktopExtensionCorpusSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Loads a real APK corpus on temporary copies; optional live catalogue checks are separate from offline conformance.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'fr.vriege.anilib.platform.desktopextensionhost.ExtensionCorpusSmoke'
+    def fixtures = providers.gradleProperty('anilib.extensionCorpus')
+    def live = providers.gradleProperty('anilib.liveExtensionCorpus').map { it == 'true' }.orElse(false)
+    onlyIf { fixtures.isPresent() }
+    doFirst {
+        args fixtures.get()
+        if (live.get()) args '--live'
+    }
 }
 
 tasks.named('check') {

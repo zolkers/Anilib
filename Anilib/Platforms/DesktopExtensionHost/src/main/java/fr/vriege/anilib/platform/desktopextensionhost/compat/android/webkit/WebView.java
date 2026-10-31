@@ -1,9 +1,14 @@
 package fr.vriege.anilib.platform.desktopextensionhost.compat.android.webkit;
 
 import fr.vriege.anilib.framework.concurrent.runtime.ManagedExecutors;
+import fr.vriege.anilib.platform.desktopextensionhost.ExtensionBrowser;
+import fr.vriege.anilib.platform.desktopextensionhost.ExtensionPlatformServices;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.android.content.Context;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.android.net.Uri;
+import fr.vriege.anilib.platform.desktopextensionhost.compat.android.os.Handler;
+import fr.vriege.anilib.platform.desktopextensionhost.compat.android.os.Looper;
 import fr.vriege.anilib.platform.desktopextensionhost.compat.android.view.View;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -12,6 +17,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Map;
@@ -22,12 +28,14 @@ import java.util.regex.Pattern;
 public class WebView extends View {
     private static final int MAX_DOCUMENT_BYTES = 2 * 1024 * 1024;
     private static final int MAX_MEDIA_CANDIDATES = 64;
-    private static final Pattern MEDIA_LOCATION = Pattern.compile(
-            "(?i)(?:https?://|(?:\\.\\.?/|/))[^\\s\\\"'<>]+\\.(?:m3u8|mp4|mpd)(?:\\?[^\\s\\\"'<>]*)?");
-    private static final HttpClient HTTP = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(5))
-            .followRedirects(HttpClient.Redirect.NORMAL)
-            .build();
+    private static final Pattern MEDIA_LOCATION =
+            Pattern.compile(
+                    "(?i)(?:https?://|(?:\\.\\.?/|/))[^\\s\\\"'<>]+\\.(?:m3u8|mp4|mpd)(?:\\?[^\\s\\\"'<>]*)?");
+    private static final HttpClient HTTP =
+            HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(5))
+                    .followRedirects(HttpClient.Redirect.NORMAL)
+                    .build();
 
     private final Context context;
     private final WebSettings settings = new WebSettings();
@@ -35,6 +43,8 @@ public class WebView extends View {
     private WebViewClient client = new WebViewClient();
     private volatile boolean destroyed;
     private volatile boolean stopped;
+    private ExtensionBrowser browser;
+    private final Handler callbacks = new Handler(Looper.getMainLooper());
 
     public WebView(Context context) {
         this.context = Objects.requireNonNull(context, "context");
@@ -54,15 +64,42 @@ public class WebView extends View {
         URI page = webLocation(url);
         Map<String, String> requestHeaders = headers == null ? Map.of() : Map.copyOf(headers);
         long requestedNavigation = navigation.incrementAndGet();
-        ManagedExecutors.run("desktop-extension-webview-load", () -> {
-            if (!isActive(requestedNavigation)) {
-                return;
+        ExtensionBrowser.Factory factory = ExtensionPlatformServices.browserFactory();
+        if (factory != null) {
+            synchronized (this) {
+                if (browser == null)
+                    browser =
+                            factory.create(
+                                    resource ->
+                                            callbacks.post(
+                                                    () -> {
+                                                        if (!destroyed && !stopped)
+                                                            notifyRequest(URI.create(resource));
+                                                    }),
+                                    finished ->
+                                            callbacks.post(
+                                                    () -> {
+                                                        if (!destroyed && !stopped)
+                                                            client.onPageFinished(this, finished);
+                                                    }));
+                Map<String, String> selectedHeaders = new LinkedHashMap<>(requestHeaders);
+                if (settings.getUserAgentString() != null)
+                    selectedHeaders.putIfAbsent("User-Agent", settings.getUserAgentString());
+                browser.load(url, selectedHeaders);
             }
-            notifyRequest(page);
-            if (isActive(requestedNavigation) && !mediaLocation(page)) {
-                inspectDocument(page, requestHeaders, requestedNavigation);
-            }
-        });
+            return;
+        }
+        ManagedExecutors.run(
+                "desktop-extension-webview-load",
+                () -> {
+                    if (!isActive(requestedNavigation)) {
+                        return;
+                    }
+                    notifyRequest(page);
+                    if (isActive(requestedNavigation) && !mediaLocation(page)) {
+                        inspectDocument(page, requestHeaders, requestedNavigation);
+                    }
+                });
     }
 
     public void loadUrl(String url) {
@@ -72,12 +109,45 @@ public class WebView extends View {
     public void stopLoading() {
         stopped = true;
         navigation.incrementAndGet();
+        synchronized (this) {
+            if (browser != null) browser.stop();
+        }
     }
 
     public void destroy() {
         stopped = true;
         destroyed = true;
         navigation.incrementAndGet();
+        synchronized (this) {
+            if (browser != null) {
+                browser.close();
+                browser = null;
+            }
+        }
+    }
+
+    public synchronized void evaluateJavascript(String script, ValueCallback<String> callback) {
+        requireActive();
+        if (browser == null)
+            throw new UnsupportedOperationException(
+                    "JavaScript requires the desktop browser runtime");
+        browser.evaluate(script)
+                .whenComplete(
+                        (value, failure) ->
+                                callbacks.post(
+                                        () -> {
+                                            if (destroyed) return;
+                                            if (failure != null) {
+                                                System.getLogger(WebView.class.getName())
+                                                        .log(
+                                                                System.Logger.Level.WARNING,
+                                                                "Extension JavaScript failed",
+                                                                failure);
+                                            }
+                                            if (callback != null)
+                                                callback.onReceiveValue(
+                                                        failure == null ? value : "null");
+                                        }));
     }
 
     public Context getContext() {
@@ -86,12 +156,14 @@ public class WebView extends View {
 
     private void inspectDocument(URI page, Map<String, String> headers, long requestedNavigation) {
         try {
-            HttpRequest.Builder request = HttpRequest.newBuilder(page).timeout(Duration.ofSeconds(8)).GET();
+            HttpRequest.Builder request =
+                    HttpRequest.newBuilder(page).timeout(Duration.ofSeconds(8)).GET();
             headers.forEach((name, value) -> addHeader(request, name, value));
             if (settings.getUserAgentString() != null && !headersContain(headers, "User-Agent")) {
                 addHeader(request, "User-Agent", settings.getUserAgentString());
             }
-            HttpResponse<InputStream> response = HTTP.send(request.build(), HttpResponse.BodyHandlers.ofInputStream());
+            HttpResponse<InputStream> response =
+                    HTTP.send(request.build(), HttpResponse.BodyHandlers.ofInputStream());
             try (InputStream body = response.body()) {
                 if (response.statusCode() < 200 || response.statusCode() >= 400) {
                     return;
@@ -100,7 +172,8 @@ public class WebView extends View {
                 if (document.length > MAX_DOCUMENT_BYTES) {
                     return;
                 }
-                notifyMediaLocations(page, new String(document, StandardCharsets.UTF_8), requestedNavigation);
+                notifyMediaLocations(
+                        page, new String(document, StandardCharsets.UTF_8), requestedNavigation);
             }
         } catch (IOException ignored) {
             // A failed embed must not make the whole extension incompatible.
@@ -147,7 +220,8 @@ public class WebView extends View {
     private static URI webLocation(String value) {
         URI location = URI.create(Objects.requireNonNull(value, "value"));
         String scheme = location.getScheme();
-        if (location.getHost() == null || scheme == null
+        if (location.getHost() == null
+                || scheme == null
                 || !(scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https"))) {
             throw new IllegalArgumentException("WebView only supports HTTP(S) locations");
         }

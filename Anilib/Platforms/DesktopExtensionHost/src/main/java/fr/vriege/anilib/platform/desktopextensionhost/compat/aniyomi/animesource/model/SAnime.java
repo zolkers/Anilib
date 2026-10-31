@@ -1,9 +1,10 @@
 package fr.vriege.anilib.platform.desktopextensionhost.compat.aniyomi.animesource.model;
 
+import kotlinx.serialization.json.JsonObject;
+
 import java.io.Serializable;
 import java.util.Arrays;
 import java.util.List;
-import kotlinx.serialization.json.JsonObject;
 
 public interface SAnime extends Serializable {
     Companion Companion = new Companion();
@@ -16,32 +17,59 @@ public interface SAnime extends Serializable {
     int ON_HIATUS = 6;
 
     String getUrl();
+
     void setUrl(String url);
+
     String getTitle();
+
     void setTitle(String title);
+
     String getThumbnail_url();
+
     void setThumbnail_url(String thumbnailUrl);
+
     String getBackground_url();
+
     void setBackground_url(String backgroundUrl);
+
     String getArtist();
+
     void setArtist(String artist);
+
     String getAuthor();
+
     void setAuthor(String author);
+
     int getStatus();
+
     void setStatus(int status);
+
     String getDescription();
+
     void setDescription(String description);
+
     String getGenre();
+
     void setGenre(String genre);
+
     AnimeUpdateStrategy getUpdate_strategy();
+
     void setUpdate_strategy(AnimeUpdateStrategy updateStrategy);
+
     FetchType getFetch_type();
+
     void setFetch_type(FetchType fetchType);
+
     double getSeason_number();
+
     void setSeason_number(double seasonNumber);
+
     boolean getInitialized();
+
     void setInitialized(boolean initialized);
+
     JsonObject getMemo();
+
     void setMemo(JsonObject memo);
 
     default List<String> getGenres() {
@@ -75,8 +103,15 @@ public interface SAnime extends Serializable {
     }
 
     final class Companion {
-        private Companion() {
-        }
+        public static final int UNKNOWN = SAnime.UNKNOWN;
+        public static final int ONGOING = SAnime.ONGOING;
+        public static final int COMPLETED = SAnime.COMPLETED;
+        public static final int LICENSED = SAnime.LICENSED;
+        public static final int PUBLISHING_FINISHED = SAnime.PUBLISHING_FINISHED;
+        public static final int CANCELLED = SAnime.CANCELLED;
+        public static final int ON_HIATUS = SAnime.ON_HIATUS;
+
+        private Companion() {}
 
         public SAnime create() {
             return new SAnimeImpl();

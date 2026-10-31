@@ -1,6 +1,7 @@
 package fr.vriege.anilib.platform.desktopextensionhost.compat.android.content;
 
 import fr.vriege.anilib.platform.desktopextensionhost.compat.android.os.Looper;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -12,20 +13,65 @@ public abstract class Context {
     public static final int MODE_MULTI_PROCESS = 4;
     public static final int BIND_AUTO_CREATE = 1;
 
-    protected Context() {
+    protected Context() {}
+
+    public Context getApplicationContext() {
+        return this;
     }
 
-    public Context getApplicationContext() { return this; }
-    public String getPackageName() { return "fr.vriege.anilib"; }
-    public String getString(int resourceId) { return ""; }
-    public ClassLoader getClassLoader() { return getClass().getClassLoader(); }
-    public Object getSystemService(String name) { return null; }
-    public Object getAssets() { return null; }
-    public Object getContentResolver() { return null; }
-    public Looper getMainLooper() { return Looper.getMainLooper(); }
-    public Object getTheme() { return null; }
-    public File getCacheDir() { return CacheDirectory.VALUE; }
-    public void startActivity(Intent intent) { }
+    public String getPackageName() {
+        return "fr.vriege.anilib";
+    }
+
+    public String getString(int resourceId) {
+        return "";
+    }
+
+    public ClassLoader getClassLoader() {
+        return getClass().getClassLoader();
+    }
+
+    public Object getSystemService(String name) {
+        return null;
+    }
+
+    public Object getAssets() {
+        return null;
+    }
+
+    public Object getContentResolver() {
+        return null;
+    }
+
+    public Looper getMainLooper() {
+        return Looper.getMainLooper();
+    }
+
+    public Object getTheme() {
+        return null;
+    }
+
+    public File getCacheDir() {
+        return CacheDirectory.VALUE;
+    }
+
+    public File getFilesDir() {
+        Path directory =
+                Path.of(
+                                System.getProperty(
+                                        "anilib.extension.dataDirectory",
+                                        getCacheDir().toPath().resolve("data").toString()))
+                        .resolve("files");
+        try {
+            return Files.createDirectories(directory).toFile();
+        } catch (IOException exception) {
+            throw new IllegalStateException(
+                    "Unable to prepare extension files directory", exception);
+        }
+    }
+
+    public void startActivity(Intent intent) {}
+
     public SharedPreferences getSharedPreferences(String name, int mode) {
         return SourcePreferences.forSource(name.hashCode());
     }
@@ -38,14 +84,16 @@ public abstract class Context {
             if (temporaryDirectory == null || temporaryDirectory.isBlank()) {
                 throw new IllegalStateException("The JVM temporary directory is unavailable");
             }
-            Path directory = Path.of(temporaryDirectory)
-                    .toAbsolutePath()
-                    .normalize()
-                    .resolve("anilib-desktop-extension-host-cache");
+            Path directory =
+                    Path.of(temporaryDirectory)
+                            .toAbsolutePath()
+                            .normalize()
+                            .resolve("anilib-desktop-extension-host-cache");
             try {
                 Files.createDirectories(directory);
             } catch (IOException exception) {
-                throw new IllegalStateException("Unable to prepare the extension cache directory", exception);
+                throw new IllegalStateException(
+                        "Unable to prepare the extension cache directory", exception);
             }
             return directory.toFile();
         }
